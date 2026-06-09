@@ -17,6 +17,7 @@ pub struct SiteConfig {
     pub info_selectors: HashMap<String, String>,
     pub headers: HashMap<String, String>,
     pub cookies: Option<String>,
+    pub supports_online_play: bool,
 }
 
 // 网站信息
@@ -37,6 +38,7 @@ pub struct Resource {
     pub url: Option<String>,
     pub magnet: Option<String>,
     pub info: Option<serde_json::Value>,
+    pub supports_online_play: bool,
 }
 
 // 搜索资源
@@ -103,6 +105,7 @@ fn parse_resource_element(element: &scraper::ElementRef, site: &Site) -> Result<
         url: Some(url),
         magnet,
         info: Some(serde_json::Value::Object(info)),
+        supports_online_play: site.config.supports_online_play,
     })
 }
 
