@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>长离 - 搜索</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+      background: #fff;
+      line-height: 1.6;
+    }
+    .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+    .tag-genre { background: #f3f4f6; color: #374151; }
+    .tag-source { background: #eff6ff; color: #2563eb; }
+    .result-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid #f0f0f0;
+      display: flex;
+      gap: 24px;
+      padding: 24px;
+    }
+    .result-card:hover {
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      border-color: #e5e7eb;
+    }
+    .nav-link {
+      padding: 12px 24px;
+      border-radius: 8px;
+      transition: all 0.2s;
+      color: #6b7280;
+    }
+    .nav-link:hover { background: #f9fafb; color: #1a1a1a; }
+    .nav-link.active { background: #f0f9ff; color: #2563eb; }
+    .search-input {
+      padding: 16px 24px 16px 56px;
+      background: #f9fafb;
+      border: 2px solid transparent;
+      border-radius: 16px;
+      font-size: 18px;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      background: #fff;
+    }
+    .search-icon {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 24px;
+    }
+    .site-filter {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #6b7280;
+    }
+    .site-filter:hover { border-color: #d1d5db; }
+    .site-filter.active { background: #111827; color: #fff; border-color: #111827; }
+    .magnet-btn {
+      padding: 8px 16px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #374151;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .magnet-btn:hover { background: #e5e7eb; }
+    .action-link {
+      padding: 8px 16px;
+      background: #2563eb;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      transition: all 0.2s;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .action-link:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <nav class="bg-white border-b border-gray-100 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-8">
+          <h1 class="text-xl font-bold">长离</h1>
+          <div class="flex gap-2">
+            <a href="#" class="nav-link">首页</a>
+            <a href="#" class="nav-link active">搜索</a>
+            <a href="#" class="nav-link">下载</a>
+            <a href="#" class="nav-link">演员</a>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+            <span>⚙️</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-8 py-12">
+    <!-- 搜索框 -->
+    <div class="mb-10">
+      <div class="relative">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="搜索资源..." class="search-input" value="进击的巨人">
+      </div>
+    </div>
+
+    <!-- 网站筛选 -->
+    <div class="flex gap-3 mb-8">
+      <button class="site-filter active">全部网站</button>
+      <button class="site-filter">网站A</button>
+      <button class="site-filter">网站B</button>
+      <button class="site-filter">网站C</button>
+      <button class="site-filter">网站D</button>
+    </div>
+
+    <!-- 搜索结果 -->
+    <div class="space-y-6">
+      <div class="text-gray-500 text-sm">找到 12 个结果</div>
+
+      <!-- 结果 1 -->
+      <div class="result-card">
+        <div class="w-32 h-44 bg-gradient-to-br from-orange-200 to-orange-300 rounded-lg flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-xl font-semibold text-gray-900">进击的巨人 最终季</h3>
+            <span class="tag tag-source">网站A</span>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <span class="tag tag-genre">日漫</span>
+            <span class="tag tag-genre">动作</span>
+            <span class="tag tag-genre">奇幻</span>
+          </div>
+          <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+            在帕拉迪岛，艾伦·耶格尔和他的同伴们继续探索墙外的世界。随着真相逐渐浮出水面，他们发现世界的残酷远超想象...
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-2">
+              <button class="magnet-btn">📋 复制磁力</button>
+              <button class="magnet-btn">📥 下载</button>
+            </div>
+            <a href="detail/index.html" class="action-link">查看详情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 结果 2 -->
+      <div class="result-card">
+        <div class="w-32 h-44 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-xl font-semibold text-gray-900">进击的巨人 第一季</h3>
+            <span class="tag tag-source">网站B</span>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <span class="tag tag-genre">日漫</span>
+            <span class="tag tag-genre">动作</span>
+          </div>
+          <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+            人类居住在由三道巨大城墙包围的城市里，以防止巨人的入侵。直到有一天，超大型巨人打破了城墙...
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-2">
+              <button class="magnet-btn">📋 复制磁力</button>
+              <button class="magnet-btn">📥 下载</button>
+            </div>
+            <a href="detail/index.html" class="action-link">查看详情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 结果 3 -->
+      <div class="result-card">
+        <div class="w-32 h-44 bg-gradient-to-br from-green-200 to-green-300 rounded-lg flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-xl font-semibold text-gray-900">进击的巨人 第二季</h3>
+            <span class="tag tag-source">网站A</span>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <span class="tag tag-genre">日漫</span>
+            <span class="tag tag-genre">动作</span>
+          </div>
+          <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+            第一季结束后，人类继续与巨人战斗。调查兵团发现了更多关于巨人和墙内世界的秘密...
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-2">
+              <button class="magnet-btn">📋 复制磁力</button>
+              <button class="magnet-btn">📥 下载</button>
+            </div>
+            <a href="detail/index.html" class="action-link">查看详情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 结果 4 -->
+      <div class="result-card">
+        <div class="w-32 h-44 bg-gradient-to-br from-purple-200 to-purple-300 rounded-lg flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-xl font-semibold text-gray-900">进击的巨人 第三季</h3>
+            <span class="tag tag-source">网站C</span>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <span class="tag tag-genre">日漫</span>
+            <span class="tag tag-genre">动作</span>
+            <span class="tag tag-genre">悬疑</span>
+          </div>
+          <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+            调查兵团开始揭露墙内世界的真相，王政的秘密逐渐浮出水面。艾伦和他的同伴们面临着更大的挑战...
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-2">
+              <button class="magnet-btn">📋 复制磁力</button>
+              <button class="magnet-btn">📥 下载</button>
+            </div>
+            <a href="detail/index.html" class="action-link">查看详情</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 结果 5 -->
+      <div class="result-card">
+        <div class="w-32 h-44 bg-gradient-to-br from-red-200 to-red-300 rounded-lg flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="flex items-start justify-between mb-3">
+            <h3 class="text-xl font-semibold text-gray-900">进击的巨人 完结篇</h3>
+            <span class="tag tag-source">网站D</span>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <span class="tag tag-genre">日漫</span>
+            <span class="tag tag-genre">动作</span>
+            <span class="tag tag-genre">完结</span>
+          </div>
+          <p class="text-gray-600 text-sm mb-4 line-clamp-2">
+            最终的战斗即将开始，艾伦的选择将决定人类的命运。故事迎来最终章...
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="flex gap-2">
+              <button class="magnet-btn">📋 复制磁力</button>
+              <button class="magnet-btn">📥 下载</button>
+            </div>
+            <a href="detail/index.html" class="action-link">查看详情</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

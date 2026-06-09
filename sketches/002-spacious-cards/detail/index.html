@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>长离 - 资源详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+      background: #fff;
+      line-height: 1.6;
+    }
+    .tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+    .tag-genre { background: #f3f4f6; color: #374151; }
+    .tag-status-ongoing { background: #fffbeb; color: #d97706; }
+    .tag-status-completed { background: #f0fdf4; color: #22c55e; }
+    .episode-card { 
+      min-width: 140px;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 2px solid transparent;
+    }
+    .episode-card:hover { 
+      transform: translateY(-4px); 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1); 
+    }
+    .episode-card.downloaded { border-color: #22c55e; }
+    .episode-card.watching { border-color: #f59e0b; }
+    .episode-card.not-downloaded { border-color: #e5e7eb; }
+    .episode-card.no-resource { border-color: #fca5a5; background: #fef2f2; }
+    .nav-link {
+      padding: 12px 24px;
+      border-radius: 8px;
+      transition: all 0.2s;
+      color: #6b7280;
+    }
+    .nav-link:hover { background: #f9fafb; color: #1a1a1a; }
+    .nav-link.active { background: #f0f9ff; color: #2563eb; }
+    .actor-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 1px solid #f0f0f0;
+    }
+    .actor-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+    }
+    .action-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #f3f4f6; color: #374151; }
+    .btn-secondary:hover { background: #e5e7eb; }
+  </style>
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <nav class="bg-white border-b border-gray-100 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-8">
+          <h1 class="text-xl font-bold">长离</h1>
+          <div class="flex gap-2">
+            <a href="#" class="nav-link">首页</a>
+            <a href="#" class="nav-link">搜索</a>
+            <a href="#" class="nav-link">下载</a>
+            <a href="#" class="nav-link">演员</a>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+            <span>⚙️</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-8 py-12">
+    <!-- 返回按钮 -->
+    <div class="mb-8">
+      <a href="#" class="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+        <span>←</span>
+        <span>返回</span>
+      </a>
+    </div>
+
+    <!-- 资源信息 -->
+    <div class="flex gap-12 mb-12">
+      <!-- 海报 -->
+      <div class="w-80 flex-shrink-0">
+        <div class="aspect-[3/4] bg-gradient-to-br from-orange-200 to-orange-300 rounded-2xl"></div>
+      </div>
+
+      <!-- 详细信息 -->
+      <div class="flex-1">
+        <h1 class="text-3xl font-bold text-gray-900 mb-4">进击的巨人 最终季</h1>
+        
+        <div class="flex gap-3 mb-6">
+          <span class="tag tag-status-ongoing">连载中</span>
+          <span class="tag tag-genre">日漫</span>
+          <span class="tag tag-genre">动作</span>
+          <span class="tag tag-genre">奇幻</span>
+          <span class="tag tag-genre">热血</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500">更新状态：</span>
+            <span class="font-medium">更新至第12集</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500">更新频率：</span>
+            <span class="font-medium">每周日更新</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500">观看进度：</span>
+            <span class="font-medium text-blue-600">第8集 19:23</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500">总集数：</span>
+            <span class="font-medium">12集</span>
+          </div>
+        </div>
+
+        <p class="text-gray-600 mb-8 leading-relaxed">
+          在帕拉迪岛，艾伦·耶格尔和他的同伴们继续探索墙外的世界。随着真相逐渐浮出水面，他们发现世界的残酷远超想象。面对马莱帝国的威胁和地鸣的阴影，艾伦做出了一个改变世界命运的决定...
+        </p>
+
+        <!-- 演员列表 -->
+        <div class="mb-8">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">参演演员</h3>
+          <div class="flex gap-4">
+            <a href="actor-detail.html" class="actor-card w-24">
+              <div class="aspect-square bg-gradient-to-br from-blue-200 to-blue-300"></div>
+              <div class="p-2 text-center">
+                <div class="text-xs font-medium text-gray-900">�的巨人</div>
+              </div>
+            </a>
+            <a href="actor-detail.html" class="actor-card w-24">
+              <div class="aspect-square bg-gradient-to-br from-pink-200 to-pink-300"></div>
+              <div class="p-2 text-center">
+                <div class="text-xs font-medium text-gray-900">三笠</div>
+              </div>
+            </a>
+            <a href="actor-detail.html" class="actor-card w-24">
+              <div class="aspect-square bg-gradient-to-br from-green-200 to-green-300"></div>
+              <div class="p-2 text-center">
+                <div class="text-xs font-medium text-gray-900">阿明</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex gap-4">
+          <button class="action-btn btn-primary">▶ 继续观看</button>
+          <button class="action-btn btn-secondary">📥 下载全部</button>
+          <button class="action-btn btn-secondary">✏️ 编辑信息</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 选集区域 -->
+    <section>
+      <div class="flex items-center justify-between mb-8">
+        <h2 class="text-2xl font-bold text-gray-900">选集</h2>
+        <div class="flex gap-2">
+          <button class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">全部</button>
+          <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">已下载</button>
+          <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">未下载</button>
+        </div>
+      </div>
+
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        <!-- 第1集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第1集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第2集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第2集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第3集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第3集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第4集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第4集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第5集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第5集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第6集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第6集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第7集 - 已下载 -->
+        <div class="episode-card downloaded">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">已下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第7集</div>
+            <div class="text-xs text-gray-500 mt-1">24:00</div>
+          </div>
+        </div>
+
+        <!-- 第8集 - 观看中 -->
+        <div class="episode-card watching">
+          <div class="aspect-video bg-gradient-to-br from-orange-100 to-orange-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">▶️</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">19:23</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第8集</div>
+            <div class="text-xs text-yellow-600 mt-1">观看中</div>
+          </div>
+        </div>
+
+        <!-- 第9集 - 未下载 -->
+        <div class="episode-card not-downloaded">
+          <div class="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">📥</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full">未下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第9集</div>
+            <div class="flex gap-2 mt-2">
+              <button class="text-xs text-blue-600 hover:underline">在线观看</button>
+              <button class="text-xs text-blue-600 hover:underline">下载</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第10集 - 未下载 -->
+        <div class="episode-card not-downloaded">
+          <div class="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">📥</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full">未下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第10集</div>
+            <div class="flex gap-2 mt-2">
+              <button class="text-xs text-blue-600 hover:underline">在线观看</button>
+              <button class="text-xs text-blue-600 hover:underline">下载</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第11集 - 暂无资源 -->
+        <div class="episode-card no-resource">
+          <div class="aspect-video bg-gradient-to-br from-red-50 to-red-100 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">❌</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">暂无资源</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第11集</div>
+            <div class="text-xs text-red-500 mt-1">暂无资源</div>
+          </div>
+        </div>
+
+        <!-- 第12集 - 未下载 -->
+        <div class="episode-card not-downloaded">
+          <div class="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl">📥</span>
+            </div>
+            <div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full">未下载</div>
+          </div>
+          <div class="p-3">
+            <div class="font-semibold text-gray-900">第12集</div>
+            <div class="flex gap-2 mt-2">
+              <button class="text-xs text-blue-600 hover:underline">在线观看</button>
+              <button class="text-xs text-blue-600 hover:underline">下载</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

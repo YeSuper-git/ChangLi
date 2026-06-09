@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>长离 - 播放器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+      background: #000;
+      line-height: 1.6;
+    }
+    .player-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+    }
+    .video-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a 0%, #000 100%);
+    }
+    .controls {
+      background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 100%);
+      padding: 20px 32px;
+    }
+    .progress-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .progress-bar:hover { height: 6px; }
+    .progress-fill {
+      height: 100%;
+      background: #2563eb;
+      border-radius: 2px;
+      width: 35%;
+      position: relative;
+    }
+    .progress-fill::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .progress-bar:hover .progress-fill::after { opacity: 1; }
+    .control-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+      cursor: pointer;
+      color: #fff;
+      font-size: 18px;
+    }
+    .control-btn:hover { background: rgba(255,255,255,0.1); }
+    .play-btn {
+      width: 48px;
+      height: 48px;
+      font-size: 24px;
+    }
+    .speed-selector {
+      background: rgba(255,255,255,0.1);
+      padding: 4px 12px;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .speed-selector:hover { background: rgba(255,255,255,0.2); }
+    .episode-list {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 360px;
+      background: rgba(0,0,0,0.95);
+      transform: translateX(100%);
+      transition: transform 0.3s;
+      overflow-y: auto;
+    }
+    .episode-list.open { transform: translateX(0); }
+    .episode-item {
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .episode-item:hover { background: rgba(255,255,255,0.05); }
+    .episode-item.active { background: rgba(37, 99, 235, 0.2); }
+    .episode-thumb {
+      width: 100px;
+      height: 56px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #374151, #4b5563);
+      flex-shrink: 0;
+    }
+    .subtitle-menu {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      background: rgba(0,0,0,0.95);
+      border-radius: 12px;
+      padding: 8px;
+      min-width: 200px;
+    }
+    .subtitle-item {
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      color: #fff;
+      font-size: 14px;
+    }
+    .subtitle-item:hover { background: rgba(255,255,255,0.1); }
+    .subtitle-item.active { background: #2563eb; }
+    .info-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #fff;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-decoration: none;
+    }
+    .back-btn:hover { background: rgba(0,0,0,0.8); }
+  </style>
+</head>
+<body>
+  <div class="player-container">
+    <!-- 视频区域 -->
+    <div class="video-area">
+      <div class="text-6xl text-white/20">▶️</div>
+      
+      <!-- 信息覆盖层 -->
+      <div class="info-overlay">
+        <a href="detail/index.html" class="back-btn">
+          <span>←</span>
+          <span>返回详情</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- 控制栏 -->
+    <div class="controls">
+      <!-- 进度条 -->
+      <div class="progress-bar">
+        <div class="progress-fill">
+          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 hover:opacity-100 transition-opacity"></div>
+        </div>
+      </div>
+
+      <!-- 控制按钮 -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <!-- 上一集 -->
+          <div class="control-btn">⏮</div>
+          
+          <!-- 播放/暂停 -->
+          <div class="control-btn play-btn">⏸</div>
+          
+          <!-- 下一集 -->
+          <div class="control-btn">⏭</div>
+          
+          <!-- 音量 -->
+          <div class="flex items-center gap-2">
+            <div class="control-btn">🔊</div>
+            <div class="w-20 h-1 bg-white/20 rounded-full cursor-pointer">
+              <div class="w-3/4 h-full bg-white rounded-full"></div>
+            </div>
+          </div>
+          
+          <!-- 时间 -->
+          <div class="text-white/80 text-sm">
+            08:23 / 24:00
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- 倍速 -->
+          <div class="speed-selector">1.0x</div>
+          
+          <!-- 字幕 -->
+          <div class="control-btn" id="subtitleBtn">CC</div>
+          
+          <!-- 画面比例 -->
+          <div class="control-btn">⬜</div>
+          
+          <!-- 选集列表 -->
+          <div class="control-btn" id="episodeListBtn">📋</div>
+          
+          <!-- 全屏 -->
+          <div class="control-btn">⛶</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 选集列表 -->
+    <div class="episode-list" id="episodeList">
+      <div class="p-4 border-b border-white/10">
+        <h3 class="text-white font-semibold text-lg">进击的巨人 最终季</h3>
+        <p class="text-white/50 text-sm mt-1">共12集</p>
+      </div>
+      <div class="py-2">
+        <div class="episode-item active">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第1集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第2集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第3集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第4集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第5集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第6集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第7集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第8集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第9集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第10集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第11集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+        <div class="episode-item">
+          <div class="episode-thumb"></div>
+          <div>
+            <div class="text-white font-medium">第12集</div>
+            <div class="text-white/50 text-sm">24:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 字幕菜单 -->
+    <div class="subtitle-menu hidden" id="subtitleMenu">
+      <div class="subtitle-item">关闭字幕</div>
+      <div class="subtitle-item active">中文</div>
+      <div class="subtitle-item">英文</div>
+      <div class="subtitle-item">日文</div>
+    </div>
+  </div>
+
+  <script>
+    // 选集列表切换
+    const episodeListBtn = document.getElementById('episodeListBtn');
+    const episodeList = document.getElementById('episodeList');
+    episodeListBtn.addEventListener('click', () => {
+      episodeList.classList.toggle('open');
+    });
+
+    // 字幕菜单切换
+    const subtitleBtn = document.getElementById('subtitleBtn');
+    const subtitleMenu = document.getElementById('subtitleMenu');
+    subtitleBtn.addEventListener('click', () => {
+      subtitleMenu.classList.toggle('hidden');
+    });
+  </script>
+</body>
+</html>
