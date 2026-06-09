@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>长离 - 紧凑侧边栏</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+      background: #f8f9fa;
+      line-height: 1.5;
+    }
+    .sidebar { width: 240px; background: #fff; border-right: 1px solid #e5e7eb; }
+    .nav-item { padding: 10px 16px; cursor: pointer; transition: background 0.2s; }
+    .nav-item:hover { background: #f3f4f6; }
+    .nav-item.active { background: #eff6ff; color: #2563eb; }
+    .card { background: #fff; border-radius: 8px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+    .status-watching { background: #dbeafe; color: #2563eb; }
+    .status-completed { background: #d1fae5; color: #059669; }
+    .status-ongoing { background: #fef3c7; color: #d97706; }
+    .progress-bar { height: 3px; background: #e5e7eb; border-radius: 2px; }
+    .progress-fill { height: 100%; background: #2563eb; border-radius: 2px; }
+    .episode { min-width: 120px; padding: 8px; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .episode:hover { background: #f3f4f6; }
+    .episode.downloaded { border: 2px solid #2563eb; }
+    .episode.not-downloaded { border: 2px dashed #d1d5db; }
+    .episode.no-resource { border: 2px dashed #fca5a5; background: #fef2f2; }
+  </style>
+</head>
+<body class="flex h-screen">
+  <!-- 侧边栏 -->
+  <aside class="sidebar flex flex-col">
+    <div class="p-4 border-b border-gray-200">
+      <h1 class="text-xl font-bold text-gray-900">长离</h1>
+    </div>
+    <nav class="flex-1 py-2">
+      <div class="nav-item active flex items-center gap-3">
+        <span>🏠</span>
+        <span>首页</span>
+      </div>
+      <div class="nav-item flex items-center gap-3">
+        <span>🔍</span>
+        <span>搜索</span>
+      </div>
+      <div class="nav-item flex items-center gap-3">
+        <span>📥</span>
+        <span>下载</span>
+      </div>
+      <div class="nav-item flex items-center gap-3">
+        <span>👤</span>
+        <span>演员</span>
+      </div>
+      <div class="nav-item flex items-center gap-3">
+        <span>⚙️</span>
+        <span>设置</span>
+      </div>
+    </nav>
+    <div class="p-4 border-t border-gray-200">
+      <div class="text-sm text-gray-500">存储空间</div>
+      <div class="progress-bar mt-2">
+        <div class="progress-fill" style="width: 45%"></div>
+      </div>
+      <div class="text-xs text-gray-400 mt-1">45.2 GB / 100 GB</div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="flex-1 overflow-auto">
+    <!-- 顶部栏 -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-2">
+          <button class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm">全部</button>
+          <button class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">日漫</button>
+          <button class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">国漫</button>
+          <button class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">泡面番</button>
+          <button class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">里番</button>
+        </div>
+        <div class="flex items-center gap-4">
+          <input type="text" placeholder="搜索资源..." class="px-4 py-2 border border-gray-200 rounded-lg text-sm w-64 focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+    </header>
+
+    <!-- 资源列表 -->
+    <div class="p-6">
+      <!-- 继续观看 -->
+      <section class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">继续观看</h2>
+        <div class="grid grid-cols-4 gap-4">
+          <!-- 资源卡片 1 -->
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-4xl">▶️</span>
+              </div>
+              <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">第8集 19:23</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">进击的巨人 最终季</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+                <span class="tag status-watching">观看中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第12集 · 每周日更新</div>
+              <div class="progress-bar mt-2">
+                <div class="progress-fill" style="width: 66%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 资源卡片 2 -->
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-4xl">▶️</span>
+              </div>
+              <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">第3集 08:45</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">间谍过家家 第二季</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+                <span class="tag status-watching">观看中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第5集 · 每周六更新</div>
+              <div class="progress-bar mt-2">
+                <div class="progress-fill" style="width: 60%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 资源卡片 3 -->
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-4xl">▶️</span>
+              </div>
+              <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">第1集 02:10</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">咒术回战 第二季</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+                <span class="tag status-watching">观看中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第10集 · 每周四更新</div>
+              <div class="progress-bar mt-2">
+                <div class="progress-fill" style="width: 10%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 资源卡片 4 -->
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-4xl">▶️</span>
+              </div>
+              <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">第24集 21:00</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">鬼灭之刃 柱训练篇</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-completed">已完结</span>
+                <span class="tag status-watching">观看中</span>
+              </div>
+              <div class="text-xs text-gray-500">共24集</div>
+              <div class="progress-bar mt-2">
+                <div class="progress-fill" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 最近更新 -->
+      <section class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">最近更新</h2>
+        <div class="grid grid-cols-4 gap-4">
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">NEW</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">葬送的芙莉莲</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第16集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200 relative">
+              <div class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">NEW</div>
+            </div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">迷宫饭</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第14集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">我推的孩子 第二季</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第8集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">药屋少女的呢喃</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-ongoing">连载中</span>
+              </div>
+              <div class="text-xs text-gray-500">更新至第20集</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 已完结 -->
+      <section>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">已完结</h2>
+        <div class="grid grid-cols-4 gap-4">
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">电锯人</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-completed">已完结</span>
+              </div>
+              <div class="text-xs text-gray-500">共12集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">莉可丽丝</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-completed">已完结</span>
+              </div>
+              <div class="text-xs text-gray-500">共12集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">孤独摇滚</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-completed">已完结</span>
+              </div>
+              <div class="text-xs text-gray-500">共12集</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="aspect-video bg-gray-200"></div>
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1">赛博浪客</h3>
+              <div class="flex gap-2 mb-2">
+                <span class="tag status-completed">已完结</span>
+              </div>
+              <div class="text-xs text-gray-500">共10集</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
