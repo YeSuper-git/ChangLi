@@ -13,6 +13,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/search', label: '搜索', icon: '🔍' },
     { path: '/downloads', label: '下载', icon: '📥' },
     { path: '/library', label: '视频库', icon: '🎬' },
+    { path: '/actors', label: '演员', icon: '👤' },
   ];
 
   return (
