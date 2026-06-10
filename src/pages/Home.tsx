@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getActors, getDownloads, getRecentResources, getTags } from '../utils/api';
-import type { Actor, Resource, Download, Tag } from '../utils/api';
+import { getActors, getDownloads, getTags, getVideos } from '../utils/api';
+import type { Actor, Download, Tag, Video } from '../utils/api';
+import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const Home: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
-  const [resources, setResources] = useState<Resource[]>([]);
   const [downloads, setDownloads] = useState<Download[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('全部');
 
@@ -17,21 +18,28 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [actorsList, resourcesList, downloadsList, tagsList] = await Promise.all([
+      const [actorsList, downloadsList, tagsList, videosList] = await Promise.all([
         getActors(),
-        getRecentResources(10),
         getDownloads(),
-        getTags()
+        getTags(),
+        getVideos()
       ]);
       setActors(actorsList);
-      setResources(resourcesList);
       setDownloads(downloadsList);
       setTags(tagsList);
+      setVideos(videosList);
     } catch (error) {
       console.error('加载数据失败:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getVideoThumbnail = (video: Video) => {
+    if (video.thumbnail) {
+      return convertFileSrc(video.thumbnail);
+    }
+    return null;
   };
 
   if (loading) {
@@ -119,32 +127,54 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 最近更新 */}
+      {/* 我的视频库 */}
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">最近更新</h2>
+          <h2 className="text-2xl font-bold text-gray-900">我的视频库</h2>
           <Link to="/library" className="text-blue-500 hover:text-blue-600 text-sm font-medium">
             查看全部 →
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-6">
-          {resources.slice(0, 8).map((resource) => (
-            <div key={resource.id} className="card">
-              <div className="aspect-[3/4] bg-gradient-to-br from-green-100 to-green-200 relative">
-                <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">NEW</div>
+          {videos.slice(0, 8).map((video) => (
+            <Link key={video.id} to={`/video/${video.id}`} className="card block">
+              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                {getVideoThumbnail(video) ? (
+                  <img
+                    src={getVideoThumbnail(video)!}
+                    alt={video.file_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-4xl">▶️</span>
+                  </div>
+                )}
+                {video.duration && (
+                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                    {Math.floor(video.duration / 60)}分钟
+                  </div>
+                )}
               </div>
               <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">{resource.title}</h3>
-                <span className="tag status-ongoing">资源</span>
-                <div className="text-sm text-gray-500 mt-2">
-                  {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : ''}
+                <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
+                  {video.file_name}
+                </h3>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    {video.file_size
+                      ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB`
+                      : ''}
+                  </span>
+                  <span>{video.resolution || ''}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
-          {resources.length === 0 && (
+          {videos.length === 0 && (
             <div className="col-span-4 text-center text-gray-500 py-12">
-              暂无资源，请先搜索或添加网站
+              <p className="text-lg mb-4">暂无视频</p>
+              <p className="text-sm">点击"扫描文件夹"添加视频</p>
             </div>
           )}
         </div>

@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "ChangLi",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "tauri": {
     "allowlist": {
@@ -35,7 +35,10 @@
       "http": {
         "all": true,
         "request": true,
-        "scope": ["http://**", "https://**"]
+        "scope": [
+          "http://**",
+          "https://**"
+        ]
       },
       "dialog": {
         "all": true,
@@ -59,13 +62,13 @@
       ]
     },
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost; media-src 'self' asset: https://asset.localhost"
     },
     "windows": [
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "长离",
+        "title": "\u957f\u79bb",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

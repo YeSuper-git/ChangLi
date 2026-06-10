@@ -99,6 +99,7 @@ export interface Video {
   source_site?: string;
   metadata?: any;
   thumbnail?: string;
+  description?: string;
   created_at: string;
 }
 
@@ -247,4 +248,8 @@ export async function getResourcesByCategory(category: string): Promise<Resource
 
 export async function getRecentResources(limit?: number): Promise<Resource[]> {
   return await invoke('get_recent_resources', { limit });
+}
+
+export async function updateVideo(id: number, fileName?: string, description?: string, thumbnail?: string): Promise<Video> {
+  return await invoke('update_video', { id, fileName, description, thumbnail });
 }

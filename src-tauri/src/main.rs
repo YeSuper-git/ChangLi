@@ -192,9 +192,9 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     let db = state.db.lock().await;
     let db = db.as_ref().ok_or("数据库未初始化")?;
     
-    let videos = scanner::scan_directory(&path).await.map_err(|e| e.to_string())?;
+    let result = scanner::scan_directory(&path).await.map_err(|e| e.to_string())?;
     
-    for video in videos {
+    for video in result.videos {
         db::add_video(db, video).await.map_err(|e| e.to_string())?;
     }
     
@@ -420,6 +420,7 @@ fn main() {
             update_watch_progress,
             get_watch_progress,
             get_resource_watch_progress,
+            update_video,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -445,4 +446,19 @@ async fn get_recent_resources(state: State<'_, AppState>, limit: Option<i64>) ->
     let db = db.as_ref().ok_or("数据库未初始化")?;
     let limit = limit.unwrap_or(10);
     db::get_recent_resources(db, limit).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_video(
+    state: State<'_, AppState>,
+    id: i64,
+    file_name: Option<String>,
+    description: Option<String>,
+    thumbnail: Option<String>,
+) -> Result<db::Video, String> {
+    let db = state.db.lock().await;
+    let db = db.as_ref().ok_or("数据库未初始化")?;
+    db::update_video(db, id, file_name, description, thumbnail)
+        .await
+        .map_err(|e| e.to_string())
 }

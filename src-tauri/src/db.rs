@@ -67,6 +67,7 @@ pub struct Video {
     pub source_site: Option<String>,
     pub metadata: Option<serde_json::Value>,
     pub thumbnail: Option<String>,
+    pub description: Option<String>,
     pub created_at: String,
 }
 
@@ -210,6 +211,7 @@ pub async fn init_database() -> Result<SqlitePool> {
             source_site TEXT,
             metadata TEXT,
             thumbnail TEXT,
+            description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         "#,
@@ -500,7 +502,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     let metadata_str = video.metadata.map(|m| serde_json::to_string(&m).unwrap_or_default());
     
     let row = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, file_size, duration, width, height, resolution, source_site, metadata, thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+        "INSERT OR IGNORE INTO videos (file_path, file_name, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
@@ -512,6 +514,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     .bind(&video.source_site)
     .bind(&metadata_str)
     .bind(&video.thumbnail)
+    .bind(&video.description)
     .fetch_one(pool)
     .await?;
     
@@ -527,6 +530,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         source_site: row.get("source_site"),
         metadata: row.get::<Option<String>, _>("metadata").and_then(|s| serde_json::from_str(&s).ok()),
         thumbnail: row.get("thumbnail"),
+        description: row.get("description"),
         created_at: row.get("created_at"),
     })
 }
@@ -550,6 +554,7 @@ pub async fn get_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
             source_site: row.get("source_site"),
             metadata: row.get::<Option<String>, _>("metadata").and_then(|s| serde_json::from_str(&s).ok()),
             thumbnail: row.get("thumbnail"),
+            description: row.get("description"),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -575,8 +580,59 @@ pub async fn get_video(pool: &SqlitePool, id: i64) -> Result<Option<Video>> {
         source_site: row.get("source_site"),
         metadata: row.get::<Option<String>, _>("metadata").and_then(|s| serde_json::from_str(&s).ok()),
         thumbnail: row.get("thumbnail"),
+        description: row.get("description"),
         created_at: row.get("created_at"),
     }))
+}
+
+pub async fn update_video(pool: &SqlitePool, id: i64, file_name: Option<String>, description: Option<String>, thumbnail: Option<String>) -> Result<Video> {
+    let mut query = String::from("UPDATE videos SET");
+    let mut params = Vec::new();
+    let mut bind_values = Vec::new();
+    
+    if let Some(name) = file_name {
+        params.push("file_name = ?");
+        bind_values.push(name);
+    }
+    if let Some(desc) = description {
+        params.push("description = ?");
+        bind_values.push(desc);
+    }
+    if let Some(thumb) = thumbnail {
+        params.push("thumbnail = ?");
+        bind_values.push(thumb);
+    }
+    
+    if params.is_empty() {
+        return get_video(pool, id).await?.ok_or_else(|| anyhow::anyhow!("视频不存在"));
+    }
+    
+    query.push_str(&params.join(", "));
+    query.push_str(" WHERE id = ? RETURNING *");
+    
+    let mut query_builder = sqlx::query(&query);
+    for value in bind_values {
+        query_builder = query_builder.bind(value);
+    }
+    query_builder = query_builder.bind(id);
+    
+    let row = query_builder.fetch_one(pool).await?;
+    
+    Ok(Video {
+        id: row.get("id"),
+        file_path: row.get("file_path"),
+        file_name: row.get("file_name"),
+        file_size: row.get("file_size"),
+        duration: row.get("duration"),
+        width: row.get("width"),
+        height: row.get("height"),
+        resolution: row.get("resolution"),
+        source_site: row.get("source_site"),
+        metadata: row.get::<Option<String>, _>("metadata").and_then(|s| serde_json::from_str(&s).ok()),
+        thumbnail: row.get("thumbnail"),
+        description: row.get("description"),
+        created_at: row.get("created_at"),
+    })
 }
 
 pub async fn delete_video(pool: &SqlitePool, id: i64) -> Result<()> {

@@ -320,6 +320,7 @@ dependencies = [
  "chrono",
  "dirs",
  "open 5.3.5",
+ "regex",
  "reqwest",
  "scraper",
  "serde",

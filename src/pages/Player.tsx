@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getVideos, getWatchProgress } from '../utils/api';
+import { getVideos, getWatchProgress, updateWatchProgress, playVideo } from '../utils/api';
 import type { Video } from '../utils/api';
+import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [video, setVideo] = useState<Video | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,12 +17,21 @@ const Player: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string>('');
 
   useEffect(() => {
     if (id) {
       loadVideo(parseInt(id));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (video) {
+      // 将本地文件路径转换为可访问的 URL
+      const src = convertFileSrc(video.file_path);
+      setVideoSrc(src);
+    }
+  }, [video]);
 
   const loadVideo = async (videoId: number) => {
     try {
@@ -45,17 +56,88 @@ const Player: React.FC = () => {
     }
   };
 
-  const handlePlay = () => {
-    setIsPlaying(!isPlaying);
+  const handlePlay = async () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        await videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
   };
 
-  const handleVolumeChange = (vol: number) => {
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+      // 恢复播放进度
+      if (currentTime > 0) {
+        videoRef.current.currentTime = currentTime;
+      }
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const vol = parseInt(e.target.value);
     setVolume(vol);
+    if (videoRef.current) {
+      videoRef.current.volume = vol / 100;
+    }
   };
 
   const handleSpeedChange = (spd: number) => {
     setSpeed(spd);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = spd;
+    }
     setShowSpeedMenu(false);
+  };
+
+  const handleEnded = async () => {
+    setIsPlaying(false);
+    // 保存播放进度
+    if (video && duration > 0) {
+      try {
+        await updateWatchProgress(video.id, 1, duration, duration);
+      } catch (error) {
+        console.error('保存播放进度失败:', error);
+      }
+    }
+  };
+
+  const handlePause = async () => {
+    // 保存播放进度
+    if (video && currentTime > 0) {
+      try {
+        await updateWatchProgress(video.id, 1, currentTime, duration);
+      } catch (error) {
+        console.error('保存播放进度失败:', error);
+      }
+    }
+  };
+
+  const handleOpenSystemPlayer = async () => {
+    if (video) {
+      try {
+        await playVideo(video.id);
+      } catch (error) {
+        console.error('打开系统播放器失败:', error);
+      }
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -82,84 +164,58 @@ const Player: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-black">
-      {/* 视频区域 */}
-      <div className="flex-1 flex items-center justify-center relative">
-        <div className="text-6xl text-white/20">▶️</div>
-        
-        {/* 返回按钮 */}
-        <div className="absolute top-4 left-4">
-          <Link
-            to="/library"
-            className="flex items-center gap-2 px-4 py-2 bg-black/60 text-white rounded-lg hover:bg-black/80 transition-colors"
-          >
-            <span>←</span>
-            <span>返回</span>
-          </Link>
-        </div>
-
-        {/* 视频信息 */}
-        <div className="absolute top-4 right-4 text-white text-right">
-          <h2 className="text-lg font-semibold">{video.file_name}</h2>
-          <div className="text-sm text-gray-300">
-            {video.resolution && <span>{video.resolution}</span>}
-            {video.duration && <span className="ml-2">{formatTime(video.duration)}</span>}
-          </div>
-        </div>
-      </div>
+    <div className="relative h-full bg-black">
+      {/* 视频播放器 */}
+      <video
+        ref={videoRef}
+        src={videoSrc}
+        className="w-full h-full object-contain"
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        onPause={handlePause}
+        onClick={handlePlay}
+      />
 
       {/* 控制栏 */}
-      <div className="bg-gradient-to-t from-black/90 to-transparent p-6">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
         {/* 进度条 */}
         <div className="mb-4">
-          <div className="flex items-center gap-4">
-            <span className="text-white text-sm w-16">{formatTime(currentTime)}</span>
-            <div className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer relative">
-              <div
-                className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
-                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              />
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
-                style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              />
-            </div>
-            <span className="text-white text-sm w-16">{formatTime(duration)}</span>
-          </div>
+          <input
+            type="range"
+            min="0"
+            max={duration || 100}
+            value={currentTime}
+            onChange={handleSeek}
+            className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+          />
         </div>
 
         {/* 控制按钮 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* 上一集 */}
-            <button className="text-white hover:text-blue-400 transition-colors">
-              ⏮
-            </button>
-            
             {/* 播放/暂停 */}
             <button
               onClick={handlePlay}
-              className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+              className="text-white text-2xl hover:text-blue-400 transition-colors"
             >
               {isPlaying ? '⏸' : '▶️'}
             </button>
             
-            {/* 下一集 */}
-            <button className="text-white hover:text-blue-400 transition-colors">
-              ⏭
-            </button>
+            {/* 时间显示 */}
+            <span className="text-white text-sm">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
             
             {/* 音量 */}
             <div className="flex items-center gap-2">
-              <button className="text-white hover:text-blue-400 transition-colors">
-                {volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊'}
-              </button>
+              <span className="text-white text-sm">🔊</span>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={volume}
-                onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                onChange={handleVolumeChange}
                 className="w-20"
               />
             </div>
@@ -191,14 +247,13 @@ const Player: React.FC = () => {
               )}
             </div>
             
-            {/* 字幕 */}
-            <button className="text-white hover:text-blue-400 transition-colors">
-              CC
-            </button>
-            
-            {/* 画面比例 */}
-            <button className="text-white hover:text-blue-400 transition-colors">
-              ⬜
+            {/* 系统播放器 */}
+            <button
+              onClick={handleOpenSystemPlayer}
+              className="text-white hover:text-blue-400 transition-colors"
+              title="使用系统播放器打开"
+            >
+              📺
             </button>
             
             {/* 选集列表 */}
@@ -214,6 +269,15 @@ const Player: React.FC = () => {
               ⛶
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* 视频信息 */}
+      <div className="absolute top-4 left-4">
+        <h2 className="text-white text-lg font-semibold">{video.file_name}</h2>
+        <div className="flex gap-2 text-gray-300 text-sm mt-1">
+          {video.resolution && <span>{video.resolution}</span>}
+          {video.file_size && <span>{(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB</span>}
         </div>
       </div>
 
