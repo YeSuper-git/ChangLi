@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "长离",
+    "productName": "ChangLi",
     "version": "0.1.0"
   },
   "tauri": {
