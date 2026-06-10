@@ -39,10 +39,10 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Install dependencies (windows only)
+      - name: Install WiX (windows only)
         if: matrix.platform == 'windows-latest'
         run: |
-          cargo install tauri-cli --version "^1"
+          dotnet tool install --global wix --version 4.0.5
 
       - name: Install dependencies (macos only)
         if: matrix.platform == 'macos-latest'
