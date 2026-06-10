@@ -3,9 +3,12 @@
 
 mod db;
 mod downloader;
+mod http;
+mod html_parser;
 mod parser;
 mod player;
 mod scanner;
+mod site_config;
 
 use std::sync::Mutex;
 use tauri::State;
@@ -50,6 +53,22 @@ async fn delete_site(state: State<'_, AppState>, id: i64) -> Result<(), String> 
     let db = state.db.lock().unwrap();
     let db = db.as_ref().ok_or("数据库未初始化")?;
     db::delete_site(db, id).await.map_err(|e| e.to_string())
+}
+
+// 网站配置模板
+#[tauri::command]
+async fn get_site_templates() -> Result<Vec<site_config::SiteTemplate>, String> {
+    Ok(site_config::get_site_templates())
+}
+
+#[tauri::command]
+async fn validate_site_config(config: site_config::SiteConfig) -> Result<(), String> {
+    site_config::validate_site_config(&config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn test_site_config(config: site_config::SiteConfig) -> Result<bool, String> {
+    site_config::test_site_config(&config).await.map_err(|e| e.to_string())
 }
 
 // 资源相关命令
@@ -346,6 +365,9 @@ fn main() {
             add_site,
             update_site,
             delete_site,
+            get_site_templates,
+            validate_site_config,
+            test_site_config,
             search_resources,
             add_download,
             get_downloads,
