@@ -67,10 +67,7 @@
             "SimpChinese"
           ],
           "displayLanguageSelector": false,
-          "installMode": "both",
-          "headerImage": null,
-          "sidebarImage": null,
-          "script": "nsis/install.nsi"
+          "installMode": "both"
         }
       }
     },
