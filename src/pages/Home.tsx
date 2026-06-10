@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getActors, getResources, getDownloads, getRecentResources } from '../utils/api';
+import { getActors, getDownloads, getRecentResources } from '../utils/api';
 import type { Actor, Resource, Download } from '../utils/api';
 
 const Home: React.FC = () => {
