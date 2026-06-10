@@ -59,7 +59,7 @@ const ActorDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">加载中...</div>
       </div>
     );
@@ -67,16 +67,16 @@ const ActorDetail: React.FC = () => {
 
   if (!actor) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">演员不存在</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
+    <div>
       {/* 返回按钮 */}
-      <div className="mb-8">
+      <div className="mb-10">
         <Link to="/actors" className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
           <span>←</span>
           <span>返回演员列表</span>
@@ -184,21 +184,19 @@ const ActorDetail: React.FC = () => {
         {resources.length > 0 ? (
           <div className="grid grid-cols-4 gap-6">
             {resources.map((resource) => (
-              <Link key={resource.id} to={`/resources/${resource.id}`} className="block">
-                <div className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
-                  <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200"></div>
-                  <div className="p-5">
-                    <h3 className="font-semibold text-gray-900 mb-2">{resource.title}</h3>
-                    <div className="text-sm text-gray-500">
-                      {resource.created_at.split('T')[0]}
-                    </div>
+              <Link key={resource.id} to={`/resources/${resource.id}`} className="card block">
+                <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200"></div>
+                <div className="p-5">
+                  <h3 className="font-semibold text-gray-900 mb-2">{resource.title}</h3>
+                  <div className="text-sm text-gray-500">
+                    {resource.created_at.split('T')[0]}
                   </div>
                 </div>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="bg-gray-50 rounded-xl p-12 text-center">
+          <div className="text-center py-16">
             <p className="text-gray-500">暂无参演作品</p>
           </div>
         )}

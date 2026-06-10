@@ -49,32 +49,32 @@ const Actors: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-8">
+    <div>
+      <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">演员库</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
         >
           添加演员
         </button>
       </div>
 
       {/* 搜索栏 */}
-      <div className="mb-8">
+      <div className="mb-10">
         <input
           type="text"
-          placeholder="搜索演员..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500"
+          placeholder="搜索演员..."
+          className="search-input"
         />
       </div>
 
@@ -82,34 +82,32 @@ const Actors: React.FC = () => {
       {filteredActors.length > 0 ? (
         <div className="grid grid-cols-4 gap-6">
           {filteredActors.map((actor) => (
-            <Link key={actor.id} to={`/actors/${actor.id}`} className="block">
-              <div className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
-                <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative">
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <div className="bg-black/60 text-white text-sm px-3 py-2 rounded-lg backdrop-blur-sm">
-                      参演作品
-                    </div>
+            <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
+              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative">
+                <div className="absolute bottom-4 left-4 right-4">
+                  <div className="bg-black/60 text-white text-sm px-3 py-2 rounded-lg backdrop-blur-sm">
+                    参演作品
                   </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {actor.debut_year ? `${actor.debut_year}年出道` : ''}
-                  </p>
-                </div>
+              </div>
+              <div className="p-5">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">{actor.name}</h3>
+                <p className="text-sm text-gray-500">
+                  {actor.debut_year ? `${actor.debut_year}年出道` : ''}
+                </p>
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="bg-gray-50 rounded-xl p-12 text-center">
+        <div className="text-center py-16">
           <p className="text-gray-500 text-lg mb-4">
             {searchTerm ? '没有找到匹配的演员' : '暂无演员数据'}
           </p>
           {!searchTerm && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
             >
               添加第一个演员
             </button>

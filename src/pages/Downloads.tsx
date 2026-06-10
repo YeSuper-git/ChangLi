@@ -82,50 +82,50 @@ const Downloads: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-8">下载管理</h1>
+    <div>
+      <h1 className="text-3xl font-bold mb-10">下载管理</h1>
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-4 gap-6 mb-10">
-        <div className="bg-white rounded-xl p-6 border border-gray-100">
+        <div className="card p-6">
           <div className="text-3xl font-bold text-blue-600 mb-1">{stats.downloading}</div>
           <div className="text-sm text-gray-500">下载中</div>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-gray-100">
+        <div className="card p-6">
           <div className="text-3xl font-bold text-yellow-600 mb-1">{stats.paused}</div>
           <div className="text-sm text-gray-500">已暂停</div>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-gray-100">
+        <div className="card p-6">
           <div className="text-3xl font-bold text-green-600 mb-1">{stats.completed}</div>
           <div className="text-sm text-gray-500">已完成</div>
         </div>
-        <div className="bg-white rounded-xl p-6 border border-gray-100">
+        <div className="card p-6">
           <div className="text-3xl font-bold text-red-600 mb-1">{stats.error}</div>
           <div className="text-sm text-gray-500">失败</div>
         </div>
       </div>
 
       {/* 添加下载 */}
-      <div className="mb-10 p-6 bg-gray-50 rounded-2xl">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">添加下载</h3>
+      <div className="card p-8 mb-10">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">添加下载</h3>
         <div className="flex gap-4">
           <input
             type="text"
             value={magnetInput}
             onChange={(e) => setMagnetInput(e.target.value)}
             placeholder="输入磁力链接..."
-            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+            className="search-input flex-1"
           />
           <button
             onClick={handleAddDownload}
-            className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600"
+            className="px-8 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600"
           >
             添加
           </button>
@@ -133,7 +133,7 @@ const Downloads: React.FC = () => {
       </div>
 
       {/* 筛选标签 */}
-      <div className="flex gap-2 mb-8">
+      <div className="flex gap-3 mb-8">
         {[
           { key: 'all', label: '全部' },
           { key: 'downloading', label: '下载中' },
@@ -144,11 +144,7 @@ const Downloads: React.FC = () => {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-lg text-sm ${
-              activeTab === tab.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`category-btn ${activeTab === tab.key ? 'active' : ''}`}
           >
             {tab.label}
           </button>
@@ -159,13 +155,10 @@ const Downloads: React.FC = () => {
       {filteredDownloads.length > 0 ? (
         <div className="space-y-4">
           {filteredDownloads.map((download) => (
-            <div
-              key={download.id}
-              className="bg-white rounded-xl border border-gray-100 p-6"
-            >
+            <div key={download.id} className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg"></div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl"></div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{download.file_name || '未知文件'}</h3>
                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
@@ -179,14 +172,11 @@ const Downloads: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    download.status === 'downloading'
-                      ? 'bg-blue-100 text-blue-600'
-                      : download.status === 'paused'
-                      ? 'bg-yellow-100 text-yellow-600'
-                      : download.status === 'completed'
-                      ? 'bg-green-100 text-green-600'
-                      : 'bg-red-100 text-red-600'
+                  <span className={`tag ${
+                    download.status === 'downloading' ? 'status-watching' :
+                    download.status === 'paused' ? 'status-ongoing' :
+                    download.status === 'completed' ? 'status-completed' :
+                    'bg-red-100 text-red-600'
                   }`}>
                     {download.status === 'downloading' ? '下载中' :
                      download.status === 'paused' ? '已暂停' :
@@ -195,7 +185,7 @@ const Downloads: React.FC = () => {
                   {download.status === 'downloading' && (
                     <button
                       onClick={() => handlePause(download.id)}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                      className="action-btn"
                     >
                       ⏸ 暂停
                     </button>
@@ -203,32 +193,32 @@ const Downloads: React.FC = () => {
                   {download.status === 'paused' && (
                     <button
                       onClick={() => handleResume(download.id)}
-                      className="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                      className="action-btn action-btn-primary"
                     >
                       ▶ 继续
                     </button>
                   )}
                   <button
                     onClick={() => handleRemove(download.id)}
-                    className="px-3 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                    className="action-btn action-btn-danger"
                   >
                     ✕ 删除
                   </button>
                 </div>
               </div>
               {download.status === 'downloading' && (
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div
-                    className="h-full bg-blue-500 rounded-full transition-all"
+                    className="progress-fill bg-blue-500"
                     style={{ width: `${download.progress}%` }}
-                  />
+                  ></div>
                 </div>
               )}
             </div>
           ))}
         </div>
       ) : (
-        <div className="bg-gray-50 rounded-xl p-12 text-center">
+        <div className="text-center py-16">
           <p className="text-gray-500 text-lg">
             {activeTab === 'all' ? '暂无下载任务' : `暂无${activeTab === 'downloading' ? '下载中' : activeTab === 'paused' ? '已暂停' : activeTab === 'completed' ? '已完成' : '失败'}的任务`}
           </p>

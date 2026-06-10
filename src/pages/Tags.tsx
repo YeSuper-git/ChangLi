@@ -49,19 +49,19 @@ const Tags: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-8">
+    <div>
+      <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">标签管理</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
         >
           添加标签
         </button>
@@ -69,32 +69,30 @@ const Tags: React.FC = () => {
 
       {/* 标签列表 */}
       {tags.length > 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100">
-          <div className="p-6">
-            <div className="flex flex-wrap gap-3">
-              {tags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full"
+        <div className="card p-8">
+          <div className="flex flex-wrap gap-3">
+            {tags.map((tag) => (
+              <div
+                key={tag.id}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full"
+              >
+                <span className="text-gray-700">{tag.name}</span>
+                <button
+                  onClick={() => handleDeleteTag(tag.id)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
                 >
-                  <span className="text-gray-700">{tag.name}</span>
-                  <button
-                    onClick={() => handleDeleteTag(tag.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
-        <div className="bg-gray-50 rounded-xl p-12 text-center">
+        <div className="text-center py-16">
           <p className="text-gray-500 text-lg mb-4">暂无标签</p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
           >
             添加第一个标签
           </button>
