@@ -30,10 +30,13 @@ const ActorDetail: React.FC = () => {
 
   const loadActor = async (actorId: number) => {
     try {
+      console.log('[Actor] 开始加载演员详情, actorId:', actorId);
       const [actorData, resourcesData] = await Promise.all([
         getActor(actorId),
         getActorResources(actorId),
       ]);
+      console.log('[Actor] getActor 返回:', actorData ? `name: ${actorData.name}, photo: ${actorData.photo || '无'}` : 'null');
+      console.log('[Actor] getActorResources 返回:', resourcesData.length, '条');
       setActor(actorData);
       setResources(resourcesData);
       if (actorData) {
@@ -47,7 +50,7 @@ const ActorDetail: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('加载演员详情失败:', error);
+      console.error('[Actor] 加载演员详情失败:', error);
     } finally {
       setLoading(false);
     }
@@ -70,7 +73,7 @@ const ActorDetail: React.FC = () => {
       setEditing(false);
       loadActor(actor.id);
     } catch (error) {
-      console.error('更新演员失败:', error);
+      console.error('[Actor] 更新演员失败:', error);
     }
   };
 
@@ -107,20 +110,25 @@ const ActorDetail: React.FC = () => {
           );
           loadActor(actor.id);
         } catch (error) {
-          console.error('上传海报失败:', error);
+          console.error('[Actor] 上传海报失败:', error);
         } finally {
           setUploadingPhoto(false);
         }
       }
     } catch (error) {
-      console.error('打开文件选择器失败:', error);
+      console.error('[Actor] 打开文件选择器失败:', error);
     }
   };
 
   const getPhotoUrl = (photo?: string) => {
-    if (!photo) return null;
-    // 如果是相对路径，需要转换
-    return convertFileSrc(photo);
+    if (!photo) {
+      console.log('[Actor] getPhotoUrl: photo 为空，返回 null');
+      return null;
+    }
+    console.log('[Actor] getPhotoUrl: 原始海报路径:', photo);
+    const url = convertFileSrc(photo);
+    console.log('[Actor] getPhotoUrl: convertFileSrc 转换后 URL:', url);
+    return url;
   };
 
   const handleAddWork = async () => {
@@ -159,13 +167,13 @@ const ActorDetail: React.FC = () => {
           // 刷新资源列表
           loadActor(actor.id);
         } catch (error) {
-          console.error('添加作品失败:', error);
+          console.error('[Actor] 添加作品失败:', error);
         } finally {
           setAddingWork(false);
         }
       }
     } catch (error) {
-      console.error('打开文件夹选择器失败:', error);
+      console.error('[Actor] 打开文件夹选择器失败:', error);
     }
   };
 
@@ -208,6 +216,8 @@ const ActorDetail: React.FC = () => {
                 src={getPhotoUrl(actor.photo)!}
                 alt={actor.name}
                 className="w-full h-full object-cover"
+                onLoad={() => console.log('[Actor] 海报图片加载成功, src:', getPhotoUrl(actor.photo))}
+                onError={(e) => console.error('[Actor] 海报图片加载失败, src:', getPhotoUrl(actor.photo), 'error:', e)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl">

@@ -16,11 +16,14 @@ const Downloads: React.FC = () => {
 
   const loadDownloads = async () => {
     try {
+      console.log('[Downloads] 开始加载下载列表...');
       const downloadsList = await getDownloads();
+      console.log('[Downloads] getDownloads 返回:', downloadsList.length, '条');
       setDownloads(downloadsList);
     } catch (error) {
-      console.error('加载下载列表失败:', error);
+      console.error('[Downloads] 加载下载列表失败:', error);
     } finally {
+      console.log('[Downloads] 设置 loading = false');
       setLoading(false);
     }
   };
@@ -37,7 +40,7 @@ const Downloads: React.FC = () => {
       setMagnetInput('');
       loadDownloads();
     } catch (error) {
-      console.error('添加下载失败:', error);
+      console.error('[Downloads] 添加下载失败:', error);
       setAddError(String(error));
     } finally {
       setAdding(false);
@@ -46,19 +49,23 @@ const Downloads: React.FC = () => {
 
   const handlePause = async (id: number) => {
     try {
+      console.log('[Downloads] 暂停下载, id:', id);
       await pauseDownload(id);
+      console.log('[Downloads] 暂停成功, 刷新列表');
       loadDownloads();
     } catch (error) {
-      console.error('暂停下载失败:', error);
+      console.error('[Downloads] 暂停下载失败:', error);
     }
   };
 
   const handleResume = async (id: number) => {
     try {
+      console.log('[Downloads] 恢复下载, id:', id);
       await resumeDownload(id);
+      console.log('[Downloads] 恢复成功, 刷新列表');
       loadDownloads();
     } catch (error) {
-      console.error('恢复下载失败:', error);
+      console.error('[Downloads] 恢复下载失败:', error);
     }
   };
 
@@ -66,10 +73,12 @@ const Downloads: React.FC = () => {
     if (!confirm('确定要删除这个下载任务吗？')) return;
     
     try {
+      console.log('[Downloads] 删除下载, id:', id);
       await removeDownload(id);
+      console.log('[Downloads] 删除成功, 刷新列表');
       loadDownloads();
     } catch (error) {
-      console.error('删除下载失败:', error);
+      console.error('[Downloads] 删除下载失败:', error);
     }
   };
 

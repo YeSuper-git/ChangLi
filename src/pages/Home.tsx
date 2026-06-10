@@ -48,14 +48,20 @@ const Home: React.FC = () => {
 
   const getVideoThumbnail = (video: Video) => {
     if (video.thumbnail) {
-      return convertFileSrc(video.thumbnail);
+      console.log('[Home] 视频缩略图路径:', video.thumbnail);
+      const url = convertFileSrc(video.thumbnail);
+      console.log('[Home] 视频缩略图 URL:', url);
+      return url;
     }
     return null;
   };
 
   const getActorPhoto = (actor: Actor) => {
     if (actor.photo) {
-      return convertFileSrc(actor.photo);
+      console.log('[Home] 演员照片路径:', actor.photo);
+      const url = convertFileSrc(actor.photo);
+      console.log('[Home] 演员照片 URL:', url);
+      return url;
     }
     return null;
   };
@@ -162,6 +168,8 @@ const Home: React.FC = () => {
                     src={getVideoThumbnail(video)!}
                     alt={video.file_name}
                     className="w-full h-full object-cover"
+                    onLoad={() => console.log('[Home] 视频缩略图加载成功:', video.file_name, getVideoThumbnail(video))}
+                    onError={(e) => console.error('[Home] 视频缩略图加载失败:', video.file_name, getVideoThumbnail(video), 'error:', e)}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -215,6 +223,8 @@ const Home: React.FC = () => {
                     src={getActorPhoto(actor)!}
                     alt={actor.name}
                     className="w-full h-full object-cover"
+                    onLoad={() => console.log('[Home] 演员照片加载成功:', actor.name, getActorPhoto(actor))}
+                    onError={(e) => console.error('[Home] 演员照片加载失败:', actor.name, getActorPhoto(actor), 'error:', e)}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-6xl">

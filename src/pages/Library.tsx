@@ -40,19 +40,20 @@ const Library: React.FC = () => {
       if (selected) {
         setScanning(true);
         try {
+          console.log('[Library] 文件夹选择器返回:', selected);
           console.log('[Library] 开始扫描:', selected);
           const result = await scanVideos(selected as string);
           console.log('[Library] 扫描完成，返回', result.length, '个视频');
           loadVideos();
         } catch (error) {
-          console.error('扫描失败:', error);
+          console.error('[Library] 扫描失败:', error);
           alert('扫描失败: ' + String(error));
         } finally {
           setScanning(false);
         }
       }
     } catch (error) {
-      console.error('打开文件夹选择器失败:', error);
+      console.error('[Library] 打开文件夹选择器失败:', error);
     }
   };
 
@@ -60,10 +61,12 @@ const Library: React.FC = () => {
     if (!confirm('确定要删除这个视频吗？')) return;
     
     try {
+      console.log('[Library] 删除视频, id:', id);
       await deleteVideo(id);
+      console.log('[Library] 删除成功, 刷新列表');
       loadVideos();
     } catch (error) {
-      console.error('删除失败:', error);
+      console.error('[Library] 删除失败:', error);
     }
   };
 
