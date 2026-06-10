@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api';
 
 // 网站相关
 export interface Site {

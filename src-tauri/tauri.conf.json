@@ -59,7 +59,20 @@
         "icons/128x128@2x.png",
         "icons/icon.icns",
         "icons/icon.ico"
-      ]
+      ],
+      "windows": {
+        "nsis": {
+          "installerIcon": "icons/icon.ico",
+          "languages": [
+            "SimpChinese"
+          ],
+          "displayLanguageSelector": false,
+          "installMode": "both",
+          "headerImage": null,
+          "sidebarImage": null,
+          "script": "nsis/install.nsi"
+        }
+      }
     },
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost; media-src 'self' asset: https://asset.localhost"
@@ -68,7 +81,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "\u957f\u79bb",
+        "title": "长离",
         "width": 1280,
         "height": 800,
         "minWidth": 800,
