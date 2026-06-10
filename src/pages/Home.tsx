@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getVideos, getActors, getDownloads } from '../utils/api';
-import type { Video, Actor, Download } from '../utils/api';
+import { getDownloads, getVideos, getActors } from '../utils/api';
+import type { Download, Video, Actor } from '../utils/api';
 
 const Home: React.FC = () => {
-  const [recentVideos, setRecentVideos] = useState<Video[]>([]);
-  const [actors, setActors] = useState<Actor[]>([]);
   const [downloads, setDownloads] = useState<Download[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [actors, setActors] = useState<Actor[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -15,14 +15,14 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [videos, actorsList, downloadsList] = await Promise.all([
+      const [downloadsList, videosList, actorsList] = await Promise.all([
+        getDownloads(),
         getVideos(),
         getActors(),
-        getDownloads(),
       ]);
-      setRecentVideos(videos.slice(0, 8));
-      setActors(actorsList.slice(0, 8));
-      setDownloads(downloadsList.filter(d => d.status === 'downloading'));
+      setDownloads(downloadsList);
+      setVideos(videosList);
+      setActors(actorsList);
     } catch (error) {
       console.error('加载数据失败:', error);
     } finally {
@@ -38,6 +38,10 @@ const Home: React.FC = () => {
     );
   }
 
+  const activeDownloads = downloads.filter(d => d.status === 'downloading');
+  const recentVideos = videos.slice(0, 8);
+  const recentActors = actors.slice(0, 8);
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-8">首页</h1>
@@ -45,7 +49,7 @@ const Home: React.FC = () => {
       {/* 统计卡片 */}
       <div className="grid grid-cols-4 gap-6 mb-10">
         <div className="bg-white rounded-xl p-6 border border-gray-100">
-          <div className="text-3xl font-bold text-gray-900 mb-1">{recentVideos.length}</div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{videos.length}</div>
           <div className="text-sm text-gray-500">本地视频</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-100">
@@ -53,7 +57,7 @@ const Home: React.FC = () => {
           <div className="text-sm text-gray-500">演员数量</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-100">
-          <div className="text-3xl font-bold text-green-600 mb-1">{downloads.length}</div>
+          <div className="text-3xl font-bold text-green-600 mb-1">{activeDownloads.length}</div>
           <div className="text-sm text-gray-500">下载中</div>
         </div>
         <div className="bg-white rounded-xl p-6 border border-gray-100">
@@ -143,9 +147,9 @@ const Home: React.FC = () => {
             查看全部 →
           </Link>
         </div>
-        {actors.length > 0 ? (
+        {recentActors.length > 0 ? (
           <div className="grid grid-cols-4 gap-6">
-            {actors.slice(0, 4).map((actor) => (
+            {recentActors.slice(0, 4).map((actor) => (
               <Link key={actor.id} to={`/actors/${actor.id}`} className="block">
                 <div className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
                   <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200"></div>
