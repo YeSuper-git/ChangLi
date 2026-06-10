@@ -7,6 +7,8 @@ const Downloads: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [magnetInput, setMagnetInput] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [addError, setAddError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     loadDownloads();
@@ -26,12 +28,19 @@ const Downloads: React.FC = () => {
   const handleAddDownload = async () => {
     if (!magnetInput.trim()) return;
     
+    setAdding(true);
+    setAddError(null);
     try {
-      await addDownload(magnetInput);
+      console.log('[Downloads] 添加下载:', magnetInput.substring(0, 50) + '...');
+      await addDownload(magnetInput.trim());
+      console.log('[Downloads] 添加下载成功');
       setMagnetInput('');
       loadDownloads();
     } catch (error) {
       console.error('添加下载失败:', error);
+      setAddError(String(error));
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -120,16 +129,23 @@ const Downloads: React.FC = () => {
             type="text"
             value={magnetInput}
             onChange={(e) => setMagnetInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddDownload()}
             placeholder="输入磁力链接..."
             className="search-input flex-1"
           />
           <button
             onClick={handleAddDownload}
-            className="px-8 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600"
+            disabled={adding || !magnetInput.trim()}
+            className="px-8 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
           >
-            添加
+            {adding ? '添加中...' : '添加'}
           </button>
         </div>
+        {addError && (
+          <div className="mt-4 text-red-500 text-sm">
+            添加失败: {addError}
+          </div>
+        )}
       </div>
 
       {/* 筛选标签 */}

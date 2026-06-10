@@ -17,19 +17,7 @@ const Library: React.FC = () => {
   const loadVideos = async () => {
     try {
       console.log('[Library] 开始加载视频...');
-      
-      const withTimeout = <T,>(p: Promise<T>, name: string, ms = 5000): Promise<T> => {
-        return Promise.race([
-          p,
-          new Promise<T>((_, reject) => setTimeout(() => {
-            console.error(`[Library] ${name} 超时（${ms/1000}秒）！`);
-            reject(new Error(`${name} 超时`));
-          }, ms))
-        ]);
-      };
-      
-      console.log('[Library] 调用 getVideos...');
-      const videosList = await withTimeout(getVideos(), 'getVideos');
+      const videosList = await getVideos();
       console.log('[Library] getVideos 返回:', videosList.length, '条');
       setVideos(videosList);
     } catch (error) {
@@ -52,10 +40,13 @@ const Library: React.FC = () => {
       if (selected) {
         setScanning(true);
         try {
-          await scanVideos(selected as string);
+          console.log('[Library] 开始扫描:', selected);
+          const result = await scanVideos(selected as string);
+          console.log('[Library] 扫描完成，返回', result.length, '个视频');
           loadVideos();
         } catch (error) {
           console.error('扫描失败:', error);
+          alert('扫描失败: ' + String(error));
         } finally {
           setScanning(false);
         }

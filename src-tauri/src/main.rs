@@ -18,12 +18,23 @@ struct AppState {
     db: Mutex<Option<sqlx::SqlitePool>>,
 }
 
-// 初始化数据库
+// 初始化数据库（如果已在 setup 中初始化则直接返回）
 #[tauri::command]
 async fn init_db(state: State<'_, AppState>) -> Result<(), String> {
+    // 检查是否已经初始化完成
+    {
+        let guard = state.db.lock().await;
+        if guard.is_some() {
+            eprintln!("[ChangLi] 数据库已在后台初始化完成，跳过重复初始化");
+            return Ok(());
+        }
+    }
+    // 如果后台尚未完成，等待并执行初始化
     let db = db::init_database().await.map_err(|e| e.to_string())?;
     let mut guard = state.db.lock().await;
-    *guard = Some(db);
+    if guard.is_none() {
+        *guard = Some(db);
+    }
     Ok(())
 }
 
@@ -141,8 +152,18 @@ async fn add_download(state: State<'_, AppState>, magnet: String) -> Result<db::
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     
-    // 调用 aria2 添加下载
-    let gid = downloader::add_magnet(&magnet).await.map_err(|e| e.to_string())?;
+    // 尝试调用 aria2 添加下载，如果失败则创建本地记录
+    let gid = match downloader::add_magnet(&magnet).await {
+        Ok(gid) => {
+            eprintln!("[ChangLi] aria2 添加下载成功, gid: {}", gid);
+            gid
+        }
+        Err(e) => {
+            eprintln!("[ChangLi] aria2 不可用，创建本地下载记录: {}", e);
+            // 生成一个本地 GID
+            format!("local_{}", uuid::Uuid::new_v4())
+        }
+    };
     
     // 保存到数据库
     let download = db::add_download(&pool, &gid, &magnet).await.map_err(|e| e.to_string())?;
@@ -308,9 +329,10 @@ async fn save_actor_photo(source_path: String) -> Result<String, String> {
     // 复制文件
     std::fs::copy(&source_path, &dest).map_err(|e| e.to_string())?;
     
-    // 返回相对路径
-    let relative_path = format!("actors/photos/{}", filename);
-    Ok(relative_path)
+    // 返回绝对路径（convertFileSrc 需要绝对路径）
+    let absolute_path = dest.to_string_lossy().to_string();
+    eprintln!("[ChangLi] 海报已保存: {}", absolute_path);
+    Ok(absolute_path)
 }
 
 #[tauri::command]
@@ -471,21 +493,6 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState {
             db: Mutex::new(None),
-        })
-        .setup(|app| {
-            let state = app.state::<AppState>();
-            tauri::async_runtime::block_on(async {
-                match db::init_database().await {
-                    Ok(pool) => {
-                        *state.db.lock().await = Some(pool);
-                        eprintln!("[ChangLi] 数据库初始化成功");
-                    }
-                    Err(e) => {
-                        eprintln!("[ChangLi] 数据库初始化失败: {}", e);
-                    }
-                }
-            });
-            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             init_db,

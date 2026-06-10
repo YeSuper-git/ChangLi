@@ -20,30 +20,17 @@ const Home: React.FC = () => {
     try {
       console.log('[Home] 开始加载数据...');
       
-      const withTimeout = <T,>(p: Promise<T>, name: string, ms = 5000): Promise<T> => {
-        return Promise.race([
-          p,
-          new Promise<T>((_, reject) => setTimeout(() => {
-            console.error(`[Home] ${name} 超时（${ms/1000}秒）！`);
-            reject(new Error(`${name} 超时`));
-          }, ms))
-        ]);
-      };
+      // 并行加载所有数据，不使用超时
+      const [actorsList, downloadsList, tagsList, videosList] = await Promise.all([
+        getActors(),
+        getDownloads(),
+        getTags(),
+        getVideos(),
+      ]);
       
-      console.log('[Home] 调用 getActors...');
-      const actorsList = await withTimeout(getActors(), 'getActors');
       console.log('[Home] getActors 返回:', actorsList.length, '条');
-      
-      console.log('[Home] 调用 getDownloads...');
-      const downloadsList = await withTimeout(getDownloads(), 'getDownloads');
       console.log('[Home] getDownloads 返回:', downloadsList.length, '条');
-      
-      console.log('[Home] 调用 getTags...');
-      const tagsList = await withTimeout(getTags(), 'getTags');
       console.log('[Home] getTags 返回:', tagsList.length, '条');
-      
-      console.log('[Home] 调用 getVideos...');
-      const videosList = await withTimeout(getVideos(), 'getVideos');
       console.log('[Home] getVideos 返回:', videosList.length, '条');
       
       setActors(actorsList);
@@ -62,6 +49,13 @@ const Home: React.FC = () => {
   const getVideoThumbnail = (video: Video) => {
     if (video.thumbnail) {
       return convertFileSrc(video.thumbnail);
+    }
+    return null;
+  };
+
+  const getActorPhoto = (actor: Actor) => {
+    if (actor.photo) {
+      return convertFileSrc(actor.photo);
     }
     return null;
   };
@@ -215,7 +209,19 @@ const Home: React.FC = () => {
         <div className="grid grid-cols-4 gap-6">
           {actors.slice(0, 4).map((actor) => (
             <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
-              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200"></div>
+              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
+                {getActorPhoto(actor) ? (
+                  <img
+                    src={getActorPhoto(actor)!}
+                    alt={actor.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-6xl">
+                    👤
+                  </div>
+                )}
+              </div>
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
                 <div className="text-sm text-gray-500">
@@ -224,6 +230,11 @@ const Home: React.FC = () => {
               </div>
             </Link>
           ))}
+          {actors.length === 0 && (
+            <div className="col-span-4 text-center text-gray-500 py-12">
+              暂无演员
+            </div>
+          )}
         </div>
       </section>
     </div>
