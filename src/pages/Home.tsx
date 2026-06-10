@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getDownloads, getVideos, getActors } from '../utils/api';
-import type { Download, Video, Actor } from '../utils/api';
+import { getActors } from '../utils/api';
+import type { Actor } from '../utils/api';
 
 const Home: React.FC = () => {
-  const [downloads, setDownloads] = useState<Download[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
   const [actors, setActors] = useState<Actor[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('全部');
@@ -16,13 +14,7 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [downloadsList, videosList, actorsList] = await Promise.all([
-        getDownloads(),
-        getVideos(),
-        getActors(),
-      ]);
-      setDownloads(downloadsList);
-      setVideos(videosList);
+      const actorsList = await getActors();
       setActors(actorsList);
     } catch (error) {
       console.error('加载数据失败:', error);
