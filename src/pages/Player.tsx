@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getVideo, getVideos, updateWatchProgress, getWatchProgress } from '../utils/api';
-import type { Video, WatchProgress } from '../utils/api';
+import { getVideos, getWatchProgress } from '../utils/api';
+import type { Video } from '../utils/api';
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [video, setVideo] = useState<Video | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [watchProgress, setWatchProgress] = useState<WatchProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -15,7 +14,7 @@ const Player: React.FC = () => {
   const [volume, setVolume] = useState(100);
   const [speed, setSpeed] = useState(1);
   const [showEpisodeList, setShowEpisodeList] = useState(false);
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -25,19 +24,18 @@ const Player: React.FC = () => {
 
   const loadVideo = async (videoId: number) => {
     try {
-      const [videoData, videosList] = await Promise.all([
-        getVideo(videoId),
-        getVideos(),
-      ]);
-      setVideo(videoData);
+      const videosList = await getVideos();
       setVideos(videosList);
       
-      if (videoData) {
+      const currentVideo = videosList.find(v => v.id === videoId);
+      setVideo(currentVideo || null);
+      
+      if (currentVideo) {
         // 加载观看进度
         const progress = await getWatchProgress(videoId, 1);
-        setWatchProgress(progress);
         if (progress) {
           setCurrentTime(progress.position);
+          setDuration(progress.duration);
         }
       }
     } catch (error) {
@@ -51,29 +49,13 @@ const Player: React.FC = () => {
     setIsPlaying(!isPlaying);
   };
 
-  const handleSeek = (time: number) => {
-    setCurrentTime(time);
-    // TODO: 调用 mpv seek
-  };
-
   const handleVolumeChange = (vol: number) => {
     setVolume(vol);
-    // TODO: 调用 mpv 设置音量
   };
 
   const handleSpeedChange = (spd: number) => {
     setSpeed(spd);
-    // TODO: 调用 mpv 设置倍速
-  };
-
-  const handleSaveProgress = async () => {
-    if (video && id) {
-      try {
-        await updateWatchProgress(parseInt(id), 1, currentTime, duration);
-      } catch (error) {
-        console.error('保存进度失败:', error);
-      }
-    }
+    setShowSpeedMenu(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -135,11 +117,11 @@ const Player: React.FC = () => {
             <div className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer relative">
               <div
                 className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
+                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
               />
               <div
                 className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
-                style={{ left: `${(currentTime / duration) * 100}%` }}
+                style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
               />
             </div>
             <span className="text-white text-sm w-16">{formatTime(duration)}</span>
@@ -187,20 +169,17 @@ const Player: React.FC = () => {
             {/* 倍速 */}
             <div className="relative">
               <button
-                onClick={() => setShowSubtitleMenu(!showSubtitleMenu)}
+                onClick={() => setShowSpeedMenu(!showSpeedMenu)}
                 className="text-white hover:text-blue-400 transition-colors"
               >
                 {speed}x
               </button>
-              {showSubtitleMenu && (
+              {showSpeedMenu && (
                 <div className="absolute bottom-full right-0 mb-2 bg-black/90 rounded-lg p-2">
                   {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
                     <button
                       key={spd}
-                      onClick={() => {
-                        handleSpeedChange(spd);
-                        setShowSubtitleMenu(false);
-                      }}
+                      onClick={() => handleSpeedChange(spd)}
                       className={`block w-full px-4 py-2 text-left rounded ${
                         speed === spd ? 'bg-blue-500' : 'hover:bg-white/10'
                       } text-white`}

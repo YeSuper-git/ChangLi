@@ -110,6 +110,10 @@ export async function getVideos(): Promise<Video[]> {
   return await invoke('get_videos');
 }
 
+export async function getVideo(id: number): Promise<Video | null> {
+  return await invoke('get_video', { id });
+}
+
 export async function deleteVideo(id: number): Promise<void> {
   return await invoke('delete_video', { id });
 }
