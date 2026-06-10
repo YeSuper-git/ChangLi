@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getActors } from '../utils/api';
-import type { Actor } from '../utils/api';
+import { getActors, getResources, getDownloads, getRecentResources } from '../utils/api';
+import type { Actor, Resource, Download } from '../utils/api';
 
 const Home: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [downloads, setDownloads] = useState<Download[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('全部');
 
@@ -14,8 +16,14 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const actorsList = await getActors();
+      const [actorsList, resourcesList, downloadsList] = await Promise.all([
+        getActors(),
+        getRecentResources(10),
+        getDownloads()
+      ]);
       setActors(actorsList);
+      setResources(resourcesList);
+      setDownloads(downloadsList);
     } catch (error) {
       console.error('加载数据失败:', error);
     } finally {
@@ -57,89 +65,42 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-8">
-          {/* 卡片 1 */}
-          <div className="card">
-            <div className="aspect-[16/10] bg-gradient-to-br from-orange-100 to-orange-200 relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-2xl ml-1">▶️</span>
+          {downloads.filter(d => d.status === 'downloading' || d.status === 'paused').slice(0, 3).map((download) => (
+            <div key={download.id} className="card">
+              <div className="aspect-[16/10] bg-gradient-to-br from-orange-100 to-orange-200 relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-2xl ml-1">▶️</span>
+                  </div>
+                </div>
+                <div className="absolute bottom-4 left-4 bg-black/80 text-white text-sm px-3 py-1.5 rounded-full">
+                  {download.progress.toFixed(0)}%
                 </div>
               </div>
-              <div className="absolute bottom-4 left-4 bg-black/80 text-white text-sm px-3 py-1.5 rounded-full">
-                第8集 19:23
-              </div>
-            </div>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">进击的巨人 最终季</h3>
-              <div className="flex gap-2 mb-4">
-                <span className="tag status-ongoing">连载中</span>
-                <span className="tag status-watching">观看中</span>
-              </div>
-              <div className="text-sm text-gray-500 mb-4">更新至第12集 · 每周日更新</div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '66%' }}></div>
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">{download.file_name || '未知文件'}</h3>
+                <div className="flex gap-2 mb-4">
+                  <span className={`tag ${download.status === 'downloading' ? 'status-ongoing' : 'status-watching'}`}>
+                    {download.status === 'downloading' ? '下载中' : '已暂停'}
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500">66%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 卡片 2 */}
-          <div className="card">
-            <div className="aspect-[16/10] bg-gradient-to-br from-pink-100 to-pink-200 relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-2xl ml-1">▶️</span>
+                <div className="text-sm text-gray-500 mb-4">
+                  {download.download_speed > 0 ? `${(download.download_speed / 1024 / 1024).toFixed(1)} MB/s` : ''}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${download.progress}%` }}></div>
+                  </div>
+                  <span className="text-sm text-gray-500">{download.progress.toFixed(0)}%</span>
                 </div>
               </div>
-              <div className="absolute bottom-4 left-4 bg-black/80 text-white text-sm px-3 py-1.5 rounded-full">
-                第3集 08:45
-              </div>
             </div>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">间谍过家家 第二季</h3>
-              <div className="flex gap-2 mb-4">
-                <span className="tag status-ongoing">连载中</span>
-                <span className="tag status-watching">观看中</span>
-              </div>
-              <div className="text-sm text-gray-500 mb-4">更新至第5集 · 每周六更新</div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-pink-500 rounded-full" style={{ width: '60%' }}></div>
-                </div>
-                <span className="text-sm text-gray-500">60%</span>
-              </div>
+          ))}
+          {downloads.filter(d => d.status === 'downloading' || d.status === 'paused').length === 0 && (
+            <div className="col-span-3 text-center text-gray-500 py-12">
+              暂无下载中的任务
             </div>
-          </div>
-
-          {/* 卡片 3 */}
-          <div className="card">
-            <div className="aspect-[16/10] bg-gradient-to-br from-purple-100 to-purple-200 relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-2xl ml-1">▶️</span>
-                </div>
-              </div>
-              <div className="absolute bottom-4 left-4 bg-black/80 text-white text-sm px-3 py-1.5 rounded-full">
-                第1集 02:10
-              </div>
-            </div>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">咒术回战 第二季</h3>
-              <div className="flex gap-2 mb-4">
-                <span className="tag status-ongoing">连载中</span>
-                <span className="tag status-watching">观看中</span>
-              </div>
-              <div className="text-sm text-gray-500 mb-4">更新至第10集 · 每周四更新</div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-500 rounded-full" style={{ width: '10%' }}></div>
-                </div>
-                <span className="text-sm text-gray-500">10%</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -152,45 +113,25 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-6">
-          <div className="card">
-            <div className="aspect-[3/4] bg-gradient-to-br from-green-100 to-green-200 relative">
-              <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">NEW</div>
+          {resources.slice(0, 8).map((resource) => (
+            <div key={resource.id} className="card">
+              <div className="aspect-[3/4] bg-gradient-to-br from-green-100 to-green-200 relative">
+                <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">NEW</div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">{resource.title}</h3>
+                <span className="tag status-ongoing">资源</span>
+                <div className="text-sm text-gray-500 mt-2">
+                  {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : ''}
+                </div>
+              </div>
             </div>
-            <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">葬送的芙莉莲</h3>
-              <span className="tag status-ongoing">连载中</span>
-              <div className="text-sm text-gray-500 mt-2">更新至第16集</div>
+          ))}
+          {resources.length === 0 && (
+            <div className="col-span-4 text-center text-gray-500 py-12">
+              暂无资源，请先搜索或添加网站
             </div>
-          </div>
-
-          <div className="card">
-            <div className="aspect-[3/4] bg-gradient-to-br from-blue-100 to-blue-200 relative">
-              <div className="absolute top-3 right-3 bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">NEW</div>
-            </div>
-            <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">迷宫饭</h3>
-              <span className="tag status-ongoing">连载中</span>
-              <div className="text-sm text-gray-500 mt-2">更新至第14集</div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="aspect-[3/4] bg-gradient-to-br from-yellow-100 to-yellow-200"></div>
-            <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">我推的孩子 第二季</h3>
-              <span className="tag status-ongoing">连载中</span>
-              <div className="text-sm text-gray-500 mt-2">更新至第8集</div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="aspect-[3/4] bg-gradient-to-br from-red-100 to-red-200"></div>
-            <div className="p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">药屋少女的呢喃</h3>
-              <span className="tag status-ongoing">连载中</span>
-              <div className="text-sm text-gray-500 mt-2">更新至第20集</div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
