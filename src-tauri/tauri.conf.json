@@ -36,6 +36,14 @@
         "all": true,
         "request": true,
         "scope": ["http://**", "https://**"]
+      },
+      "dialog": {
+        "all": true,
+        "open": true,
+        "save": true,
+        "message": true,
+        "ask": true,
+        "confirm": true
       }
     },
     "bundle": {
