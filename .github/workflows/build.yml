@@ -1,13 +1,14 @@
-name: Build and Release
+name: Build
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -39,11 +40,6 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Install WiX (windows only)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          dotnet tool install --global wix --version 4.0.5
-
       - name: Install dependencies (macos only)
         if: matrix.platform == 'macos-latest'
         run: |
@@ -57,9 +53,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: '长离 ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: false
-          prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changli-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
