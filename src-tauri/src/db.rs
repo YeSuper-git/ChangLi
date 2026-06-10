@@ -899,3 +899,69 @@ pub async fn get_resource_watch_progress(pool: &SqlitePool, resource_id: i64) ->
     
     Ok(progress)
 }
+
+// 资源操作
+pub async fn get_resources(pool: &SqlitePool) -> Result<Vec<Resource>> {
+    let rows = sqlx::query("SELECT * FROM resources ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    
+    let resources = rows
+        .iter()
+        .map(|row| Resource {
+            id: row.get("id"),
+            site_id: row.get("site_id"),
+            title: row.get("title"),
+            url: row.get("url"),
+            magnet: row.get("magnet"),
+            info: row.get("info"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+    
+    Ok(resources)
+}
+
+pub async fn get_resources_by_category(pool: &SqlitePool, category: &str) -> Result<Vec<Resource>> {
+    let rows = sqlx::query("SELECT r.* FROM resources r LEFT JOIN resource_tags rt ON r.id = rt.resource_id LEFT JOIN tags t ON rt.tag_id = t.id WHERE t.name = ? ORDER BY r.created_at DESC")
+        .bind(category)
+        .fetch_all(pool)
+        .await?;
+    
+    let resources = rows
+        .iter()
+        .map(|row| Resource {
+            id: row.get("id"),
+            site_id: row.get("site_id"),
+            title: row.get("title"),
+            url: row.get("url"),
+            magnet: row.get("magnet"),
+            info: row.get("info"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+    
+    Ok(resources)
+}
+
+pub async fn get_recent_resources(pool: &SqlitePool, limit: i64) -> Result<Vec<Resource>> {
+    let rows = sqlx::query("SELECT * FROM resources ORDER BY created_at DESC LIMIT ?")
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+    
+    let resources = rows
+        .iter()
+        .map(|row| Resource {
+            id: row.get("id"),
+            site_id: row.get("site_id"),
+            title: row.get("title"),
+            url: row.get("url"),
+            magnet: row.get("magnet"),
+            info: row.get("info"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+    
+    Ok(resources)
+}

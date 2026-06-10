@@ -421,3 +421,25 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[tauri::command]
+async fn get_resources(state: State<'_, AppState>) -> Result<Vec<db::Resource>, String> {
+    let db = state.db.lock().await;
+    let db = db.as_ref().ok_or("数据库未初始化")?;
+    db::get_resources(db).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_resources_by_category(state: State<'_, AppState>, category: String) -> Result<Vec<db::Resource>, String> {
+    let db = state.db.lock().await;
+    let db = db.as_ref().ok_or("数据库未初始化")?;
+    db::get_resources_by_category(db, &category).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_recent_resources(state: State<'_, AppState>, limit: Option<i64>) -> Result<Vec<db::Resource>, String> {
+    let db = state.db.lock().await;
+    let db = db.as_ref().ok_or("数据库未初始化")?;
+    let limit = limit.unwrap_or(10);
+    db::get_recent_resources(db, limit).await.map_err(|e| e.to_string())
+}

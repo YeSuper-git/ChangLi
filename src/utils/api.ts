@@ -236,3 +236,15 @@ export async function getWatchProgress(resourceId: number, episode: number): Pro
 export async function getResourceWatchProgress(resourceId: number): Promise<WatchProgress[]> {
   return await invoke('get_resource_watch_progress', { resourceId });
 }
+
+export async function getResources(): Promise<Resource[]> {
+  return await invoke('get_resources');
+}
+
+export async function getResourcesByCategory(category: string): Promise<Resource[]> {
+  return await invoke('get_resources_by_category', { category });
+}
+
+export async function getRecentResources(limit?: number): Promise<Resource[]> {
+  return await invoke('get_recent_resources', { limit });
+}
