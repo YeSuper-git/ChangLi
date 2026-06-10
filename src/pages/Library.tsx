@@ -16,11 +16,26 @@ const Library: React.FC = () => {
 
   const loadVideos = async () => {
     try {
-      const videosList = await getVideos();
+      console.log('[Library] 开始加载视频...');
+      
+      const withTimeout = <T,>(p: Promise<T>, name: string, ms = 5000): Promise<T> => {
+        return Promise.race([
+          p,
+          new Promise<T>((_, reject) => setTimeout(() => {
+            console.error(`[Library] ${name} 超时（${ms/1000}秒）！`);
+            reject(new Error(`${name} 超时`));
+          }, ms))
+        ]);
+      };
+      
+      console.log('[Library] 调用 getVideos...');
+      const videosList = await withTimeout(getVideos(), 'getVideos');
+      console.log('[Library] getVideos 返回:', videosList.length, '条');
       setVideos(videosList);
     } catch (error) {
-      console.error('加载视频失败:', error);
+      console.error('[Library] 加载视频失败:', error);
     } finally {
+      console.log('[Library] 设置 loading = false');
       setLoading(false);
     }
   };

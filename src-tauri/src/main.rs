@@ -11,7 +11,7 @@ mod scanner;
 mod site_config;
 
 use tokio::sync::Mutex;
-use tauri::State;
+use tauri::{State, Manager};
 
 // 应用状态
 struct AppState {
@@ -271,21 +271,46 @@ async fn get_actor(state: State<'_, AppState>, id: i64) -> Result<Option<db::Act
 }
 
 #[tauri::command]
-async fn add_actor(state: State<'_, AppState>, name: String, photo: Option<String>, bio: Option<String>, debut_year: Option<i32>) -> Result<db::Actor, String> {
+async fn add_actor(state: State<'_, AppState>, name: String, photo: Option<String>, bio: Option<String>, birthday: Option<String>, height: Option<String>, measurements: Option<String>, japanese_name: Option<String>) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_actor(&pool, &name, photo.as_deref(), bio.as_deref(), debut_year).await.map_err(|e| e.to_string())
+    db::add_actor(&pool, &name, photo.as_deref(), bio.as_deref(), birthday.as_deref(), height.as_deref(), measurements.as_deref(), japanese_name.as_deref()).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn update_actor(state: State<'_, AppState>, id: i64, name: String, photo: Option<String>, bio: Option<String>, debut_year: Option<i32>) -> Result<db::Actor, String> {
+async fn update_actor(state: State<'_, AppState>, id: i64, name: String, photo: Option<String>, bio: Option<String>, birthday: Option<String>, height: Option<String>, measurements: Option<String>, japanese_name: Option<String>) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_actor(&pool, id, &name, photo.as_deref(), bio.as_deref(), debut_year).await.map_err(|e| e.to_string())
+    db::update_actor(&pool, id, &name, photo.as_deref(), bio.as_deref(), birthday.as_deref(), height.as_deref(), measurements.as_deref(), japanese_name.as_deref()).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_actor_photo(source_path: String) -> Result<String, String> {
+    let data_dir = dirs::data_dir()
+        .ok_or("无法获取数据目录")?
+        .join("changli")
+        .join("actors")
+        .join("photos");
+    
+    // 确保目录存在
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    
+    // 生成唯一文件名
+    let source = std::path::Path::new(&source_path);
+    let ext = source.extension().and_then(|e| e.to_str()).unwrap_or("jpg");
+    let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+    let dest = data_dir.join(&filename);
+    
+    // 复制文件
+    std::fs::copy(&source_path, &dest).map_err(|e| e.to_string())?;
+    
+    // 返回相对路径
+    let relative_path = format!("actors/photos/{}", filename);
+    Ok(relative_path)
 }
 
 #[tauri::command]
@@ -447,6 +472,21 @@ fn main() {
         .manage(AppState {
             db: Mutex::new(None),
         })
+        .setup(|app| {
+            let state = app.state::<AppState>();
+            tauri::async_runtime::block_on(async {
+                match db::init_database().await {
+                    Ok(pool) => {
+                        *state.db.lock().await = Some(pool);
+                        eprintln!("[ChangLi] 数据库初始化成功");
+                    }
+                    Err(e) => {
+                        eprintln!("[ChangLi] 数据库初始化失败: {}", e);
+                    }
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             init_db,
             get_sites,
@@ -490,6 +530,7 @@ fn main() {
             get_watch_progress,
             get_resource_watch_progress,
             update_video,
+            save_actor_photo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

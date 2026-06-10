@@ -125,7 +125,10 @@ export interface Actor {
   name: string;
   photo?: string;
   bio?: string;
-  debut_year?: number;
+  birthday?: string;
+  height?: string;
+  measurements?: string;
+  japanese_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -138,12 +141,12 @@ export async function getActor(id: number): Promise<Actor | null> {
   return await invoke('get_actor', { id });
 }
 
-export async function addActor(name: string, photo?: string, bio?: string, debutYear?: number): Promise<Actor> {
-  return await invoke('add_actor', { name, photo, bio, debutYear });
+export async function addActor(name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string): Promise<Actor> {
+  return await invoke('add_actor', { name, photo, bio, birthday, height, measurements, japaneseName });
 }
 
-export async function updateActor(id: number, name: string, photo?: string, bio?: string, debutYear?: number): Promise<Actor> {
-  return await invoke('update_actor', { id, name, photo, bio, debutYear });
+export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string): Promise<Actor> {
+  return await invoke('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName });
 }
 
 export async function deleteActor(id: number): Promise<void> {
@@ -152,6 +155,10 @@ export async function deleteActor(id: number): Promise<void> {
 
 export async function getActorResources(actorId: number): Promise<Resource[]> {
   return await invoke('get_actor_resources', { actorId });
+}
+
+export async function saveActorPhoto(sourcePath: string): Promise<string> {
+  return await invoke('save_actor_photo', { sourcePath });
 }
 
 // 标签相关

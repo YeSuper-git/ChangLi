@@ -8,7 +8,7 @@ const Actors: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newActor, setNewActor] = useState({ name: '', bio: '', debutYear: '' });
+  const [newActor, setNewActor] = useState({ name: '', bio: '' });
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -33,11 +33,10 @@ const Actors: React.FC = () => {
       const actor = await addActor(
         newActor.name,
         undefined,
-        newActor.bio || undefined,
-        newActor.debutYear ? parseInt(newActor.debutYear) : undefined
+        newActor.bio || undefined
       );
       setShowAddModal(false);
-      setNewActor({ name: '', bio: '', debutYear: '' });
+      setNewActor({ name: '', bio: '' });
       // 跳转到演员详情页
       navigate(`/actors/${actor.id}`);
     } catch (error) {
@@ -95,7 +94,7 @@ const Actors: React.FC = () => {
               <div className="p-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">{actor.name}</h3>
                 <p className="text-sm text-gray-500">
-                  {actor.debut_year ? `${actor.debut_year}年出道` : ''}
+                  {actor.birthday ? `${actor.birthday}` : ''}
                 </p>
               </div>
             </Link>
@@ -131,16 +130,6 @@ const Actors: React.FC = () => {
                   onChange={(e) => setNewActor({ ...newActor, name: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                   placeholder="输入演员姓名"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">出道年份</label>
-                <input
-                  type="number"
-                  value={newActor.debutYear}
-                  onChange={(e) => setNewActor({ ...newActor, debutYear: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="如：2020"
                 />
               </div>
               <div>

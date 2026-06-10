@@ -78,7 +78,10 @@ pub struct Actor {
     pub name: String,
     pub photo: Option<String>,
     pub bio: Option<String>,
-    pub debut_year: Option<i32>,
+    pub birthday: Option<String>,
+    pub height: Option<String>,
+    pub measurements: Option<String>,
+    pub japanese_name: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -226,7 +229,10 @@ pub async fn init_database() -> Result<SqlitePool> {
             name TEXT NOT NULL,
             photo TEXT,
             bio TEXT,
-            debut_year INTEGER,
+            birthday TEXT,
+            height TEXT,
+            measurements TEXT,
+            japanese_name TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -234,6 +240,12 @@ pub async fn init_database() -> Result<SqlitePool> {
     )
     .execute(&pool)
     .await?;
+    
+    // 迁移：添加新列（如果不存在）
+    let _ = sqlx::query("ALTER TABLE actors ADD COLUMN birthday TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE actors ADD COLUMN height TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE actors ADD COLUMN measurements TEXT").execute(&pool).await;
+    let _ = sqlx::query("ALTER TABLE actors ADD COLUMN japanese_name TEXT").execute(&pool).await;
     
     sqlx::query(
         r#"
@@ -673,7 +685,10 @@ pub async fn get_actors(pool: &SqlitePool) -> Result<Vec<Actor>> {
             name: row.get("name"),
             photo: row.get("photo"),
             bio: row.get("bio"),
-            debut_year: row.get("debut_year"),
+            birthday: row.get("birthday"),
+            height: row.get("height"),
+            measurements: row.get("measurements"),
+            japanese_name: row.get("japanese_name"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
@@ -693,20 +708,26 @@ pub async fn get_actor(pool: &SqlitePool, id: i64) -> Result<Option<Actor>> {
         name: row.get("name"),
         photo: row.get("photo"),
         bio: row.get("bio"),
-        debut_year: row.get("debut_year"),
+        birthday: row.get("birthday"),
+        height: row.get("height"),
+        measurements: row.get("measurements"),
+        japanese_name: row.get("japanese_name"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     }))
 }
 
-pub async fn add_actor(pool: &SqlitePool, name: &str, photo: Option<&str>, bio: Option<&str>, debut_year: Option<i32>) -> Result<Actor> {
+pub async fn add_actor(pool: &SqlitePool, name: &str, photo: Option<&str>, bio: Option<&str>, birthday: Option<&str>, height: Option<&str>, measurements: Option<&str>, japanese_name: Option<&str>) -> Result<Actor> {
     let row = sqlx::query(
-        "INSERT INTO actors (name, photo, bio, debut_year) VALUES (?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(name)
     .bind(photo)
     .bind(bio)
-    .bind(debut_year)
+    .bind(birthday)
+    .bind(height)
+    .bind(measurements)
+    .bind(japanese_name)
     .fetch_one(pool)
     .await?;
     
@@ -715,20 +736,26 @@ pub async fn add_actor(pool: &SqlitePool, name: &str, photo: Option<&str>, bio: 
         name: row.get("name"),
         photo: row.get("photo"),
         bio: row.get("bio"),
-        debut_year: row.get("debut_year"),
+        birthday: row.get("birthday"),
+        height: row.get("height"),
+        measurements: row.get("measurements"),
+        japanese_name: row.get("japanese_name"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
 }
 
-pub async fn update_actor(pool: &SqlitePool, id: i64, name: &str, photo: Option<&str>, bio: Option<&str>, debut_year: Option<i32>) -> Result<Actor> {
+pub async fn update_actor(pool: &SqlitePool, id: i64, name: &str, photo: Option<&str>, bio: Option<&str>, birthday: Option<&str>, height: Option<&str>, measurements: Option<&str>, japanese_name: Option<&str>) -> Result<Actor> {
     let row = sqlx::query(
-        "UPDATE actors SET name = ?, photo = ?, bio = ?, debut_year = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
     )
     .bind(name)
     .bind(photo)
     .bind(bio)
-    .bind(debut_year)
+    .bind(birthday)
+    .bind(height)
+    .bind(measurements)
+    .bind(japanese_name)
     .bind(id)
     .fetch_one(pool)
     .await?;
@@ -738,7 +765,10 @@ pub async fn update_actor(pool: &SqlitePool, id: i64, name: &str, photo: Option<
         name: row.get("name"),
         photo: row.get("photo"),
         bio: row.get("bio"),
-        debut_year: row.get("debut_year"),
+        birthday: row.get("birthday"),
+        height: row.get("height"),
+        measurements: row.get("measurements"),
+        japanese_name: row.get("japanese_name"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
@@ -867,7 +897,10 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
             name: row.get("name"),
             photo: row.get("photo"),
             bio: row.get("bio"),
-            debut_year: row.get("debut_year"),
+            birthday: row.get("birthday"),
+            height: row.get("height"),
+            measurements: row.get("measurements"),
+            japanese_name: row.get("japanese_name"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })

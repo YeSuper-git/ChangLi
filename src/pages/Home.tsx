@@ -219,7 +219,7 @@ const Home: React.FC = () => {
               <div className="p-4">
                 <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
                 <div className="text-sm text-gray-500">
-                  {actor.debut_year ? `${actor.debut_year}年出道` : ''}
+                  {actor.birthday ? `${actor.birthday}` : ''}
                 </div>
               </div>
             </Link>
