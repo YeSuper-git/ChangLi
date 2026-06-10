@@ -19,18 +19,33 @@ const Home: React.FC = () => {
   const loadData = async () => {
     try {
       console.log('[Home] 开始加载数据...');
+      
+      const withTimeout = <T,>(p: Promise<T>, name: string, ms = 5000): Promise<T> => {
+        return Promise.race([
+          p,
+          new Promise<T>((_, reject) => setTimeout(() => {
+            console.error(`[Home] ${name} 超时（${ms/1000}秒）！`);
+            reject(new Error(`${name} 超时`));
+          }, ms))
+        ]);
+      };
+      
       console.log('[Home] 调用 getActors...');
-      const actorsList = await getActors();
-      console.log('[Home] getActors 返回:', actorsList);
+      const actorsList = await withTimeout(getActors(), 'getActors');
+      console.log('[Home] getActors 返回:', actorsList.length, '条');
+      
       console.log('[Home] 调用 getDownloads...');
-      const downloadsList = await getDownloads();
-      console.log('[Home] getDownloads 返回:', downloadsList);
+      const downloadsList = await withTimeout(getDownloads(), 'getDownloads');
+      console.log('[Home] getDownloads 返回:', downloadsList.length, '条');
+      
       console.log('[Home] 调用 getTags...');
-      const tagsList = await getTags();
-      console.log('[Home] getTags 返回:', tagsList);
+      const tagsList = await withTimeout(getTags(), 'getTags');
+      console.log('[Home] getTags 返回:', tagsList.length, '条');
+      
       console.log('[Home] 调用 getVideos...');
-      const videosList = await getVideos();
-      console.log('[Home] getVideos 返回:', videosList);
+      const videosList = await withTimeout(getVideos(), 'getVideos');
+      console.log('[Home] getVideos 返回:', videosList.length, '条');
+      
       setActors(actorsList);
       setDownloads(downloadsList);
       setTags(tagsList);

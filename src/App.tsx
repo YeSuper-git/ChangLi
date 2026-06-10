@@ -21,7 +21,12 @@ function App() {
     const initDatabase = async () => {
       try {
         console.log('[App] 开始调用 init_db...');
+        const timeout = setTimeout(() => {
+          console.error('[App] init_db 超时（5秒）！');
+          setError('数据库初始化超时');
+        }, 5000);
         await invoke('init_db');
+        clearTimeout(timeout);
         console.log('[App] init_db 成功');
         setDbReady(true);
       } catch (err) {
