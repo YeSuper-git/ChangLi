@@ -1,0 +1,27 @@
+{
+  "version": "v0.4.0",
+  "start_time": "2026-06-10T11:36:38Z",
+  "checks": [
+    {
+      "check": 1,
+      "time": "2026-06-10T11:36:40Z",
+      "status": "check_3",
+      "details": "检查完成"
+    },
+    {
+      "check": 1,
+      "time": "2026-06-10T11:36:40Z",
+      "status": "in_progress",
+      "details": "部署进行中"
+    },
+    {
+      "check": 2,
+      "time": "2026-06-10T11:46:41Z",
+      "status": "check_0",
+      "details": "检查完成"
+    }
+  ],
+  "status": "success",
+  "final_result": "success",
+  "end_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}

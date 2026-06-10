@@ -501,8 +501,8 @@ pub async fn delete_download(pool: &SqlitePool, id: i64) -> Result<()> {
 pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     let metadata_str = video.metadata.map(|m| serde_json::to_string(&m).unwrap_or_default());
     
-    let row = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+    let result = sqlx::query(
+        "INSERT OR IGNORE INTO videos (file_path, file_name, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
@@ -515,10 +515,27 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     .bind(&metadata_str)
     .bind(&video.thumbnail)
     .bind(&video.description)
-    .fetch_one(pool)
+    .execute(pool)
     .await?;
     
-    Ok(Video {
+    // If the insert was ignored (duplicate file_path), fetch the existing record
+    if result.rows_affected() == 0 {
+        return get_video_by_path(pool, &video.file_path).await?
+            .ok_or_else(|| anyhow::anyhow!("视频已存在但无法查询"));
+    }
+    
+    // Otherwise, fetch the newly inserted record
+    get_video_by_path(pool, &video.file_path).await?
+        .ok_or_else(|| anyhow::anyhow!("视频插入后无法查询"))
+}
+
+async fn get_video_by_path(pool: &SqlitePool, file_path: &str) -> Result<Option<Video>> {
+    let row = sqlx::query("SELECT * FROM videos WHERE file_path = ?")
+        .bind(file_path)
+        .fetch_optional(pool)
+        .await?;
+    
+    Ok(row.map(|row| Video {
         id: row.get("id"),
         file_path: row.get("file_path"),
         file_name: row.get("file_name"),
@@ -532,7 +549,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         thumbnail: row.get("thumbnail"),
         description: row.get("description"),
         created_at: row.get("created_at"),
-    })
+    }))
 }
 
 pub async fn get_videos(pool: &SqlitePool) -> Result<Vec<Video>> {

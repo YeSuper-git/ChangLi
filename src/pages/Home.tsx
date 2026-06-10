@@ -18,19 +18,28 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [actorsList, downloadsList, tagsList, videosList] = await Promise.all([
-        getActors(),
-        getDownloads(),
-        getTags(),
-        getVideos()
-      ]);
+      console.log('[Home] 开始加载数据...');
+      console.log('[Home] 调用 getActors...');
+      const actorsList = await getActors();
+      console.log('[Home] getActors 返回:', actorsList);
+      console.log('[Home] 调用 getDownloads...');
+      const downloadsList = await getDownloads();
+      console.log('[Home] getDownloads 返回:', downloadsList);
+      console.log('[Home] 调用 getTags...');
+      const tagsList = await getTags();
+      console.log('[Home] getTags 返回:', tagsList);
+      console.log('[Home] 调用 getVideos...');
+      const videosList = await getVideos();
+      console.log('[Home] getVideos 返回:', videosList);
       setActors(actorsList);
       setDownloads(downloadsList);
       setTags(tagsList);
       setVideos(videosList);
+      console.log('[Home] 数据加载完成');
     } catch (error) {
-      console.error('加载数据失败:', error);
+      console.error('[Home] 加载数据失败:', error);
     } finally {
+      console.log('[Home] 设置 loading = false');
       setLoading(false);
     }
   };

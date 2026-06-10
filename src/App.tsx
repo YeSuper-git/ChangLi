@@ -20,10 +20,12 @@ function App() {
   useEffect(() => {
     const initDatabase = async () => {
       try {
+        console.log('[App] 开始调用 init_db...');
         await invoke('init_db');
+        console.log('[App] init_db 成功');
         setDbReady(true);
       } catch (err) {
-        console.error('数据库初始化失败:', err);
+        console.error('[App] 数据库初始化失败:', err);
         setError(String(err));
       }
     };
