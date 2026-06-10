@@ -7,6 +7,7 @@ use crate::db::Video;
 // 支持的视频格式
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mkv", "avi", "flv", "mov", "wmv", "webm", "m4v", "mpg", "mpeg", "3gp",
+    "ts", "rmvb", "rm", "vob", "asf", "f4v",
 ];
 
 // 扫描目录
@@ -108,4 +109,61 @@ async fn get_video_metadata(path: &Path) -> Result<VideoMetadata> {
     }
     
     Ok(metadata)
+}
+
+// 生成缩略图
+pub async fn generate_thumbnail(video_path: &str, output_path: &str) -> Result<()> {
+    let path = Path::new(video_path);
+    if !path.exists() {
+        return Err(anyhow::anyhow!("视频文件不存在: {}", path.display()));
+    }
+    
+    // 使用 mpv 生成缩略图
+    let mpv = libmpv::Mpv::new()?;
+    mpv.command("loadfile", &[video_path])?;
+    
+    // 等待加载
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    
+    // 跳转到视频中间位置
+    if let Ok(duration) = mpv.get_property::<f64>("duration") {
+        let seek_pos = duration / 2.0;
+        mpv.command("seek", &[&seek_pos.to_string(), "absolute"])?;
+    }
+    
+    // 等待seek完成
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    
+    // 截图
+    mpv.command("screenshot-to-file", &[output_path])?;
+    
+    // 等待截图完成
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    
+    Ok(())
+}
+
+// 扫描并生成缩略图
+pub async fn scan_and_generate_thumbnails(path: &str, thumbnail_dir: &str) -> Result<Vec<Video>> {
+    let videos = scan_directory(path).await?;
+    
+    // 确保缩略图目录存在
+    std::fs::create_dir_all(thumbnail_dir)?;
+    
+    for video in &videos {
+        let thumbnail_name = format!("{}.jpg", video.id);
+        let thumbnail_path = Path::new(thumbnail_dir).join(&thumbnail_name);
+        
+        match generate_thumbnail(&video.file_path, &thumbnail_path.to_string_lossy()).await {
+            Ok(_) => {
+                // 更新视频的缩略图路径
+                // 注意：这里需要更新数据库，但我们在外部处理
+            }
+            Err(e) => {
+                eprintln!("生成缩略图失败 {}: {}", video.file_name, e);
+            }
+        }
+    }
+    
+    Ok(videos)
 }
