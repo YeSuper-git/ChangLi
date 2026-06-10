@@ -8,6 +8,7 @@ const Actors: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newActor, setNewActor] = useState({ name: '', bio: '', debutYear: '' });
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadActors();
@@ -42,6 +43,10 @@ const Actors: React.FC = () => {
     }
   };
 
+  const filteredActors = actors.filter(actor =>
+    actor.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -67,14 +72,16 @@ const Actors: React.FC = () => {
         <input
           type="text"
           placeholder="搜索演员..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500"
         />
       </div>
 
       {/* 演员列表 */}
-      {actors.length > 0 ? (
+      {filteredActors.length > 0 ? (
         <div className="grid grid-cols-4 gap-6">
-          {actors.map((actor) => (
+          {filteredActors.map((actor) => (
             <Link key={actor.id} to={`/actors/${actor.id}`} className="block">
               <div className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
                 <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative">
@@ -96,13 +103,17 @@ const Actors: React.FC = () => {
         </div>
       ) : (
         <div className="bg-gray-50 rounded-xl p-12 text-center">
-          <p className="text-gray-500 text-lg mb-4">暂无演员数据</p>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            添加第一个演员
-          </button>
+          <p className="text-gray-500 text-lg mb-4">
+            {searchTerm ? '没有找到匹配的演员' : '暂无演员数据'}
+          </p>
+          {!searchTerm && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              添加第一个演员
+            </button>
+          )}
         </div>
       )}
 
