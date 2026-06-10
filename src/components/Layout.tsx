@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -7,6 +7,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navItems = [
     { path: '/', label: '首页' },
@@ -47,7 +48,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 placeholder="搜索..."
                 className="px-4 py-2 bg-gray-50 border-0 rounded-full text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               />
-              <button className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200">
+              <button 
+                onClick={() => navigate('/settings')}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
+              >
                 <span>⚙️</span>
               </button>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchResources } from '../utils/api';
+import { searchResources, getResources } from '../utils/api';
 import type { Resource } from '../utils/api';
 
 const Search: React.FC = () => {
@@ -15,8 +15,24 @@ const Search: React.FC = () => {
     setSearched(true);
     
     try {
-      const resources = await searchResources(keyword);
-      setResults(resources);
+      // 同时搜索本地资源和在线资源
+      const [localResources, onlineResources] = await Promise.all([
+        getResources(),
+        searchResources(keyword)
+      ]);
+      
+      // 过滤本地资源（按关键词匹配）
+      const filteredLocal = localResources.filter(r => 
+        r.title.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      // 合并结果，去重
+      const allResources = [...filteredLocal, ...onlineResources];
+      const uniqueResources = allResources.filter((r, index, self) => 
+        index === self.findIndex(t => t.title === r.title)
+      );
+      
+      setResults(uniqueResources);
     } catch (error) {
       console.error('搜索失败:', error);
     } finally {

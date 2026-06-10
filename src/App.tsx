@@ -8,6 +8,7 @@ import Player from './pages/Player';
 import Actors from './pages/Actors';
 import ActorDetail from './pages/ActorDetail';
 import Tags from './pages/Tags';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/actors" element={<Actors />} />
           <Route path="/actors/:id" element={<ActorDetail />} />
           <Route path="/tags" element={<Tags />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
     </Router>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getActors, getDownloads, getRecentResources } from '../utils/api';
-import type { Actor, Resource, Download } from '../utils/api';
+import { getActors, getDownloads, getRecentResources, getTags } from '../utils/api';
+import type { Actor, Resource, Download, Tag } from '../utils/api';
 
 const Home: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [downloads, setDownloads] = useState<Download[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('全部');
 
@@ -16,14 +17,16 @@ const Home: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [actorsList, resourcesList, downloadsList] = await Promise.all([
+      const [actorsList, resourcesList, downloadsList, tagsList] = await Promise.all([
         getActors(),
         getRecentResources(10),
-        getDownloads()
+        getDownloads(),
+        getTags()
       ]);
       setActors(actorsList);
       setResources(resourcesList);
       setDownloads(downloadsList);
+      setTags(tagsList);
     } catch (error) {
       console.error('加载数据失败:', error);
     } finally {
@@ -39,21 +42,33 @@ const Home: React.FC = () => {
     );
   }
 
-  const categories = ['全部', '日漫', '国漫', '泡面番', '里番', '系列'];
-
   return (
     <div>
       {/* 分类标签 */}
-      <div className="flex gap-3 mb-12">
-        {categories.map((category) => (
+      <div className="flex items-center justify-between mb-12">
+        <div className="flex gap-3">
           <button
-            key={category}
-            onClick={() => setActiveCategory(category)}
-            className={`category-btn ${activeCategory === category ? 'active' : ''}`}
+            onClick={() => setActiveCategory('全部')}
+            className={`category-btn ${activeCategory === '全部' ? 'active' : ''}`}
           >
-            {category}
+            全部
           </button>
-        ))}
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              onClick={() => setActiveCategory(tag.name)}
+              className={`category-btn ${activeCategory === tag.name ? 'active' : ''}`}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+        <Link
+          to="/settings"
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
+        >
+          + 添加资源
+        </Link>
       </div>
 
       {/* 继续观看 */}

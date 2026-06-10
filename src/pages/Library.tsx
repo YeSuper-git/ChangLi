@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getVideos, scanVideos, deleteVideo } from '../utils/api';
 import type { Video } from '../utils/api';
+import { open } from '@tauri-apps/api/dialog';
 
 const Library: React.FC = () => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scanPath, setScanPath] = useState('');
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -26,16 +26,27 @@ const Library: React.FC = () => {
   };
 
   const handleScan = async () => {
-    if (!scanPath.trim()) return;
-    
-    setScanning(true);
     try {
-      await scanVideos(scanPath);
-      loadVideos();
+      // 打开文件夹选择器
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: '选择要扫描的文件夹'
+      });
+      
+      if (selected) {
+        setScanning(true);
+        try {
+          await scanVideos(selected as string);
+          loadVideos();
+        } catch (error) {
+          console.error('扫描失败:', error);
+        } finally {
+          setScanning(false);
+        }
+      }
     } catch (error) {
-      console.error('扫描失败:', error);
-    } finally {
-      setScanning(false);
+      console.error('打开文件夹选择器失败:', error);
     }
   };
 
@@ -64,27 +75,15 @@ const Library: React.FC = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-10">视频库</h1>
-
-      {/* 扫描目录 */}
-      <div className="card p-8 mb-10">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">扫描目录</h3>
-        <div className="flex gap-4">
-          <input
-            type="text"
-            value={scanPath}
-            onChange={(e) => setScanPath(e.target.value)}
-            placeholder="输入目录路径..."
-            className="search-input flex-1"
-          />
-          <button
-            onClick={handleScan}
-            disabled={scanning}
-            className="px-8 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
-          >
-            {scanning ? '扫描中...' : '扫描'}
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-10">
+        <h1 className="text-3xl font-bold">视频库</h1>
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
+        >
+          {scanning ? '扫描中...' : '扫描文件夹'}
+        </button>
       </div>
 
       {/* 搜索栏 */}
@@ -153,7 +152,7 @@ const Library: React.FC = () => {
             {searchTerm ? '没有找到匹配的视频' : '暂无视频'}
           </p>
           {!searchTerm && (
-            <p className="text-gray-400 text-sm">扫描本地目录添加视频</p>
+            <p className="text-gray-400 text-sm">点击"扫描文件夹"添加视频</p>
           )}
         </div>
       )}

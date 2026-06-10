@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getActors, addActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 
 const Actors: React.FC = () => {
+  const navigate = useNavigate();
   const [actors, setActors] = useState<Actor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -29,7 +30,7 @@ const Actors: React.FC = () => {
     if (!newActor.name.trim()) return;
     
     try {
-      await addActor(
+      const actor = await addActor(
         newActor.name,
         undefined,
         newActor.bio || undefined,
@@ -37,7 +38,8 @@ const Actors: React.FC = () => {
       );
       setShowAddModal(false);
       setNewActor({ name: '', bio: '', debutYear: '' });
-      loadActors();
+      // 跳转到演员详情页
+      navigate(`/actors/${actor.id}`);
     } catch (error) {
       console.error('添加演员失败:', error);
     }
