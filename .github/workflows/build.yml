@@ -12,18 +12,7 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
-            rust_target: aarch64-apple-darwin
-          - platform: windows-latest
-            args: ''
-            rust_target: x86_64-pc-windows-msvc
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -35,12 +24,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.rust_target }}
-
-      - name: Install dependencies (macos only)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew install ffmpeg mpv
+          targets: x86_64-pc-windows-msvc
 
       - name: Install frontend dependencies
         run: npm ci
@@ -49,20 +33,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
-
-      - name: Upload macOS artifact
-        if: matrix.platform == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: changli-macos-aarch64
-          path: |
-            src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.rust_target }}/release/bundle/macos/*.app.tar.gz
 
       - name: Upload Windows artifact
-        if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: changli-windows
