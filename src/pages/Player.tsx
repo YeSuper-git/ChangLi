@@ -7,6 +7,7 @@ import { convertFileSrc } from '@tauri-apps/api/tauri';
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const systemPlayerOpenedRef = useRef(false);
   const [video, setVideo] = useState<Video | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,7 @@ const Player: React.FC = () => {
       console.log('[Player] video.file_path:', video.file_path, 'videoSrc:', src);
       setVideoSrc(src);
       setPlayError(null);
+      systemPlayerOpenedRef.current = false;
     }
   }, [video]);
 
@@ -64,9 +66,9 @@ const Player: React.FC = () => {
       if (isPlaying) {
         videoRef.current.pause();
       } else {
-        await videoRef.current.play().catch((error) => {
+        await videoRef.current.play().catch(async (error) => {
           console.error('视频播放失败:', error);
-          setPlayError('当前视频无法在内置播放器中播放，可能是编码不被系统 WebView 支持。可点击右侧 📺 使用系统播放器打开。');
+          await openSystemPlayerFallback('内置播放器暂不可用，已切换为 Windows 11 系统播放器模式打开。');
           throw error;
         });
       }
@@ -137,14 +139,21 @@ const Player: React.FC = () => {
     }
   };
 
-  const handleOpenSystemPlayer = async () => {
-    if (video) {
-      try {
-        await playVideo(video.id);
-      } catch (error) {
-        console.error('打开系统播放器失败:', error);
-      }
+  const openSystemPlayerFallback = async (message: string) => {
+    if (!video || systemPlayerOpenedRef.current) return;
+    systemPlayerOpenedRef.current = true;
+    setPlayError(message);
+    try {
+      await playVideo(video.id);
+    } catch (error) {
+      console.error('打开系统播放器失败:', error);
+      setPlayError('系统播放器打开失败，请确认视频文件仍存在。');
+      systemPlayerOpenedRef.current = false;
     }
+  };
+
+  const handleOpenSystemPlayer = async () => {
+    await openSystemPlayerFallback('已使用系统播放器打开视频。');
   };
 
   const formatTime = (seconds: number) => {
@@ -191,7 +200,7 @@ const Player: React.FC = () => {
         onPlay={() => setIsPlaying(true)}
         onError={(event) => {
           console.error('视频元素加载失败:', event.currentTarget.error, 'src:', videoSrc);
-          setPlayError('视频加载失败，请确认文件仍存在，或使用系统播放器打开。');
+          openSystemPlayerFallback('内置播放器无法直接加载该文件，已切换为 Windows 11 系统播放器模式打开。');
         }}
       />
 

@@ -353,6 +353,18 @@ export async function saveActorPhoto(sourcePath: string): Promise<string> {
   }
 }
 
+export async function saveVideoThumbnail(sourcePath: string): Promise<string> {
+  console.log('[API] 调用 saveVideoThumbnail, sourcePath:', sourcePath);
+  try {
+    const result = await invoke<string>('save_video_thumbnail', { sourcePath });
+    console.log('[API] saveVideoThumbnail 成功, 返回路径:', result);
+    return result;
+  } catch (err) {
+    console.error('[API] saveVideoThumbnail 失败:', err);
+    throw err;
+  }
+}
+
 // 标签相关
 export interface Tag {
   id: number;

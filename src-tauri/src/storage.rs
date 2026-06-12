@@ -68,6 +68,10 @@ pub fn actor_photos_dir() -> PathBuf {
     active_data_dir().join("actors").join("photos")
 }
 
+pub fn video_thumbnails_dir() -> PathBuf {
+    active_data_dir().join("videos").join("thumbnails")
+}
+
 pub fn resolve_data_path(path: &str) -> PathBuf {
     let source = Path::new(path);
     if source.is_absolute() {

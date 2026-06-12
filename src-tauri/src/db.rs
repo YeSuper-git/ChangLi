@@ -565,7 +565,18 @@ async fn get_video_by_path(pool: &SqlitePool, file_path: &str) -> Result<Option<
         .fetch_optional(pool)
         .await?;
 
-    Ok(row.map(|row| Video {
+    Ok(row.map(|row| video_from_row(&row)))
+}
+
+fn video_from_row(row: &SqliteRow) -> Video {
+    let thumbnail: Option<String> = row.get("thumbnail");
+    let resolved_thumbnail = thumbnail.map(|path| {
+        storage::resolve_data_path(&path)
+            .to_string_lossy()
+            .to_string()
+    });
+
+    Video {
         id: row.get("id"),
         file_path: row.get("file_path"),
         file_name: row.get("file_name"),
@@ -578,10 +589,10 @@ async fn get_video_by_path(pool: &SqlitePool, file_path: &str) -> Result<Option<
         metadata: row
             .get::<Option<String>, _>("metadata")
             .and_then(|s| serde_json::from_str(&s).ok()),
-        thumbnail: row.get("thumbnail"),
+        thumbnail: resolved_thumbnail,
         description: row.get("description"),
         created_at: row.get("created_at"),
-    }))
+    }
 }
 
 pub async fn get_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
@@ -589,26 +600,7 @@ pub async fn get_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
         .fetch_all(pool)
         .await?;
 
-    let videos = rows
-        .iter()
-        .map(|row| Video {
-            id: row.get("id"),
-            file_path: row.get("file_path"),
-            file_name: row.get("file_name"),
-            file_size: row.get("file_size"),
-            duration: row.get("duration"),
-            width: row.get("width"),
-            height: row.get("height"),
-            resolution: row.get("resolution"),
-            source_site: row.get("source_site"),
-            metadata: row
-                .get::<Option<String>, _>("metadata")
-                .and_then(|s| serde_json::from_str(&s).ok()),
-            thumbnail: row.get("thumbnail"),
-            description: row.get("description"),
-            created_at: row.get("created_at"),
-        })
-        .collect();
+    let videos = rows.iter().map(video_from_row).collect();
 
     Ok(videos)
 }
@@ -619,23 +611,7 @@ pub async fn get_video(pool: &SqlitePool, id: i64) -> Result<Option<Video>> {
         .fetch_optional(pool)
         .await?;
 
-    Ok(row.map(|row| Video {
-        id: row.get("id"),
-        file_path: row.get("file_path"),
-        file_name: row.get("file_name"),
-        file_size: row.get("file_size"),
-        duration: row.get("duration"),
-        width: row.get("width"),
-        height: row.get("height"),
-        resolution: row.get("resolution"),
-        source_site: row.get("source_site"),
-        metadata: row
-            .get::<Option<String>, _>("metadata")
-            .and_then(|s| serde_json::from_str(&s).ok()),
-        thumbnail: row.get("thumbnail"),
-        description: row.get("description"),
-        created_at: row.get("created_at"),
-    }))
+    Ok(row.map(|row| video_from_row(&row)))
 }
 
 pub async fn update_video(
@@ -679,23 +655,7 @@ pub async fn update_video(
 
     let row = query_builder.fetch_one(pool).await?;
 
-    Ok(Video {
-        id: row.get("id"),
-        file_path: row.get("file_path"),
-        file_name: row.get("file_name"),
-        file_size: row.get("file_size"),
-        duration: row.get("duration"),
-        width: row.get("width"),
-        height: row.get("height"),
-        resolution: row.get("resolution"),
-        source_site: row.get("source_site"),
-        metadata: row
-            .get::<Option<String>, _>("metadata")
-            .and_then(|s| serde_json::from_str(&s).ok()),
-        thumbnail: row.get("thumbnail"),
-        description: row.get("description"),
-        created_at: row.get("created_at"),
-    })
+    Ok(video_from_row(&row))
 }
 
 pub async fn delete_video(pool: &SqlitePool, id: i64) -> Result<()> {

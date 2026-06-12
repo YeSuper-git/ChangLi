@@ -1,6 +1,6 @@
 [package]
 name = "changli"
-version = "0.5.2"
+version = "0.5.3"
 description = "长离 - 全功能视频管理播放平台"
 authors = ["YeSuper"]
 license = "MIT"
@@ -28,6 +28,7 @@ walkdir = "2.4"
 dirs = "5.0"
 open = "5.0"
 regex = "1.12.4"
+image = { version = "0.25", default-features = false, features = ["png", "bmp", "tiff"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

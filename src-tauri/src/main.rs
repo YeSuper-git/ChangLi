@@ -11,6 +11,8 @@ mod scanner;
 mod site_config;
 mod storage;
 
+use image::ImageReader;
+use std::path::Path;
 use tauri::State;
 use tokio::sync::Mutex;
 
@@ -392,13 +394,22 @@ fn normalize_photo_path_for_storage(path: &str) -> String {
 
 #[tauri::command]
 async fn save_actor_photo(source_path: String) -> Result<String, String> {
-    let data_dir = storage::actor_photos_dir();
+    save_image_asset(&source_path, &storage::actor_photos_dir(), "actor")
+}
 
-    // 确保目录存在
-    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+#[tauri::command]
+async fn save_video_thumbnail(source_path: String) -> Result<String, String> {
+    save_image_asset(
+        &source_path,
+        &storage::video_thumbnails_dir(),
+        "video-thumbnail",
+    )
+}
 
-    // 支持常见网页/相册图片格式；保持原始格式，前端通过 asset URL 直接展示。
-    let source = std::path::Path::new(&source_path);
+fn save_image_asset(source_path: &str, data_dir: &Path, prefix: &str) -> Result<String, String> {
+    std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
+
+    let source = Path::new(source_path);
     if !source.exists() || !source.is_file() {
         return Err("选择的海报文件不存在".to_string());
     }
@@ -406,24 +417,37 @@ async fn save_actor_photo(source_path: String) -> Result<String, String> {
     let ext = source
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("jpg")
+        .unwrap_or("")
         .to_lowercase();
-    let allowed_extensions = [
-        "jpg", "jpeg", "png", "webp", "gif", "bmp", "avif", "svg", "tif", "tiff", "heic", "heif",
-    ];
-    if !allowed_extensions.contains(&ext.as_str()) {
+
+    let copy_directly = ["jpg", "jpeg", "png", "webp", "gif", "svg", "avif"];
+    let convert_to_png = ["bmp", "tif", "tiff", "ico"];
+
+    let dest = if copy_directly.contains(&ext.as_str()) {
+        let filename = format!("{}-{}.{}", prefix, uuid::Uuid::new_v4(), ext);
+        let dest = data_dir.join(filename);
+        std::fs::copy(source, &dest).map_err(|e| e.to_string())?;
+        dest
+    } else if convert_to_png.contains(&ext.as_str()) {
+        let filename = format!("{}-{}.png", prefix, uuid::Uuid::new_v4());
+        let dest = data_dir.join(filename);
+        let image = ImageReader::open(source)
+            .map_err(|e| format!("读取图片失败: {}", e))?
+            .decode()
+            .map_err(|e| format!("解析图片失败: {}", e))?;
+        image
+            .save_with_format(&dest, image::ImageFormat::Png)
+            .map_err(|e| format!("转换图片失败: {}", e))?;
+        dest
+    } else if ext == "heic" || ext == "heif" {
+        return Err("HEIC/HEIF 需要 Windows 系统已安装 HEIF 图像扩展；当前内置转换器暂不支持。请先另存为 JPG/PNG/WebP 后再导入。".to_string());
+    } else {
         return Err(format!("不支持的图片格式: {}", ext));
-    }
-
-    let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
-    let dest = data_dir.join(&filename);
-
-    // 复制文件
-    std::fs::copy(&source_path, &dest).map_err(|e| e.to_string())?;
+    };
 
     let relative_path = storage::path_relative_to_data_dir(&dest);
     eprintln!(
-        "[ChangLi] 海报已保存: {} -> {}",
+        "[ChangLi] 图片资产已保存: {} -> {}",
         dest.display(),
         relative_path
     );
@@ -704,6 +728,7 @@ fn main() {
             get_resource_watch_progress,
             update_video,
             save_actor_photo,
+            save_video_thumbnail,
             get_storage_info,
             open_data_dir,
         ])
@@ -761,7 +786,8 @@ async fn update_video(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_video(&pool, id, file_name, description, thumbnail)
+    let stored_thumbnail = thumbnail.as_deref().map(normalize_photo_path_for_storage);
+    db::update_video(&pool, id, file_name, description, stored_thumbnail)
         .await
         .map_err(|e| e.to_string())
 }

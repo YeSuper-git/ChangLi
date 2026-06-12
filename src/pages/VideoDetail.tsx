@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getVideo, updateVideo, getTags, addTag, getActors, addActor, getResourceTags, addResourceTag, removeResourceTag, getResourceActors, addResourceActor, removeResourceActor } from '../utils/api';
+import {
+  getVideo,
+  updateVideo,
+  getTags,
+  addTag,
+  getActors,
+  addActor,
+  getResourceTags,
+  addResourceTag,
+  removeResourceTag,
+  getResourceActors,
+  addResourceActor,
+  removeResourceActor,
+  saveVideoThumbnail,
+} from '../utils/api';
 import type { Video, Tag, Actor } from '../utils/api';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
@@ -12,15 +26,17 @@ const VideoDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({ fileName: '', description: '', thumbnail: '' });
-  
-  // 标签相关
+
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [videoTags, setVideoTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [creatingTag, setCreatingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
-  
-  // 演员相关
+
   const [allActors, setAllActors] = useState<Actor[]>([]);
   const [videoActors, setVideoActors] = useState<Actor[]>([]);
+  const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
+  const [showNewActorModal, setShowNewActorModal] = useState(false);
   const [newActorName, setNewActorName] = useState('');
 
   useEffect(() => {
@@ -39,16 +55,17 @@ const VideoDetail: React.FC = () => {
         setEditData({
           fileName: videoData.file_name,
           description: videoData.description || '',
-          thumbnail: videoData.thumbnail || ''
+          thumbnail: videoData.thumbnail || '',
         });
-        
-        // 加载视频的标签和演员
+
         const [tags, actors] = await Promise.all([
           getResourceTags(videoId),
-          getResourceActors(videoId)
+          getResourceActors(videoId),
         ]);
         setVideoTags(tags);
         setVideoActors(actors);
+        setSelectedTagIds(tags.map((tag) => tag.id));
+        setSelectedActorIds(actors.map((actor) => actor.id));
       }
     } catch (error) {
       console.error('加载视频失败:', error);
@@ -75,15 +92,76 @@ const VideoDetail: React.FC = () => {
     }
   };
 
+  const beginEditing = () => {
+    if (!video) return;
+    setEditData({
+      fileName: video.file_name,
+      description: video.description || '',
+      thumbnail: video.thumbnail || '',
+    });
+    setSelectedTagIds(videoTags.map((tag) => tag.id));
+    setSelectedActorIds(videoActors.map((actor) => actor.id));
+    setCreatingTag(false);
+    setNewTagName('');
+    setShowNewActorModal(false);
+    setNewActorName('');
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (video) {
+      setEditData({
+        fileName: video.file_name,
+        description: video.description || '',
+        thumbnail: video.thumbnail || '',
+      });
+    }
+    setSelectedTagIds(videoTags.map((tag) => tag.id));
+    setSelectedActorIds(videoActors.map((actor) => actor.id));
+    setCreatingTag(false);
+    setNewTagName('');
+    setShowNewActorModal(false);
+    setNewActorName('');
+    setEditing(false);
+  };
+
+  const syncRelations = async () => {
+    if (!video) return;
+
+    const currentTagIds = new Set(videoTags.map((tag) => tag.id));
+    const nextTagIds = new Set(selectedTagIds);
+    await Promise.all([
+      ...selectedTagIds
+        .filter((tagId) => !currentTagIds.has(tagId))
+        .map((tagId) => addResourceTag(video.id, tagId)),
+      ...videoTags
+        .filter((tag) => !nextTagIds.has(tag.id))
+        .map((tag) => removeResourceTag(video.id, tag.id)),
+    ]);
+
+    const currentActorIds = new Set(videoActors.map((actor) => actor.id));
+    const nextActorIds = new Set(selectedActorIds);
+    await Promise.all([
+      ...selectedActorIds
+        .filter((actorId) => !currentActorIds.has(actorId))
+        .map((actorId) => addResourceActor(video.id, actorId)),
+      ...videoActors
+        .filter((actor) => !nextActorIds.has(actor.id))
+        .map((actor) => removeResourceActor(video.id, actor.id)),
+    ]);
+  };
+
   const handleSave = async () => {
     if (!video) return;
-    
+
     try {
       await updateVideo(video.id, editData.fileName, editData.description, editData.thumbnail);
+      await syncRelations();
       setEditing(false);
-      loadVideo(video.id);
+      await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
     } catch (error) {
       console.error('保存失败:', error);
+      alert(`保存失败：${String(error)}`);
     }
   };
 
@@ -93,77 +171,77 @@ const VideoDetail: React.FC = () => {
         multiple: false,
         filters: [{
           name: '图片',
-          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'heic', 'heif']
-        }]
+          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'ico', 'heic', 'heif'],
+        }],
       });
-      
+
       if (selected) {
-        setEditData({ ...editData, thumbnail: selected as string });
+        const storedPath = await saveVideoThumbnail(selected as string);
+        setEditData({ ...editData, thumbnail: storedPath });
       }
     } catch (error) {
       console.error('选择海报失败:', error);
+      alert(`选择海报失败：${String(error)}`);
     }
   };
 
-  const handleAddTag = async (tagName: string) => {
-    if (!video || !tagName.trim()) return;
-    
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds((current) =>
+      current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId]
+    );
+  };
+
+  const toggleActor = (actorId: number) => {
+    setSelectedActorIds((current) =>
+      current.includes(actorId) ? current.filter((id) => id !== actorId) : [...current, actorId]
+    );
+  };
+
+  const handleCreateTag = async () => {
+    const name = newTagName.trim();
+    if (!name) return;
+
+    const duplicated = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicated) {
+      alert(`标签“${name}”已存在，不能重复添加。`);
+      return;
+    }
+
     try {
-      // 先检查标签是否存在，不存在则创建
-      let tag = allTags.find(t => t.name === tagName);
-      if (!tag) {
-        tag = await addTag(tagName);
-        loadTags();
-      }
-      
-      await addResourceTag(video.id, tag.id);
-      const tags = await getResourceTags(video.id);
-      setVideoTags(tags);
+      const tag = await addTag(name);
+      setAllTags((current) => [...current, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedTagIds((current) => [...current, tag.id]);
+      setNewTagName('');
+      setCreatingTag(false);
     } catch (error) {
-      console.error('添加标签失败:', error);
+      console.error('新建标签失败:', error);
+      alert(`新建标签失败：${String(error)}`);
     }
   };
 
-  const handleRemoveTag = async (tagId: number) => {
-    if (!video) return;
-    
-    try {
-      await removeResourceTag(video.id, tagId);
-      const tags = await getResourceTags(video.id);
-      setVideoTags(tags);
-    } catch (error) {
-      console.error('移除标签失败:', error);
-    }
-  };
+  const handleCreateActor = async () => {
+    const name = newActorName.trim();
+    if (!name) return;
 
-  const handleAddActor = async (actorName: string) => {
-    if (!video || !actorName.trim()) return;
-    
-    try {
-      // 先检查演员是否存在，不存在则创建
-      let actor = allActors.find(a => a.name === actorName);
-      if (!actor) {
-        actor = await addActor(actorName);
-        loadActors();
-      }
-      
-      await addResourceActor(video.id, actor.id);
-      const actors = await getResourceActors(video.id);
-      setVideoActors(actors);
-    } catch (error) {
-      console.error('添加演员失败:', error);
+    const duplicated = allActors.find((actor) => actor.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicated) {
+      alert(`演员“${name}”已存在，已为你选中该演员。`);
+      setSelectedActorIds((current) => current.includes(duplicated.id) ? current : [...current, duplicated.id]);
+      setShowNewActorModal(false);
+      setNewActorName('');
+      return;
     }
-  };
 
-  const handleRemoveActor = async (actorId: number) => {
-    if (!video) return;
-    
     try {
-      await removeResourceActor(video.id, actorId);
-      const actors = await getResourceActors(video.id);
-      setVideoActors(actors);
+      const actor = await addActor(name);
+      setAllActors((current) => [...current, actor].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedActorIds((current) => [...current, actor.id]);
+      setShowNewActorModal(false);
+      setNewActorName('');
+      alert('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
-      console.error('移除演员失败:', error);
+      console.error('新建演员失败:', error);
+      alert(`新建演员失败：${String(error)}`);
     }
   };
 
@@ -180,11 +258,13 @@ const VideoDetail: React.FC = () => {
       <div className="text-center py-16">
         <p className="text-gray-500 text-lg">视频不存在</p>
         <Link to="/library" className="text-blue-500 hover:text-blue-600 mt-4 inline-block">
-          返回视频库
+          返回视频
         </Link>
       </div>
     );
   }
+
+  const displayThumbnail = editData.thumbnail || video.thumbnail;
 
   return (
     <div>
@@ -194,7 +274,7 @@ const VideoDetail: React.FC = () => {
           {editing ? (
             <>
               <button
-                onClick={() => setEditing(false)}
+                onClick={cancelEditing}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
                 取消
@@ -208,7 +288,7 @@ const VideoDetail: React.FC = () => {
             </>
           ) : (
             <button
-              onClick={() => setEditing(true)}
+              onClick={beginEditing}
               className="px-4 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
             >
               编辑
@@ -218,16 +298,18 @@ const VideoDetail: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-3 gap-8">
-        {/* 左侧：视频信息 */}
         <div className="col-span-2 space-y-6">
-          {/* 海报 */}
           <div className="card overflow-hidden">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
-              {video.thumbnail ? (
+              {displayThumbnail ? (
                 <img
-                  src={convertFileSrc(video.thumbnail)}
+                  src={convertFileSrc(displayThumbnail)}
                   alt={video.file_name}
                   className="w-full h-full object-cover"
+                  onError={(event) => {
+                    console.error('视频海报加载失败:', displayThumbnail, event);
+                    event.currentTarget.style.display = 'none';
+                  }}
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -245,7 +327,6 @@ const VideoDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* 文件名 */}
           <div className="card p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">文件名</h3>
             {editing ? (
@@ -260,7 +341,6 @@ const VideoDetail: React.FC = () => {
             )}
           </div>
 
-          {/* 简介 */}
           <div className="card p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">简介</h3>
             {editing ? (
@@ -276,7 +356,6 @@ const VideoDetail: React.FC = () => {
             )}
           </div>
 
-          {/* 视频信息 */}
           <div className="card p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-4">视频信息</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -300,9 +379,7 @@ const VideoDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* 右侧：标签和演员 */}
         <div className="space-y-6">
-          {/* 播放按钮 */}
           <Link
             to={`/player/${video.id}`}
             className="block w-full px-6 py-4 bg-blue-500 text-white text-center rounded-xl font-medium hover:bg-blue-600"
@@ -310,139 +387,180 @@ const VideoDetail: React.FC = () => {
             ▶️ 播放视频
           </Link>
 
-          {/* 标签 */}
           <div className="card p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-4">标签</h3>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {videoTags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-sm"
-                >
-                  {tag.name}
-                  {editing && (
-                    <button
-                      onClick={() => handleRemoveTag(tag.id)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-            {editing && (
+            {editing ? (
               <>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="输入新标签或选择已有标签..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddTag(newTagName);
-                        setNewTagName('');
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      handleAddTag(newTagName);
-                      setNewTagName('');
-                    }}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-                  >
-                    添加
-                  </button>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-400 mb-2">已有标签：</p>
-                  <div className="flex flex-wrap gap-2">
-                    {allTags.filter(t => !videoTags.find(vt => vt.id === t.id)).slice(0, 10).map((tag) => (
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => {
+                    const selected = selectedTagIds.includes(tag.id);
+                    return (
                       <button
                         key={tag.id}
-                        onClick={() => handleAddTag(tag.name)}
-                        className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                          selected
+                            ? 'bg-blue-500 border-blue-500 text-white'
+                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                        }`}
                       >
-                        + {tag.name}
+                        {tag.name}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCreatingTag(true)}
+                    className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                  >
+                    + 新建标签
+                  </button>
                 </div>
+                {allTags.length === 0 && !creatingTag && (
+                  <p className="text-sm text-gray-400 mt-3">暂无已有标签，可点击“新建标签”添加。</p>
+                )}
+                {creatingTag && (
+                  <div className="mt-4 flex gap-2">
+                    <input
+                      type="text"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateTag();
+                        if (e.key === 'Escape') {
+                          setCreatingTag(false);
+                          setNewTagName('');
+                        }
+                      }}
+                      placeholder="输入标签名"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                    <button onClick={handleCreateTag} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+                      完成
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCreatingTag(false);
+                        setNewTagName('');
+                      }}
+                      className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+                    >
+                      取消
+                    </button>
+                  </div>
+                )}
               </>
+            ) : videoTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {videoTags.map((tag) => (
+                  <span key={tag.id} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">暂未添加标签，点击编辑添加标签</p>
             )}
           </div>
 
-          {/* 演员 */}
           <div className="card p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-4">演员</h3>
-            <div className="space-y-2 mb-4">
-              {videoActors.map((actor) => (
-                <div
-                  key={actor.id}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                >
-                  <Link to={`/actors/${actor.id}`} className="text-gray-900 hover:text-blue-600">
-                    {actor.name}
-                  </Link>
-                  {editing && (
-                    <button
-                      onClick={() => handleRemoveActor(actor.id)}
-                      className="text-gray-400 hover:text-red-500 text-sm"
-                    >
-                      移除
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {editing && (
+            {editing ? (
               <>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newActorName}
-                    onChange={(e) => setNewActorName(e.target.value)}
-                    placeholder="输入新演员或选择已有演员..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddActor(newActorName);
-                        setNewActorName('');
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      handleAddActor(newActorName);
-                      setNewActorName('');
-                    }}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-                  >
-                    添加
-                  </button>
-                </div>
-                <div className="mt-4">
-                  <p className="text-xs text-gray-400 mb-2">已有演员：</p>
-                  <div className="flex flex-wrap gap-2">
-                    {allActors.filter(a => !videoActors.find(va => va.id === a.id)).slice(0, 10).map((actor) => (
+                <div className="flex flex-wrap gap-2">
+                  {allActors.map((actor) => {
+                    const selected = selectedActorIds.includes(actor.id);
+                    return (
                       <button
                         key={actor.id}
-                        onClick={() => handleAddActor(actor.name)}
-                        className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                        type="button"
+                        onClick={() => toggleActor(actor.id)}
+                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                          selected
+                            ? 'bg-blue-500 border-blue-500 text-white'
+                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                        }`}
                       >
-                        + {actor.name}
+                        {actor.name}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setShowNewActorModal(true)}
+                    className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                  >
+                    + 新建演员
+                  </button>
                 </div>
+                {allActors.length === 0 && (
+                  <p className="text-sm text-gray-400 mt-3">暂无已有演员，可点击“新建演员”添加。</p>
+                )}
               </>
+            ) : videoActors.length > 0 ? (
+              <div className="space-y-2">
+                {videoActors.map((actor) => (
+                  <Link
+                    key={actor.id}
+                    to={`/actors/${actor.id}`}
+                    className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-blue-600"
+                  >
+                    {actor.name}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">暂未添加演员，点击编辑添加演员</p>
             )}
           </div>
         </div>
       </div>
+
+      {showNewActorModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 w-96">
+            <h2 className="text-2xl font-bold mb-6">新建演员</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">姓名 *</label>
+              <input
+                type="text"
+                value={newActorName}
+                onChange={(e) => setNewActorName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateActor();
+                  if (e.key === 'Escape') {
+                    setShowNewActorModal(false);
+                    setNewActorName('');
+                  }
+                }}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                placeholder="输入演员姓名"
+                autoFocus
+              />
+              <p className="text-xs text-gray-400 mt-2">新建后会自动选中，稍后可去演员中补充海报和详细信息。</p>
+            </div>
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={() => {
+                  setShowNewActorModal(false);
+                  setNewActorName('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateActor}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
