@@ -1,5 +1,35 @@
 import { invoke } from '@tauri-apps/api';
 
+export interface StorageInfo {
+  mode: 'system' | 'portable';
+  data_dir: string;
+  db_path: string;
+  portable_root?: string;
+}
+
+export async function getStorageInfo(): Promise<StorageInfo> {
+  console.log('[API] 调用 getStorageInfo');
+  try {
+    const result = await invoke<StorageInfo>('get_storage_info');
+    console.log('[API] getStorageInfo 返回:', result);
+    return result;
+  } catch (err) {
+    console.error('[API] getStorageInfo 失败:', err);
+    throw err;
+  }
+}
+
+export async function openDataDir(): Promise<void> {
+  console.log('[API] 调用 openDataDir');
+  try {
+    await invoke('open_data_dir');
+    console.log('[API] openDataDir 成功');
+  } catch (err) {
+    console.error('[API] openDataDir 失败:', err);
+    throw err;
+  }
+}
+
 // 网站相关
 export interface Site {
   id: number;

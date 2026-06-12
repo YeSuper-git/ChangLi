@@ -3,15 +3,16 @@
 
 mod db;
 mod downloader;
-mod http;
 mod html_parser;
+mod http;
 mod parser;
 mod player;
 mod scanner;
 mod site_config;
+mod storage;
 
-use tokio::sync::Mutex;
 use tauri::State;
+use tokio::sync::Mutex;
 
 // 应用状态
 struct AppState {
@@ -58,12 +59,18 @@ async fn add_site(state: State<'_, AppState>, site: db::NewSite) -> Result<db::S
 }
 
 #[tauri::command]
-async fn update_site(state: State<'_, AppState>, id: i64, site: db::NewSite) -> Result<db::Site, String> {
+async fn update_site(
+    state: State<'_, AppState>,
+    id: i64,
+    site: db::NewSite,
+) -> Result<db::Site, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_site(&pool, id, site).await.map_err(|e| e.to_string())
+    db::update_site(&pool, id, site)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -88,7 +95,9 @@ async fn validate_site_config(config: site_config::SiteConfig) -> Result<(), Str
 
 #[tauri::command]
 async fn test_site_config(config: site_config::SiteConfig) -> Result<bool, String> {
-    site_config::test_site_config(&config).await.map_err(|e| e.to_string())
+    site_config::test_site_config(&config)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 资源相关命令
@@ -102,45 +111,51 @@ async fn search_resources(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     // 获取网站列表
     let sites = if let Some(ids) = site_ids {
         let all_sites = db::get_sites(&pool).await.map_err(|e| e.to_string())?;
-        all_sites.into_iter().filter(|s| ids.contains(&s.id)).collect()
+        all_sites
+            .into_iter()
+            .filter(|s| ids.contains(&s.id))
+            .collect()
     } else {
         db::get_sites(&pool).await.map_err(|e| e.to_string())?
     };
-    
+
     // 搜索资源
     let mut all_resources = Vec::new();
     for site in sites {
-        let config: parser::SiteConfig = serde_json::from_value(site.config.clone())
-            .map_err(|e| e.to_string())?;
+        let config: parser::SiteConfig =
+            serde_json::from_value(site.config.clone()).map_err(|e| e.to_string())?;
         let site_info = parser::Site {
             id: site.id,
             name: site.name.clone(),
             url: site.url.clone(),
             config,
         };
-        
+
         match parser::search_resources(&site_info, &keyword).await {
             Ok(resources) => {
                 // 转换 parser::Resource 到 db::Resource
-                let db_resources: Vec<db::Resource> = resources.into_iter().map(|r| db::Resource {
-                    id: 0,
-                    site_id: r.site_id,
-                    title: r.title,
-                    url: r.url,
-                    magnet: r.magnet,
-                    info: r.info,
-                    created_at: chrono::Utc::now().to_rfc3339(),
-                }).collect();
+                let db_resources: Vec<db::Resource> = resources
+                    .into_iter()
+                    .map(|r| db::Resource {
+                        id: 0,
+                        site_id: r.site_id,
+                        title: r.title,
+                        url: r.url,
+                        magnet: r.magnet,
+                        info: r.info,
+                        created_at: chrono::Utc::now().to_rfc3339(),
+                    })
+                    .collect();
                 all_resources.extend(db_resources);
-            },
+            }
             Err(e) => eprintln!("搜索 {} 失败: {}", site.name, e),
         }
     }
-    
+
     Ok(all_resources)
 }
 
@@ -151,7 +166,7 @@ async fn add_download(state: State<'_, AppState>, magnet: String) -> Result<db::
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     // 尝试调用 aria2 添加下载，如果失败则创建本地记录
     let gid = match downloader::add_magnet(&magnet).await {
         Ok(gid) => {
@@ -164,10 +179,12 @@ async fn add_download(state: State<'_, AppState>, magnet: String) -> Result<db::
             format!("local_{}", uuid::Uuid::new_v4())
         }
     };
-    
+
     // 保存到数据库
-    let download = db::add_download(&pool, &gid, &magnet).await.map_err(|e| e.to_string())?;
-    
+    let download = db::add_download(&pool, &gid, &magnet)
+        .await
+        .map_err(|e| e.to_string())?;
+
     Ok(download)
 }
 
@@ -186,13 +203,17 @@ async fn pause_download(state: State<'_, AppState>, id: i64) -> Result<(), Strin
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
-    let download = db::get_download(&pool, id).await.map_err(|e| e.to_string())?;
+
+    let download = db::get_download(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
     if let Some(gid) = download.aria2_gid {
         downloader::pause(&gid).await.map_err(|e| e.to_string())?;
-        db::update_download_status(&pool, id, "paused").await.map_err(|e| e.to_string())?;
+        db::update_download_status(&pool, id, "paused")
+            .await
+            .map_err(|e| e.to_string())?;
     }
-    
+
     Ok(())
 }
 
@@ -202,13 +223,17 @@ async fn resume_download(state: State<'_, AppState>, id: i64) -> Result<(), Stri
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
-    let download = db::get_download(&pool, id).await.map_err(|e| e.to_string())?;
+
+    let download = db::get_download(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
     if let Some(gid) = download.aria2_gid {
         downloader::resume(&gid).await.map_err(|e| e.to_string())?;
-        db::update_download_status(&pool, id, "downloading").await.map_err(|e| e.to_string())?;
+        db::update_download_status(&pool, id, "downloading")
+            .await
+            .map_err(|e| e.to_string())?;
     }
-    
+
     Ok(())
 }
 
@@ -218,13 +243,17 @@ async fn remove_download(state: State<'_, AppState>, id: i64) -> Result<(), Stri
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
-    let download = db::get_download(&pool, id).await.map_err(|e| e.to_string())?;
+
+    let download = db::get_download(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
     if let Some(gid) = download.aria2_gid {
         downloader::remove(&gid).await.map_err(|e| e.to_string())?;
     }
-    db::delete_download(&pool, id).await.map_err(|e| e.to_string())?;
-    
+    db::delete_download(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }
 
@@ -235,13 +264,17 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
-    let result = scanner::scan_directory(&path).await.map_err(|e| e.to_string())?;
-    
+
+    let result = scanner::scan_directory(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+
     for video in result.videos {
-        db::add_video(&pool, video).await.map_err(|e| e.to_string())?;
+        db::add_video(&pool, video)
+            .await
+            .map_err(|e| e.to_string())?;
     }
-    
+
     db::get_videos(&pool).await.map_err(|e| e.to_string())
 }
 
@@ -292,30 +325,74 @@ async fn get_actor(state: State<'_, AppState>, id: i64) -> Result<Option<db::Act
 }
 
 #[tauri::command]
-async fn add_actor(state: State<'_, AppState>, name: String, photo: Option<String>, bio: Option<String>, birthday: Option<String>, height: Option<String>, measurements: Option<String>, japanese_name: Option<String>) -> Result<db::Actor, String> {
+async fn add_actor(
+    state: State<'_, AppState>,
+    name: String,
+    photo: Option<String>,
+    bio: Option<String>,
+    birthday: Option<String>,
+    height: Option<String>,
+    measurements: Option<String>,
+    japanese_name: Option<String>,
+) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_actor(&pool, &name, photo.as_deref(), bio.as_deref(), birthday.as_deref(), height.as_deref(), measurements.as_deref(), japanese_name.as_deref()).await.map_err(|e| e.to_string())
+    let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    db::add_actor(
+        &pool,
+        &name,
+        stored_photo.as_deref(),
+        bio.as_deref(),
+        birthday.as_deref(),
+        height.as_deref(),
+        measurements.as_deref(),
+        japanese_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn update_actor(state: State<'_, AppState>, id: i64, name: String, photo: Option<String>, bio: Option<String>, birthday: Option<String>, height: Option<String>, measurements: Option<String>, japanese_name: Option<String>) -> Result<db::Actor, String> {
+async fn update_actor(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+    photo: Option<String>,
+    bio: Option<String>,
+    birthday: Option<String>,
+    height: Option<String>,
+    measurements: Option<String>,
+    japanese_name: Option<String>,
+) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_actor(&pool, id, &name, photo.as_deref(), bio.as_deref(), birthday.as_deref(), height.as_deref(), measurements.as_deref(), japanese_name.as_deref()).await.map_err(|e| e.to_string())
+    let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    db::update_actor(
+        &pool,
+        id,
+        &name,
+        stored_photo.as_deref(),
+        bio.as_deref(),
+        birthday.as_deref(),
+        height.as_deref(),
+        measurements.as_deref(),
+        japanese_name.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+fn normalize_photo_path_for_storage(path: &str) -> String {
+    storage::path_relative_to_data_dir(&storage::resolve_data_path(path))
 }
 
 #[tauri::command]
 async fn save_actor_photo(source_path: String) -> Result<String, String> {
-    let data_dir = dirs::data_dir()
-        .ok_or("无法获取数据目录")?
-        .join("changli")
-        .join("actors")
-        .join("photos");
+    let data_dir = storage::actor_photos_dir();
 
     // 确保目录存在
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
@@ -344,10 +421,25 @@ async fn save_actor_photo(source_path: String) -> Result<String, String> {
     // 复制文件
     std::fs::copy(&source_path, &dest).map_err(|e| e.to_string())?;
 
-    // 返回绝对路径（convertFileSrc 需要绝对路径）
-    let absolute_path = dest.to_string_lossy().to_string();
-    eprintln!("[ChangLi] 海报已保存: {}", absolute_path);
-    Ok(absolute_path)
+    let relative_path = storage::path_relative_to_data_dir(&dest);
+    eprintln!(
+        "[ChangLi] 海报已保存: {} -> {}",
+        dest.display(),
+        relative_path
+    );
+    Ok(relative_path)
+}
+
+#[tauri::command]
+async fn get_storage_info() -> Result<storage::StorageInfo, String> {
+    storage::storage_info().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn open_data_dir() -> Result<(), String> {
+    let data_dir = storage::active_data_dir();
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    open::that(&data_dir).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -360,12 +452,17 @@ async fn delete_actor(state: State<'_, AppState>, id: i64) -> Result<(), String>
 }
 
 #[tauri::command]
-async fn get_actor_resources(state: State<'_, AppState>, actor_id: i64) -> Result<Vec<db::Resource>, String> {
+async fn get_actor_resources(
+    state: State<'_, AppState>,
+    actor_id: i64,
+) -> Result<Vec<db::Resource>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_actor_resources(&pool, actor_id).await.map_err(|e| e.to_string())
+    db::get_actor_resources(&pool, actor_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 标签相关命令
@@ -397,58 +494,93 @@ async fn delete_tag(state: State<'_, AppState>, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_resource_tags(state: State<'_, AppState>, resource_id: i64) -> Result<Vec<db::Tag>, String> {
+async fn get_resource_tags(
+    state: State<'_, AppState>,
+    resource_id: i64,
+) -> Result<Vec<db::Tag>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_resource_tags(&pool, resource_id).await.map_err(|e| e.to_string())
+    db::get_resource_tags(&pool, resource_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn add_resource_tag(state: State<'_, AppState>, resource_id: i64, tag_id: i64) -> Result<(), String> {
+async fn add_resource_tag(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    tag_id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_resource_tag(&pool, resource_id, tag_id).await.map_err(|e| e.to_string())
+    db::add_resource_tag(&pool, resource_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn remove_resource_tag(state: State<'_, AppState>, resource_id: i64, tag_id: i64) -> Result<(), String> {
+async fn remove_resource_tag(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    tag_id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::remove_resource_tag(&pool, resource_id, tag_id).await.map_err(|e| e.to_string())
+    db::remove_resource_tag(&pool, resource_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 资源演员关联命令
 #[tauri::command]
-async fn get_resource_actors(state: State<'_, AppState>, resource_id: i64) -> Result<Vec<db::Actor>, String> {
+async fn get_resource_actors(
+    state: State<'_, AppState>,
+    resource_id: i64,
+) -> Result<Vec<db::Actor>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_resource_actors(&pool, resource_id).await.map_err(|e| e.to_string())
+    db::get_resource_actors(&pool, resource_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn add_resource_actor(state: State<'_, AppState>, resource_id: i64, actor_id: i64, role: Option<String>) -> Result<(), String> {
+async fn add_resource_actor(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    actor_id: i64,
+    role: Option<String>,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_resource_actor(&pool, resource_id, actor_id, role.as_deref()).await.map_err(|e| e.to_string())
+    db::add_resource_actor(&pool, resource_id, actor_id, role.as_deref())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn remove_resource_actor(state: State<'_, AppState>, resource_id: i64, actor_id: i64) -> Result<(), String> {
+async fn remove_resource_actor(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    actor_id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::remove_resource_actor(&pool, resource_id, actor_id).await.map_err(|e| e.to_string())
+    db::remove_resource_actor(&pool, resource_id, actor_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 播放器相关命令
@@ -458,12 +590,12 @@ async fn play_video(state: State<'_, AppState>, id: i64) -> Result<(), String> {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     let video = db::get_video(&pool, id).await.map_err(|e| e.to_string())?;
     if let Some(video) = video {
         player::play(&video.file_path).map_err(|e| e.to_string())?;
     }
-    
+
     Ok(())
 }
 
@@ -478,30 +610,49 @@ async fn get_play_history(state: State<'_, AppState>) -> Result<Vec<db::PlayHist
 
 // 观看进度相关命令
 #[tauri::command]
-async fn update_watch_progress(state: State<'_, AppState>, resource_id: i64, episode: i32, position: f64, duration: f64) -> Result<(), String> {
+async fn update_watch_progress(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    episode: i32,
+    position: f64,
+    duration: f64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_watch_progress(&pool, resource_id, episode, position, duration).await.map_err(|e| e.to_string())
+    db::update_watch_progress(&pool, resource_id, episode, position, duration)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn get_watch_progress(state: State<'_, AppState>, resource_id: i64, episode: i32) -> Result<Option<db::WatchProgress>, String> {
+async fn get_watch_progress(
+    state: State<'_, AppState>,
+    resource_id: i64,
+    episode: i32,
+) -> Result<Option<db::WatchProgress>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_watch_progress(&pool, resource_id, episode).await.map_err(|e| e.to_string())
+    db::get_watch_progress(&pool, resource_id, episode)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn get_resource_watch_progress(state: State<'_, AppState>, resource_id: i64) -> Result<Vec<db::WatchProgress>, String> {
+async fn get_resource_watch_progress(
+    state: State<'_, AppState>,
+    resource_id: i64,
+) -> Result<Vec<db::WatchProgress>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_resource_watch_progress(&pool, resource_id).await.map_err(|e| e.to_string())
+    db::get_resource_watch_progress(&pool, resource_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn main() {
@@ -553,6 +704,8 @@ fn main() {
             get_resource_watch_progress,
             update_video,
             save_actor_photo,
+            get_storage_info,
+            open_data_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -568,22 +721,32 @@ async fn get_resources(state: State<'_, AppState>) -> Result<Vec<db::Resource>, 
 }
 
 #[tauri::command]
-async fn get_resources_by_category(state: State<'_, AppState>, category: String) -> Result<Vec<db::Resource>, String> {
+async fn get_resources_by_category(
+    state: State<'_, AppState>,
+    category: String,
+) -> Result<Vec<db::Resource>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_resources_by_category(&pool, &category).await.map_err(|e| e.to_string())
+    db::get_resources_by_category(&pool, &category)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn get_recent_resources(state: State<'_, AppState>, limit: Option<i64>) -> Result<Vec<db::Resource>, String> {
+async fn get_recent_resources(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> Result<Vec<db::Resource>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let limit = limit.unwrap_or(10);
-    db::get_recent_resources(&pool, limit).await.map_err(|e| e.to_string())
+    db::get_recent_resources(&pool, limit)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

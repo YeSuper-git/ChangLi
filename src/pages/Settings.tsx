@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag } from '../utils/api';
-import type { Site, Tag } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir } from '../utils/api';
+import type { Site, Tag, StorageInfo } from '../utils/api';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
@@ -16,9 +17,10 @@ const Settings: React.FC = () => {
 
   const loadSettingsData = async () => {
     try {
-      const [sitesList, tagsList] = await Promise.all([getSites(), getTags()]);
+      const [sitesList, tagsList, storage] = await Promise.all([getSites(), getTags(), getStorageInfo()]);
       setSites(sitesList);
       setTags(tagsList);
+      setStorageInfo(storage);
     } catch (error) {
       console.error('加载设置失败:', error);
     } finally {
@@ -102,6 +104,45 @@ const Settings: React.FC = () => {
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">设置</h1>
       </div>
+
+      {/* 数据存储 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">数据存储</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              默认使用系统数据目录；如果程序同级存在 data 目录或 portable.flag，则自动切换为便携模式。
+            </p>
+          </div>
+          <button
+            onClick={() => openDataDir()}
+            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+          >
+            打开数据目录
+          </button>
+        </div>
+
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500 w-24">当前模式</span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
+              {storageInfo?.mode === 'portable' ? '便携模式' : '系统数据目录'}
+            </span>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-sm text-gray-500 w-24 shrink-0">数据目录</span>
+            <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
+              {storageInfo?.data_dir || '加载中...'}
+            </code>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-sm text-gray-500 w-24 shrink-0">数据库</span>
+            <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
+              {storageInfo?.db_path || '加载中...'}
+            </code>
+          </div>
+        </div>
+      </section>
 
       {/* 标签管理 */}
       <section className="mb-12">
