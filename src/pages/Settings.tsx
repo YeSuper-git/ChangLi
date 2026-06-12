@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite } from '../utils/api';
-import type { Site } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag } from '../utils/api';
+import type { Site, Tag } from '../utils/api';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
+  const [newTagName, setNewTagName] = useState('');
 
   useEffect(() => {
-    loadSites();
+    loadSettingsData();
   }, []);
 
-  const loadSites = async () => {
+  const loadSettingsData = async () => {
     try {
-      const sitesList = await getSites();
+      const [sitesList, tagsList] = await Promise.all([getSites(), getTags()]);
       setSites(sitesList);
+      setTags(tagsList);
     } catch (error) {
-      console.error('加载网站失败:', error);
+      console.error('加载设置失败:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSites = async () => {
+    const sitesList = await getSites();
+    setSites(sitesList);
+  };
+
+  const loadTags = async () => {
+    const tagsList = await getTags();
+    setTags(tagsList);
   };
 
   const handleAddSite = async () => {
@@ -52,6 +65,30 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleAddTag = async () => {
+    const name = newTagName.trim();
+    if (!name) return;
+
+    try {
+      await addTag(name);
+      setNewTagName('');
+      loadTags();
+    } catch (error) {
+      console.error('添加标签失败:', error);
+    }
+  };
+
+  const handleDeleteTag = async (id: number) => {
+    if (!confirm('确定要删除这个标签吗？')) return;
+
+    try {
+      await deleteTag(id);
+      loadTags();
+    } catch (error) {
+      console.error('删除标签失败:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -65,6 +102,57 @@ const Settings: React.FC = () => {
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">设置</h1>
       </div>
+
+      {/* 标签管理 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">标签管理</h2>
+            <p className="text-sm text-gray-500 mt-1">标签入口已移动到设置中，可在这里统一新增和删除。</p>
+          </div>
+        </div>
+
+        <div className="card p-6 mb-4">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={newTagName}
+              onChange={(event) => setNewTagName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleAddTag();
+              }}
+              placeholder="输入新标签名称"
+              className="search-input flex-1"
+            />
+            <button
+              onClick={handleAddTag}
+              disabled={!newTagName.trim()}
+              className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              添加标签
+            </button>
+          </div>
+        </div>
+
+        {tags.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {tags.map((tag) => (
+              <div key={tag.id} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+                <span className="text-sm text-gray-800">{tag.name}</span>
+                <button
+                  onClick={() => handleDeleteTag(tag.id)}
+                  className="text-gray-400 hover:text-red-500"
+                  aria-label={`删除标签 ${tag.name}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-gray-500">暂无标签</div>
+        )}
+      </section>
 
       {/* 网站管理 */}
       <section className="mb-12">

@@ -1,132 +1,180 @@
-import React, { useState } from 'react';
-import { searchResources, getResources } from '../utils/api';
-import type { Resource } from '../utils/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getActors, getVideos } from '../utils/api';
+import type { Actor, Video } from '../utils/api';
+import { convertFileSrc } from '@tauri-apps/api/tauri';
+
+type SearchItem =
+  | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
+  | { type: 'actor'; id: number; title: string; subtitle: string; actor: Actor };
+
+const normalize = (value: string) => value.toLowerCase().trim();
+
+const fuzzyMatch = (source: string, keyword: string) => {
+  const text = normalize(source);
+  const query = normalize(keyword);
+  if (!query) return false;
+  if (text.includes(query)) return true;
+
+  let queryIndex = 0;
+  for (const char of text) {
+    if (char === query[queryIndex]) queryIndex += 1;
+    if (queryIndex === query.length) return true;
+  }
+  return false;
+};
 
 const Search: React.FC = () => {
-  const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState<Resource[]>([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
+  const [keyword, setKeyword] = useState(queryKeyword);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [actors, setActors] = useState<Actor[]>([]);
+  const [results, setResults] = useState<SearchItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const handleSearch = async () => {
-    if (!keyword.trim()) return;
-    
+  useEffect(() => {
+    setKeyword(queryKeyword);
+    if (queryKeyword.trim()) {
+      handleSearch(queryKeyword);
+    }
+  }, [queryKeyword]);
+
+  const buildResults = (searchKeyword: string, videoList: Video[], actorList: Actor[]) => {
+    const videoResults: SearchItem[] = videoList
+      .filter((video) =>
+        fuzzyMatch(video.file_name, searchKeyword) ||
+        fuzzyMatch(video.description || '', searchKeyword) ||
+        fuzzyMatch(video.source_site || '', searchKeyword)
+      )
+      .map((video) => ({
+        type: 'video',
+        id: video.id,
+        title: video.file_name,
+        subtitle: video.resolution ? `视频 · ${video.resolution}` : '视频',
+        video,
+      }));
+
+    const actorResults: SearchItem[] = actorList
+      .filter((actor) =>
+        fuzzyMatch(actor.name, searchKeyword) ||
+        fuzzyMatch(actor.japanese_name || '', searchKeyword) ||
+        fuzzyMatch(actor.bio || '', searchKeyword)
+      )
+      .map((actor) => ({
+        type: 'actor',
+        id: actor.id,
+        title: actor.name,
+        subtitle: actor.japanese_name ? `演员 · ${actor.japanese_name}` : '演员',
+        actor,
+      }));
+
+    return [...videoResults, ...actorResults];
+  };
+
+  const handleSearch = async (inputKeyword = keyword) => {
+    const nextKeyword = inputKeyword.trim();
+    if (!nextKeyword) return;
+
     setLoading(true);
     setSearched(true);
-    
+
     try {
-      // 同时搜索本地资源和在线资源
-      const [localResources, onlineResources] = await Promise.all([
-        getResources(),
-        searchResources(keyword)
+      const [videoList, actorList] = await Promise.all([
+        videos.length ? Promise.resolve(videos) : getVideos(),
+        actors.length ? Promise.resolve(actors) : getActors(),
       ]);
-      
-      // 过滤本地资源（按关键词匹配）
-      const filteredLocal = localResources.filter(r => 
-        r.title.toLowerCase().includes(keyword.toLowerCase())
-      );
-      
-      // 合并结果，去重
-      const allResources = [...filteredLocal, ...onlineResources];
-      const uniqueResources = allResources.filter((r, index, self) => 
-        index === self.findIndex(t => t.title === r.title)
-      );
-      
-      setResults(uniqueResources);
+      setVideos(videoList);
+      setActors(actorList);
+      setResults(buildResults(nextKeyword, videoList, actorList));
+      if (nextKeyword !== queryKeyword) {
+        navigate(`/search?q=${encodeURIComponent(nextKeyword)}`, { replace: true });
+      }
     } catch (error) {
       console.error('搜索失败:', error);
+      setResults([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    handleSearch(keyword);
   };
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-10">搜索资源</h1>
-      
-      {/* 搜索框 */}
-      <div className="flex gap-4 mb-10">
+      <h1 className="text-3xl font-bold mb-10">搜索</h1>
+
+      <form onSubmit={handleSubmit} className="flex gap-4 mb-10">
         <input
-          type="text"
+          type="search"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="输入关键词搜索..."
+          placeholder="输入视频名、演员名或简介关键词..."
           className="search-input flex-1"
+          autoFocus
         />
         <button
-          onClick={handleSearch}
-          disabled={loading}
+          type="submit"
+          disabled={loading || !keyword.trim()}
           className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
         >
           {loading ? '搜索中...' : '搜索'}
         </button>
-      </div>
+      </form>
 
-      {/* 搜索结果 */}
       {searched && (
         <div>
           <div className="text-gray-500 mb-8">
-            {loading ? '搜索中...' : `找到 ${results.length} 个结果`}
+            {loading ? '搜索中...' : `找到 ${results.length} 个本地结果`}
           </div>
-          
+
           {results.length > 0 ? (
-            <div className="space-y-6">
-              {results.map((resource, index) => (
-                <div key={index} className="card p-6">
-                  <div className="flex gap-6">
-                    <div className="w-32 h-44 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex-shrink-0"></div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                        {resource.title}
-                      </h3>
-                      {resource.info && (
-                        <div className="flex gap-2 mb-4 flex-wrap">
-                          {Object.entries(resource.info).map(([key, value]) => (
-                            <span key={key} className="tag status-ongoing">
-                              {String(value)}
-                            </span>
-                          ))}
-                        </div>
+            <div className="space-y-4">
+              {results.map((item) => {
+                const target = item.type === 'video' ? `/video/${item.id}` : `/actors/${item.id}`;
+                const image = item.type === 'video' ? item.video.thumbnail : item.actor.photo;
+                return (
+                  <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
+                    <div className="w-24 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                      {image ? (
+                        <img src={convertFileSrc(image)} alt={item.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl">{item.type === 'video' ? '▶️' : '👤'}</span>
                       )}
-                      <div className="flex items-center justify-between mt-6">
-                        <div className="flex gap-3">
-                          {resource.magnet && (
-                            <button className="action-btn">
-                              📋 复制磁力
-                            </button>
-                          )}
-                          <button className="action-btn">
-                            📥 下载
-                          </button>
-                        </div>
-                        <button className="action-btn action-btn-primary">
-                          查看详情
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-3">
+                        {item.type === 'video' ? '视频' : '演员'}
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2 truncate">{item.title}</h3>
+                      <p className="text-sm text-gray-500">{item.subtitle}</p>
+                      {item.type === 'video' && item.video.description && (
+                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.video.description}</p>
+                      )}
+                      {item.type === 'actor' && item.actor.bio && (
+                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.actor.bio}</p>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">没有找到相关资源</p>
+              <p className="text-gray-500 text-lg">没有找到匹配的视频或演员</p>
             </div>
           )}
         </div>
       )}
 
-      {/* 未搜索时的提示 */}
       {!searched && (
         <div className="text-center py-16">
-          <p className="text-gray-500 text-lg">输入关键词开始搜索</p>
+          <p className="text-gray-500 text-lg">在右上角或这里输入关键词，支持模糊搜索视频和演员</p>
         </div>
       )}
     </div>

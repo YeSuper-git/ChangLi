@@ -93,7 +93,7 @@ const VideoDetail: React.FC = () => {
         multiple: false,
         filters: [{
           name: '图片',
-          extensions: ['jpg', 'jpeg', 'png', 'webp']
+          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'heic', 'heif']
         }]
       });
       
@@ -320,54 +320,59 @@ const VideoDetail: React.FC = () => {
                   className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-sm"
                 >
                   {tag.name}
-                  <button
-                    onClick={() => handleRemoveTag(tag.id)}
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    ✕
-                  </button>
+                  {editing && (
+                    <button
+                      onClick={() => handleRemoveTag(tag.id)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="添加标签..."
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddTag(newTagName);
-                    setNewTagName('');
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  handleAddTag(newTagName);
-                  setNewTagName('');
-                }}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                添加
-              </button>
-            </div>
-            {/* 建议标签 */}
-            <div className="mt-4">
-              <p className="text-xs text-gray-400 mb-2">建议标签：</p>
-              <div className="flex flex-wrap gap-2">
-                {allTags.filter(t => !videoTags.find(vt => vt.id === t.id)).slice(0, 5).map((tag) => (
+            {editing && (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    placeholder="输入新标签或选择已有标签..."
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddTag(newTagName);
+                        setNewTagName('');
+                      }
+                    }}
+                  />
                   <button
-                    key={tag.id}
-                    onClick={() => handleAddTag(tag.name)}
-                    className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                    onClick={() => {
+                      handleAddTag(newTagName);
+                      setNewTagName('');
+                    }}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
                   >
-                    + {tag.name}
+                    添加
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-gray-400 mb-2">已有标签：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.filter(t => !videoTags.find(vt => vt.id === t.id)).slice(0, 10).map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => handleAddTag(tag.name)}
+                        className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                      >
+                        + {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* 演员 */}
@@ -382,54 +387,59 @@ const VideoDetail: React.FC = () => {
                   <Link to={`/actors/${actor.id}`} className="text-gray-900 hover:text-blue-600">
                     {actor.name}
                   </Link>
-                  <button
-                    onClick={() => handleRemoveActor(actor.id)}
-                    className="text-gray-400 hover:text-red-500 text-sm"
-                  >
-                    移除
-                  </button>
+                  {editing && (
+                    <button
+                      onClick={() => handleRemoveActor(actor.id)}
+                      className="text-gray-400 hover:text-red-500 text-sm"
+                    >
+                      移除
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newActorName}
-                onChange={(e) => setNewActorName(e.target.value)}
-                placeholder="添加演员..."
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddActor(newActorName);
-                    setNewActorName('');
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  handleAddActor(newActorName);
-                  setNewActorName('');
-                }}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                添加
-              </button>
-            </div>
-            {/* 建议演员 */}
-            <div className="mt-4">
-              <p className="text-xs text-gray-400 mb-2">建议演员：</p>
-              <div className="flex flex-wrap gap-2">
-                {allActors.filter(a => !videoActors.find(va => va.id === a.id)).slice(0, 5).map((actor) => (
+            {editing && (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newActorName}
+                    onChange={(e) => setNewActorName(e.target.value)}
+                    placeholder="输入新演员或选择已有演员..."
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddActor(newActorName);
+                        setNewActorName('');
+                      }
+                    }}
+                  />
                   <button
-                    key={actor.id}
-                    onClick={() => handleAddActor(actor.name)}
-                    className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                    onClick={() => {
+                      handleAddActor(newActorName);
+                      setNewActorName('');
+                    }}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
                   >
-                    + {actor.name}
+                    添加
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-gray-400 mb-2">已有演员：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {allActors.filter(a => !videoActors.find(va => va.id === a.id)).slice(0, 10).map((actor) => (
+                      <button
+                        key={actor.id}
+                        onClick={() => handleAddActor(actor.name)}
+                        className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100"
+                      >
+                        + {actor.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

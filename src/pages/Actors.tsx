@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getActors, addActor } from '../utils/api';
 import type { Actor } from '../utils/api';
+import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
@@ -84,7 +85,19 @@ const Actors: React.FC = () => {
         <div className="grid grid-cols-4 gap-6">
           {filteredActors.map((actor) => (
             <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
-              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative">
+              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
+                {actor.photo ? (
+                  <img
+                    src={convertFileSrc(actor.photo)}
+                    alt={actor.name}
+                    className="w-full h-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-5xl">👤</div>
+                )}
                 <div className="absolute bottom-4 left-4 right-4">
                   <div className="bg-black/60 text-white text-sm px-3 py-2 rounded-lg backdrop-blur-sm">
                     参演作品

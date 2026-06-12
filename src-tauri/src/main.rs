@@ -11,7 +11,7 @@ mod scanner;
 mod site_config;
 
 use tokio::sync::Mutex;
-use tauri::{State, Manager};
+use tauri::State;
 
 // 应用状态
 struct AppState {
@@ -316,19 +316,34 @@ async fn save_actor_photo(source_path: String) -> Result<String, String> {
         .join("changli")
         .join("actors")
         .join("photos");
-    
+
     // 确保目录存在
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
-    
-    // 生成唯一文件名
+
+    // 支持常见网页/相册图片格式；保持原始格式，前端通过 asset URL 直接展示。
     let source = std::path::Path::new(&source_path);
-    let ext = source.extension().and_then(|e| e.to_str()).unwrap_or("jpg");
+    if !source.exists() || !source.is_file() {
+        return Err("选择的海报文件不存在".to_string());
+    }
+
+    let ext = source
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpg")
+        .to_lowercase();
+    let allowed_extensions = [
+        "jpg", "jpeg", "png", "webp", "gif", "bmp", "avif", "svg", "tif", "tiff", "heic", "heif",
+    ];
+    if !allowed_extensions.contains(&ext.as_str()) {
+        return Err(format!("不支持的图片格式: {}", ext));
+    }
+
     let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
     let dest = data_dir.join(&filename);
-    
+
     // 复制文件
     std::fs::copy(&source_path, &dest).map_err(|e| e.to_string())?;
-    
+
     // 返回绝对路径（convertFileSrc 需要绝对路径）
     let absolute_path = dest.to_string_lossy().to_string();
     eprintln!("[ChangLi] 海报已保存: {}", absolute_path);

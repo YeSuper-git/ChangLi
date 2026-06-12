@@ -85,7 +85,7 @@ const Library: React.FC = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-10">
-        <h1 className="text-3xl font-bold">视频库</h1>
+        <h1 className="text-3xl font-bold">视频</h1>
         <button
           onClick={handleScan}
           disabled={scanning}

@@ -18,6 +18,7 @@ const Player: React.FC = () => {
   const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string>('');
+  const [playError, setPlayError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -27,9 +28,11 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     if (video) {
-      // 将本地文件路径转换为可访问的 URL
+      // 将本地文件绝对路径转换为 Tauri asset URL，video 元素才能读取本地文件。
       const src = convertFileSrc(video.file_path);
+      console.log('[Player] video.file_path:', video.file_path, 'videoSrc:', src);
       setVideoSrc(src);
+      setPlayError(null);
     }
   }, [video]);
 
@@ -61,7 +64,11 @@ const Player: React.FC = () => {
       if (isPlaying) {
         videoRef.current.pause();
       } else {
-        await videoRef.current.play();
+        await videoRef.current.play().catch((error) => {
+          console.error('视频播放失败:', error);
+          setPlayError('当前视频无法在内置播放器中播放，可能是编码不被系统 WebView 支持。可点击右侧 📺 使用系统播放器打开。');
+          throw error;
+        });
       }
       setIsPlaying(!isPlaying);
     }
@@ -164,18 +171,35 @@ const Player: React.FC = () => {
   }
 
   return (
-    <div className="relative h-full bg-black">
+    <div className="relative bg-black" style={{ minHeight: 'calc(100vh - 160px)' }}>
       {/* 视频播放器 */}
       <video
         ref={videoRef}
         src={videoSrc}
-        className="w-full h-full object-contain"
+        className="w-full object-contain bg-black"
+        style={{ minHeight: 'calc(100vh - 160px)', maxHeight: 'calc(100vh - 160px)' }}
+        controls
+        preload="metadata"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
-        onPause={handlePause}
+        onPause={() => {
+          setIsPlaying(false);
+          handlePause();
+        }}
         onClick={handlePlay}
+        onPlay={() => setIsPlaying(true)}
+        onError={(event) => {
+          console.error('视频元素加载失败:', event.currentTarget.error, 'src:', videoSrc);
+          setPlayError('视频加载失败，请确认文件仍存在，或使用系统播放器打开。');
+        }}
       />
+
+      {playError && (
+        <div className="absolute top-20 left-4 right-4 rounded-xl bg-red-500/90 text-white px-4 py-3 text-sm">
+          {playError}
+        </div>
+      )}
 
       {/* 控制栏 */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">

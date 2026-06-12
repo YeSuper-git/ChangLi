@@ -84,7 +84,7 @@ const ActorDetail: React.FC = () => {
         multiple: false,
         filters: [{
           name: '图片',
-          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']
+          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'heic', 'heif']
         }],
         title: '选择演员海报'
       });
