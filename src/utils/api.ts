@@ -261,6 +261,7 @@ export interface Actor {
   id: number;
   name: string;
   photo?: string;
+  photo_data_url?: string;
   bio?: string;
   birthday?: string;
   height?: string;

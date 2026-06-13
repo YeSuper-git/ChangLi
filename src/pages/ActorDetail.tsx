@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
 import type { Actor, Resource } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
 
 const ActorDetail: React.FC = () => {
@@ -121,13 +120,12 @@ const ActorDetail: React.FC = () => {
   };
 
   const getPhotoUrl = (photo?: string) => {
-    if (!photo) {
+    if (!actor?.photo_data_url && !photo) {
       console.log('[Actor] getPhotoUrl: photo 为空，返回 null');
       return null;
     }
-    console.log('[Actor] getPhotoUrl: 原始海报路径:', photo);
-    const url = convertFileSrc(photo);
-    console.log('[Actor] getPhotoUrl: convertFileSrc 转换后 URL:', url);
+    const url = actor?.photo_data_url || photo || null;
+    console.log('[Actor] getPhotoUrl: 使用 Base64 Data URL 展示海报:', Boolean(actor?.photo_data_url));
     return url;
   };
 

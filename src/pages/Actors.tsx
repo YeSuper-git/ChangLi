@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getActors, addActor } from '../utils/api';
 import type { Actor } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
@@ -88,7 +87,7 @@ const Actors: React.FC = () => {
               <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
                 {actor.photo ? (
                   <img
-                    src={convertFileSrc(actor.photo)}
+                    src={actor.photo_data_url || actor.photo}
                     alt={actor.name}
                     className="w-full h-full object-cover"
                     onError={(event) => {

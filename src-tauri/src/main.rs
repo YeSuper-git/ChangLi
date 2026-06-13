@@ -609,7 +609,11 @@ async fn remove_resource_actor(
 
 // 播放器相关命令
 #[tauri::command]
-async fn play_video(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+async fn play_video(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -617,7 +621,7 @@ async fn play_video(state: State<'_, AppState>, id: i64) -> Result<(), String> {
 
     let video = db::get_video(&pool, id).await.map_err(|e| e.to_string())?;
     if let Some(video) = video {
-        player::play(&video.file_path).map_err(|e| e.to_string())?;
+        player::play(&app, &video.file_path).map_err(|e| e.to_string())?;
     }
 
     Ok(())

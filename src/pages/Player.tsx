@@ -1,351 +1,109 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getVideos, getWatchProgress, updateWatchProgress, playVideo } from '../utils/api';
+import { getVideo, playVideo } from '../utils/api';
 import type { Video } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const systemPlayerOpenedRef = useRef(false);
   const [video, setVideo] = useState<Video | null>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(100);
-  const [speed, setSpeed] = useState(1);
-  const [showEpisodeList, setShowEpisodeList] = useState(false);
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [videoSrc, setVideoSrc] = useState<string>('');
-  const [playError, setPlayError] = useState<string | null>(null);
+  const [launching, setLaunching] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (id) {
-      loadVideo(parseInt(id));
+      loadAndPlay(parseInt(id));
     }
   }, [id]);
 
-  useEffect(() => {
-    if (video) {
-      // 将本地文件绝对路径转换为 Tauri asset URL，video 元素才能读取本地文件。
-      const src = convertFileSrc(video.file_path);
-      console.log('[Player] video.file_path:', video.file_path, 'videoSrc:', src);
-      setVideoSrc(src);
-      setPlayError(null);
-      systemPlayerOpenedRef.current = false;
-    }
-  }, [video]);
-
-  const loadVideo = async (videoId: number) => {
+  const loadAndPlay = async (videoId: number) => {
+    setLoading(true);
+    setError('');
+    setMessage('');
     try {
-      const videosList = await getVideos();
-      setVideos(videosList);
-      
-      const currentVideo = videosList.find(v => v.id === videoId);
-      setVideo(currentVideo || null);
-      
+      const currentVideo = await getVideo(videoId);
+      setVideo(currentVideo);
       if (currentVideo) {
-        // 加载观看进度
-        const progress = await getWatchProgress(videoId, 1);
-        if (progress) {
-          setCurrentTime(progress.position);
-          setDuration(progress.duration);
-        }
+        await launchMpv(currentVideo.id, true);
       }
-    } catch (error) {
-      console.error('加载视频失败:', error);
+    } catch (err) {
+      console.error('[Player] 加载或启动 mpv 失败:', err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePlay = async () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        await videoRef.current.play().catch(async (error) => {
-          console.error('视频播放失败:', error);
-          await openSystemPlayerFallback('内置播放器暂不可用，已切换为 Windows 11 系统播放器模式打开。');
-          throw error;
-        });
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-      // 恢复播放进度
-      if (currentTime > 0) {
-        videoRef.current.currentTime = currentTime;
-      }
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseInt(e.target.value);
-    setVolume(vol);
-    if (videoRef.current) {
-      videoRef.current.volume = vol / 100;
-    }
-  };
-
-  const handleSpeedChange = (spd: number) => {
-    setSpeed(spd);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = spd;
-    }
-    setShowSpeedMenu(false);
-  };
-
-  const handleEnded = async () => {
-    setIsPlaying(false);
-    // 保存播放进度
-    if (video && duration > 0) {
-      try {
-        await updateWatchProgress(video.id, 1, duration, duration);
-      } catch (error) {
-        console.error('保存播放进度失败:', error);
-      }
-    }
-  };
-
-  const handlePause = async () => {
-    // 保存播放进度
-    if (video && currentTime > 0) {
-      try {
-        await updateWatchProgress(video.id, 1, currentTime, duration);
-      } catch (error) {
-        console.error('保存播放进度失败:', error);
-      }
-    }
-  };
-
-  const openSystemPlayerFallback = async (message: string) => {
-    if (!video || systemPlayerOpenedRef.current) return;
-    systemPlayerOpenedRef.current = true;
-    setPlayError(message);
+  const launchMpv = async (videoId: number, initial = false) => {
+    setLaunching(true);
+    setError('');
     try {
-      await playVideo(video.id);
-    } catch (error) {
-      console.error('打开系统播放器失败:', error);
-      setPlayError('系统播放器打开失败，请确认视频文件仍存在。');
-      systemPlayerOpenedRef.current = false;
+      await playVideo(videoId);
+      setMessage(initial ? '已在 mpv 独占播放器窗口打开视频。' : '已重新打开 mpv 播放器窗口。');
+    } catch (err) {
+      console.error('[Player] 启动 mpv 失败:', err);
+      setError(String(err));
+    } finally {
+      setLaunching(false);
     }
-  };
-
-  const handleOpenSystemPlayer = async () => {
-    await openSystemPlayerFallback('已使用系统播放器打开视频。');
-  };
-
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-black">
-        <div className="text-white">加载中...</div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">正在准备 mpv 播放器...</div>
       </div>
     );
   }
 
   if (!video) {
     return (
-      <div className="flex items-center justify-center h-full bg-black">
-        <div className="text-white">视频不存在</div>
+      <div className="text-center py-16">
+        <p className="text-gray-500 text-lg mb-4">视频不存在</p>
+        <Link to="/library" className="text-blue-500 hover:text-blue-600">返回视频</Link>
       </div>
     );
   }
 
   return (
-    <div className="relative bg-black" style={{ minHeight: 'calc(100vh - 160px)' }}>
-      {/* 视频播放器 */}
-      <video
-        ref={videoRef}
-        src={videoSrc}
-        className="w-full object-contain bg-black"
-        style={{ minHeight: 'calc(100vh - 160px)', maxHeight: 'calc(100vh - 160px)' }}
-        controls
-        preload="metadata"
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleEnded}
-        onPause={() => {
-          setIsPlaying(false);
-          handlePause();
-        }}
-        onClick={handlePlay}
-        onPlay={() => setIsPlaying(true)}
-        onError={(event) => {
-          console.error('视频元素加载失败:', event.currentTarget.error, 'src:', videoSrc);
-          openSystemPlayerFallback('内置播放器无法直接加载该文件，已切换为 Windows 11 系统播放器模式打开。');
-        }}
-      />
+    <div className="max-w-3xl mx-auto py-16">
+      <div className="card p-8 text-center">
+        <div className="text-6xl mb-6">▶️</div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">{video.file_name}</h1>
+        <p className="text-gray-500 mb-8">
+          ChangLi 现在使用 mpv 独占窗口播放本地视频，不再通过 WebView 内置播放器渲染。
+        </p>
 
-      {playError && (
-        <div className="absolute top-20 left-4 right-4 rounded-xl bg-red-500/90 text-white px-4 py-3 text-sm">
-          {playError}
-        </div>
-      )}
-
-      {/* 控制栏 */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-        {/* 进度条 */}
-        <div className="mb-4">
-          <input
-            type="range"
-            min="0"
-            max={duration || 100}
-            value={currentTime}
-            onChange={handleSeek}
-            className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-          />
-        </div>
-
-        {/* 控制按钮 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {/* 播放/暂停 */}
-            <button
-              onClick={handlePlay}
-              className="text-white text-2xl hover:text-blue-400 transition-colors"
-            >
-              {isPlaying ? '⏸' : '▶️'}
-            </button>
-            
-            {/* 时间显示 */}
-            <span className="text-white text-sm">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-            
-            {/* 音量 */}
-            <div className="flex items-center gap-2">
-              <span className="text-white text-sm">🔊</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={handleVolumeChange}
-                className="w-20"
-              />
-            </div>
+        {message && (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {message}
           </div>
+        )}
 
-          <div className="flex items-center gap-4">
-            {/* 倍速 */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                className="text-white hover:text-blue-400 transition-colors"
-              >
-                {speed}x
-              </button>
-              {showSpeedMenu && (
-                <div className="absolute bottom-full right-0 mb-2 bg-black/90 rounded-lg p-2">
-                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
-                    <button
-                      key={spd}
-                      onClick={() => handleSpeedChange(spd)}
-                      className={`block w-full px-4 py-2 text-left rounded ${
-                        speed === spd ? 'bg-blue-500' : 'hover:bg-white/10'
-                      } text-white`}
-                    >
-                      {spd}x
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* 系统播放器 */}
-            <button
-              onClick={handleOpenSystemPlayer}
-              className="text-white hover:text-blue-400 transition-colors"
-              title="使用系统播放器打开"
-            >
-              📺
-            </button>
-            
-            {/* 选集列表 */}
-            <button
-              onClick={() => setShowEpisodeList(!showEpisodeList)}
-              className="text-white hover:text-blue-400 transition-colors"
-            >
-              📋
-            </button>
-            
-            {/* 全屏 */}
-            <button className="text-white hover:text-blue-400 transition-colors">
-              ⛶
-            </button>
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 text-left">
+            <div className="font-medium mb-1">mpv 启动失败</div>
+            <div>{error}</div>
           </div>
+        )}
+
+        <div className="flex justify-center gap-4">
+          <button
+            onClick={() => launchMpv(video.id)}
+            disabled={launching}
+            className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-60"
+          >
+            {launching ? '启动中...' : '重新打开 mpv 播放'}
+          </button>
+          <Link
+            to={`/video/${video.id}`}
+            className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"
+          >
+            返回详情
+          </Link>
         </div>
       </div>
-
-      {/* 视频信息 */}
-      <div className="absolute top-4 left-4">
-        <h2 className="text-white text-lg font-semibold">{video.file_name}</h2>
-        <div className="flex gap-2 text-gray-300 text-sm mt-1">
-          {video.resolution && <span>{video.resolution}</span>}
-          {video.file_size && <span>{(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB</span>}
-        </div>
-      </div>
-
-      {/* 选集列表 */}
-      {showEpisodeList && (
-        <div className="absolute right-0 top-0 bottom-0 w-80 bg-black/95 overflow-y-auto">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold">选集</h3>
-              <button
-                onClick={() => setShowEpisodeList(false)}
-                className="text-white hover:text-blue-400"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              {videos.map((v, index) => (
-                <Link
-                  key={v.id}
-                  to={`/player/${v.id}`}
-                  className={`block p-3 rounded-lg ${
-                    v.id === video.id
-                      ? 'bg-blue-500'
-                      : 'bg-white/10 hover:bg-white/20'
-                  } transition-colors`}
-                >
-                  <div className="text-white font-medium">第 {index + 1} 集</div>
-                  <div className="text-gray-300 text-sm">{v.file_name}</div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

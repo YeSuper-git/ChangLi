@@ -38,6 +38,7 @@ const VideoDetail: React.FC = () => {
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [showNewActorModal, setShowNewActorModal] = useState(false);
   const [newActorName, setNewActorName] = useState('');
+  const [actorNotice, setActorNotice] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -225,7 +226,7 @@ const VideoDetail: React.FC = () => {
 
     const duplicated = allActors.find((actor) => actor.name.trim().toLowerCase() === name.toLowerCase());
     if (duplicated) {
-      alert(`演员“${name}”已存在，已为你选中该演员。`);
+      setActorNotice(`演员“${name}”已存在，已为你选中该演员。`);
       setSelectedActorIds((current) => current.includes(duplicated.id) ? current : [...current, duplicated.id]);
       setShowNewActorModal(false);
       setNewActorName('');
@@ -238,7 +239,7 @@ const VideoDetail: React.FC = () => {
       setSelectedActorIds((current) => [...current, actor.id]);
       setShowNewActorModal(false);
       setNewActorName('');
-      alert('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
+      setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
       console.error('新建演员失败:', error);
       alert(`新建演员失败：${String(error)}`);
@@ -518,11 +519,35 @@ const VideoDetail: React.FC = () => {
         </div>
       </div>
 
+      {actorNotice && (
+        <div className="fixed right-6 top-6 z-50 max-w-sm rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">✓</div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-gray-900">演员已更新</div>
+              <div className="mt-1 text-sm text-gray-500">{actorNotice}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActorNotice('')}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="关闭提示"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {showNewActorModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-96">
-            <h2 className="text-2xl font-bold mb-6">新建演员</h2>
-            <div>
+        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">演员资料</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">新建演员</h2>
+              <p className="mt-2 text-sm text-gray-500">新建后会自动选中，保存视频详情时同步关联。</p>
+            </div>
+            <div className="px-6 py-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">姓名 *</label>
               <input
                 type="text"
@@ -541,7 +566,7 @@ const VideoDetail: React.FC = () => {
               />
               <p className="text-xs text-gray-400 mt-2">新建后会自动选中，稍后可去演员中补充海报和详细信息。</p>
             </div>
-            <div className="flex gap-4 mt-8">
+            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
               <button
                 onClick={() => {
                   setShowNewActorModal(false);

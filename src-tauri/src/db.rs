@@ -1,8 +1,11 @@
 use crate::storage;
 use anyhow::Result;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
+use std::path::Path;
 
 // 网站配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +81,7 @@ pub struct Actor {
     pub id: i64,
     pub name: String,
     pub photo: Option<String>,
+    pub photo_data_url: Option<String>,
     pub bio: Option<String>,
     pub birthday: Option<String>,
     pub height: Option<String>,
@@ -644,8 +648,9 @@ pub async fn update_video(
             .ok_or_else(|| anyhow::anyhow!("视频不存在"));
     }
 
+    query.push(' ');
     query.push_str(&params.join(", "));
-    query.push_str(" WHERE id = ? RETURNING *");
+    query.push_str(", updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *");
 
     let mut query_builder = sqlx::query(&query);
     for value in bind_values {
@@ -740,6 +745,36 @@ pub async fn update_actor(
     Ok(actor_from_row(&row))
 }
 
+fn image_mime_from_path(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        _ => "application/octet-stream",
+    }
+}
+
+fn image_data_url(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let encoded = BASE64_STANDARD.encode(bytes);
+    Some(format!(
+        "data:{};base64,{}",
+        image_mime_from_path(path),
+        encoded
+    ))
+}
+
 fn actor_from_row(row: &SqliteRow) -> Actor {
     let photo: Option<String> = row.get("photo");
     let resolved_photo = photo.map(|path| {
@@ -747,11 +782,15 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
             .to_string_lossy()
             .to_string()
     });
+    let photo_data_url = resolved_photo
+        .as_ref()
+        .and_then(|path| image_data_url(Path::new(path)));
 
     Actor {
         id: row.get("id"),
         name: row.get("name"),
         photo: resolved_photo,
+        photo_data_url,
         bio: row.get("bio"),
         birthday: row.get("birthday"),
         height: row.get("height"),

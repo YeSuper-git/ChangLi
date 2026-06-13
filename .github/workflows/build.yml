@@ -37,6 +37,23 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Bundle mpv player runtime
+        shell: pwsh
+        run: |
+          choco install mpv -y --no-progress
+          $mpvExe = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Filter mpv.exe -Recurse | Select-Object -First 1
+          if (-not $mpvExe) {
+            throw "mpv.exe was not found after Chocolatey installation"
+          }
+          $mpvSource = $mpvExe.Directory.FullName
+          $mpvTarget = "src-tauri\resources\mpv"
+          New-Item -ItemType Directory -Force -Path $mpvTarget | Out-Null
+          Copy-Item -Path "$mpvSource\*" -Destination $mpvTarget -Recurse -Force
+          if (-not (Test-Path "$mpvTarget\mpv.exe")) {
+            throw "mpv.exe was not copied into $mpvTarget"
+          }
+          Get-ChildItem $mpvTarget | Select-Object Name, Length
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
