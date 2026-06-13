@@ -40,13 +40,31 @@ jobs:
       - name: Bundle mpv player runtime
         shell: pwsh
         run: |
-          choco install mpv -y --no-progress
-          $mpvExe = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Filter mpv.exe -Recurse | Select-Object -First 1
+          $ErrorActionPreference = "Stop"
+          $release = Invoke-RestMethod -Headers @{ "User-Agent" = "ChangLi-CI"; "Accept" = "application/vnd.github+json" } -Uri "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+          $asset = $release.assets |
+            Where-Object { $_.name -match '^mpv-x86_64-.*\.7z$' -and $_.name -notmatch 'debug|symbols' } |
+            Select-Object -First 1
+          if (-not $asset) {
+            throw "No x86_64 mpv archive found in latest shinchiro/mpv-winbuild-cmake release"
+          }
+
+          $downloadDir = Join-Path $env:RUNNER_TEMP "mpv-download"
+          $extractDir = Join-Path $env:RUNNER_TEMP "mpv-extract"
+          New-Item -ItemType Directory -Force -Path $downloadDir, $extractDir | Out-Null
+          $archive = Join-Path $downloadDir $asset.name
+          Invoke-WebRequest -Headers @{ "User-Agent" = "ChangLi-CI" } -Uri $asset.browser_download_url -OutFile $archive
+          7z x $archive "-o$extractDir" -y | Out-Host
+
+          $mpvExe = Get-ChildItem $extractDir -Filter mpv.exe -Recurse | Select-Object -First 1
           if (-not $mpvExe) {
-            throw "mpv.exe was not found after Chocolatey installation"
+            throw "mpv.exe was not found after extracting $($asset.name)"
           }
           $mpvSource = $mpvExe.Directory.FullName
           $mpvTarget = "src-tauri\resources\mpv"
+          if (Test-Path $mpvTarget) {
+            Remove-Item $mpvTarget -Recurse -Force
+          }
           New-Item -ItemType Directory -Force -Path $mpvTarget | Out-Null
           Copy-Item -Path "$mpvSource\*" -Destination $mpvTarget -Recurse -Force
           if (-not (Test-Path "$mpvTarget\mpv.exe")) {
