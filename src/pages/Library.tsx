@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getVideos, scanVideos, deleteVideo } from '../utils/api';
 import type { Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
+import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const Library: React.FC = () => {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -109,13 +110,21 @@ const Library: React.FC = () => {
       {/* 视频列表 */}
       {filteredVideos.length > 0 ? (
         <div className="grid grid-cols-4 gap-6">
-          {filteredVideos.map((video) => (
+          {filteredVideos.map((video) => {
+            const thumbnailDataUrl = videoPosterDataUrl(video);
+            return (
             <div key={video.id} className="card">
               <Link to={`/player/${video.id}`}>
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-4xl">▶️</span>
-                  </div>
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                  {thumbnailDataUrl ? (
+                    <img
+                      src={thumbnailDataUrl}
+                      alt={video.file_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <StaticImagePlaceholder kind="video" />
+                  )}
                   {video.duration && (
                     <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                       {Math.floor(video.duration / 60)}分钟
@@ -153,7 +162,8 @@ const Library: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <div className="text-center py-16">

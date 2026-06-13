@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
 import type { Actor, Resource } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
+import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -119,15 +120,6 @@ const ActorDetail: React.FC = () => {
     }
   };
 
-  const getPhotoUrl = (photo?: string) => {
-    if (!actor?.photo_data_url && !photo) {
-      console.log('[Actor] getPhotoUrl: photo 为空，返回 null');
-      return null;
-    }
-    const url = actor?.photo_data_url || photo || null;
-    console.log('[Actor] getPhotoUrl: 使用 Base64 Data URL 展示海报:', Boolean(actor?.photo_data_url));
-    return url;
-  };
 
   const handleAddWork = async () => {
     try {
@@ -209,18 +201,14 @@ const ActorDetail: React.FC = () => {
             className="aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden cursor-pointer relative group"
             onClick={handlePhotoClick}
           >
-            {getPhotoUrl(actor.photo) ? (
+            {actorPhotoDataUrl(actor) ? (
               <img
-                src={getPhotoUrl(actor.photo)!}
+                src={actorPhotoDataUrl(actor)!}
                 alt={actor.name}
                 className="w-full h-full object-cover"
-                onLoad={() => console.log('[Actor] 海报图片加载成功, src:', getPhotoUrl(actor.photo))}
-                onError={(e) => console.error('[Actor] 海报图片加载失败, src:', getPhotoUrl(actor.photo), 'error:', e)}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl">
-                👤
-              </div>
+              <StaticImagePlaceholder kind="actor" />
             )}
             {/* 悬浮提示 */}
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

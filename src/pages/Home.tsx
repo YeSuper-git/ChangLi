@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getActors, getDownloads, getTags, getVideos } from '../utils/api';
 import type { Actor, Download, Tag, Video } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
+import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const Home: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
@@ -19,20 +19,19 @@ const Home: React.FC = () => {
   const loadData = async () => {
     try {
       console.log('[Home] 开始加载数据...');
-      
-      // 并行加载所有数据，不使用超时
+
       const [actorsList, downloadsList, tagsList, videosList] = await Promise.all([
         getActors(),
         getDownloads(),
         getTags(),
         getVideos(),
       ]);
-      
+
       console.log('[Home] getActors 返回:', actorsList.length, '条');
       console.log('[Home] getDownloads 返回:', downloadsList.length, '条');
       console.log('[Home] getTags 返回:', tagsList.length, '条');
       console.log('[Home] getVideos 返回:', videosList.length, '条');
-      
+
       setActors(actorsList);
       setDownloads(downloadsList);
       setTags(tagsList);
@@ -46,26 +45,6 @@ const Home: React.FC = () => {
     }
   };
 
-  const getVideoThumbnail = (video: Video) => {
-    if (video.thumbnail) {
-      console.log('[Home] 视频缩略图路径:', video.thumbnail);
-      const url = convertFileSrc(video.thumbnail);
-      console.log('[Home] 视频缩略图 URL:', url);
-      return url;
-    }
-    return null;
-  };
-
-  const getActorPhoto = (actor: Actor) => {
-    if (actor.photo) {
-      console.log('[Home] 演员照片路径:', actor.photo);
-      const url = convertFileSrc(actor.photo);
-      console.log('[Home] 演员照片 URL:', url);
-      return url;
-    }
-    return null;
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -76,7 +55,6 @@ const Home: React.FC = () => {
 
   return (
     <div>
-      {/* 分类标签 */}
       <div className="flex items-center justify-between mb-12">
         <div className="flex gap-3">
           <button
@@ -103,7 +81,6 @@ const Home: React.FC = () => {
         </Link>
       </div>
 
-      {/* 继续观看 */}
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900">继续观看</h2>
@@ -151,7 +128,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 我的视频库 */}
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900">我的视频库</h2>
@@ -160,43 +136,42 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-6">
-          {videos.slice(0, 8).map((video) => (
-            <Link key={video.id} to={`/video/${video.id}`} className="card block">
-              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                {getVideoThumbnail(video) ? (
-                  <img
-                    src={getVideoThumbnail(video)!}
-                    alt={video.file_name}
-                    className="w-full h-full object-cover"
-                    onLoad={() => console.log('[Home] 视频缩略图加载成功:', video.file_name, getVideoThumbnail(video))}
-                    onError={(e) => console.error('[Home] 视频缩略图加载失败:', video.file_name, getVideoThumbnail(video), 'error:', e)}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-4xl">▶️</span>
-                  </div>
-                )}
-                {video.duration && (
-                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                    {Math.floor(video.duration / 60)}分钟
-                  </div>
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
-                  {video.file_name}
-                </h3>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {video.file_size
-                      ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB`
-                      : ''}
-                  </span>
-                  <span>{video.resolution || ''}</span>
+          {videos.slice(0, 8).map((video) => {
+            const thumbnailDataUrl = videoPosterDataUrl(video);
+            return (
+              <Link key={video.id} to={`/video/${video.id}`} className="card block">
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                  {thumbnailDataUrl ? (
+                    <img
+                      src={thumbnailDataUrl}
+                      alt={video.file_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <StaticImagePlaceholder kind="video" />
+                  )}
+                  {video.duration && (
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                      {Math.floor(video.duration / 60)}分钟
+                    </div>
+                  )}
                 </div>
-              </div>
-            </Link>
-          ))}
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
+                    {video.file_name}
+                  </h3>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      {video.file_size
+                        ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB`
+                        : ''}
+                    </span>
+                    <span>{video.resolution || ''}</span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
           {videos.length === 0 && (
             <div className="col-span-4 text-center text-gray-500 py-12">
               <p className="text-lg mb-4">暂无视频</p>
@@ -206,7 +181,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 热门演员 */}
       <section>
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900">热门演员</h2>
@@ -215,31 +189,30 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-6">
-          {actors.slice(0, 4).map((actor) => (
-            <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
-              <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
-                {getActorPhoto(actor) ? (
-                  <img
-                    src={getActorPhoto(actor)!}
-                    alt={actor.name}
-                    className="w-full h-full object-cover"
-                    onLoad={() => console.log('[Home] 演员照片加载成功:', actor.name, getActorPhoto(actor))}
-                    onError={(e) => console.error('[Home] 演员照片加载失败:', actor.name, getActorPhoto(actor), 'error:', e)}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-6xl">
-                    👤
-                  </div>
-                )}
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                <div className="text-sm text-gray-500">
-                  {actor.birthday ? `${actor.birthday}` : ''}
+          {actors.slice(0, 4).map((actor) => {
+            const photoDataUrl = actorPhotoDataUrl(actor);
+            return (
+              <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
+                <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
+                  {photoDataUrl ? (
+                    <img
+                      src={photoDataUrl}
+                      alt={actor.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <StaticImagePlaceholder kind="actor" />
+                  )}
                 </div>
-              </div>
-            </Link>
-          ))}
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
+                  <div className="text-sm text-gray-500">
+                    {actor.birthday ? `${actor.birthday}` : ''}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
           {actors.length === 0 && (
             <div className="col-span-4 text-center text-gray-500 py-12">
               暂无演员

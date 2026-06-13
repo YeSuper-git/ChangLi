@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getActors, getVideos } from '../utils/api';
 import type { Actor, Video } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
+import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 type SearchItem =
   | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
@@ -137,14 +137,16 @@ const Search: React.FC = () => {
             <div className="space-y-4">
               {results.map((item) => {
                 const target = item.type === 'video' ? `/video/${item.id}` : `/actors/${item.id}`;
-                const image = item.type === 'video' ? item.video.thumbnail : item.actor.photo;
+                const imageDataUrl = item.type === 'video'
+                  ? videoPosterDataUrl(item.video)
+                  : actorPhotoDataUrl(item.actor);
                 return (
                   <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
                     <div className="w-24 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      {image ? (
-                        <img src={convertFileSrc(image)} alt={item.title} className="w-full h-full object-cover" />
+                      {imageDataUrl ? (
+                        <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-3xl">{item.type === 'video' ? '▶️' : '👤'}</span>
+                        <StaticImagePlaceholder kind={item.type === 'video' ? 'video' : 'actor'} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

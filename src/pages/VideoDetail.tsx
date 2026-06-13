@@ -16,8 +16,8 @@ import {
   saveVideoThumbnail,
 } from '../utils/api';
 import type { Video, Tag, Actor } from '../utils/api';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
+import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -265,7 +265,9 @@ const VideoDetail: React.FC = () => {
     );
   }
 
-  const displayThumbnail = editData.thumbnail || video.thumbnail;
+  const displayThumbnailDataUrl = editing && editData.thumbnail !== (video.thumbnail || '')
+    ? null
+    : videoPosterDataUrl(video);
 
   return (
     <div>
@@ -302,20 +304,14 @@ const VideoDetail: React.FC = () => {
         <div className="col-span-2 space-y-6">
           <div className="card overflow-hidden">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
-              {displayThumbnail ? (
+              {displayThumbnailDataUrl ? (
                 <img
-                  src={convertFileSrc(displayThumbnail)}
+                  src={displayThumbnailDataUrl}
                   alt={video.file_name}
                   className="w-full h-full object-cover"
-                  onError={(event) => {
-                    console.error('视频海报加载失败:', displayThumbnail, event);
-                    event.currentTarget.style.display = 'none';
-                  }}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-6xl">▶️</span>
-                </div>
+                <StaticImagePlaceholder kind="video" />
               )}
               {editing && (
                 <button

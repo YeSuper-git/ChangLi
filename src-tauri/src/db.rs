@@ -71,6 +71,7 @@ pub struct Video {
     pub source_site: Option<String>,
     pub metadata: Option<serde_json::Value>,
     pub thumbnail: Option<String>,
+    pub thumbnail_data_url: Option<String>,
     pub description: Option<String>,
     pub created_at: String,
 }
@@ -579,6 +580,9 @@ fn video_from_row(row: &SqliteRow) -> Video {
             .to_string_lossy()
             .to_string()
     });
+    let thumbnail_data_url = resolved_thumbnail
+        .as_ref()
+        .and_then(|path| image_data_url(Path::new(path)));
 
     Video {
         id: row.get("id"),
@@ -594,6 +598,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
             .get::<Option<String>, _>("metadata")
             .and_then(|s| serde_json::from_str(&s).ok()),
         thumbnail: resolved_thumbnail,
+        thumbnail_data_url,
         description: row.get("description"),
         created_at: row.get("created_at"),
     }

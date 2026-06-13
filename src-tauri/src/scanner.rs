@@ -156,6 +156,7 @@ async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video> {
         source_site: None,
         metadata: episode.map(|ep| serde_json::json!({"episode": ep})),
         thumbnail: poster.map(|p| p.to_string()),
+        thumbnail_data_url: None,
         description: None,
         created_at: chrono::Utc::now().to_rfc3339(),
     })

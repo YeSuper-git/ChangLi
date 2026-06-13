@@ -205,6 +205,7 @@ export interface Video {
   source_site?: string;
   metadata?: any;
   thumbnail?: string;
+  thumbnail_data_url?: string;
   description?: string;
   created_at: string;
 }
