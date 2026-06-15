@@ -159,7 +159,7 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<Window> {
         return Ok(window);
     }
 
-    let window = WindowBuilder::new(
+    let mut builder = WindowBuilder::new(
         app,
         PLAYER_WINDOW_LABEL,
         WindowUrl::App("index.html?window=player".into()),
@@ -169,11 +169,23 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<Window> {
     .min_inner_size(480.0, 270.0)
     .resizable(true)
     .decorations(false)
-    .transparent(true)
     .skip_taskbar(true)
-    .visible(false)
-    .build()
-    .context("create player window")?;
+    .visible(false);
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows + mpv --wid 嵌入到透明 WebView 窗口时容易被 DWM/WebView2 合成成
+        // 悬浮透明孤儿窗或有声音无画面。Windows 播放承载窗改为不透明黑底，
+        // 让 mpv 子窗口严格限制在 Tauri 的黑色播放区域内。
+        builder = builder.transparent(false);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        builder = builder.transparent(true);
+    }
+
+    let window = builder.build().context("create player window")?;
 
     window.on_window_event(|event| match event {
         WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => kill_mpv(),
@@ -188,6 +200,8 @@ fn apply_player_window_style(window: &Window) -> Result<()> {
     let always_on_top = *ALWAYS_ON_TOP
         .lock()
         .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
+    window.set_decorations(false)?;
+    window.set_skip_taskbar(true)?;
     window.set_always_on_top(always_on_top)?;
     set_windows_11_rounded_corners(window);
     Ok(())
@@ -275,23 +289,29 @@ fn spawn_mpv_process(
 ) -> Result<Child> {
     let mut command = Command::new(mpv_path);
 
-    if let Some(wid) = wid {
-        command.arg(format!("--wid={wid}"));
-    }
-
     #[cfg(target_os = "windows")]
     {
+        if let Some(wid) = wid {
+            command
+                .arg("--attach-parent-window")
+                .arg(format!("--wid={wid}"));
+        }
+
         command
             .arg("--vo=gpu")
-            .arg("--gpu-context=win")
-            .arg("--attach-parent-window")
+            .arg("--gpu-context=angle")
             .arg("--no-border")
             .arg("--no-keepaspect-window")
             .arg("--background=none");
     }
 
     #[cfg(not(target_os = "windows"))]
-    command.arg("--border=no");
+    {
+        if let Some(wid) = wid {
+            command.arg(format!("--wid={wid}"));
+        }
+        command.arg("--border=no");
+    }
 
     command
         .arg("--force-window=yes")
