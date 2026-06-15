@@ -284,8 +284,10 @@ fn spawn_mpv_process(
         command
             .arg("--vo=gpu")
             .arg("--gpu-context=win")
+            .arg("--attach-parent-window")
             .arg("--no-border")
-            .arg("--no-keepaspect-window");
+            .arg("--no-keepaspect-window")
+            .arg("--background=none");
     }
 
     #[cfg(not(target_os = "windows"))]

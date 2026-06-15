@@ -27,6 +27,11 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
   useEffect(() => {
     if (!isPlayerWindow) return;
 
+    document.documentElement.classList.add('player-window-document');
+    document.body.classList.add('player-window-document');
+    const root = document.getElementById('root');
+    root?.classList.add('player-window-document');
+
     const handleKeyDown = async (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         await appWindow.setFullscreen(false);
@@ -35,7 +40,12 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.documentElement.classList.remove('player-window-document');
+      document.body.classList.remove('player-window-document');
+      root?.classList.remove('player-window-document');
+    };
   }, [isPlayerWindow]);
 
   const loadAndPlay = async (videoId: number) => {

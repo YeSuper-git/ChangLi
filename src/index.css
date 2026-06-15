@@ -17,6 +17,12 @@ body {
   min-height: 100vh;
 }
 
+html.player-window-document,
+body.player-window-document,
+#root.player-window-document {
+  background: transparent !important;
+}
+
 /* 卡片样式 */
 .card { 
   background: #fff; 
