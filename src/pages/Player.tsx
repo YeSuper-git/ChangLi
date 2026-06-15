@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { appWindow } from '@tauri-apps/api/window';
 import { getVideo, playVideo } from '../utils/api';
@@ -37,8 +37,6 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isPlayerWindow]);
-
-  const title = useMemo(() => video?.file_name || 'ChangLi Player', [video]);
 
   const loadAndPlay = async (videoId: number) => {
     setLoading(true);
@@ -79,41 +77,8 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
     setFullscreen(next);
   };
 
-  const closePlayerWindow = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    await appWindow.close();
-  };
-
-  const minimizePlayerWindow = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    await appWindow.minimize();
-  };
-
-  const togglePlayerFullscreen = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    await toggleFullscreen();
-  };
-
   if (isPlayerWindow) {
-    return (
-      <div className="player-window-root fade-in" onDoubleClick={toggleFullscreen}>
-        <div className="player-window-vibrancy" />
-        <div className="player-window-chrome" data-tauri-drag-region>
-          <div className="player-window-traffic" data-tauri-drag-region>
-            <button className="traffic-dot traffic-red" title="关闭播放器" onClick={closePlayerWindow}>×</button>
-            <button className="traffic-dot traffic-yellow" title="最小化播放器" onClick={minimizePlayerWindow}>−</button>
-            <button className="traffic-dot traffic-green" title="切换全屏" onClick={togglePlayerFullscreen}>□</button>
-          </div>
-          <div className="player-window-title" data-tauri-drag-region>{title}</div>
-          <div className="player-window-hint" data-tauri-drag-region>
-            双击全屏 · ESC 退出 · Ctrl+Shift+T 置顶
-          </div>
-        </div>
-        <div className="player-window-stage">
-          <div className="player-window-watermark">ChangLi</div>
-        </div>
-      </div>
-    );
+    return <div className="player-window-root player-window-embedded" onDoubleClick={toggleFullscreen} />;
   }
 
   if (loading) {

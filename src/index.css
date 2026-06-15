@@ -167,6 +167,13 @@ body {
   user-select: none;
 }
 
+.player-window-root.player-window-embedded {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .player-window-vibrancy {
   position: absolute;
   inset: 0;
