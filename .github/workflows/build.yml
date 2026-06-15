@@ -59,7 +59,7 @@ jobs:
                   throw "$Description failed after $MaxAttempts attempts: $($_.Exception.Message)"
                 }
                 $delaySeconds = [Math]::Min(30, [Math]::Pow(2, $attempt))
-                Write-Warning "$Description failed on attempt $attempt/$MaxAttempts: $($_.Exception.Message). Retrying in $delaySeconds seconds..."
+                Write-Warning "$Description failed on attempt $attempt/${MaxAttempts}: $($_.Exception.Message). Retrying in $delaySeconds seconds..."
                 Start-Sleep -Seconds $delaySeconds
               }
             }
