@@ -39,9 +39,40 @@ jobs:
 
       - name: Bundle mpv player runtime
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
-          $release = Invoke-RestMethod -Headers @{ "User-Agent" = "ChangLi-CI"; "Accept" = "application/vnd.github+json" } -Uri "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+
+          function Invoke-WithRetry {
+            param(
+              [scriptblock]$ScriptBlock,
+              [string]$Description,
+              [int]$MaxAttempts = 5
+            )
+
+            for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+              try {
+                return & $ScriptBlock
+              } catch {
+                if ($attempt -eq $MaxAttempts) {
+                  throw "$Description failed after $MaxAttempts attempts: $($_.Exception.Message)"
+                }
+                $delaySeconds = [Math]::Min(30, [Math]::Pow(2, $attempt))
+                Write-Warning "$Description failed on attempt $attempt/$MaxAttempts: $($_.Exception.Message). Retrying in $delaySeconds seconds..."
+                Start-Sleep -Seconds $delaySeconds
+              }
+            }
+          }
+
+          $headers = @{
+            "User-Agent" = "ChangLi-CI"
+            "Accept" = "application/vnd.github+json"
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          }
+          $release = Invoke-WithRetry -Description "Fetch latest mpv release" -ScriptBlock {
+            Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+          }
           $asset = $release.assets |
             Where-Object { $_.name -match '^mpv-x86_64-.*\.7z$' -and $_.name -notmatch 'debug|symbols' } |
             Select-Object -First 1
@@ -53,7 +84,9 @@ jobs:
           $extractDir = Join-Path $env:RUNNER_TEMP "mpv-extract"
           New-Item -ItemType Directory -Force -Path $downloadDir, $extractDir | Out-Null
           $archive = Join-Path $downloadDir $asset.name
-          Invoke-WebRequest -Headers @{ "User-Agent" = "ChangLi-CI" } -Uri $asset.browser_download_url -OutFile $archive
+          Invoke-WithRetry -Description "Download $($asset.name)" -ScriptBlock {
+            Invoke-WebRequest -Headers @{ "User-Agent" = "ChangLi-CI"; "Authorization" = "Bearer $env:GITHUB_TOKEN" } -Uri $asset.browser_download_url -OutFile $archive
+          } | Out-Null
           7z x $archive "-o$extractDir" -y | Out-Host
 
           $mpvExe = Get-ChildItem $extractDir -Filter mpv.exe -Recurse | Select-Object -First 1
