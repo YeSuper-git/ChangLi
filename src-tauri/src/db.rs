@@ -63,6 +63,8 @@ pub struct Video {
     pub id: i64,
     pub file_path: String,
     pub file_name: String,
+    pub series_id: Option<i64>,
+    pub episode_number: Option<i32>,
     pub file_size: Option<i64>,
     pub duration: Option<f64>,
     pub width: Option<i32>,
@@ -74,6 +76,19 @@ pub struct Video {
     pub thumbnail_data_url: Option<String>,
     pub description: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VideoSeries {
+    pub id: i64,
+    pub title: String,
+    pub description: Option<String>,
+    pub poster: Option<String>,
+    pub poster_data_url: Option<String>,
+    pub folder_path: Option<String>,
+    pub video_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // 演员
@@ -341,10 +356,12 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         .map(|m| serde_json::to_string(&m).unwrap_or_default());
 
     let result = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
+    .bind(video.series_id)
+    .bind(video.episode_number)
     .bind(video.file_size)
     .bind(video.duration)
     .bind(video.width)
@@ -394,6 +411,8 @@ fn video_from_row(row: &SqliteRow) -> Video {
         id: row.get("id"),
         file_path: row.get("file_path"),
         file_name: row.get("file_name"),
+        series_id: row.get("series_id"),
+        episode_number: row.get("episode_number"),
         file_size: row.get("file_size"),
         duration: row.get("duration"),
         width: row.get("width"),
@@ -427,6 +446,145 @@ pub async fn get_video(pool: &SqlitePool, id: i64) -> Result<Option<Video>> {
         .await?;
 
     Ok(row.map(|row| video_from_row(&row)))
+}
+
+pub async fn get_standalone_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
+    let rows = sqlx::query("SELECT * FROM videos WHERE series_id IS NULL ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(video_from_row).collect())
+}
+
+fn series_from_row(row: &SqliteRow) -> VideoSeries {
+    let poster: Option<String> = row.get("poster");
+    let resolved_poster = poster.map(|path| {
+        storage::resolve_data_path(&path)
+            .to_string_lossy()
+            .to_string()
+    });
+    let poster_data_url = resolved_poster
+        .as_ref()
+        .and_then(|path| image_data_url(Path::new(path)));
+    VideoSeries {
+        id: row.get("id"),
+        title: row.get("title"),
+        description: row.get("description"),
+        poster: resolved_poster,
+        poster_data_url,
+        folder_path: row.get("folder_path"),
+        video_count: row.try_get("video_count").unwrap_or(0),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }
+}
+
+pub async fn add_video_series(
+    pool: &SqlitePool,
+    title: &str,
+    folder_path: Option<&str>,
+    poster: Option<&str>,
+) -> Result<VideoSeries> {
+    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster) VALUES (?, ?, ?)")
+        .bind(title)
+        .bind(folder_path)
+        .bind(poster)
+        .execute(pool)
+        .await?;
+    if let Some(path) = folder_path {
+        if let Some(series) = get_video_series_by_folder_path(pool, path).await? {
+            return Ok(series);
+        }
+    }
+    let row = sqlx::query(
+        "SELECT video_series.*, 0 AS video_count FROM video_series WHERE id = last_insert_rowid()",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(series_from_row(&row))
+}
+
+pub async fn get_video_series_by_folder_path(
+    pool: &SqlitePool,
+    folder_path: &str,
+) -> Result<Option<VideoSeries>> {
+    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.folder_path = ? GROUP BY s.id")
+        .bind(folder_path)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|row| series_from_row(&row)))
+}
+
+pub async fn get_video_series_list(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
+    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(series_from_row).collect())
+}
+
+pub async fn get_video_series(pool: &SqlitePool, id: i64) -> Result<Option<VideoSeries>> {
+    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.id = ? GROUP BY s.id")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|row| series_from_row(&row)))
+}
+
+pub async fn get_series_videos(pool: &SqlitePool, series_id: i64) -> Result<Vec<Video>> {
+    let rows = sqlx::query("SELECT * FROM videos WHERE series_id = ? ORDER BY episode_number IS NULL, episode_number, file_name")
+        .bind(series_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(video_from_row).collect())
+}
+
+pub async fn update_video_series(
+    pool: &SqlitePool,
+    id: i64,
+    title: String,
+    description: Option<String>,
+    poster: Option<String>,
+) -> Result<VideoSeries> {
+    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(title)
+        .bind(description)
+        .bind(poster)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    get_video_series(pool, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("视频集不存在"))
+}
+
+pub async fn delete_video_series(pool: &SqlitePool, id: i64, delete_videos: bool) -> Result<()> {
+    if delete_videos {
+        sqlx::query("DELETE FROM videos WHERE series_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+    } else {
+        sqlx::query("UPDATE videos SET series_id = NULL, episode_number = NULL, updated_at = CURRENT_TIMESTAMP WHERE series_id = ?").bind(id).execute(pool).await?;
+    }
+    sqlx::query("DELETE FROM video_series WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn set_video_series(
+    pool: &SqlitePool,
+    video_id: i64,
+    series_id: Option<i64>,
+    episode_number: Option<i32>,
+) -> Result<Video> {
+    let row = sqlx::query("UPDATE videos SET series_id = ?, episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *")
+        .bind(series_id)
+        .bind(episode_number)
+        .bind(video_id)
+        .fetch_one(pool)
+        .await?;
+    Ok(video_from_row(&row))
 }
 
 pub async fn update_video(

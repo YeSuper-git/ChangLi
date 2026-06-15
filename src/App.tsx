@@ -12,6 +12,7 @@ import Actors from './pages/Actors';
 import ActorDetail from './pages/ActorDetail';
 import Tags from './pages/Tags';
 import VideoDetail from './pages/VideoDetail';
+import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
 
 function App() {
@@ -74,6 +75,7 @@ function App() {
           <Route path="/actors/:id" element={<ActorDetail />} />
           <Route path="/tags" element={<Tags />} />
           <Route path="/video/:id" element={<VideoDetail />} />
+          <Route path="/series/:id" element={<SeriesDetail />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>

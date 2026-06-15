@@ -268,12 +268,45 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
 
+    let import_path = Path::new(&path);
+    if import_path.is_file() {
+        if !scanner::is_video_file(import_path) {
+            return Err("选择的文件不是支持的视频格式".to_string());
+        }
+        let video = scanner::scan_video_file(import_path, None)
+            .await
+            .map_err(|e| e.to_string())?;
+        db::add_video(&pool, video)
+            .await
+            .map_err(|e| e.to_string())?;
+        return db::get_videos(&pool).await.map_err(|e| e.to_string());
+    }
+
+    let folder_name = import_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("未命名视频集")
+        .to_string();
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;
+    let series_poster = result.posters.values().next().cloned();
+    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref())
+        .await
+        .map_err(|e| e.to_string())?;
 
-    for video in result.videos {
-        db::add_video(&pool, video)
+    for mut video in result.videos {
+        video.series_id = Some(series.id);
+        if video.episode_number.is_none() {
+            video.episode_number = scanner::extract_episode_from_filename(&video.file_name);
+        }
+        let episode_number = video.episode_number;
+        let saved = db::add_video(&pool, video)
+            .await
+            .map_err(|e| e.to_string())?;
+        // add_video 对重复 file_path 使用 INSERT OR IGNORE，会返回已有记录。
+        // 重新扫描文件夹时必须显式更新关联，避免旧单视频/旧视频集记录没有挂到当前视频集。
+        db::set_video_series(&pool, saved.id, Some(series.id), episode_number)
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -306,6 +339,119 @@ async fn delete_video(state: State<'_, AppState>, id: i64) -> Result<(), String>
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::delete_video(&pool, id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_video_series_list(state: State<'_, AppState>) -> Result<Vec<db::VideoSeries>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_list(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_standalone_videos(state: State<'_, AppState>) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_standalone_videos(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_video_series_detail(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(Option<db::VideoSeries>, Vec<db::Video>), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let series = db::get_video_series(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let videos = db::get_series_videos(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok((series, videos))
+}
+
+#[tauri::command]
+async fn update_video_series(
+    state: State<'_, AppState>,
+    id: i64,
+    title: String,
+    description: Option<String>,
+    poster: Option<String>,
+) -> Result<db::VideoSeries, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let stored_poster = poster.as_deref().map(normalize_photo_path_for_storage);
+    db::update_video_series(&pool, id, title, description, stored_poster)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_video_series(
+    state: State<'_, AppState>,
+    id: i64,
+    delete_videos: bool,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_video_series(&pool, id, delete_videos)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_video_to_series(
+    state: State<'_, AppState>,
+    series_id: i64,
+    path: String,
+) -> Result<db::Video, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let video_path = Path::new(&path);
+    if !video_path.is_file() || !scanner::is_video_file(video_path) {
+        return Err("请选择支持的视频文件".to_string());
+    }
+    let mut video = scanner::scan_video_file(video_path, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    video.series_id = Some(series_id);
+    let saved = db::add_video(&pool, video)
+        .await
+        .map_err(|e| e.to_string())?;
+    db::set_video_series(&pool, saved.id, Some(series_id), saved.episode_number)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_video_from_series(
+    state: State<'_, AppState>,
+    video_id: i64,
+) -> Result<db::Video, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::set_video_series(&pool, video_id, None, None)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 演员相关命令
@@ -722,6 +868,13 @@ fn main() {
             get_videos,
             get_video,
             delete_video,
+            get_video_series_list,
+            get_standalone_videos,
+            get_video_series_detail,
+            update_video_series,
+            delete_video_series,
+            add_video_to_series,
+            remove_video_from_series,
             get_actors,
             get_actor,
             add_actor,

@@ -70,10 +70,29 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
     execute(
         pool,
         r#"
+        CREATE TABLE IF NOT EXISTS video_series (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            poster TEXT,
+            folder_path TEXT UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create video_series table",
+    )
+    .await?;
+
+    execute(
+        pool,
+        r#"
         CREATE TABLE IF NOT EXISTS videos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_path TEXT NOT NULL UNIQUE,
             file_name TEXT NOT NULL,
+            series_id INTEGER REFERENCES video_series(id) ON DELETE SET NULL,
+            episode_number INTEGER,
             file_size INTEGER,
             duration REAL,
             width INTEGER,
@@ -83,7 +102,8 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
             metadata TEXT,
             thumbnail TEXT,
             description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         "#,
         "create videos table",
@@ -213,6 +233,8 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("downloads", "updated_at", "TEXT"),
         Column::new("videos", "file_path", "TEXT NOT NULL DEFAULT ''"),
         Column::new("videos", "file_name", "TEXT NOT NULL DEFAULT ''"),
+        Column::new("videos", "series_id", "INTEGER"),
+        Column::new("videos", "episode_number", "INTEGER"),
         Column::new("videos", "file_size", "INTEGER"),
         Column::new("videos", "duration", "REAL"),
         Column::new("videos", "width", "INTEGER"),
@@ -223,6 +245,13 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("videos", "thumbnail", "TEXT"),
         Column::new("videos", "description", "TEXT"),
         Column::new("videos", "created_at", "TEXT"),
+        Column::new("videos", "updated_at", "TEXT"),
+        Column::new("video_series", "title", "TEXT NOT NULL DEFAULT ''"),
+        Column::new("video_series", "description", "TEXT"),
+        Column::new("video_series", "poster", "TEXT"),
+        Column::new("video_series", "folder_path", "TEXT"),
+        Column::new("video_series", "created_at", "TEXT"),
+        Column::new("video_series", "updated_at", "TEXT"),
         Column::new("actors", "name", "TEXT NOT NULL DEFAULT ''"),
         Column::new("actors", "photo", "TEXT"),
         Column::new("actors", "bio", "TEXT"),
@@ -291,6 +320,10 @@ async fn backfill_required_values(pool: &SqlitePool) -> Result<()> {
         "UPDATE videos SET file_path = '' WHERE file_path IS NULL",
         "UPDATE videos SET file_name = '' WHERE file_name IS NULL",
         "UPDATE videos SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+        "UPDATE videos SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
+        "UPDATE video_series SET title = '' WHERE title IS NULL",
+        "UPDATE video_series SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
+        "UPDATE video_series SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",
         "UPDATE actors SET name = '' WHERE name IS NULL",
         "UPDATE actors SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL",
         "UPDATE actors SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL",

@@ -197,6 +197,8 @@ export interface Video {
   id: number;
   file_path: string;
   file_name: string;
+  series_id?: number;
+  episode_number?: number;
   file_size?: number;
   duration?: number;
   width?: number;
@@ -255,6 +257,46 @@ export async function deleteVideo(id: number): Promise<void> {
     console.error('[API] deleteVideo 失败:', err);
     throw err;
   }
+}
+
+export interface VideoSeries {
+  id: number;
+  title: string;
+  description?: string;
+  poster?: string;
+  poster_data_url?: string;
+  folder_path?: string;
+  video_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getVideoSeriesList(): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_video_series_list');
+}
+
+export async function getStandaloneVideos(): Promise<Video[]> {
+  return invoke<Video[]>('get_standalone_videos');
+}
+
+export async function getVideoSeriesDetail(id: number): Promise<[VideoSeries | null, Video[]]> {
+  return invoke<[VideoSeries | null, Video[]]>('get_video_series_detail', { id });
+}
+
+export async function updateVideoSeries(id: number, title: string, description?: string, poster?: string): Promise<VideoSeries> {
+  return invoke<VideoSeries>('update_video_series', { id, title, description, poster });
+}
+
+export async function deleteVideoSeries(id: number, deleteVideos: boolean): Promise<void> {
+  return invoke('delete_video_series', { id, deleteVideos });
+}
+
+export async function addVideoToSeries(seriesId: number, path: string): Promise<Video> {
+  return invoke<Video>('add_video_to_series', { seriesId, path });
+}
+
+export async function removeVideoFromSeries(videoId: number): Promise<Video> {
+  return invoke<Video>('remove_video_from_series', { videoId });
 }
 
 // 演员相关
