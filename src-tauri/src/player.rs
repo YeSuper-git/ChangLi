@@ -3,6 +3,10 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+#[cfg(target_os = "windows")]
+use std::thread;
+#[cfg(target_os = "windows")]
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
     AppHandle, GlobalShortcutManager, LogicalPosition, LogicalSize, Manager, Window, WindowBuilder,
@@ -396,23 +400,46 @@ fn unique_ipc_path() -> String {
 
 #[cfg(target_os = "windows")]
 fn native_window_id(window: &Window) -> Result<Option<String>> {
-    match window.raw_window_handle() {
-        RawWindowHandle::Win32(handle) => {
-            let hwnd = handle.hwnd as isize as i64;
-            if hwnd == 0 {
+    let mut last_hwnd = 0_i64;
+    let mut stable_count = 0_u8;
+
+    for _ in 0..20 {
+        let hwnd = match window.raw_window_handle() {
+            RawWindowHandle::Win32(handle) => {
+                // Tauri 1.x uses raw-window-handle 0.5 here.
+                // If upgrading to Tauri 2/raw-window-handle 0.6, switch to
+                // HasWindowHandle + window_handle()?.as_raw() + hwnd.get().
+                handle.hwnd as isize as i64
+            }
+            other => {
                 return Err(anyhow!(
-                    "独立播放窗口 HWND 为 0，拒绝启动 mpv；window label={}",
+                    "独立播放窗口不是 Win32 RawWindowHandle，实际为 {:?}；window label={}",
+                    other,
                     window.label()
                 ));
             }
-            Ok(Some(hwnd.to_string()))
+        };
+
+        if hwnd > 0 {
+            if hwnd == last_hwnd {
+                stable_count += 1;
+            } else {
+                last_hwnd = hwnd;
+                stable_count = 1;
+            }
+
+            if stable_count >= 2 {
+                return Ok(Some(hwnd.to_string()));
+            }
         }
-        other => Err(anyhow!(
-            "独立播放窗口不是 Win32 RawWindowHandle，实际为 {:?}；window label={}",
-            other,
-            window.label()
-        )),
+
+        thread::sleep(Duration::from_millis(50));
     }
+
+    Err(anyhow!(
+        "独立播放窗口 HWND 获取失败或不稳定，拒绝启动 mpv；window label={}",
+        window.label()
+    ))
 }
 
 #[cfg(not(target_os = "windows"))]
