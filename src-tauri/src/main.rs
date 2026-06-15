@@ -5,6 +5,7 @@ mod db;
 mod downloader;
 mod html_parser;
 mod http;
+mod migrations;
 mod parser;
 mod player;
 mod scanner;
@@ -13,7 +14,7 @@ mod storage;
 
 use image::ImageReader;
 use std::path::Path;
-use tauri::State;
+use tauri::{Manager, State};
 use tokio::sync::Mutex;
 
 // 应用状态
@@ -687,6 +688,17 @@ fn main() {
     tauri::Builder::default()
         .manage(AppState {
             db: Mutex::new(None),
+        })
+        .setup(|app| {
+            if let Err(error) = player::register_shortcuts(&app.handle()) {
+                eprintln!("[ChangLi] 注册播放窗口快捷键失败: {error:#}");
+            }
+            Ok(())
+        })
+        .on_window_event(|event| {
+            if event.window().label() == "main" {
+                player::handle_main_window_event(&event.window().app_handle(), event.event());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             init_db,

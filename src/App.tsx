@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api';
+import { appWindow } from '@tauri-apps/api/window';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -14,10 +15,15 @@ import VideoDetail from './pages/VideoDetail';
 import Settings from './pages/Settings';
 
 function App() {
+  const isPlayerWindow = appWindow.label === 'player';
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isPlayerWindow) {
+      return;
+    }
+
     const initDatabase = async () => {
       try {
         console.log('[App] 开始调用 init_db...');
@@ -30,7 +36,11 @@ function App() {
       }
     };
     initDatabase();
-  }, []);
+  }, [isPlayerWindow]);
+
+  if (isPlayerWindow) {
+    return <Player embeddedWindow />;
+  }
 
   if (error) {
     return (

@@ -7,11 +7,14 @@
   },
   "package": {
     "productName": "ChangLi",
-    "version": "0.5.6"
+    "version": "0.5.7"
   },
   "tauri": {
     "allowlist": {
       "all": false,
+      "globalShortcut": {
+        "all": true
+      },
       "shell": {
         "all": false,
         "execute": true,
@@ -49,6 +52,7 @@
         "confirm": true
       }
     },
+    "macOSPrivateApi": true,
     "bundle": {
       "active": true,
       "targets": "all",

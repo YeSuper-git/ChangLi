@@ -48,10 +48,6 @@ pub fn portable_root_dir() -> Option<PathBuf> {
     }
 }
 
-pub fn is_portable_mode() -> bool {
-    portable_root_dir().is_some()
-}
-
 pub fn active_data_dir() -> PathBuf {
     if let Some(root) = portable_root_dir() {
         root.join(PORTABLE_DATA_DIR_NAME)
@@ -110,51 +106,10 @@ pub fn prepare_active_data_dir() -> Result<()> {
     let active = active_data_dir();
     std::fs::create_dir_all(&active)?;
 
-    if is_portable_mode() {
-        migrate_default_data_to_portable_if_needed()?;
-    }
-
-    Ok(())
-}
-
-fn migrate_default_data_to_portable_if_needed() -> Result<()> {
-    let default_dir = default_data_dir();
-    let active = active_data_dir();
-
-    if default_dir == active || !default_dir.exists() {
-        return Ok(());
-    }
-
-    let active_db = active.join("changli.db");
-    let default_db = default_dir.join("changli.db");
-
-    // Only seed portable data on first portable run. If portable already has a DB,
-    // never overwrite it.
-    if active_db.exists() || !default_db.exists() {
-        return Ok(());
-    }
-
-    copy_dir_missing_only(&default_dir, &active)?;
-    Ok(())
-}
-
-fn copy_dir_missing_only(source: &Path, dest: &Path) -> Result<()> {
-    std::fs::create_dir_all(dest)?;
-
-    for entry in std::fs::read_dir(source)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let dest_path = dest.join(entry.file_name());
-
-        if source_path.is_dir() {
-            copy_dir_missing_only(&source_path, &dest_path)?;
-        } else if !dest_path.exists() {
-            if let Some(parent) = dest_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::copy(&source_path, &dest_path)?;
-        }
-    }
-
+    // 不再自动把 system 数据目录复制到 portable 数据目录。
+    // 旧逻辑会在用户创建空 data/ 或 portable.flag 时，把另一份 changli.db 拷贝过来，
+    // 容易表现为“删掉的数据又回来了”或“程序连接的不是我正在看的数据库”。
+    // 现在 init_database 只会打开 active_data_dir()/changli.db 并执行幂等迁移，
+    // 不会覆盖、复制或重置任何已有数据。
     Ok(())
 }
