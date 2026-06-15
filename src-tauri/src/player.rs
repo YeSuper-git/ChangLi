@@ -9,9 +9,6 @@ use tauri::{
     WindowEvent, WindowUrl,
 };
 
-#[cfg(target_os = "windows")]
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-
 const PLAYER_WINDOW_LABEL: &str = "player";
 const PLAYER_OFFSET_X: f64 = 40.0;
 const PLAYER_WIDTH: f64 = 720.0;
@@ -58,6 +55,32 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
         return Err(anyhow!("视频文件不存在: {}", path));
     }
 
+    play_platform(app, &video_path)
+}
+
+#[cfg(target_os = "windows")]
+fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
+    // Windows 使用 mpv 原生窗口；如果旧版本/快捷键曾创建过 Tauri 播放壳，先关闭它，
+    // 避免继续出现仿 macOS 的无边框三色点窗口。
+    if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
+        let _ = window.close();
+    }
+
+    let mut session = MPV_SESSION
+        .lock()
+        .map_err(|_| anyhow!("mpv session lock poisoned"))?;
+
+    if reuse_existing_session(&mut session, video_path)? {
+        return Ok(());
+    }
+
+    let new_session = spawn_mpv_native_window(app, video_path)?;
+    *session = Some(new_session);
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     let player_window = get_or_create_player_window(app)?;
     position_player_window_next_to_main(app, &player_window)?;
     sync_player_minimize_state(app, &player_window)?;
@@ -68,15 +91,11 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
         .lock()
         .map_err(|_| anyhow!("mpv session lock poisoned"))?;
 
-    if let Some(existing) = session.as_mut() {
-        if existing.child.try_wait()?.is_none()
-            && send_loadfile(&existing.ipc_path, &video_path).is_ok()
-        {
-            return Ok(());
-        }
+    if reuse_existing_session(&mut session, video_path)? {
+        return Ok(());
     }
 
-    let new_session = spawn_mpv(app, &player_window, &video_path)?;
+    let new_session = spawn_mpv(app, &player_window, video_path)?;
     *session = Some(new_session);
     Ok(())
 }
@@ -107,6 +126,16 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub fn toggle_always_on_top(_app: &AppHandle) -> Result<bool> {
+    let mut flag = ALWAYS_ON_TOP
+        .lock()
+        .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
+    *flag = !*flag;
+    Ok(*flag)
+}
+
+#[cfg(not(target_os = "windows"))]
 pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
     let player_window = get_or_create_player_window(app)?;
     let mut flag = ALWAYS_ON_TOP
@@ -204,21 +233,45 @@ fn sync_player_minimize_state(app: &AppHandle, player: &Window) -> Result<()> {
 fn spawn_mpv(app: &AppHandle, window: &Window, video_path: &PathBuf) -> Result<MpvSession> {
     let ipc_path = unique_ipc_path();
     let wid = native_window_id(window).context("获取独立播放窗口原生句柄失败")?;
+    spawn_mpv_with_options(app, wid.as_deref(), None, &ipc_path, video_path)
+}
 
+#[cfg(target_os = "windows")]
+fn spawn_mpv_native_window(app: &AppHandle, video_path: &PathBuf) -> Result<MpvSession> {
+    let ipc_path = unique_ipc_path();
+    let geometry = windows_mpv_geometry(app);
+    spawn_mpv_with_options(app, None, geometry.as_deref(), &ipc_path, video_path)
+}
+
+fn spawn_mpv_with_options(
+    app: &AppHandle,
+    wid: Option<&str>,
+    geometry: Option<&str>,
+    ipc_path: &str,
+    video_path: &PathBuf,
+) -> Result<MpvSession> {
     let mut last_error: Option<anyhow::Error> = None;
     for mpv_path in candidate_mpv_paths(app) {
         if !mpv_path.exists() || !mpv_path.is_file() {
             continue;
         }
 
-        match spawn_mpv_process(&mpv_path, wid.as_deref(), &ipc_path, video_path) {
-            Ok(child) => return Ok(MpvSession { child, ipc_path }),
+        match spawn_mpv_process(&mpv_path, wid, geometry, ipc_path, video_path) {
+            Ok(child) => {
+                return Ok(MpvSession {
+                    child,
+                    ipc_path: ipc_path.to_string(),
+                })
+            }
             Err(error) => last_error = Some(error),
         }
     }
 
-    match spawn_mpv_process(&PathBuf::from("mpv"), wid.as_deref(), &ipc_path, video_path) {
-        Ok(child) => Ok(MpvSession { child, ipc_path }),
+    match spawn_mpv_process(&PathBuf::from("mpv"), wid, geometry, ipc_path, video_path) {
+        Ok(child) => Ok(MpvSession {
+            child,
+            ipc_path: ipc_path.to_string(),
+        }),
         Err(error) => Err(last_error.unwrap_or(error)).context(
             "无法启动 mpv。请确认安装包已内置 mpv，或本机 PATH 中存在 mpv；也可以设置 CHANGLI_MPV_PATH 指向 mpv.exe。",
         ),
@@ -228,6 +281,7 @@ fn spawn_mpv(app: &AppHandle, window: &Window, video_path: &PathBuf) -> Result<M
 fn spawn_mpv_process(
     mpv_path: &PathBuf,
     wid: Option<&str>,
+    geometry: Option<&str>,
     ipc_path: &str,
     video_path: &PathBuf,
 ) -> Result<Child> {
@@ -238,12 +292,26 @@ fn spawn_mpv_process(
         .arg("--osc=yes")
         .arg("--input-default-bindings=yes")
         .arg("--keep-open=no")
-        .arg("--border=no")
         .arg("--title=ChangLi - ${media-title}")
         .arg(format!("--input-ipc-server={ipc_path}"));
 
+    #[cfg(target_os = "windows")]
+    {
+        command.arg("--border=yes");
+        if ALWAYS_ON_TOP.lock().map(|flag| *flag).unwrap_or(false) {
+            command.arg("--ontop");
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    command.arg("--border=no");
+
     if let Some(wid) = wid {
         command.arg(format!("--wid={wid}"));
+    }
+
+    if let Some(geometry) = geometry {
+        command.arg(format!("--geometry={geometry}"));
     }
 
     command.arg(video_path);
@@ -251,6 +319,57 @@ fn spawn_mpv_process(
     command
         .spawn()
         .with_context(|| format!("启动 mpv 失败: {}", mpv_path.display()))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_mpv_geometry(app: &AppHandle) -> Option<String> {
+    let main = app.get_window("main")?;
+    let pos = main.outer_position().ok()?;
+    let size = main.outer_size().ok()?;
+    let x = pos
+        .x
+        .saturating_add(size.width as i32)
+        .saturating_add(PLAYER_OFFSET_X as i32);
+    let y = pos.y;
+    Some(format!(
+        "{}x{}{}{}",
+        PLAYER_WIDTH as i32,
+        PLAYER_HEIGHT as i32,
+        signed_geometry_offset(x),
+        signed_geometry_offset(y)
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn signed_geometry_offset(value: i32) -> String {
+    if value >= 0 {
+        format!("+{value}")
+    } else {
+        value.to_string()
+    }
+}
+
+fn reuse_existing_session(session: &mut Option<MpvSession>, video_path: &PathBuf) -> Result<bool> {
+    let should_discard = if let Some(existing) = session.as_mut() {
+        if existing.child.try_wait()?.is_none() {
+            if send_loadfile(&existing.ipc_path, video_path).is_ok() {
+                return Ok(true);
+            }
+            true
+        } else {
+            true
+        }
+    } else {
+        false
+    };
+
+    if should_discard {
+        if let Some(existing) = session.take() {
+            cleanup_mpv_session(existing);
+        }
+    }
+
+    Ok(false)
 }
 
 fn send_loadfile(ipc_path: &str, video_path: &PathBuf) -> Result<()> {
@@ -288,13 +407,17 @@ fn send_loadfile(ipc_path: &str, video_path: &PathBuf) -> Result<()> {
 
 fn kill_mpv() {
     if let Ok(mut session) = MPV_SESSION.lock() {
-        if let Some(mut existing) = session.take() {
-            let _ = existing.child.kill();
-            let _ = existing.child.wait();
-            #[cfg(unix)]
-            let _ = std::fs::remove_file(existing.ipc_path);
+        if let Some(existing) = session.take() {
+            cleanup_mpv_session(existing);
         }
     }
+}
+
+fn cleanup_mpv_session(mut existing: MpvSession) {
+    let _ = existing.child.kill();
+    let _ = existing.child.wait();
+    #[cfg(unix)]
+    let _ = std::fs::remove_file(existing.ipc_path);
 }
 
 fn unique_ipc_path() -> String {
@@ -317,32 +440,9 @@ fn unique_ipc_path() -> String {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn native_window_id(window: &Window) -> Result<Option<String>> {
-    match window.raw_window_handle() {
-        RawWindowHandle::Win32(handle) => {
-            let hwnd = handle.hwnd as isize as i64;
-            if hwnd == 0 {
-                return Err(anyhow!(
-                    "独立播放窗口 HWND 为 0，拒绝传给 mpv --wid；window label={}",
-                    window.label()
-                ));
-            }
-
-            Ok(Some(hwnd.to_string()))
-        }
-        other => Err(anyhow!(
-            "独立播放窗口不是 Win32 RawWindowHandle，实际为 {:?}；window label={}",
-            other,
-            window.label()
-        )),
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
 fn native_window_id(_window: &Window) -> Result<Option<String>> {
-    // mpv 的 --wid 在 Windows 上用于绑定 HWND。macOS 仍创建同款无边框控制窗口，
-    // 但不传平台私有句柄，保证跨平台编译和播放兜底可用。
+    // Windows 使用 mpv 自己的原生窗口，避免 WebView2 覆盖 --wid 嵌入画面导致黑屏。
+    // macOS 保持现有独立控制窗口逻辑，不传平台私有句柄。
     Ok(None)
 }
 
