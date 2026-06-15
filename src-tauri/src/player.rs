@@ -9,6 +9,9 @@ use tauri::{
     WindowEvent, WindowUrl,
 };
 
+#[cfg(target_os = "windows")]
+use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+
 const PLAYER_WINDOW_LABEL: &str = "player";
 const PLAYER_OFFSET_X: f64 = 40.0;
 const PLAYER_WIDTH: f64 = 720.0;
@@ -146,6 +149,11 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<Window> {
     .build()
     .context("create player window")?;
 
+    window.on_window_event(|event| match event {
+        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => kill_mpv(),
+        _ => {}
+    });
+
     apply_player_window_style(&window)?;
     Ok(window)
 }
@@ -195,7 +203,7 @@ fn sync_player_minimize_state(app: &AppHandle, player: &Window) -> Result<()> {
 
 fn spawn_mpv(app: &AppHandle, window: &Window, video_path: &PathBuf) -> Result<MpvSession> {
     let ipc_path = unique_ipc_path();
-    let wid = native_window_id(window)?;
+    let wid = native_window_id(window).context("获取独立播放窗口原生句柄失败")?;
 
     let mut last_error: Option<anyhow::Error> = None;
     for mpv_path in candidate_mpv_paths(app) {
@@ -225,7 +233,6 @@ fn spawn_mpv_process(
 ) -> Result<Child> {
     let mut command = Command::new(mpv_path);
     command
-        .arg(video_path)
         .arg("--force-window=yes")
         .arg("--hwdec=auto-safe")
         .arg("--osc=yes")
@@ -238,6 +245,8 @@ fn spawn_mpv_process(
     if let Some(wid) = wid {
         command.arg(format!("--wid={wid}"));
     }
+
+    command.arg(video_path);
 
     command
         .spawn()
@@ -310,8 +319,24 @@ fn unique_ipc_path() -> String {
 
 #[cfg(target_os = "windows")]
 fn native_window_id(window: &Window) -> Result<Option<String>> {
-    let hwnd = window.hwnd()?;
-    Ok(Some(format!("{}", hwnd.0 as isize)))
+    match window.raw_window_handle() {
+        RawWindowHandle::Win32(handle) => {
+            let hwnd = handle.hwnd as isize as i64;
+            if hwnd == 0 {
+                return Err(anyhow!(
+                    "独立播放窗口 HWND 为 0，拒绝传给 mpv --wid；window label={}",
+                    window.label()
+                ));
+            }
+
+            Ok(Some(hwnd.to_string()))
+        }
+        other => Err(anyhow!(
+            "独立播放窗口不是 Win32 RawWindowHandle，实际为 {:?}；window label={}",
+            other,
+            window.label()
+        )),
+    }
 }
 
 #[cfg(not(target_os = "windows"))]

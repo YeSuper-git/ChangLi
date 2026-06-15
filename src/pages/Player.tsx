@@ -79,15 +79,30 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
     setFullscreen(next);
   };
 
+  const closePlayerWindow = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    await appWindow.close();
+  };
+
+  const minimizePlayerWindow = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    await appWindow.minimize();
+  };
+
+  const togglePlayerFullscreen = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    await toggleFullscreen();
+  };
+
   if (isPlayerWindow) {
     return (
       <div className="player-window-root fade-in" onDoubleClick={toggleFullscreen}>
         <div className="player-window-vibrancy" />
         <div className="player-window-chrome" data-tauri-drag-region>
           <div className="player-window-traffic" data-tauri-drag-region>
-            <span className="traffic-dot traffic-red" />
-            <span className="traffic-dot traffic-yellow" />
-            <span className="traffic-dot traffic-green" />
+            <button className="traffic-dot traffic-red" title="关闭播放器" onClick={closePlayerWindow}>×</button>
+            <button className="traffic-dot traffic-yellow" title="最小化播放器" onClick={minimizePlayerWindow}>−</button>
+            <button className="traffic-dot traffic-green" title="切换全屏" onClick={togglePlayerFullscreen}>□</button>
           </div>
           <div className="player-window-title" data-tauri-drag-region>{title}</div>
           <div className="player-window-hint" data-tauri-drag-region>
