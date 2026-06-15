@@ -520,6 +520,31 @@ export async function removeResourceActor(resourceId: number, actorId: number): 
   }
 }
 
+// 视频集标签/演员关联
+export async function getSeriesTags(seriesId: number): Promise<Tag[]> {
+  return invoke<Tag[]>('get_series_tags', { seriesId });
+}
+
+export async function addSeriesTag(seriesId: number, tagId: number): Promise<void> {
+  return invoke('add_series_tag', { seriesId, tagId });
+}
+
+export async function removeSeriesTag(seriesId: number, tagId: number): Promise<void> {
+  return invoke('remove_series_tag', { seriesId, tagId });
+}
+
+export async function getSeriesActors(seriesId: number): Promise<Actor[]> {
+  return invoke<Actor[]>('get_series_actors', { seriesId });
+}
+
+export async function addSeriesActor(seriesId: number, actorId: number, role?: string): Promise<void> {
+  return invoke('add_series_actor', { seriesId, actorId, role });
+}
+
+export async function removeSeriesActor(seriesId: number, actorId: number): Promise<void> {
+  return invoke('remove_series_actor', { seriesId, actorId });
+}
+
 // 播放器相关
 export async function playVideo(id: number): Promise<void> {
   console.log('[API] 调用 playVideo, id:', id);

@@ -2,15 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
 import {
+  addActor,
+  addSeriesActor,
+  addSeriesTag,
+  addTag,
   addVideoToSeries,
   deleteVideo,
   deleteVideoSeries,
+  getActors,
+  getSeriesActors,
+  getSeriesTags,
+  getTags,
   getVideoSeriesDetail,
+  removeSeriesActor,
+  removeSeriesTag,
   removeVideoFromSeries,
   saveVideoThumbnail,
   updateVideoSeries,
 } from '../utils/api';
-import type { Video, VideoSeries } from '../utils/api';
+import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
 import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const SeriesDetail: React.FC = () => {
@@ -24,6 +34,14 @@ const SeriesDetail: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({ title: '', description: '', poster: '' });
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [seriesTags, setSeriesTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [newTagName, setNewTagName] = useState('');
+  const [allActors, setAllActors] = useState<Actor[]>([]);
+  const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
+  const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
+  const [newActorName, setNewActorName] = useState('');
 
   useEffect(() => {
     if (seriesId) {
@@ -34,8 +52,20 @@ const SeriesDetail: React.FC = () => {
   const loadSeries = async () => {
     try {
       const [seriesData, seriesVideos] = await getVideoSeriesDetail(seriesId);
+      const [tags, actors, selectedTags, selectedActors] = await Promise.all([
+        getTags(),
+        getActors(),
+        getSeriesTags(seriesId),
+        getSeriesActors(seriesId),
+      ]);
       setSeries(seriesData);
       setVideos(seriesVideos);
+      setAllTags(tags);
+      setAllActors(actors);
+      setSeriesTags(selectedTags);
+      setSeriesActors(selectedActors);
+      setSelectedTagIds(selectedTags.map((tag) => tag.id));
+      setSelectedActorIds(selectedActors.map((actor) => actor.id));
       if (seriesData) {
         setEditData({
           title: seriesData.title,
@@ -65,6 +95,59 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const syncSeriesRelations = async () => {
+    if (!series) return;
+    const currentTagIds = new Set(seriesTags.map((tag) => tag.id));
+    const nextTagIds = new Set(selectedTagIds);
+    const currentActorIds = new Set(seriesActors.map((actor) => actor.id));
+    const nextActorIds = new Set(selectedActorIds);
+
+    await Promise.all([
+      ...selectedTagIds.filter((tagId) => !currentTagIds.has(tagId)).map((tagId) => addSeriesTag(series.id, tagId)),
+      ...seriesTags.filter((tag) => !nextTagIds.has(tag.id)).map((tag) => removeSeriesTag(series.id, tag.id)),
+      ...selectedActorIds.filter((actorId) => !currentActorIds.has(actorId)).map((actorId) => addSeriesActor(series.id, actorId)),
+      ...seriesActors.filter((actor) => !nextActorIds.has(actor.id)).map((actor) => removeSeriesActor(series.id, actor.id)),
+    ]);
+  };
+
+  const handleCreateTag = async () => {
+    const name = newTagName.trim();
+    if (!name) return;
+    const existing = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setSelectedTagIds((current) => current.includes(existing.id) ? current : [...current, existing.id]);
+      setNewTagName('');
+      return;
+    }
+    const tag = await addTag(name);
+    setAllTags((current) => [...current, tag].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelectedTagIds((current) => [...current, tag.id]);
+    setNewTagName('');
+  };
+
+  const handleCreateActor = async () => {
+    const name = newActorName.trim();
+    if (!name) return;
+    const existing = allActors.find((actor) => actor.name.trim().toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setSelectedActorIds((current) => current.includes(existing.id) ? current : [...current, existing.id]);
+      setNewActorName('');
+      return;
+    }
+    const actor = await addActor(name);
+    setAllActors((current) => [...current, actor].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelectedActorIds((current) => [...current, actor.id]);
+    setNewActorName('');
+  };
+
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds((current) => current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId]);
+  };
+
+  const toggleActor = (actorId: number) => {
+    setSelectedActorIds((current) => current.includes(actorId) ? current.filter((id) => id !== actorId) : [...current, actorId]);
+  };
+
   const handleSave = async () => {
     if (!series) return;
     const title = editData.title.trim();
@@ -75,6 +158,7 @@ const SeriesDetail: React.FC = () => {
     setSaving(true);
     try {
       await updateVideoSeries(series.id, title, editData.description, editData.poster);
+      await syncSeriesRelations();
       setEditing(false);
       await loadSeries();
     } catch (error) {
@@ -87,10 +171,9 @@ const SeriesDetail: React.FC = () => {
 
   const handleDeleteSeries = async () => {
     if (!series) return;
-    if (!confirm('确定要删除整个视频集吗？可在下一步选择是否同时删除分集记录。')) return;
-    const deleteVideos = confirm('是否同时删除该视频集下的所有分集记录？\n确定：删除视频集和分集。\n取消：只删除视频集，分集转为单视频。');
+    if (!confirm('确定要删除整个视频集吗？该操作会同时删除该视频集下的所有分集记录。')) return;
     try {
-      await deleteVideoSeries(series.id, deleteVideos);
+      await deleteVideoSeries(series.id, true);
       navigate('/library');
     } catch (error) {
       console.error('删除视频集失败:', error);
@@ -171,6 +254,62 @@ const SeriesDetail: React.FC = () => {
                   className="search-input min-h-[120px]"
                   placeholder="简介"
                 />
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">视频集标签</div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allTags.map((tag) => {
+                      const selected = selectedTagIds.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.id)}
+                          className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTag(); }}
+                      className="search-input"
+                      placeholder="新建标签"
+                    />
+                    <button type="button" onClick={handleCreateTag} className="action-btn">添加标签</button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">视频集演员</div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allActors.map((actor) => {
+                      const selected = selectedActorIds.includes(actor.id);
+                      return (
+                        <button
+                          key={actor.id}
+                          type="button"
+                          onClick={() => toggleActor(actor.id)}
+                          className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {actor.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={newActorName}
+                      onChange={(e) => setNewActorName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateActor(); }}
+                      className="search-input"
+                      placeholder="新建演员"
+                    />
+                    <button type="button" onClick={handleCreateActor} className="action-btn">添加演员</button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button onClick={handleSelectPoster} className="action-btn">选择海报</button>
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
@@ -181,7 +320,21 @@ const SeriesDetail: React.FC = () => {
               <>
                 <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
                 <p className="text-gray-500 mb-4">{series.video_count} 集</p>
-                {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-6">{series.description}</p>}
+                {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
+                <div className="mb-4 space-y-3">
+                  <div>
+                    <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
+                    {seriesTags.length > 0 ? seriesTags.map((tag) => (
+                      <span key={tag.id} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{tag.name}</span>
+                    )) : <span className="text-sm text-gray-400">暂无</span>}
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
+                    {seriesActors.length > 0 ? seriesActors.map((actor) => (
+                      <Link key={actor.id} to={`/actors/${actor.id}`} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-blue-600">{actor.name}</Link>
+                    )) : <span className="text-sm text-gray-400">暂无</span>}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleAddEpisode} className="action-btn">添加分集</button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   getVideo,
   updateVideo,
@@ -14,15 +14,19 @@ import {
   addResourceActor,
   removeResourceActor,
   saveVideoThumbnail,
+  getVideoSeriesDetail,
 } from '../utils/api';
-import type { Video, Tag, Actor } from '../utils/api';
+import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   const [video, setVideo] = useState<Video | null>(null);
+  const [series, setSeries] = useState<VideoSeries | null>(null);
+  const [seriesVideos, setSeriesVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({ fileName: '', description: '', thumbnail: '' });
@@ -59,14 +63,26 @@ const VideoDetail: React.FC = () => {
           thumbnail: videoData.thumbnail || '',
         });
 
-        const [tags, actors] = await Promise.all([
-          getResourceTags(videoId),
-          getResourceActors(videoId),
-        ]);
-        setVideoTags(tags);
-        setVideoActors(actors);
-        setSelectedTagIds(tags.map((tag) => tag.id));
-        setSelectedActorIds(actors.map((actor) => actor.id));
+        if (videoData.series_id) {
+          const [seriesData, episodes] = await getVideoSeriesDetail(videoData.series_id);
+          setSeries(seriesData);
+          setSeriesVideos(episodes);
+          setVideoTags([]);
+          setVideoActors([]);
+          setSelectedTagIds([]);
+          setSelectedActorIds([]);
+        } else {
+          setSeries(null);
+          setSeriesVideos([]);
+          const [tags, actors] = await Promise.all([
+            getResourceTags(videoId),
+            getResourceActors(videoId),
+          ]);
+          setVideoTags(tags);
+          setVideoActors(actors);
+          setSelectedTagIds(tags.map((tag) => tag.id));
+          setSelectedActorIds(actors.map((actor) => actor.id));
+        }
       }
     } catch (error) {
       console.error('加载视频失败:', error);
@@ -157,7 +173,9 @@ const VideoDetail: React.FC = () => {
 
     try {
       await updateVideo(video.id, editData.fileName, editData.description, editData.thumbnail);
-      await syncRelations();
+      if (!video.series_id) {
+        await syncRelations();
+      }
       setEditing(false);
       await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
     } catch (error) {
@@ -265,6 +283,7 @@ const VideoDetail: React.FC = () => {
     );
   }
 
+  const isSeriesEpisode = Boolean(video.series_id);
   const displayThumbnailDataUrl = editing && editData.thumbnail !== (video.thumbnail || '')
     ? null
     : videoPosterDataUrl(video);
@@ -291,10 +310,16 @@ const VideoDetail: React.FC = () => {
             </>
           ) : (
             <button
-              onClick={beginEditing}
+              onClick={() => {
+                if (isSeriesEpisode && video.series_id) {
+                  navigate(`/series/${video.series_id}`);
+                } else {
+                  beginEditing();
+                }
+              }}
               className="px-4 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
             >
-              编辑
+              {isSeriesEpisode ? '编辑视频集' : '编辑'}
             </button>
           )}
         </div>
@@ -384,134 +409,164 @@ const VideoDetail: React.FC = () => {
             ▶️ 播放视频
           </Link>
 
-          <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-4">标签</h3>
-            {editing ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {allTags.map((tag) => {
-                    const selected = selectedTagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => toggleTag(tag.id)}
-                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                          selected
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setCreatingTag(true)}
-                    className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
-                  >
-                    + 新建标签
-                  </button>
-                </div>
-                {allTags.length === 0 && !creatingTag && (
-                  <p className="text-sm text-gray-400 mt-3">暂无已有标签，可点击“新建标签”添加。</p>
-                )}
-                {creatingTag && (
-                  <div className="mt-4 flex gap-2">
-                    <input
-                      type="text"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleCreateTag();
-                        if (e.key === 'Escape') {
-                          setCreatingTag(false);
-                          setNewTagName('');
-                        }
-                      }}
-                      placeholder="输入标签名"
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                      autoFocus
-                    />
-                    <button onClick={handleCreateTag} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
-                      完成
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCreatingTag(false);
-                        setNewTagName('');
-                      }}
-                      className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
-                    >
-                      取消
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : videoTags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {videoTags.map((tag) => (
-                  <span key={tag.id} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">暂未添加标签，点击编辑添加标签</p>
-            )}
-          </div>
-
-          <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-4">演员</h3>
-            {editing ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {allActors.map((actor) => {
-                    const selected = selectedActorIds.includes(actor.id);
-                    return (
-                      <button
-                        key={actor.id}
-                        type="button"
-                        onClick={() => toggleActor(actor.id)}
-                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                          selected
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        {actor.name}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setShowNewActorModal(true)}
-                    className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
-                  >
-                    + 新建演员
-                  </button>
-                </div>
-                {allActors.length === 0 && (
-                  <p className="text-sm text-gray-400 mt-3">暂无已有演员，可点击“新建演员”添加。</p>
-                )}
-              </>
-            ) : videoActors.length > 0 ? (
+          {isSeriesEpisode ? (
+            <div className="card p-6">
+              <h3 className="text-sm font-medium text-gray-500 mb-4">视频集管理</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                这是视频集中的单集。演员和标签归属于整个视频集，不在单个分集上编辑。
+              </p>
+              {series && (
+                <Link
+                  to={`/series/${series.id}`}
+                  className="block p-3 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 mb-4"
+                >
+                  管理《{series.title}》演员、标签和分集
+                </Link>
+              )}
               <div className="space-y-2">
-                {videoActors.map((actor) => (
+                {seriesVideos.map((episode) => (
                   <Link
-                    key={actor.id}
-                    to={`/actors/${actor.id}`}
-                    className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-blue-600"
+                    key={episode.id}
+                    to={`/player/${episode.id}`}
+                    className={`block p-2 rounded-lg text-sm ${episode.id === video.id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-700 hover:text-blue-600'}`}
                   >
-                    {actor.name}
+                    {episode.episode_number ? `第 ${episode.episode_number} 集 · ` : ''}{episode.file_name}
                   </Link>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-gray-400">暂未添加演员，点击编辑添加演员</p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="card p-6">
+                <h3 className="text-sm font-medium text-gray-500 mb-4">标签</h3>
+                {editing ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {allTags.map((tag) => {
+                        const selected = selectedTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.id)}
+                            className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                              selected
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                            }`}
+                          >
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setCreatingTag(true)}
+                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                      >
+                        + 新建标签
+                      </button>
+                    </div>
+                    {allTags.length === 0 && !creatingTag && (
+                      <p className="text-sm text-gray-400 mt-3">暂无已有标签，可点击“新建标签”添加。</p>
+                    )}
+                    {creatingTag && (
+                      <div className="mt-4 flex gap-2">
+                        <input
+                          type="text"
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCreateTag();
+                            if (e.key === 'Escape') {
+                              setCreatingTag(false);
+                              setNewTagName('');
+                            }
+                          }}
+                          placeholder="输入标签名"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                          autoFocus
+                        />
+                        <button onClick={handleCreateTag} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+                          完成
+                        </button>
+                        <button
+                          onClick={() => {
+                            setCreatingTag(false);
+                            setNewTagName('');
+                          }}
+                          className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : videoTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {videoTags.map((tag) => (
+                      <span key={tag.id} className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">暂未添加标签，点击编辑添加标签</p>
+                )}
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-sm font-medium text-gray-500 mb-4">演员</h3>
+                {editing ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {allActors.map((actor) => {
+                        const selected = selectedActorIds.includes(actor.id);
+                        return (
+                          <button
+                            key={actor.id}
+                            type="button"
+                            onClick={() => toggleActor(actor.id)}
+                            className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                              selected
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                            }`}
+                          >
+                            {actor.name}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setShowNewActorModal(true)}
+                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                      >
+                        + 新建演员
+                      </button>
+                    </div>
+                    {allActors.length === 0 && (
+                      <p className="text-sm text-gray-400 mt-3">暂无已有演员，可点击“新建演员”添加。</p>
+                    )}
+                  </>
+                ) : videoActors.length > 0 ? (
+                  <div className="space-y-2">
+                    {videoActors.map((actor) => (
+                      <Link
+                        key={actor.id}
+                        to={`/actors/${actor.id}`}
+                        className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-blue-600"
+                      >
+                        {actor.name}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">暂未添加演员，点击编辑添加演员</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

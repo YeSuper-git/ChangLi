@@ -169,8 +169,14 @@ pub async fn init_database() -> Result<SqlitePool> {
     eprintln!("[ChangLi] 数据库路径: {}", db_path.display());
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
     let pool = SqlitePool::connect(&db_url).await?;
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await?;
 
     migrations::run(&pool).await?;
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await?;
 
     Ok(pool)
 }
@@ -556,15 +562,7 @@ pub async fn update_video_series(
         .ok_or_else(|| anyhow::anyhow!("视频集不存在"))
 }
 
-pub async fn delete_video_series(pool: &SqlitePool, id: i64, delete_videos: bool) -> Result<()> {
-    if delete_videos {
-        sqlx::query("DELETE FROM videos WHERE series_id = ?")
-            .bind(id)
-            .execute(pool)
-            .await?;
-    } else {
-        sqlx::query("UPDATE videos SET series_id = NULL, episode_number = NULL, updated_at = CURRENT_TIMESTAMP WHERE series_id = ?").bind(id).execute(pool).await?;
-    }
+pub async fn delete_video_series(pool: &SqlitePool, id: i64, _delete_videos: bool) -> Result<()> {
     sqlx::query("DELETE FROM video_series WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -819,7 +817,7 @@ pub async fn delete_tag(pool: &SqlitePool, id: i64) -> Result<()> {
 
 // 资源标签关联
 pub async fn add_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i64) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO resource_tags (resource_id, tag_id) VALUES (?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_tags (video_id, tag_id) VALUES (?, ?)")
         .bind(resource_id)
         .bind(tag_id)
         .execute(pool)
@@ -828,7 +826,7 @@ pub async fn add_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i64) 
 }
 
 pub async fn remove_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i64) -> Result<()> {
-    sqlx::query("DELETE FROM resource_tags WHERE resource_id = ? AND tag_id = ?")
+    sqlx::query("DELETE FROM video_tags WHERE video_id = ? AND tag_id = ?")
         .bind(resource_id)
         .bind(tag_id)
         .execute(pool)
@@ -838,7 +836,7 @@ pub async fn remove_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i6
 
 pub async fn get_resource_tags(pool: &SqlitePool, resource_id: i64) -> Result<Vec<Tag>> {
     let rows = sqlx::query(
-        "SELECT t.* FROM tags t JOIN resource_tags rt ON t.id = rt.tag_id WHERE rt.resource_id = ? ORDER BY t.name",
+        "SELECT t.* FROM tags t JOIN video_tags vt ON t.id = vt.tag_id WHERE vt.video_id = ? ORDER BY t.name",
     )
     .bind(resource_id)
     .fetch_all(pool)
@@ -863,14 +861,12 @@ pub async fn add_resource_actor(
     actor_id: i64,
     role: Option<&str>,
 ) -> Result<()> {
-    sqlx::query(
-        "INSERT OR IGNORE INTO resource_actors (resource_id, actor_id, role) VALUES (?, ?, ?)",
-    )
-    .bind(resource_id)
-    .bind(actor_id)
-    .bind(role)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT OR IGNORE INTO video_actors (video_id, actor_id, role) VALUES (?, ?, ?)")
+        .bind(resource_id)
+        .bind(actor_id)
+        .bind(role)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -879,7 +875,7 @@ pub async fn remove_resource_actor(
     resource_id: i64,
     actor_id: i64,
 ) -> Result<()> {
-    sqlx::query("DELETE FROM resource_actors WHERE resource_id = ? AND actor_id = ?")
+    sqlx::query("DELETE FROM video_actors WHERE video_id = ? AND actor_id = ?")
         .bind(resource_id)
         .bind(actor_id)
         .execute(pool)
@@ -889,7 +885,7 @@ pub async fn remove_resource_actor(
 
 pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<Vec<Actor>> {
     let rows = sqlx::query(
-        "SELECT a.* FROM actors a JOIN resource_actors ra ON a.id = ra.actor_id WHERE ra.resource_id = ? ORDER BY a.name",
+        "SELECT a.* FROM actors a JOIN video_actors va ON a.id = va.actor_id WHERE va.video_id = ? ORDER BY a.name",
     )
     .bind(resource_id)
     .fetch_all(pool)
@@ -924,6 +920,75 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
         .collect();
 
     Ok(resources)
+}
+
+pub async fn add_series_tag(pool: &SqlitePool, series_id: i64, tag_id: i64) -> Result<()> {
+    sqlx::query("INSERT OR IGNORE INTO series_tags (series_id, tag_id) VALUES (?, ?)")
+        .bind(series_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn remove_series_tag(pool: &SqlitePool, series_id: i64, tag_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM series_tags WHERE series_id = ? AND tag_id = ?")
+        .bind(series_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_series_tags(pool: &SqlitePool, series_id: i64) -> Result<Vec<Tag>> {
+    let rows = sqlx::query(
+        "SELECT t.* FROM tags t JOIN series_tags st ON t.id = st.tag_id WHERE st.series_id = ? ORDER BY t.name",
+    )
+    .bind(series_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .iter()
+        .map(|row| Tag {
+            id: row.get("id"),
+            name: row.get("name"),
+            created_at: row.get("created_at"),
+        })
+        .collect())
+}
+
+pub async fn add_series_actor(
+    pool: &SqlitePool,
+    series_id: i64,
+    actor_id: i64,
+    role: Option<&str>,
+) -> Result<()> {
+    sqlx::query("INSERT OR IGNORE INTO series_actors (series_id, actor_id, role) VALUES (?, ?, ?)")
+        .bind(series_id)
+        .bind(actor_id)
+        .bind(role)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn remove_series_actor(pool: &SqlitePool, series_id: i64, actor_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM series_actors WHERE series_id = ? AND actor_id = ?")
+        .bind(series_id)
+        .bind(actor_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_series_actors(pool: &SqlitePool, series_id: i64) -> Result<Vec<Actor>> {
+    let rows = sqlx::query(
+        "SELECT a.* FROM actors a JOIN series_actors sa ON a.id = sa.actor_id WHERE sa.series_id = ? ORDER BY a.name",
+    )
+    .bind(series_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(actor_from_row).collect())
 }
 
 // 播放记录操作

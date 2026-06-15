@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
-use sqlx::sqlite::SqlitePool;
+use sqlx::{sqlite::SqlitePool, Row};
 
 pub async fn run(pool: &SqlitePool) -> Result<()> {
     create_base_tables(pool).await?;
     migrate_existing_tables(pool).await?;
+    migrate_cascade_foreign_keys(pool).await?;
+    create_video_and_series_relation_tables(pool).await?;
+    migrate_legacy_video_relations(pool).await?;
     backfill_required_values(pool).await?;
     seed_default_actors_if_empty(pool).await?;
     create_indexes(pool).await?;
@@ -91,7 +94,7 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             file_path TEXT NOT NULL UNIQUE,
             file_name TEXT NOT NULL,
-            series_id INTEGER REFERENCES video_series(id) ON DELETE SET NULL,
+            series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
             episode_number INTEGER,
             file_size INTEGER,
             duration REAL,
@@ -169,6 +172,8 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
         "create resource_actors table",
     )
     .await?;
+
+    create_video_and_series_relation_tables(pool).await?;
 
     execute(
         pool,
@@ -281,6 +286,349 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
+async fn create_video_and_series_relation_tables(pool: &SqlitePool) -> Result<()> {
+    for (sql, action) in [
+        (
+            r#"
+            CREATE TABLE IF NOT EXISTS video_tags (
+                video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+                tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (video_id, tag_id)
+            )
+            "#,
+            "create video_tags table",
+        ),
+        (
+            r#"
+            CREATE TABLE IF NOT EXISTS video_actors (
+                video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+                actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
+                role TEXT,
+                PRIMARY KEY (video_id, actor_id)
+            )
+            "#,
+            "create video_actors table",
+        ),
+        (
+            r#"
+            CREATE TABLE IF NOT EXISTS series_tags (
+                series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+                tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (series_id, tag_id)
+            )
+            "#,
+            "create series_tags table",
+        ),
+        (
+            r#"
+            CREATE TABLE IF NOT EXISTS series_actors (
+                series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+                actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
+                role TEXT,
+                PRIMARY KEY (series_id, actor_id)
+            )
+            "#,
+            "create series_actors table",
+        ),
+    ] {
+        execute(pool, sql, action).await?;
+    }
+    Ok(())
+}
+
+async fn migrate_legacy_video_relations(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        INSERT OR IGNORE INTO video_tags (video_id, tag_id)
+        SELECT rt.resource_id, rt.tag_id
+        FROM resource_tags rt
+        JOIN videos v ON v.id = rt.resource_id
+        JOIN tags t ON t.id = rt.tag_id
+        "#,
+        "migrate legacy resource_tags to video_tags",
+    )
+    .await?;
+
+    execute(
+        pool,
+        r#"
+        INSERT OR IGNORE INTO video_actors (video_id, actor_id, role)
+        SELECT ra.resource_id, ra.actor_id, ra.role
+        FROM resource_actors ra
+        JOIN videos v ON v.id = ra.resource_id
+        JOIN actors a ON a.id = ra.actor_id
+        "#,
+        "migrate legacy resource_actors to video_actors",
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn migrate_cascade_foreign_keys(pool: &SqlitePool) -> Result<()> {
+    rebuild_videos_table_if_needed(pool).await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "resource_tags",
+        r#"
+        CREATE TABLE resource_tags_new (
+            resource_id INTEGER REFERENCES resources(id) ON DELETE CASCADE,
+            tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (resource_id, tag_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO resource_tags_new (resource_id, tag_id)
+         SELECT resource_id, tag_id FROM resource_tags
+         WHERE EXISTS (SELECT 1 FROM resources r WHERE r.id = resource_tags.resource_id)
+           AND EXISTS (SELECT 1 FROM tags t WHERE t.id = resource_tags.tag_id)",
+    )
+    .await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "resource_actors",
+        r#"
+        CREATE TABLE resource_actors_new (
+            resource_id INTEGER REFERENCES resources(id) ON DELETE CASCADE,
+            actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
+            role TEXT,
+            PRIMARY KEY (resource_id, actor_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO resource_actors_new (resource_id, actor_id, role)
+         SELECT resource_id, actor_id, role FROM resource_actors
+         WHERE EXISTS (SELECT 1 FROM resources r WHERE r.id = resource_actors.resource_id)
+           AND EXISTS (SELECT 1 FROM actors a WHERE a.id = resource_actors.actor_id)",
+    )
+    .await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "video_tags",
+        r#"
+        CREATE TABLE video_tags_new (
+            video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+            tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (video_id, tag_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO video_tags_new (video_id, tag_id)
+         SELECT video_id, tag_id FROM video_tags
+         WHERE EXISTS (SELECT 1 FROM videos v WHERE v.id = video_tags.video_id)
+           AND EXISTS (SELECT 1 FROM tags t WHERE t.id = video_tags.tag_id)",
+    )
+    .await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "video_actors",
+        r#"
+        CREATE TABLE video_actors_new (
+            video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
+            actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
+            role TEXT,
+            PRIMARY KEY (video_id, actor_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO video_actors_new (video_id, actor_id, role)
+         SELECT video_id, actor_id, role FROM video_actors
+         WHERE EXISTS (SELECT 1 FROM videos v WHERE v.id = video_actors.video_id)
+           AND EXISTS (SELECT 1 FROM actors a WHERE a.id = video_actors.actor_id)",
+    )
+    .await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "series_tags",
+        r#"
+        CREATE TABLE series_tags_new (
+            series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+            tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+            PRIMARY KEY (series_id, tag_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO series_tags_new (series_id, tag_id)
+         SELECT series_id, tag_id FROM series_tags
+         WHERE EXISTS (SELECT 1 FROM video_series s WHERE s.id = series_tags.series_id)
+           AND EXISTS (SELECT 1 FROM tags t WHERE t.id = series_tags.tag_id)",
+    )
+    .await?;
+
+    rebuild_pair_table_if_missing_cascade(
+        pool,
+        "series_actors",
+        r#"
+        CREATE TABLE series_actors_new (
+            series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+            actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
+            role TEXT,
+            PRIMARY KEY (series_id, actor_id)
+        )
+        "#,
+        "INSERT OR IGNORE INTO series_actors_new (series_id, actor_id, role)
+         SELECT series_id, actor_id, role FROM series_actors
+         WHERE EXISTS (SELECT 1 FROM video_series s WHERE s.id = series_actors.series_id)
+           AND EXISTS (SELECT 1 FROM actors a WHERE a.id = series_actors.actor_id)",
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn rebuild_videos_table_if_needed(pool: &SqlitePool) -> Result<()> {
+    let video_sql: Option<String> = sqlx::query_scalar(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'videos'",
+    )
+    .fetch_optional(pool)
+    .await
+    .context("read videos table schema")?;
+
+    let needs_rebuild = video_sql
+        .as_deref()
+        .map(|sql| {
+            !sql.to_ascii_lowercase()
+                .contains("references video_series(id) on delete cascade")
+        })
+        .unwrap_or(false);
+
+    if !needs_rebuild {
+        return Ok(());
+    }
+
+    let mut conn = pool
+        .acquire()
+        .await
+        .context("acquire sqlite connection for videos rebuild")?;
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .context("disable foreign keys for videos rebuild")?;
+    sqlx::query("DROP TABLE IF EXISTS videos_new")
+        .execute(&mut *conn)
+        .await
+        .context("drop stale videos_new")?;
+    sqlx::query(
+        r#"
+        CREATE TABLE videos_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path TEXT NOT NULL UNIQUE,
+            file_name TEXT NOT NULL,
+            series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+            episode_number INTEGER,
+            file_size INTEGER,
+            duration REAL,
+            width INTEGER,
+            height INTEGER,
+            resolution TEXT,
+            source_site TEXT,
+            metadata TEXT,
+            thumbnail TEXT,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+    )
+    .execute(&mut *conn)
+    .await
+    .context("create videos_new with cascade series fk")?;
+    sqlx::query(
+        r#"
+        INSERT OR IGNORE INTO videos_new (
+            id, file_path, file_name, series_id, episode_number, file_size, duration,
+            width, height, resolution, source_site, metadata, thumbnail, description,
+            created_at, updated_at
+        )
+        SELECT
+            id, file_path, file_name,
+            CASE WHEN series_id IS NULL OR EXISTS (SELECT 1 FROM video_series s WHERE s.id = videos.series_id) THEN series_id ELSE NULL END,
+            episode_number, file_size, duration, width, height, resolution, source_site,
+            metadata, thumbnail, description, created_at, updated_at
+        FROM videos
+        "#,
+    )
+    .execute(&mut *conn)
+    .await
+    .context("copy videos into cascade table")?;
+    sqlx::query("DROP TABLE videos")
+        .execute(&mut *conn)
+        .await
+        .context("drop old videos table")?;
+    sqlx::query("ALTER TABLE videos_new RENAME TO videos")
+        .execute(&mut *conn)
+        .await
+        .context("rename videos_new")?;
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await
+        .context("reenable foreign keys after videos rebuild")?;
+    Ok(())
+}
+
+async fn rebuild_pair_table_if_missing_cascade(
+    pool: &SqlitePool,
+    table: &str,
+    create_new_sql: &str,
+    copy_sql: &str,
+) -> Result<()> {
+    if !table_exists(pool, table).await? || table_has_delete_cascade(pool, table).await? {
+        return Ok(());
+    }
+
+    let backup_table = format!("{table}_old_migration");
+    let final_create_sql = create_new_sql.replace(&format!("{table}_new"), table);
+    execute(
+        pool,
+        &format!("DROP TABLE IF EXISTS {backup_table}"),
+        "drop stale relation backup table",
+    )
+    .await?;
+    execute(
+        pool,
+        &format!("ALTER TABLE {table} RENAME TO {backup_table}"),
+        "rename old relation table to backup",
+    )
+    .await?;
+    execute(pool, &final_create_sql, "create rebuilt relation table").await?;
+    let copy_sql = copy_sql
+        .replace(&format!("{table}_new"), "__CHangLi_TARGET_TABLE__")
+        .replace(table, &backup_table)
+        .replace("__CHangLi_TARGET_TABLE__", table);
+    execute(pool, &copy_sql, "copy relation table data").await?;
+    execute(
+        pool,
+        &format!("DROP TABLE {backup_table}"),
+        "drop relation backup table",
+    )
+    .await?;
+    Ok(())
+}
+
+async fn table_exists(pool: &SqlitePool, table: &str) -> Result<bool> {
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?")
+            .bind(table)
+            .fetch_one(pool)
+            .await
+            .with_context(|| format!("check table {table} exists"))?;
+    Ok(count > 0)
+}
+
+async fn table_has_delete_cascade(pool: &SqlitePool, table: &str) -> Result<bool> {
+    let sql = format!("PRAGMA foreign_key_list({table})");
+    let rows = sqlx::query(&sql)
+        .fetch_all(pool)
+        .await
+        .with_context(|| format!("read foreign keys for {table}"))?;
+    Ok(!rows.is_empty()
+        && rows.iter().all(|row| {
+            row.get::<String, _>("on_delete")
+                .eq_ignore_ascii_case("CASCADE")
+        }))
+}
+
 pub async fn add_column_if_not_exists(
     pool: &SqlitePool,
     table: &str,
@@ -378,6 +726,11 @@ async fn create_indexes(pool: &SqlitePool) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_videos_source_site ON videos(source_site)",
         "CREATE INDEX IF NOT EXISTS idx_play_history_video_id ON play_history(video_id)",
         "CREATE INDEX IF NOT EXISTS idx_watch_progress_resource_id ON watch_progress(resource_id)",
+        "CREATE INDEX IF NOT EXISTS idx_videos_series_id ON videos(series_id)",
+        "CREATE INDEX IF NOT EXISTS idx_video_tags_tag_id ON video_tags(tag_id)",
+        "CREATE INDEX IF NOT EXISTS idx_video_actors_actor_id ON video_actors(actor_id)",
+        "CREATE INDEX IF NOT EXISTS idx_series_tags_tag_id ON series_tags(tag_id)",
+        "CREATE INDEX IF NOT EXISTS idx_series_actors_actor_id ON series_actors(actor_id)",
     ] {
         execute(pool, sql, "create index").await?;
     }
@@ -483,6 +836,105 @@ mod tests {
         assert_eq!(row.get::<String, _>("bio"), "保留");
         assert!(!row.get::<String, _>("created_at").is_empty());
         assert!(!row.get::<String, _>("updated_at").is_empty());
+
+        pool.close().await;
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn migrates_cascade_foreign_keys_and_deletes_series_children() -> Result<()> {
+        let db_path = temp_db_path();
+        let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
+        let pool = SqlitePool::connect(&db_url).await?;
+
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE video_series (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, poster TEXT, folder_path TEXT UNIQUE, created_at TEXT, updated_at TEXT)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE videos (id INTEGER PRIMARY KEY AUTOINCREMENT, file_path TEXT NOT NULL UNIQUE, file_name TEXT NOT NULL, series_id INTEGER REFERENCES video_series(id), episode_number INTEGER, file_size INTEGER, duration REAL, width INTEGER, height INTEGER, resolution TEXT, source_site TEXT, metadata TEXT, thumbnail TEXT, description TEXT, created_at TEXT, updated_at TEXT)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE actors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, photo TEXT, bio TEXT, birthday TEXT, height TEXT, measurements TEXT, japanese_name TEXT, created_at TEXT, updated_at TEXT)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE video_actors (video_id INTEGER REFERENCES videos(id), actor_id INTEGER REFERENCES actors(id), role TEXT, PRIMARY KEY (video_id, actor_id))")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE video_tags (video_id INTEGER REFERENCES videos(id), tag_id INTEGER REFERENCES tags(id), PRIMARY KEY (video_id, tag_id))")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE series_actors (series_id INTEGER REFERENCES video_series(id), actor_id INTEGER REFERENCES actors(id), role TEXT, PRIMARY KEY (series_id, actor_id))")
+            .execute(&pool)
+            .await?;
+        sqlx::query("CREATE TABLE series_tags (series_id INTEGER REFERENCES video_series(id), tag_id INTEGER REFERENCES tags(id), PRIMARY KEY (series_id, tag_id))")
+            .execute(&pool)
+            .await?;
+
+        sqlx::query("INSERT INTO video_series (id, title) VALUES (1, '剧集')")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO videos (id, file_path, file_name, series_id) VALUES (1, '/tmp/a.mp4', 'a.mp4', 1)").execute(&pool).await?;
+        sqlx::query("INSERT INTO actors (id, name) VALUES (1, '演员')")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO tags (id, name) VALUES (1, '标签')")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO video_actors (video_id, actor_id) VALUES (1, 1)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO video_tags (video_id, tag_id) VALUES (1, 1)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO series_actors (series_id, actor_id) VALUES (1, 1)")
+            .execute(&pool)
+            .await?;
+        sqlx::query("INSERT INTO series_tags (series_id, tag_id) VALUES (1, 1)")
+            .execute(&pool)
+            .await?;
+
+        run(&pool).await?;
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await?;
+
+        sqlx::query("DELETE FROM actors WHERE id = 1")
+            .execute(&pool)
+            .await?;
+        let video_actor_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM video_actors")
+            .fetch_one(&pool)
+            .await?;
+        let series_actor_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM series_actors")
+            .fetch_one(&pool)
+            .await?;
+        assert_eq!(video_actor_count, 0);
+        assert_eq!(series_actor_count, 0);
+
+        sqlx::query("DELETE FROM tags WHERE id = 1")
+            .execute(&pool)
+            .await?;
+        let video_tag_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM video_tags")
+            .fetch_one(&pool)
+            .await?;
+        let series_tag_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM series_tags")
+            .fetch_one(&pool)
+            .await?;
+        assert_eq!(video_tag_count, 0);
+        assert_eq!(series_tag_count, 0);
+
+        sqlx::query("DELETE FROM video_series WHERE id = 1")
+            .execute(&pool)
+            .await?;
+        let video_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM videos")
+            .fetch_one(&pool)
+            .await?;
+        assert_eq!(video_count, 0);
 
         pool.close().await;
         let _ = std::fs::remove_file(db_path);

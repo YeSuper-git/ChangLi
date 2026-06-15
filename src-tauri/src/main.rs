@@ -754,6 +754,95 @@ async fn remove_resource_actor(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_series_tags(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<Vec<db::Tag>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_series_tags(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_series_tag(
+    state: State<'_, AppState>,
+    series_id: i64,
+    tag_id: i64,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::add_series_tag(&pool, series_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_series_tag(
+    state: State<'_, AppState>,
+    series_id: i64,
+    tag_id: i64,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::remove_series_tag(&pool, series_id, tag_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_series_actors(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<Vec<db::Actor>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_series_actors(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_series_actor(
+    state: State<'_, AppState>,
+    series_id: i64,
+    actor_id: i64,
+    role: Option<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::add_series_actor(&pool, series_id, actor_id, role.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_series_actor(
+    state: State<'_, AppState>,
+    series_id: i64,
+    actor_id: i64,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::remove_series_actor(&pool, series_id, actor_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // 播放器相关命令
 #[tauri::command]
 async fn play_video(
@@ -890,6 +979,12 @@ fn main() {
             get_resource_actors,
             add_resource_actor,
             remove_resource_actor,
+            get_series_tags,
+            add_series_tag,
+            remove_series_tag,
+            get_series_actors,
+            add_series_actor,
+            remove_series_actor,
             play_video,
             get_play_history,
             update_watch_progress,
