@@ -11,6 +11,11 @@ const ActorDetail: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const editFromUrl = searchParams.get('edit') === '1';
+  const clearEditQuery = () => {
+    if (editFromUrl) {
+      navigate(location.pathname, { replace: true, state: location.state });
+    }
+  };
   const [actor, setActor] = useState<Actor | null>(null);
   const [resources, setResources] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +83,7 @@ const ActorDetail: React.FC = () => {
         editForm.japanese_name || undefined
       );
       setEditing(false);
+      clearEditQuery();
       loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 更新演员失败:', error);
@@ -309,7 +315,7 @@ const ActorDetail: React.FC = () => {
               </div>
               <div className="flex gap-4">
                 <button
-                  onClick={() => setEditing(false)}
+                  onClick={() => { setEditing(false); clearEditQuery(); }}
                   className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                 >
                   取消

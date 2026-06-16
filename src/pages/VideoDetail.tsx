@@ -28,6 +28,14 @@ const VideoDetail: React.FC = () => {
   const fromActor = searchParams.get('fromActor');
   const fromHome = searchParams.get('fromHome') === '1';
   const editFromUrl = searchParams.get('edit') === '1';
+  const clearEditQuery = () => {
+    if (editFromUrl) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('edit');
+      const query = params.toString();
+      navigate(`${location.pathname}${query ? `?${query}` : ''}`, { replace: true, state: location.state });
+    }
+  };
 
   const [video, setVideo] = useState<Video | null>(null);
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -148,6 +156,7 @@ const VideoDetail: React.FC = () => {
     setShowNewActorModal(false);
     setNewActorName('');
     setEditing(false);
+    clearEditQuery();
   };
 
   const syncRelations = async () => {
@@ -185,6 +194,7 @@ const VideoDetail: React.FC = () => {
         await syncRelations();
       }
       setEditing(false);
+      clearEditQuery();
       await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
     } catch (error) {
       console.error('保存失败:', error);

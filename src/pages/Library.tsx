@@ -185,17 +185,7 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-6">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="搜索视频或视频集..."
-          className="search-input"
-        />
-      </div>
-
-      <div className="mb-10 flex gap-3 flex-wrap">
+      <div className="mb-6 flex gap-3 flex-wrap">
         <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
         {tags.map((tag) => (
           <button
@@ -206,6 +196,16 @@ const Library: React.FC = () => {
             {tag.name}
           </button>
         ))}
+      </div>
+
+      <div className="mb-10">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="搜索视频或视频集..."
+          className="search-input"
+        />
       </div>
 
       {filteredSeries.length > 0 && (

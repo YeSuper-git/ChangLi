@@ -145,9 +145,9 @@ const Actors: React.FC = () => {
                   {actor.work_count || 0} 部作品
                 </div>
               </div>
-              <div className="p-5">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                <p className="text-sm text-gray-500 line-clamp-2 min-h-[2.5rem]">
+              <div className="px-4 py-3">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">{actor.name}</h3>
+                <p className="text-sm text-gray-500 line-clamp-1">
                   {actor.bio || '暂无简介'}
                 </p>
               </div>

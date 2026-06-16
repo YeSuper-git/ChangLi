@@ -30,6 +30,14 @@ const SeriesDetail: React.FC = () => {
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const editFromUrl = searchParams.get('edit') === '1';
+  const clearEditQuery = () => {
+    if (editFromUrl) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('edit');
+      const query = params.toString();
+      navigate(`${location.pathname}${query ? `?${query}` : ''}`, { replace: true, state: location.state });
+    }
+  };
   const seriesId = Number(id);
 
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -168,6 +176,7 @@ const SeriesDetail: React.FC = () => {
       await updateVideoSeries(series.id, title, editData.description, editData.poster);
       await syncSeriesRelations();
       setEditing(false);
+      clearEditQuery();
       await loadSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);
@@ -322,7 +331,7 @@ const SeriesDetail: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={handleSelectPoster} className="action-btn">选择海报</button>
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
-                  <button onClick={() => setEditing(false)} className="action-btn">取消</button>
+                  <button onClick={() => { setEditing(false); clearEditQuery(); }} className="action-btn">取消</button>
                 </div>
               </div>
             ) : (

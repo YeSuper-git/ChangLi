@@ -140,10 +140,12 @@ const Home: React.FC = () => {
                   )}
                   <button
                     onClick={(event) => handlePlay(item.video.id, event)}
-                    className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors"
+                    className={`absolute inset-0 flex items-center justify-center transition-colors ${poster ? 'bg-transparent hover:bg-black/10' : 'bg-black/0 hover:bg-black/20'}`}
                     title="继续播放"
                   >
-                    <span className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg text-2xl ml-1">▶️</span>
+                    {!poster && (
+                      <span className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg text-2xl ml-1">▶️</span>
+                    )}
                   </button>
                 </div>
                 <div className="p-6">

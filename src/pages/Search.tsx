@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getActors, getVideos } from '../utils/api';
-import type { Actor, Video } from '../utils/api';
+import { getActors, getStandaloneVideos, getVideoSeriesList } from '../utils/api';
+import type { Actor, Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 type SearchItem =
   | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
+  | { type: 'series'; id: number; title: string; subtitle: string; series: VideoSeries }
   | { type: 'actor'; id: number; title: string; subtitle: string; actor: Actor };
 
 const normalize = (value: string) => value.toLowerCase().trim();
@@ -30,6 +31,7 @@ const Search: React.FC = () => {
   const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
   const [keyword, setKeyword] = useState(queryKeyword);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
   const [actors, setActors] = useState<Actor[]>([]);
   const [results, setResults] = useState<SearchItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ const Search: React.FC = () => {
     }
   }, [queryKeyword]);
 
-  const buildResults = (searchKeyword: string, videoList: Video[], actorList: Actor[]) => {
+  const buildResults = (searchKeyword: string, videoList: Video[], seriesItems: VideoSeries[], actorList: Actor[]) => {
     const videoResults: SearchItem[] = videoList
       .filter((video) =>
         fuzzyMatch(video.file_name, searchKeyword) ||
@@ -55,6 +57,19 @@ const Search: React.FC = () => {
         title: video.file_name,
         subtitle: video.resolution ? `视频 · ${video.resolution}` : '视频',
         video,
+      }));
+
+    const seriesResults: SearchItem[] = seriesItems
+      .filter((series) =>
+        fuzzyMatch(series.title, searchKeyword) ||
+        fuzzyMatch(series.description || '', searchKeyword)
+      )
+      .map((series) => ({
+        type: 'series',
+        id: series.id,
+        title: series.title,
+        subtitle: `视频集 · ${series.video_count} 集`,
+        series,
       }));
 
     const actorResults: SearchItem[] = actorList
@@ -71,7 +86,7 @@ const Search: React.FC = () => {
         actor,
       }));
 
-    return [...videoResults, ...actorResults];
+    return [...seriesResults, ...videoResults, ...actorResults];
   };
 
   const handleSearch = async (inputKeyword = keyword) => {
@@ -82,13 +97,15 @@ const Search: React.FC = () => {
     setSearched(true);
 
     try {
-      const [videoList, actorList] = await Promise.all([
-        videos.length ? Promise.resolve(videos) : getVideos(),
+      const [videoList, seriesItems, actorList] = await Promise.all([
+        videos.length ? Promise.resolve(videos) : getStandaloneVideos(),
+        seriesList.length ? Promise.resolve(seriesList) : getVideoSeriesList(),
         actors.length ? Promise.resolve(actors) : getActors(),
       ]);
       setVideos(videoList);
+      setSeriesList(seriesItems);
       setActors(actorList);
-      setResults(buildResults(nextKeyword, videoList, actorList));
+      setResults(buildResults(nextKeyword, videoList, seriesItems, actorList));
       if (nextKeyword !== queryKeyword) {
         navigate(`/search?q=${encodeURIComponent(nextKeyword)}`, { replace: true });
       }
@@ -136,27 +153,32 @@ const Search: React.FC = () => {
           {results.length > 0 ? (
             <div className="space-y-4">
               {results.map((item) => {
-                const target = item.type === 'video' ? `/video/${item.id}` : `/actors/${item.id}`;
+                const target = item.type === 'video' ? `/video/${item.id}` : item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
                 const imageDataUrl = item.type === 'video'
                   ? videoPosterDataUrl(item.video)
-                  : actorPhotoDataUrl(item.actor);
+                  : item.type === 'series'
+                    ? item.series.poster_data_url
+                    : actorPhotoDataUrl(item.actor);
                 return (
                   <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
                     <div className="w-24 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
                       {imageDataUrl ? (
                         <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />
                       ) : (
-                        <StaticImagePlaceholder kind={item.type === 'video' ? 'video' : 'actor'} />
+                        <StaticImagePlaceholder kind={item.type === 'actor' ? 'actor' : 'video'} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-3">
-                        {item.type === 'video' ? '视频' : '演员'}
+                        {item.type === 'video' ? '视频' : item.type === 'series' ? '视频集' : '演员'}
                       </div>
                       <h3 className="text-xl font-semibold text-gray-900 mb-2 truncate">{item.title}</h3>
                       <p className="text-sm text-gray-500">{item.subtitle}</p>
                       {item.type === 'video' && item.video.description && (
                         <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.video.description}</p>
+                      )}
+                      {item.type === 'series' && item.series.description && (
+                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.series.description}</p>
                       )}
                       {item.type === 'actor' && item.actor.bio && (
                         <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.actor.bio}</p>
