@@ -290,6 +290,17 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;
+
+    // UI 现在只有“添加”入口并选择文件夹：当前文件夹扫描到 1 个视频时按单视频导入；
+    // 0 个或多个视频时保持视频集扫描逻辑。
+    if result.videos.len() == 1 {
+        let video = result.videos.into_iter().next().expect("len checked");
+        db::add_video(&pool, video)
+            .await
+            .map_err(|e| e.to_string())?;
+        return db::get_videos(&pool).await.map_err(|e| e.to_string());
+    }
+
     let series_poster = result.posters.values().next().cloned();
     let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref())
         .await

@@ -183,6 +183,16 @@ const ActorDetail: React.FC = () => {
     );
   }
 
+  const workItems = Array.from(
+    resources.reduce((map, resource) => {
+      const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
+      if (!map.has(key)) {
+        map.set(key, resource);
+      }
+      return map;
+    }, new Map<string, Video>()).values()
+  );
+
   return (
     <div>
       {/* 返回按钮 */}
@@ -323,7 +333,7 @@ const ActorDetail: React.FC = () => {
                 )}
                 <div className="flex items-center gap-3">
                   <span className="text-gray-500 w-20">作品数量</span>
-                  <span className="font-medium">{resources.length}部</span>
+                  <span className="font-medium">{actor.work_count || workItems.length}部</span>
                 </div>
               </div>
 
@@ -357,23 +367,26 @@ const ActorDetail: React.FC = () => {
           </button>
         </div>
 
-        {resources.length > 0 ? (
+        {workItems.length > 0 ? (
           <div className="grid grid-cols-4 gap-6">
-            {resources.map((resource) => {
-              const poster = videoPosterDataUrl(resource);
+            {workItems.map((resource) => {
+              const isSeries = Boolean(resource.series_id);
+              const title = isSeries ? (resource.series_title || '视频集') : resource.file_name;
+              const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
+              const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/video/${resource.id}?fromActor=${actor.id}`;
               return (
-              <Link key={resource.id} to={`/video/${resource.id}`} className="card block">
+              <Link key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`} to={target} className="card block">
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {poster ? (
-                    <img src={poster} alt={resource.file_name} className="w-full h-full object-cover" />
+                    <img src={poster} alt={title} className="w-full h-full object-cover" />
                   ) : (
                     <StaticImagePlaceholder kind="video" />
                   )}
                 </div>
                 <div className="p-5">
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{resource.file_name}</h3>
+                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
                   <div className="text-sm text-gray-500">
-                    {resource.series_id ? `第 ${resource.episode_number || '?'} 集` : '单视频'}
+                    {isSeries ? '视频集' : '单视频'}
                   </div>
                 </div>
               </Link>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
 import {
   addActor,
@@ -8,7 +8,6 @@ import {
   addTag,
   addVideoToSeries,
   deleteVideo,
-  deleteVideoSeries,
   getActors,
   getSeriesActors,
   getSeriesTags,
@@ -25,7 +24,8 @@ import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromActor = searchParams.get('fromActor');
   const seriesId = Number(id);
 
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -169,18 +169,6 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleDeleteSeries = async () => {
-    if (!series) return;
-    if (!confirm('确定要删除整个视频集吗？该操作会同时删除该视频集下的所有分集记录。')) return;
-    try {
-      await deleteVideoSeries(series.id, true);
-      navigate('/library');
-    } catch (error) {
-      console.error('删除视频集失败:', error);
-      alert('删除失败: ' + String(error));
-    }
-  };
-
   const handleAddEpisode = async () => {
     const selected = await open({
       multiple: false,
@@ -227,7 +215,9 @@ const SeriesDetail: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/library" className="text-sm text-blue-600 hover:underline">← 返回视频库</Link>
+        <Link to={fromActor ? `/actors/${fromActor}` : '/library'} className="text-sm text-blue-600 hover:underline">
+          ← {fromActor ? '返回演员详情' : '返回视频'}
+        </Link>
       </div>
 
       <div className="card p-6 mb-8">
@@ -338,7 +328,6 @@ const SeriesDetail: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleAddEpisode} className="action-btn">添加分集</button>
-                  <button onClick={handleDeleteSeries} className="action-btn action-btn-danger">删除整个集</button>
                 </div>
               </>
             )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getActors, addActor } from '../utils/api';
+import { getActors, addActor, deleteActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 
@@ -11,9 +11,16 @@ const Actors: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newActor, setNewActor] = useState({ name: '', bio: '' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [contextMenu, setContextMenu] = useState<{ id: number; name: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     loadActors();
+  }, []);
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
   }, []);
 
   const loadActors = async () => {
@@ -43,6 +50,25 @@ const Actors: React.FC = () => {
     } catch (error) {
       console.error('添加演员失败:', error);
     }
+  };
+
+
+  const handleDeleteActor = async (actorId: number, actorName: string) => {
+    if (!confirm(`确定要删除演员“${actorName}”吗？删除后会同步移除作品关联。`)) return;
+    try {
+      await deleteActor(actorId);
+      setContextMenu(null);
+      await loadActors();
+    } catch (error) {
+      console.error('删除演员失败:', error);
+      alert('删除演员失败: ' + String(error));
+    }
+  };
+
+  const openContextMenu = (event: React.MouseEvent, actor: Actor) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ id: actor.id, name: actor.name, x: event.clientX, y: event.clientY });
   };
 
   const filteredActors = actors.filter(actor =>
@@ -86,7 +112,12 @@ const Actors: React.FC = () => {
           {filteredActors.map((actor) => {
             const photoDataUrl = actorPhotoDataUrl(actor);
             return (
-            <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
+            <Link
+              key={actor.id}
+              to={`/actors/${actor.id}`}
+              onContextMenu={(event) => openContextMenu(event, actor)}
+              className="card block"
+            >
               <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
                 {photoDataUrl ? (
                   <img
@@ -99,15 +130,16 @@ const Actors: React.FC = () => {
                 )}
                 <div className="absolute bottom-4 left-4 right-4">
                   <div className="bg-black/60 text-white text-sm px-3 py-2 rounded-lg backdrop-blur-sm">
-                    参演作品
+                    {actor.work_count || 0} 部作品
                   </div>
                 </div>
               </div>
               <div className="p-5">
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                <p className="text-sm text-gray-500">
-                  {actor.birthday ? `${actor.birthday}` : ''}
+                <p className="text-sm text-gray-500 line-clamp-2 min-h-[2.5rem]">
+                  {actor.bio || '暂无简介'}
                 </p>
+                <p className="text-xs text-gray-400 mt-2">{actor.work_count || 0} 部作品</p>
               </div>
             </Link>
           );
@@ -126,6 +158,21 @@ const Actors: React.FC = () => {
               添加第一个演员
             </button>
           )}
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => handleDeleteActor(contextMenu.id, contextMenu.name)}
+          >
+            删除
+          </button>
         </div>
       )}
 

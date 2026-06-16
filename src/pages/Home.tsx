@@ -126,7 +126,7 @@ const Home: React.FC = () => {
               ? `观看至第 ${item.video.episode_number || '?'} 集 ${formatWatchTime(item.last_position)}`
               : `观看至 ${formatWatchTime(item.last_position)}`;
             return (
-              <Link key={`${item.video.id}-${item.last_played}`} to={`/video/${item.video.id}`} className="card block">
+              <Link key={`${item.video.id}-${item.last_played}`} to={`/video/${item.video.id}?fromHome=1`} className="card block">
                 <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {poster ? (
                     <img src={poster} alt={title} className="w-full h-full object-cover" />
@@ -185,7 +185,7 @@ const Home: React.FC = () => {
           {videos.slice(0, Math.max(0, 8 - seriesList.length)).map((video) => {
             const thumbnailDataUrl = videoPosterDataUrl(video);
             return (
-              <Link key={`video-${video.id}`} to={`/video/${video.id}`} className="card block">
+              <Link key={`video-${video.id}`} to={`/video/${video.id}?fromHome=1`} className="card block">
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {thumbnailDataUrl ? (
                     <img src={thumbnailDataUrl} alt={video.file_name} className="w-full h-full object-cover" />

@@ -18,7 +18,9 @@ pub fn is_video_file(path: &Path) -> bool {
 }
 
 // 支持的图片格式
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "bmp", "gif"];
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "webp", "bmp", "gif", "avif", "svg", "tif", "tiff", "ico",
+];
 
 // 扫描结果
 #[derive(Debug)]
@@ -71,7 +73,8 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
         }
     }
 
-    // 处理每个文件夹
+    // 处理每个文件夹。排序规则：如果同一文件夹下所有视频文件名（不含扩展名）都是
+    // 固定两位数字 01、02、03，则按数字集数排序；否则按文件名自然排序。
     for (folder, videos_in_folder) in &folder_videos {
         let folder_name = folder
             .file_name()
@@ -79,14 +82,23 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
             .to_string_lossy()
             .to_string();
 
-        // 查找该文件夹的海报图片
-        let poster_path = find_poster_for_folder(folder, &folder_name, &image_files);
+        let folder_poster_path = find_poster_for_folder(folder, &folder_name, &image_files);
+        let mut sorted_videos = videos_in_folder.clone();
+        sort_episode_files(&mut sorted_videos);
 
-        // 为每个视频文件创建记录
-        for video_path in videos_in_folder {
+        for (index, video_path) in sorted_videos.iter().enumerate() {
+            let poster_path = find_poster_for_video(video_path, &image_files)
+                .or_else(|| folder_poster_path.clone());
             match scan_video_file(video_path, poster_path.as_deref()).await {
-                Ok(video) => {
-                    // 记录海报映射
+                Ok(mut video) => {
+                    if folder_uses_fixed_episode_names(&sorted_videos) {
+                        video.episode_number = video_path
+                            .file_stem()
+                            .and_then(|stem| stem.to_str())
+                            .and_then(|stem| stem.parse::<i32>().ok());
+                    } else if video.episode_number.is_none() {
+                        video.episode_number = Some((index + 1) as i32);
+                    }
                     if let Some(ref poster) = poster_path {
                         posters.insert(video.file_path.clone(), poster.clone());
                     }
@@ -98,6 +110,65 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
     }
 
     Ok(ScanResult { videos, posters })
+}
+
+fn file_stem_lower(path: &Path) -> String {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default()
+        .to_lowercase()
+}
+
+fn fixed_episode_from_path(path: &Path) -> Option<i32> {
+    let stem = path.file_stem()?.to_str()?;
+    if stem.len() == 2 && stem.chars().all(|c| c.is_ascii_digit()) {
+        stem.parse::<i32>().ok()
+    } else {
+        None
+    }
+}
+
+fn folder_uses_fixed_episode_names(files: &[PathBuf]) -> bool {
+    !files.is_empty()
+        && files
+            .iter()
+            .all(|path| fixed_episode_from_path(path).is_some())
+}
+
+fn sort_episode_files(files: &mut Vec<PathBuf>) {
+    if folder_uses_fixed_episode_names(files) {
+        files.sort_by_key(|path| fixed_episode_from_path(path).unwrap_or(i32::MAX));
+    } else {
+        files.sort_by_key(|path| file_stem_lower(path));
+    }
+}
+
+fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<String> {
+    let video_parent = video_path.parent()?;
+    let video_stem = file_stem_lower(video_path);
+    image_files.iter().find_map(|image_path| {
+        if image_path.parent() == Some(video_parent) && file_stem_lower(image_path) == video_stem {
+            Some(image_path.to_string_lossy().to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn find_poster_next_to_video(video_path: &Path) -> Option<String> {
+    let parent = video_path.parent()?;
+    let stem = video_path.file_stem()?.to_str()?;
+    for ext in IMAGE_EXTENSIONS {
+        let candidate = parent.join(format!("{stem}.{ext}"));
+        if candidate.exists() && candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+        let upper = parent.join(format!("{stem}.{}", ext.to_uppercase()));
+        if upper.exists() && upper.is_file() {
+            return Some(upper.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 // 查找文件夹的海报图片
@@ -145,8 +216,12 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
 
     let file_size = std::fs::metadata(path)?.len() as i64;
 
-    // 从文件名提取集数信息
-    let episode = extract_episode_from_filename(&file_name);
+    // 从文件名提取集数信息。固定两位数字文件名 01/02/03 直接作为集数。
+    let episode =
+        fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name));
+    let poster = poster
+        .map(|p| p.to_string())
+        .or_else(|| find_poster_next_to_video(path));
 
     Ok(Video {
         id: 0,
@@ -161,8 +236,10 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         resolution: None,
         source_site: None,
         metadata: None,
-        thumbnail: poster.map(|p| p.to_string()),
+        thumbnail: poster,
         thumbnail_data_url: None,
+        series_title: None,
+        series_poster_data_url: None,
         description: None,
         created_at: chrono::Utc::now().to_rfc3339(),
     })
@@ -259,4 +336,64 @@ pub struct FolderInfo {
     pub name: String,
     pub path: String,
     pub video_count: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("changli-scanner-{name}-{suffix}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn fixed_two_digit_filenames_define_episode_order() -> Result<()> {
+        let dir = temp_dir("episodes");
+        fs::write(dir.join("02.mp4"), b"two")?;
+        fs::write(dir.join("01.mp4"), b"one")?;
+
+        let result = scan_directory(dir.to_str().unwrap()).await?;
+        let episodes: Vec<_> = result
+            .videos
+            .iter()
+            .map(|video| (video.file_name.clone(), video.episode_number))
+            .collect();
+
+        assert_eq!(episodes[0], ("01.mp4".to_string(), Some(1)));
+        assert_eq!(episodes[1], ("02.mp4".to_string(), Some(2)));
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn same_stem_image_is_selected_before_folder_poster() -> Result<()> {
+        let dir = temp_dir("poster");
+        let video_path = dir.join("movie.mp4");
+        let same_stem = dir.join("movie.jpg");
+        let folder_poster = dir.join(
+            dir.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap()
+                .to_string()
+                + ".jpg",
+        );
+        fs::write(&video_path, b"video")?;
+        fs::write(&same_stem, b"same")?;
+        fs::write(&folder_poster, b"folder")?;
+
+        let video = scan_video_file(&video_path, None).await?;
+        assert_eq!(video.thumbnail.as_deref(), Some(same_stem.to_str().unwrap()));
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
 }

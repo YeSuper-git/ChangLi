@@ -67,11 +67,18 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
-    let player_window = get_or_create_player_window(app)?;
-    position_player_window_next_to_main(app, &player_window)?;
-    sync_player_minimize_state(app, &player_window)?;
-    player_window.show()?;
-    player_window.set_focus()?;
+    // 根因确认：此前 Windows 路径创建了一个 Tauri WebView 播放壳，再把 mpv --wid
+    // 嵌入到这个 WebView HWND。这个架构在 WebView2/DWM 合成下反复出现“外部悬浮、
+    // 黑屏/无声、无边框无法关闭”：
+    // 1) position_player_window_next_to_main 会把播放壳放到主窗口右侧（不是主窗口内）；
+    // 2) 播放壳 decorations(false) 且前端只渲染空 div，没有真实系统关闭入口；
+    // 3) --wid 嵌入 WebView HWND 已加 attach-parent/ANGLE/不透明黑底仍不稳定。
+    // 因此 Windows 改用 mpv 原生窗口兜底：不再创建 Tauri 播放壳、不传 --wid，
+    // 通过 --geometry 把 mpv 窗口摆在主窗口内容区域内，保留系统标题栏和关闭按钮，
+    // 优先保证能正常播放、能关闭、视觉上覆盖在 ChangLi 主窗口内。
+    if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
+        let _ = window.close();
+    }
 
     let mut session = MPV_SESSION
         .lock()
@@ -81,7 +88,10 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
         return Ok(());
     }
 
-    let new_session = spawn_mpv(app, &player_window, video_path)?;
+    let ipc_path = unique_ipc_path();
+    let geometry = windows_mpv_geometry(app);
+    let new_session =
+        spawn_mpv_with_options(app, None, geometry.as_deref(), &ipc_path, video_path)?;
     *session = Some(new_session);
     Ok(())
 }
@@ -134,12 +144,15 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
 }
 
 pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
-    let player_window = get_or_create_player_window(app)?;
     let mut flag = ALWAYS_ON_TOP
         .lock()
         .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
     *flag = !*flag;
-    player_window.set_always_on_top(*flag)?;
+    #[cfg(not(target_os = "windows"))]
+    {
+        let player_window = get_or_create_player_window(app)?;
+        player_window.set_always_on_top(*flag)?;
+    }
     Ok(*flag)
 }
 
@@ -244,12 +257,13 @@ fn sync_player_minimize_state(app: &AppHandle, player: &Window) -> Result<()> {
 fn spawn_mpv(app: &AppHandle, window: &Window, video_path: &PathBuf) -> Result<MpvSession> {
     let ipc_path = unique_ipc_path();
     let wid = native_window_id(window).context("获取独立播放窗口原生句柄失败")?;
-    spawn_mpv_with_options(app, wid.as_deref(), &ipc_path, video_path)
+    spawn_mpv_with_options(app, wid.as_deref(), None, &ipc_path, video_path)
 }
 
 fn spawn_mpv_with_options(
     app: &AppHandle,
     wid: Option<&str>,
+    geometry: Option<&str>,
     ipc_path: &str,
     video_path: &PathBuf,
 ) -> Result<MpvSession> {
@@ -259,7 +273,7 @@ fn spawn_mpv_with_options(
             continue;
         }
 
-        match spawn_mpv_process(&mpv_path, wid, ipc_path, video_path) {
+        match spawn_mpv_process(&mpv_path, wid, geometry, ipc_path, video_path) {
             Ok(child) => {
                 return Ok(MpvSession {
                     child,
@@ -270,7 +284,7 @@ fn spawn_mpv_with_options(
         }
     }
 
-    match spawn_mpv_process(&PathBuf::from("mpv"), wid, ipc_path, video_path) {
+    match spawn_mpv_process(&PathBuf::from("mpv"), wid, geometry, ipc_path, video_path) {
         Ok(child) => Ok(MpvSession {
             child,
             ipc_path: ipc_path.to_string(),
@@ -284,6 +298,7 @@ fn spawn_mpv_with_options(
 fn spawn_mpv_process(
     mpv_path: &PathBuf,
     wid: Option<&str>,
+    _geometry: Option<&str>,
     ipc_path: &str,
     video_path: &PathBuf,
 ) -> Result<Child> {
@@ -300,9 +315,17 @@ fn spawn_mpv_process(
         command
             .arg("--vo=gpu")
             .arg("--gpu-context=angle")
-            .arg("--no-border")
             .arg("--no-keepaspect-window")
             .arg("--background=none");
+
+        if wid.is_some() {
+            command.arg("--no-border");
+        } else {
+            command.arg("--border=yes");
+            if let Some(geometry) = _geometry {
+                command.arg(format!("--geometry={geometry}"));
+            }
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -322,11 +345,44 @@ fn spawn_mpv_process(
         .arg("--title=ChangLi - ${media-title}")
         .arg(format!("--input-ipc-server={ipc_path}"));
 
+    #[cfg(target_os = "windows")]
+    if *ALWAYS_ON_TOP
+        .lock()
+        .map_err(|_| anyhow!("always-on-top lock poisoned"))?
+    {
+        command.arg("--ontop");
+    }
+
     command.arg(video_path);
 
     command
         .spawn()
         .with_context(|| format!("启动 mpv 失败: {}", mpv_path.display()))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_mpv_geometry(app: &AppHandle) -> Option<String> {
+    let main = app.get_window("main")?;
+    let pos = main.outer_position().ok()?;
+    let size = main.outer_size().ok()?;
+
+    let margin_x = 32_i32;
+    let top_margin = 96_i32;
+    let bottom_margin = 40_i32;
+    let width = (size.width as i32 - margin_x * 2).max(640);
+    let height = (size.height as i32 - top_margin - bottom_margin).max(360);
+    let x = pos.x + margin_x;
+    let y = pos.y + top_margin;
+
+    Some(format!(
+        "{}x{}{}{}{}{}",
+        width,
+        height,
+        if x >= 0 { "+" } else { "" },
+        x,
+        if y >= 0 { "+" } else { "" },
+        y
+    ))
 }
 
 fn reuse_existing_session(session: &mut Option<MpvSession>, video_path: &PathBuf) -> Result<bool> {

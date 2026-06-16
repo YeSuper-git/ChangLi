@@ -208,6 +208,8 @@ export interface Video {
   metadata?: any;
   thumbnail?: string;
   thumbnail_data_url?: string;
+  series_title?: string;
+  series_poster_data_url?: string;
   description?: string;
   created_at: string;
 }
@@ -331,6 +333,7 @@ export interface Actor {
   height?: string;
   measurements?: string;
   japanese_name?: string;
+  work_count: number;
   created_at: string;
   updated_at: string;
 }

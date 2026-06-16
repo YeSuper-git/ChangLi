@@ -74,6 +74,8 @@ pub struct Video {
     pub metadata: Option<serde_json::Value>,
     pub thumbnail: Option<String>,
     pub thumbnail_data_url: Option<String>,
+    pub series_title: Option<String>,
+    pub series_poster_data_url: Option<String>,
     pub description: Option<String>,
     pub created_at: String,
 }
@@ -103,6 +105,7 @@ pub struct Actor {
     pub height: Option<String>,
     pub measurements: Option<String>,
     pub japanese_name: Option<String>,
+    pub work_count: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -422,6 +425,11 @@ fn video_from_row(row: &SqliteRow) -> Video {
     let thumbnail_data_url = resolved_thumbnail
         .as_ref()
         .and_then(|path| image_data_url(Path::new(path)));
+    let series_poster: Option<String> = row.try_get("series_poster").ok();
+    let series_poster_data_url = series_poster
+        .map(|path| storage::resolve_data_path(&path))
+        .as_ref()
+        .and_then(|path| image_data_url(path));
 
     Video {
         id: row.get("id"),
@@ -440,6 +448,8 @@ fn video_from_row(row: &SqliteRow) -> Video {
             .and_then(|s| serde_json::from_str(&s).ok()),
         thumbnail: resolved_thumbnail,
         thumbnail_data_url,
+        series_title: row.try_get("series_title").ok(),
+        series_poster_data_url,
         description: row.get("description"),
         created_at: row.get("created_at"),
     }
@@ -696,9 +706,31 @@ pub async fn delete_video(pool: &SqlitePool, id: i64) -> Result<()> {
 
 // 演员操作
 pub async fn get_actors(pool: &SqlitePool) -> Result<Vec<Actor>> {
-    let rows = sqlx::query("SELECT * FROM actors ORDER BY name")
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT a.*, COALESCE(w.work_count, 0) AS work_count
+         FROM actors a
+         LEFT JOIN (
+             SELECT actor_id, COUNT(*) AS work_count
+             FROM (
+                 SELECT va.actor_id, 'video-' || v.id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NULL
+                 UNION
+                 SELECT va.actor_id, 'series-' || v.series_id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NOT NULL
+                 UNION
+                 SELECT sa.actor_id, 'series-' || sa.series_id AS work_key
+                 FROM series_actors sa
+             ) actor_works
+             GROUP BY actor_id
+         ) w ON w.actor_id = a.id
+         ORDER BY a.name",
+    )
+    .fetch_all(pool)
+    .await?;
 
     let actors = rows.iter().map(actor_from_row).collect();
 
@@ -706,10 +738,32 @@ pub async fn get_actors(pool: &SqlitePool) -> Result<Vec<Actor>> {
 }
 
 pub async fn get_actor(pool: &SqlitePool, id: i64) -> Result<Option<Actor>> {
-    let row = sqlx::query("SELECT * FROM actors WHERE id = ?")
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
+    let row = sqlx::query(
+        "SELECT a.*, COALESCE(w.work_count, 0) AS work_count
+         FROM actors a
+         LEFT JOIN (
+             SELECT actor_id, COUNT(*) AS work_count
+             FROM (
+                 SELECT va.actor_id, 'video-' || v.id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NULL
+                 UNION
+                 SELECT va.actor_id, 'series-' || v.series_id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NOT NULL
+                 UNION
+                 SELECT sa.actor_id, 'series-' || sa.series_id AS work_key
+                 FROM series_actors sa
+             ) actor_works
+             GROUP BY actor_id
+         ) w ON w.actor_id = a.id
+         WHERE a.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
 
     Ok(row.map(|row| actor_from_row(&row)))
 }
@@ -783,6 +837,7 @@ fn image_mime_from_path(path: &Path) -> &'static str {
         "svg" => "image/svg+xml",
         "avif" => "image/avif",
         "bmp" => "image/bmp",
+        "tif" | "tiff" => "image/tiff",
         "ico" => "image/x-icon",
         _ => "application/octet-stream",
     }
@@ -819,6 +874,7 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
         height: row.get("height"),
         measurements: row.get("measurements"),
         japanese_name: row.get("japanese_name"),
+        work_count: row.try_get("work_count").unwrap_or(0),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     }
@@ -954,12 +1010,13 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
 
 pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
     let rows = sqlx::query(
-        "SELECT DISTINCT v.*
+        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster
          FROM videos v
+         LEFT JOIN video_series s ON s.id = v.series_id
          LEFT JOIN video_actors va ON va.video_id = v.id
          LEFT JOIN series_actors sa ON sa.series_id = v.series_id
          WHERE va.actor_id = ? OR sa.actor_id = ?
-         ORDER BY v.created_at DESC",
+         ORDER BY COALESCE(s.updated_at, v.created_at) DESC, COALESCE(v.episode_number, 999999), v.file_name",
     )
     .bind(actor_id)
     .bind(actor_id)

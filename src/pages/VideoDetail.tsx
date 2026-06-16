@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideo,
   updateVideo,
@@ -23,6 +23,9 @@ import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromActor = searchParams.get('fromActor');
+  const fromHome = searchParams.get('fromHome') === '1';
 
   const [video, setVideo] = useState<Video | null>(null);
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -284,12 +287,18 @@ const VideoDetail: React.FC = () => {
   }
 
   const isSeriesEpisode = Boolean(video.series_id);
+  const backTo = fromActor ? `/actors/${fromActor}` : fromHome ? '/' : '/library';
+  const backLabel = fromActor ? '返回演员详情' : fromHome ? '返回首页' : '返回视频';
   const displayThumbnailDataUrl = editing && editData.thumbnail !== (video.thumbnail || '')
     ? null
     : videoPosterDataUrl(video);
 
   return (
     <div>
+      <div className="mb-6">
+        <Link to={backTo} className="text-sm text-blue-600 hover:underline">← {backLabel}</Link>
+      </div>
+
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">视频详情</h1>
         <div className="flex gap-4">

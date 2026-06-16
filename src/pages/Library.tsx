@@ -25,9 +25,16 @@ const Library: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     loadLibrary(null);
+  }, []);
+
+  useEffect(() => {
+    const closeMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
   }, []);
 
   const loadLibrary = async (tagId: number | null = activeTagId) => {
@@ -48,16 +55,12 @@ const Library: React.FC = () => {
     }
   };
 
-  const importPath = async (directory: boolean) => {
+  const importPath = async () => {
     try {
       const selected = await open({
-        directory,
+        directory: true,
         multiple: false,
-        title: directory ? '选择要扫描的视频文件夹' : '选择要添加的视频文件',
-        filters: directory ? undefined : [{
-          name: '视频',
-          extensions: ['mp4', 'mkv', 'avi', 'flv', 'mov', 'wmv', 'webm', 'm4v', 'mpg', 'mpeg', '3gp', 'ts', 'rmvb', 'rm', 'vob', 'asf', 'f4v'],
-        }],
+        title: '选择要添加的视频文件夹',
       });
 
       if (selected) {
@@ -77,12 +80,12 @@ const Library: React.FC = () => {
     }
   };
 
-  const handleDeleteVideo = async (id: number, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (!confirm('确定要删除这个视频吗？')) return;
+  const handleDeleteVideo = async (id: number, name: string) => {
+    if (!confirm(`确定要删除视频“${name}”吗？`)) return;
 
     try {
       await deleteVideo(id);
+      setContextMenu(null);
       await loadLibrary(activeTagId);
     } catch (error) {
       console.error('[Library] 删除失败:', error);
@@ -90,17 +93,23 @@ const Library: React.FC = () => {
     }
   };
 
-  const handleDeleteSeries = async (id: number, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (!confirm('确定要删除这个视频集吗？该操作会同时删除该视频集下的所有分集记录。')) return;
+  const handleDeleteSeries = async (id: number, name: string) => {
+    if (!confirm(`确定要删除视频集“${name}”吗？该操作会同时删除该视频集下的所有分集记录。`)) return;
 
     try {
       await deleteVideoSeries(id, true);
+      setContextMenu(null);
       await loadLibrary(activeTagId);
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
       alert('删除视频集失败: ' + String(error));
     }
+  };
+
+  const openContextMenu = (event: React.MouseEvent, type: 'video' | 'series', id: number, name: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
   };
 
   const handlePlayVideo = async (id: number, event: React.MouseEvent) => {
@@ -156,18 +165,11 @@ const Library: React.FC = () => {
         <h1 className="text-3xl font-bold">视频</h1>
         <div className="flex gap-3">
           <button
-            onClick={() => importPath(false)}
-            disabled={scanning}
-            className="px-6 py-3 bg-white border border-gray-200 rounded-xl font-medium hover:bg-gray-50 disabled:opacity-50"
-          >
-            添加单视频
-          </button>
-          <button
-            onClick={() => importPath(true)}
+            onClick={importPath}
             disabled={scanning}
             className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
           >
-            {scanning ? '扫描中...' : '扫描文件夹'}
+            {scanning ? '添加中...' : '添加'}
           </button>
         </div>
       </div>
@@ -203,6 +205,7 @@ const Library: React.FC = () => {
               <div
                 key={series.id}
                 onClick={() => navigate(`/series/${series.id}`)}
+                onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className="card block cursor-pointer"
               >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
@@ -222,7 +225,6 @@ const Library: React.FC = () => {
                   {series.description && <p className="text-xs text-gray-500 line-clamp-2 mb-3">{series.description}</p>}
                   <div className="flex gap-2">
                     <button onClick={(event) => handlePlaySeries(series.id, event)} className="flex-1 action-btn action-btn-primary text-center">播放</button>
-                    <button onClick={(event) => handleDeleteSeries(series.id, event)} className="action-btn action-btn-danger">删除</button>
                   </div>
                 </div>
               </div>
@@ -241,6 +243,7 @@ const Library: React.FC = () => {
                 <div
                   key={video.id}
                   onClick={() => navigate(`/video/${video.id}`)}
+                  onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
                   className="card cursor-pointer"
                 >
                   <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
@@ -260,7 +263,6 @@ const Library: React.FC = () => {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={(event) => handlePlayVideo(video.id, event)} className="flex-1 action-btn action-btn-primary text-center">播放</button>
-                      <button onClick={(event) => handleDeleteVideo(video.id, event)} className="action-btn action-btn-danger">删除</button>
                     </div>
                   </div>
                 </div>
@@ -273,7 +275,24 @@ const Library: React.FC = () => {
       {filteredSeries.length === 0 && filteredVideos.length === 0 && (
         <div className="text-center py-16">
           <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : '暂无视频'}</p>
-          {!searchTerm && <p className="text-gray-400 text-sm">点击“添加单视频”或“扫描文件夹”添加视频</p>}
+          {!searchTerm && <p className="text-gray-400 text-sm">点击“添加”选择文件夹添加视频</p>}
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => contextMenu.type === 'video'
+              ? handleDeleteVideo(contextMenu.id, contextMenu.name)
+              : handleDeleteSeries(contextMenu.id, contextMenu.name)}
+          >
+            删除
+          </button>
         </div>
       )}
     </div>
