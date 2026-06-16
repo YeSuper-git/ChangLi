@@ -60,7 +60,13 @@ const SeriesDetail: React.FC = () => {
     if (seriesId) {
       loadSeries();
     }
-  }, [seriesId, editFromUrl]);
+  }, [seriesId]);
+
+  useEffect(() => {
+    if (editFromUrl && series) {
+      setEditing(true);
+    }
+  }, [editFromUrl, series]);
 
   const loadSeries = async () => {
     try {
@@ -85,9 +91,6 @@ const SeriesDetail: React.FC = () => {
           description: seriesData.description || '',
           poster: seriesData.poster || '',
         });
-        if (editFromUrl) {
-          setEditing(true);
-        }
       }
     } catch (error) {
       console.error('加载视频集失败:', error);
@@ -175,8 +178,8 @@ const SeriesDetail: React.FC = () => {
     try {
       await updateVideoSeries(series.id, title, editData.description, editData.poster);
       await syncSeriesRelations();
-      setEditing(false);
       clearEditQuery();
+      setEditing(false);
       await loadSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);

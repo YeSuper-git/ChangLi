@@ -35,7 +35,13 @@ const ActorDetail: React.FC = () => {
     if (id) {
       loadActor(parseInt(id));
     }
-  }, [id, editFromUrl]);
+  }, [id]);
+
+  useEffect(() => {
+    if (editFromUrl && actor) {
+      setEditing(true);
+    }
+  }, [editFromUrl, actor]);
 
   const loadActor = async (actorId: number) => {
     try {
@@ -57,9 +63,6 @@ const ActorDetail: React.FC = () => {
           measurements: actorData.measurements || '',
           japanese_name: actorData.japanese_name || '',
         });
-        if (editFromUrl) {
-          setEditing(true);
-        }
       }
     } catch (error) {
       console.error('[Actor] 加载演员详情失败:', error);
@@ -82,8 +85,8 @@ const ActorDetail: React.FC = () => {
         editForm.measurements || undefined,
         editForm.japanese_name || undefined
       );
-      setEditing(false);
       clearEditQuery();
+      setEditing(false);
       loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 更新演员失败:', error);

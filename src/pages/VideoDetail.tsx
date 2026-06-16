@@ -63,7 +63,13 @@ const VideoDetail: React.FC = () => {
       loadTags();
       loadActors();
     }
-  }, [id, editFromUrl]);
+  }, [id]);
+
+  useEffect(() => {
+    if (editFromUrl && video) {
+      setEditing(true);
+    }
+  }, [editFromUrl, video]);
 
   const loadVideo = async (videoId: number) => {
     try {
@@ -95,9 +101,6 @@ const VideoDetail: React.FC = () => {
           setVideoActors(actors);
           setSelectedTagIds(tags.map((tag) => tag.id));
           setSelectedActorIds(actors.map((actor) => actor.id));
-        }
-        if (editFromUrl) {
-          setEditing(true);
         }
       }
     } catch (error) {
@@ -193,8 +196,8 @@ const VideoDetail: React.FC = () => {
       if (!video.series_id) {
         await syncRelations();
       }
-      setEditing(false);
       clearEditQuery();
+      setEditing(false);
       await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
     } catch (error) {
       console.error('保存失败:', error);
