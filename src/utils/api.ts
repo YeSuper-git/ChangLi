@@ -212,6 +212,7 @@ export interface Video {
   series_title?: string;
   series_poster_data_url?: string;
   description?: string;
+  season?: number;
   created_at: string;
 }
 

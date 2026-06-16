@@ -66,6 +66,7 @@ pub struct Video {
     pub series_id: Option<i64>,
     pub episode_number: Option<i32>,
     pub file_size: Option<i64>,
+    pub season: Option<i32>,
     pub duration: Option<f64>,
     pub width: Option<i32>,
     pub height: Option<i32>,
@@ -378,12 +379,13 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         .map(|m| serde_json::to_string(&m).unwrap_or_default());
 
     let result = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
     .bind(video.series_id)
     .bind(video.episode_number)
+    .bind(video.season.unwrap_or(0))
     .bind(video.file_size)
     .bind(video.duration)
     .bind(video.width)
@@ -423,12 +425,13 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
 
         // INSERT OR IGNORE + RETURNING
         let row = sqlx::query(
-            "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+            "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
         )
         .bind(&video.file_path)
         .bind(&video.file_name)
         .bind(video.series_id)
         .bind(video.episode_number)
+        .bind(video.season.unwrap_or(0))
         .bind(video.file_size)
         .bind(video.duration)
         .bind(video.width)
@@ -447,9 +450,10 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
             let mut saved = video_from_row(&row);
             if let Some(sid) = series_id {
                 // 更新 series_id 和 episode_number
-                sqlx::query("UPDATE videos SET series_id = ?, episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                sqlx::query("UPDATE videos SET series_id = ?, episode_number = ?, season = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                     .bind(sid)
                     .bind(saved.episode_number)
+                    .bind(saved.season.unwrap_or(0))
                     .bind(saved.id)
                     .execute(&mut *tx)
                     .await?;
@@ -460,9 +464,10 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
             // 重复记录，查询已有记录
             if let Some(existing) = get_video_by_path_tx(&mut tx, &video.file_path).await? {
                 if let Some(sid) = series_id {
-                    // 更新 series_id
-                    sqlx::query("UPDATE videos SET series_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    // 更新 series_id 和 season
+                    sqlx::query("UPDATE videos SET series_id = ?, season = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                         .bind(sid)
+                        .bind(video.season.unwrap_or(0))
                         .bind(existing.id)
                         .execute(&mut *tx)
                         .await?;
@@ -522,6 +527,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         file_size: row.get("file_size"),
         duration: row.get("duration"),
         width: row.get("width"),
+        season: row.try_get("season").ok(),
         height: row.get("height"),
         resolution: row.get("resolution"),
         source_site: row.get("source_site"),

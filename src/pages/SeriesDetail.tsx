@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
 import {
@@ -383,48 +383,151 @@ const SeriesDetail: React.FC = () => {
 
       <h2 className="text-xl font-semibold mb-4">分集</h2>
       {videos.length > 0 ? (
-        <div className={seriesPosterOrientation === 'portrait' ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6'}>
-          {videos.map((video) => {
-            const poster = videoPosterDataUrl(video);
-            return (
-              <div key={video.id} className="card">
-                <Link to={`/player/${video.id}`}>
-                  <div className={`${seriesPosterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gray-100 overflow-hidden relative`}>
-                    <SmartPoster src={poster} alt={video.file_name} />
-                    {video.episode_number && (
-                      <div className="absolute bottom-2 right-2 bg-gray-700/70 text-white text-xs px-2.5 py-1 rounded-full">
-                        第 {video.episode_number} 集
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="p-4">
-                  <h3 className="font-semibold text-sm line-clamp-2 mb-2">
-                    {video.file_name}
-                  </h3>
-                  <div className="flex gap-2 flex-wrap">
-                    <Link to={`/player/${video.id}`} className="action-btn action-btn-primary text-center">播放</Link>
-                    <button
-                      onClick={() => requestSecondConfirm(`remove-episode-${video.id}`, () => handleRemoveEpisode(video.id))}
-                      className="action-btn"
-                    >
-                      {pendingKey === `remove-episode-${video.id}` ? '再次确认移出' : '移出'}
-                    </button>
-                    <button
-                      onClick={() => requestSecondConfirm(`delete-episode-${video.id}`, () => handleDeleteEpisode(video.id))}
-                      className="action-btn action-btn-danger"
-                    >
-                      {pendingKey === `delete-episode-${video.id}` ? '再次确认删除' : '删除'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <VideoGrid
+          videos={videos}
+          posterOrientation={seriesPosterOrientation}
+          pendingKey={pendingKey}
+          requestSecondConfirm={requestSecondConfirm}
+          handleRemoveEpisode={handleRemoveEpisode}
+          handleDeleteEpisode={handleDeleteEpisode}
+        />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
       )}
+    </div>
+  );
+};
+
+/** 获取季标题 */
+function getSeasonLabel(season: number): string {
+  if (season === 999) return '剧场版';
+  if (season >= 1 && season <= 998) return `第${season}季`;
+  return `第${season}季`;
+}
+
+interface VideoGridProps {
+  videos: Video[];
+  posterOrientation: string;
+  pendingKey: string | null;
+  requestSecondConfirm: (key: string, onConfirm: () => void) => void;
+  handleRemoveEpisode: (videoId: number) => void;
+  handleDeleteEpisode: (videoId: number) => void;
+}
+
+const VideoGrid: React.FC<VideoGridProps> = ({
+  videos,
+  posterOrientation,
+  pendingKey,
+  requestSecondConfirm,
+  handleRemoveEpisode,
+  handleDeleteEpisode,
+}) => {
+  // 判断是否有任何视频设置了 season（非 0）
+  const hasSeason = useMemo(
+    () => videos.some((v) => v.season != null && v.season !== 0),
+    [videos]
+  );
+
+  // 按 season 分组并排序
+  const seasonGroups = useMemo(() => {
+    if (!hasSeason) return [];
+    const map = new Map<number, Video[]>();
+    for (const v of videos) {
+      const s = v.season ?? 0;
+      if (!map.has(s)) map.set(s, []);
+      map.get(s)!.push(v);
+    }
+    const entries = Array.from(map.entries());
+    // 排序：普通季（1,2,3...）在前，999 在最后
+    entries.sort(([a], [b]) => {
+      if (a === 999 && b !== 999) return 1;
+      if (b === 999 && a !== 999) return -1;
+      return a - b;
+    });
+    return entries;
+  }, [videos, hasSeason]);
+
+  const gridClass =
+    posterOrientation === 'portrait'
+      ? 'grid grid-cols-5 gap-5'
+      : 'grid grid-cols-4 gap-6';
+
+  /** 渲染单个视频卡片 */
+  const renderVideoCard = (video: Video) => {
+    const poster = videoPosterDataUrl(video);
+    return (
+      <div key={video.id} className="card">
+        <Link to={`/player/${video.id}`}>
+          <div
+            className={`${
+              posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
+            } bg-gray-100 overflow-hidden relative`}
+          >
+            <SmartPoster src={poster} alt={video.file_name} />
+            {video.episode_number && (
+              <div className="absolute bottom-2 right-2 bg-gray-700/70 text-white text-xs px-2.5 py-1 rounded-full">
+                第 {video.episode_number} 集
+              </div>
+            )}
+          </div>
+        </Link>
+        <div className="p-4">
+          <h3 className="font-semibold text-sm line-clamp-2 mb-2">
+            {video.file_name}
+          </h3>
+          <div className="flex gap-2 flex-wrap">
+            <Link
+              to={`/player/${video.id}`}
+              className="action-btn action-btn-primary text-center"
+            >
+              播放
+            </Link>
+            <button
+              onClick={() =>
+                requestSecondConfirm(`remove-episode-${video.id}`, () =>
+                  handleRemoveEpisode(video.id)
+                )
+              }
+              className="action-btn"
+            >
+              {pendingKey === `remove-episode-${video.id}` ? '再次确认移出' : '移出'}
+            </button>
+            <button
+              onClick={() =>
+                requestSecondConfirm(`delete-episode-${video.id}`, () =>
+                  handleDeleteEpisode(video.id)
+                )
+              }
+              className="action-btn action-btn-danger"
+            >
+              {pendingKey === `delete-episode-${video.id}` ? '再次确认删除' : '删除'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 无 season 信息时保持原有扁平展示
+  if (!hasSeason) {
+    return (
+      <div className={gridClass}>
+        {videos.map((video) => renderVideoCard(video))}
+      </div>
+    );
+  }
+
+  // 按季分组展示
+  return (
+    <div className="space-y-8">
+      {seasonGroups.map(([season, groupVideos]) => (
+        <div key={season}>
+          <h3 className="text-xl font-semibold mb-4">{getSeasonLabel(season)}</h3>
+          <div className={gridClass}>
+            {groupVideos.map((video) => renderVideoCard(video))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

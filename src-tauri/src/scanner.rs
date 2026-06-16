@@ -73,20 +73,75 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
     let mut videos = Vec::new();
     let mut posters = HashMap::new();
 
-    // 收集所有视频文件和图片文件
+    // 检测是否有多季结构：根目录下存在包含视频的子文件夹
+    let mut subdirs: Vec<PathBuf> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                subdirs.push(entry.path());
+            }
+        }
+    }
+
+    if subdirs.is_empty() {
+        // 扁平模式：没有子文件夹，直接扫描根目录
+        process_directory_videos(path, None, &mut videos, &mut posters).await?;
+    } else {
+        // 多季模式：每个子文件夹为一季或剧场版
+        // 按文件夹名称排序，保证季数顺序一致
+        subdirs.sort_by(|a, b| {
+            let a_name = a
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            let b_name = b
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            a_name.cmp(&b_name)
+        });
+
+        let mut season_counter = 0;
+        for subdir in &subdirs {
+            let count = count_videos_in_folder(subdir);
+            if count == 0 {
+                continue;
+            }
+
+            // 仅一部作品 → 剧场版（season = 999），多部 → 正常季
+            let season = if count == 1 { 999 } else {
+                season_counter += 1;
+                season_counter
+            };
+
+            process_directory_videos(subdir, Some(season), &mut videos, &mut posters).await?;
+        }
+    }
+
+    Ok(ScanResult { videos, posters })
+}
+
+/// 处理指定目录下的所有视频，按父文件夹分组并分配集数和季数。
+async fn process_directory_videos(
+    dir: &Path,
+    season: Option<i32>,
+    videos: &mut Vec<Video>,
+    posters: &mut HashMap<String, String>,
+) -> Result<()> {
+    // 收集该目录下所有视频和图片文件
     let mut video_files: Vec<PathBuf> = Vec::new();
     let mut image_files: Vec<PathBuf> = Vec::new();
 
-    for entry in WalkDir::new(path)
+    for entry in WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
     {
         let file_path = entry.path();
-
         if let Some(ext) = file_path.extension() {
             let ext = ext.to_string_lossy().to_lowercase();
-
             if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
                 video_files.push(file_path.to_path_buf());
             } else if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
@@ -95,9 +150,8 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
         }
     }
 
-    // 按文件夹分组视频文件
+    // 按父文件夹分组
     let mut folder_videos: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
-
     for video_path in &video_files {
         if let Some(parent) = video_path.parent() {
             folder_videos
@@ -125,6 +179,7 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
                 .or_else(|| folder_poster_path.clone());
             match scan_video_file(video_path, poster_path.as_deref()).await {
                 Ok(mut video) => {
+                    video.season = season;
                     if folder_uses_fixed_episode_names(&sorted_videos) {
                         video.episode_number = video_path
                             .file_stem()
@@ -143,7 +198,7 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
         }
     }
 
-    Ok(ScanResult { videos, posters })
+    Ok(())
 }
 
 fn file_stem_lower(path: &Path) -> String {
@@ -269,6 +324,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         series_id: None,
         episode_number: episode,
         file_size: Some(file_size),
+        season: None,
         duration: None,
         width: None,
         height: None,

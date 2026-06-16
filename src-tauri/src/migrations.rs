@@ -246,6 +246,7 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("videos", "height", "INTEGER"),
         Column::new("videos", "resolution", "TEXT"),
         Column::new("videos", "source_site", "TEXT"),
+        Column::new("videos", "season", "INTEGER DEFAULT 0"),
         Column::new("videos", "metadata", "TEXT"),
         Column::new("videos", "thumbnail", "TEXT"),
         Column::new("videos", "thumbnail_base64", "TEXT"),
