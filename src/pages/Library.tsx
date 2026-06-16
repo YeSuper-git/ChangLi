@@ -14,7 +14,7 @@ import {
 } from '../utils/api';
 import type { Tag, Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Library: React.FC = () => {
@@ -220,11 +220,7 @@ const Library: React.FC = () => {
                 className="card block cursor-pointer"
               >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  {series.poster_data_url ? (
-                    <img src={series.poster_data_url} alt={series.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <StaticImagePlaceholder kind="video" />
-                  )}
+                  <SmartPoster src={series.poster_data_url} alt={series.title} />
                   <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                     {series.video_count} 集
                   </div>
@@ -258,11 +254,7 @@ const Library: React.FC = () => {
                   className="card cursor-pointer"
                 >
                   <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                    {thumbnailDataUrl ? (
-                      <img src={thumbnailDataUrl} alt={video.file_name} className="w-full h-full object-cover" />
-                    ) : (
-                      <StaticImagePlaceholder kind="video" />
-                    )}
+                    <SmartPoster src={thumbnailDataUrl} alt={video.file_name} />
                   </div>
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2 hover:text-blue-600">

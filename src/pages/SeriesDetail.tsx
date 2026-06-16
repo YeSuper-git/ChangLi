@@ -20,7 +20,8 @@ import {
   updateVideoSeries,
 } from '../utils/api';
 import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
-import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { SmartPoster, videoPosterDataUrl } from '../utils/media';
+import type { ImageOrientation } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const SeriesDetail: React.FC = () => {
@@ -54,6 +55,7 @@ const SeriesDetail: React.FC = () => {
   const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [newActorName, setNewActorName] = useState('');
+  const [seriesPosterOrientation, setSeriesPosterOrientation] = useState<ImageOrientation>('unknown');
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
@@ -67,6 +69,12 @@ const SeriesDetail: React.FC = () => {
       setEditing(true);
     }
   }, [editFromUrl, series]);
+
+  useEffect(() => {
+    if (!series?.poster_data_url) {
+      setSeriesPosterOrientation('unknown');
+    }
+  }, [series?.poster_data_url]);
 
   const loadSeries = async () => {
     try {
@@ -254,11 +262,11 @@ const SeriesDetail: React.FC = () => {
       <div className="card p-6 mb-8">
         <div className="flex gap-6">
           <div className="w-80 aspect-video bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            {series.poster_data_url ? (
-              <img src={series.poster_data_url} alt={series.title} className="w-full h-full object-cover" />
-            ) : (
-              <StaticImagePlaceholder kind="video" />
-            )}
+            <SmartPoster
+              src={series.poster_data_url}
+              alt={series.title}
+              onOrientationChange={setSeriesPosterOrientation}
+            />
           </div>
           <div className="flex-1">
             {editing ? (
@@ -375,14 +383,14 @@ const SeriesDetail: React.FC = () => {
 
       <h2 className="text-xl font-semibold mb-4">分集</h2>
       {videos.length > 0 ? (
-        <div className="grid grid-cols-4 gap-6">
+        <div className={seriesPosterOrientation === 'portrait' ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6'}>
           {videos.map((video) => {
             const poster = videoPosterDataUrl(video);
             return (
               <div key={video.id} className="card">
                 <Link to={`/player/${video.id}`}>
-                  <div className="aspect-video bg-gray-100 overflow-hidden relative">
-                    {poster ? <img src={poster} alt={video.file_name} className="w-full h-full object-cover" /> : <StaticImagePlaceholder kind="video" />}
+                  <div className={`${seriesPosterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gray-100 overflow-hidden relative`}>
+                    <SmartPoster src={poster} alt={video.file_name} />
                     {video.episode_number && (
                       <div className="absolute bottom-2 right-2 bg-gray-700/70 text-white text-xs px-2.5 py-1 rounded-full">
                         第 {video.episode_number} 集

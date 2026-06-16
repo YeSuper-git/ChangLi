@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getActors, getStandaloneVideos, getVideoSeriesList } from '../utils/api';
 import type { Actor, Video, VideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 type SearchItem =
   | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
@@ -162,10 +162,14 @@ const Search: React.FC = () => {
                 return (
                   <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
                     <div className="w-24 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      {imageDataUrl ? (
-                        <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />
+                      {item.type === 'actor' ? (
+                        imageDataUrl ? (
+                          <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <StaticImagePlaceholder kind="actor" />
+                        )
                       ) : (
-                        <StaticImagePlaceholder kind={item.type === 'actor' ? 'actor' : 'video'} />
+                        <SmartPoster src={imageDataUrl} alt={item.title} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

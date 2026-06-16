@@ -11,7 +11,7 @@ import {
   playVideo,
 } from '../utils/api';
 import type { Actor, RecentWatchItem, Tag, Video, VideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const formatWatchTime = (seconds: number) => {
   const safeSeconds = Math.max(0, Math.floor(seconds || 0));
@@ -133,11 +133,7 @@ const Home: React.FC = () => {
                 className="card block"
               >
                 <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  {poster ? (
-                    <img src={poster} alt={title} className="w-full h-full object-cover" />
-                  ) : (
-                    <StaticImagePlaceholder kind="video" />
-                  )}
+                  <SmartPoster src={poster} alt={title} />
                   <button
                     onClick={(event) => handlePlay(item.video.id, event)}
                     className={`absolute inset-0 flex items-center justify-center transition-colors ${poster ? 'bg-transparent hover:bg-black/10' : 'bg-black/0 hover:bg-black/20'}`}
@@ -174,11 +170,7 @@ const Home: React.FC = () => {
           {seriesList.slice(0, 8).map((series) => (
             <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block">
               <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                {series.poster_data_url ? (
-                  <img src={series.poster_data_url} alt={series.title} className="w-full h-full object-cover" />
-                ) : (
-                  <StaticImagePlaceholder kind="video" />
-                )}
+                <SmartPoster src={series.poster_data_url} alt={series.title} />
                 <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                   {series.video_count} 集
                 </div>
@@ -194,11 +186,7 @@ const Home: React.FC = () => {
             return (
               <Link key={`video-${video.id}`} to={`/video/${video.id}?fromHome=1`} state={{ from: '/', backLabel: '返回首页' }} className="card block">
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  {thumbnailDataUrl ? (
-                    <img src={thumbnailDataUrl} alt={video.file_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <StaticImagePlaceholder kind="video" />
-                  )}
+                  <SmartPoster src={thumbnailDataUrl} alt={video.file_name} />
                   {video.duration && (
                     <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                       {Math.floor(video.duration / 60)}分钟

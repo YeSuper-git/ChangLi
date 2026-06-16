@@ -3,7 +3,7 @@ import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'reac
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
 import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -408,11 +408,7 @@ const ActorDetail: React.FC = () => {
                 className="card block"
               >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  {poster ? (
-                    <img src={poster} alt={title} className="w-full h-full object-cover" />
-                  ) : (
-                    <StaticImagePlaceholder kind="video" />
-                  )}
+                  <SmartPoster src={poster} alt={title} />
                 </div>
                 <div className="p-5">
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>

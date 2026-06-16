@@ -18,7 +18,7 @@ import {
 } from '../utils/api';
 import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -366,15 +366,7 @@ const VideoDetail: React.FC = () => {
         <div className="col-span-2 space-y-6">
           <div className="card overflow-hidden">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
-              {displayThumbnailDataUrl ? (
-                <img
-                  src={displayThumbnailDataUrl}
-                  alt={video.file_name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <StaticImagePlaceholder kind="video" />
-              )}
+              <SmartPoster src={displayThumbnailDataUrl} alt={video.file_name} />
               {editing && (
                 <button
                   onClick={handleSelectThumbnail}
