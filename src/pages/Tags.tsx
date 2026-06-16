@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { getTags, addTag, deleteTag } from '../utils/api';
 import type { Tag } from '../utils/api';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Tags: React.FC = () => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
     loadTags();
@@ -37,8 +39,6 @@ const Tags: React.FC = () => {
   };
 
   const handleDeleteTag = async (id: number) => {
-    if (!confirm('确定要删除这个标签吗？')) return;
-    
     try {
       await deleteTag(id);
       loadTags();
@@ -78,10 +78,10 @@ const Tags: React.FC = () => {
               >
                 <span className="text-gray-700">{tag.name}</span>
                 <button
-                  onClick={() => handleDeleteTag(tag.id)}
+                  onClick={() => requestSecondConfirm(`tag-${tag.id}`, () => handleDeleteTag(tag.id))}
                   className="text-gray-400 hover:text-red-500 transition-colors"
                 >
-                  ✕
+                  {pendingKey === `tag-${tag.id}` ? '确认' : '✕'}
                 </button>
               </div>
             ))}

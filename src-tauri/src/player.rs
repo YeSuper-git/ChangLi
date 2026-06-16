@@ -73,9 +73,10 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // 1) position_player_window_next_to_main 会把播放壳放到主窗口右侧（不是主窗口内）；
     // 2) 播放壳 decorations(false) 且前端只渲染空 div，没有真实系统关闭入口；
     // 3) --wid 嵌入 WebView HWND 已加 attach-parent/ANGLE/不透明黑底仍不稳定。
-    // 因此 Windows 改用 mpv 原生窗口兜底：不再创建 Tauri 播放壳、不传 --wid，
-    // 通过 --geometry 把 mpv 窗口摆在主窗口内容区域内，保留系统标题栏和关闭按钮，
-    // 优先保证能正常播放、能关闭、视觉上覆盖在 ChangLi 主窗口内。
+    // 因此 Windows 改用 mpv 原生窗口兜底：不再创建 Tauri 播放壳、不传 --wid。
+    // 根因复核：把未父子绑定的原生 mpv 窗口用 --geometry 摆进主窗口内部时，
+    // Windows 可把它创建在 ChangLi 主窗口后方，表现为“有声音但窗口/画面看不到”。
+    // 所以 native 兜底回到已知可见的主窗口右侧几何位置，避免被主窗口遮挡。
     if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
@@ -312,14 +313,13 @@ fn spawn_mpv_process(
                 .arg(format!("--wid={wid}"));
         }
 
-        command
-            .arg("--vo=gpu")
-            .arg("--gpu-context=angle")
-            .arg("--no-keepaspect-window")
-            .arg("--background=none");
-
         if wid.is_some() {
-            command.arg("--no-border");
+            command
+                .arg("--vo=gpu")
+                .arg("--gpu-context=angle")
+                .arg("--no-keepaspect-window")
+                .arg("--background=none")
+                .arg("--no-border");
         } else {
             command.arg("--border=yes");
             if let Some(geometry) = _geometry {
@@ -365,24 +365,28 @@ fn windows_mpv_geometry(app: &AppHandle) -> Option<String> {
     let main = app.get_window("main")?;
     let pos = main.outer_position().ok()?;
     let size = main.outer_size().ok()?;
-
-    let margin_x = 32_i32;
-    let top_margin = 96_i32;
-    let bottom_margin = 40_i32;
-    let width = (size.width as i32 - margin_x * 2).max(640);
-    let height = (size.height as i32 - top_margin - bottom_margin).max(360);
-    let x = pos.x + margin_x;
-    let y = pos.y + top_margin;
+    let x = pos
+        .x
+        .saturating_add(size.width as i32)
+        .saturating_add(PLAYER_OFFSET_X as i32);
+    let y = pos.y;
 
     Some(format!(
-        "{}x{}{}{}{}{}",
-        width,
-        height,
-        if x >= 0 { "+" } else { "" },
-        x,
-        if y >= 0 { "+" } else { "" },
-        y
+        "{}x{}{}{}",
+        PLAYER_WIDTH as i32,
+        PLAYER_HEIGHT as i32,
+        signed_geometry_offset(x),
+        signed_geometry_offset(y)
     ))
+}
+
+#[cfg(target_os = "windows")]
+fn signed_geometry_offset(value: i32) -> String {
+    if value >= 0 {
+        format!("+{value}")
+    } else {
+        value.to_string()
+    }
 }
 
 fn reuse_existing_session(session: &mut Option<MpvSession>, video_path: &PathBuf) -> Result<bool> {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   getVideo,
   updateVideo,
@@ -23,9 +23,11 @@ import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const fromHome = searchParams.get('fromHome') === '1';
+  const editFromUrl = searchParams.get('edit') === '1';
 
   const [video, setVideo] = useState<Video | null>(null);
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -53,7 +55,7 @@ const VideoDetail: React.FC = () => {
       loadTags();
       loadActors();
     }
-  }, [id]);
+  }, [id, editFromUrl]);
 
   const loadVideo = async (videoId: number) => {
     try {
@@ -85,6 +87,9 @@ const VideoDetail: React.FC = () => {
           setVideoActors(actors);
           setSelectedTagIds(tags.map((tag) => tag.id));
           setSelectedActorIds(actors.map((actor) => actor.id));
+        }
+        if (editFromUrl) {
+          setEditing(true);
         }
       }
     } catch (error) {
@@ -287,8 +292,18 @@ const VideoDetail: React.FC = () => {
   }
 
   const isSeriesEpisode = Boolean(video.series_id);
-  const backTo = fromActor ? `/actors/${fromActor}` : fromHome ? '/' : '/library';
-  const backLabel = fromActor ? '返回演员详情' : fromHome ? '返回首页' : '返回视频';
+  const backState = location.state as { from?: string; backLabel?: string } | null;
+  const fallbackBackTo = fromActor ? `/actors/${fromActor}` : fromHome ? '/' : '/library';
+  const fallbackBackLabel = fromActor ? '返回演员详情' : fromHome ? '返回首页' : '返回视频';
+  const backTo = backState?.from || fallbackBackTo;
+  const backLabel = backState?.backLabel || fallbackBackLabel;
+  const handleBack = () => {
+    if (backState?.from) {
+      navigate(-1);
+    } else {
+      navigate(backTo);
+    }
+  };
   const displayThumbnailDataUrl = editing && editData.thumbnail !== (video.thumbnail || '')
     ? null
     : videoPosterDataUrl(video);
@@ -296,7 +311,7 @@ const VideoDetail: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <Link to={backTo} className="text-sm text-blue-600 hover:underline">← {backLabel}</Link>
+        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline">← {backLabel}</button>
       </div>
 
       <div className="flex items-center justify-between mb-8">
@@ -321,7 +336,7 @@ const VideoDetail: React.FC = () => {
             <button
               onClick={() => {
                 if (isSeriesEpisode && video.series_id) {
-                  navigate(`/series/${video.series_id}`);
+                  navigate(`/series/${video.series_id}?edit=1`, { state: { from: `/video/${video.id}`, backLabel: '返回视频详情' } });
                 } else {
                   beginEditing();
                 }
@@ -439,7 +454,12 @@ const VideoDetail: React.FC = () => {
                     to={`/player/${episode.id}`}
                     className={`block p-2 rounded-lg text-sm ${episode.id === video.id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-700 hover:text-blue-600'}`}
                   >
-                    {episode.episode_number ? `第 ${episode.episode_number} 集 · ` : ''}{episode.file_name}
+                    <span>{episode.file_name}</span>
+                    {episode.episode_number && (
+                      <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                        第 {episode.episode_number} 集
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
@@ -564,6 +584,7 @@ const VideoDetail: React.FC = () => {
                       <Link
                         key={actor.id}
                         to={`/actors/${actor.id}`}
+                        state={{ from: `/video/${video.id}`, backLabel: '返回视频详情' }}
                         className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-blue-600"
                       >
                         {actor.name}

@@ -15,6 +15,7 @@ import {
 import type { Tag, Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
@@ -26,13 +27,17 @@ const Library: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
+  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
   useEffect(() => {
     loadLibrary(null);
   }, []);
 
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null);
+    const closeMenu = () => {
+      setContextMenu(null);
+      clearPending();
+    };
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
@@ -80,9 +85,7 @@ const Library: React.FC = () => {
     }
   };
 
-  const handleDeleteVideo = async (id: number, name: string) => {
-    if (!confirm(`确定要删除视频“${name}”吗？`)) return;
-
+  const handleDeleteVideo = async (id: number) => {
     try {
       await deleteVideo(id);
       setContextMenu(null);
@@ -93,9 +96,7 @@ const Library: React.FC = () => {
     }
   };
 
-  const handleDeleteSeries = async (id: number, name: string) => {
-    if (!confirm(`确定要删除视频集“${name}”吗？该操作会同时删除该视频集下的所有分集记录。`)) return;
-
+  const handleDeleteSeries = async (id: number) => {
     try {
       await deleteVideoSeries(id, true);
       setContextMenu(null);
@@ -110,6 +111,16 @@ const Library: React.FC = () => {
     event.preventDefault();
     event.stopPropagation();
     setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
+  };
+
+  const handleEditContextItem = () => {
+    if (!contextMenu) return;
+    const target = contextMenu.type === 'video'
+      ? `/video/${contextMenu.id}?edit=1`
+      : `/series/${contextMenu.id}?edit=1`;
+    setContextMenu(null);
+    clearPending();
+    navigate(target, { state: { from: '/library', backLabel: '返回视频' } });
   };
 
   const handlePlayVideo = async (id: number, event: React.MouseEvent) => {
@@ -204,7 +215,7 @@ const Library: React.FC = () => {
             {filteredSeries.map((series) => (
               <div
                 key={series.id}
-                onClick={() => navigate(`/series/${series.id}`)}
+                onClick={() => navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className="card block cursor-pointer"
               >
@@ -242,7 +253,7 @@ const Library: React.FC = () => {
               return (
                 <div
                   key={video.id}
-                  onClick={() => navigate(`/video/${video.id}`)}
+                  onClick={() => navigate(`/video/${video.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
                   onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
                   className="card cursor-pointer"
                 >
@@ -286,12 +297,21 @@ const Library: React.FC = () => {
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            onClick={() => contextMenu.type === 'video'
-              ? handleDeleteVideo(contextMenu.id, contextMenu.name)
-              : handleDeleteSeries(contextMenu.id, contextMenu.name)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={handleEditContextItem}
           >
-            删除
+            编辑
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => {
+              const key = `${contextMenu.type}-${contextMenu.id}`;
+              requestSecondConfirm(key, () => contextMenu.type === 'video'
+                ? handleDeleteVideo(contextMenu.id)
+                : handleDeleteSeries(contextMenu.id));
+            }}
+          >
+            {pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
           </button>
         </div>
       )}

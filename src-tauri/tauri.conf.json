@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "ChangLi",
-    "version": "0.5.19"
+    "version": "0.5.20"
   },
   "tauri": {
     "allowlist": {
@@ -68,7 +68,11 @@
         "resources/mpv/**/*"
       ],
       "windows": {
+        "allowDowngrades": false,
         "nsis": {
+          "template": "nsis/installer.nsi",
+          "headerImage": "nsis/installer-header.bmp",
+          "sidebarImage": "nsis/installer-sidebar.bmp",
           "installerIcon": "icons/icon.ico",
           "languages": [
             "SimpChinese"

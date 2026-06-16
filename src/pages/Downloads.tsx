@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDownloads, addDownload, pauseDownload, resumeDownload, removeDownload } from '../utils/api';
 import type { Download } from '../utils/api';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Downloads: React.FC = () => {
   const [downloads, setDownloads] = useState<Download[]>([]);
@@ -9,6 +10,7 @@ const Downloads: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
     loadDownloads();
@@ -70,8 +72,6 @@ const Downloads: React.FC = () => {
   };
 
   const handleRemove = async (id: number) => {
-    if (!confirm('确定要删除这个下载任务吗？')) return;
-    
     try {
       console.log('[Downloads] 删除下载, id:', id);
       await removeDownload(id);
@@ -224,10 +224,10 @@ const Downloads: React.FC = () => {
                     </button>
                   )}
                   <button
-                    onClick={() => handleRemove(download.id)}
+                    onClick={() => requestSecondConfirm(`download-${download.id}`, () => handleRemove(download.id))}
                     className="action-btn action-btn-danger"
                   >
-                    ✕ 删除
+                    ✕ {pendingKey === `download-${download.id}` ? '再次确认删除' : '删除'}
                   </button>
                 </div>
               </div>

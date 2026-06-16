@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
 import {
   addActor,
@@ -21,11 +21,15 @@ import {
 } from '../utils/api';
 import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
 import { StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
+  const editFromUrl = searchParams.get('edit') === '1';
   const seriesId = Number(id);
 
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -42,12 +46,13 @@ const SeriesDetail: React.FC = () => {
   const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [newActorName, setNewActorName] = useState('');
+  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
     if (seriesId) {
       loadSeries();
     }
-  }, [seriesId]);
+  }, [seriesId, editFromUrl]);
 
   const loadSeries = async () => {
     try {
@@ -72,6 +77,9 @@ const SeriesDetail: React.FC = () => {
           description: seriesData.description || '',
           poster: seriesData.poster || '',
         });
+        if (editFromUrl) {
+          setEditing(true);
+        }
       }
     } catch (error) {
       console.error('加载视频集失败:', error);
@@ -188,7 +196,6 @@ const SeriesDetail: React.FC = () => {
   };
 
   const handleRemoveEpisode = async (videoId: number) => {
-    if (!confirm('确定要从视频集中移除这个分集吗？视频记录会保留为单视频。')) return;
     try {
       await removeVideoFromSeries(videoId);
       await loadSeries();
@@ -199,7 +206,6 @@ const SeriesDetail: React.FC = () => {
   };
 
   const handleDeleteEpisode = async (videoId: number) => {
-    if (!confirm('确定要删除这个分集的视频记录吗？')) return;
     try {
       await deleteVideo(videoId);
       await loadSeries();
@@ -209,15 +215,28 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const backState = location.state as { from?: string; backLabel?: string } | null;
+  const fallbackBackTo = fromActor ? `/actors/${fromActor}` : '/library';
+  const fallbackBackLabel = fromActor ? '返回演员详情' : '返回视频';
+  const backTo = backState?.from || fallbackBackTo;
+  const backLabel = backState?.backLabel || fallbackBackLabel;
+  const handleBack = () => {
+    if (backState?.from) {
+      navigate(-1);
+    } else {
+      navigate(backTo);
+    }
+  };
+
   if (loading) return <div className="text-gray-500">加载中...</div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   return (
     <div>
       <div className="mb-6">
-        <Link to={fromActor ? `/actors/${fromActor}` : '/library'} className="text-sm text-blue-600 hover:underline">
-          ← {fromActor ? '返回演员详情' : '返回视频'}
-        </Link>
+        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline">
+          ← {backLabel}
+        </button>
       </div>
 
       <div className="card p-6 mb-8">
@@ -321,7 +340,14 @@ const SeriesDetail: React.FC = () => {
                   <div>
                     <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
                     {seriesActors.length > 0 ? seriesActors.map((actor) => (
-                      <Link key={actor.id} to={`/actors/${actor.id}`} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-blue-600">{actor.name}</Link>
+                      <Link
+                        key={actor.id}
+                        to={`/actors/${actor.id}`}
+                        state={{ from: `/series/${series.id}`, backLabel: '返回视频集详情' }}
+                        className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-blue-600"
+                      >
+                        {actor.name}
+                      </Link>
                     )) : <span className="text-sm text-gray-400">暂无</span>}
                   </div>
                 </div>
@@ -343,18 +369,33 @@ const SeriesDetail: React.FC = () => {
             return (
               <div key={video.id} className="card">
                 <Link to={`/player/${video.id}`}>
-                  <div className="aspect-video bg-gray-100 overflow-hidden">
+                  <div className="aspect-video bg-gray-100 overflow-hidden relative">
                     {poster ? <img src={poster} alt={video.file_name} className="w-full h-full object-cover" /> : <StaticImagePlaceholder kind="video" />}
+                    {video.episode_number && (
+                      <div className="absolute bottom-2 right-2 bg-gray-700/70 text-white text-xs px-2.5 py-1 rounded-full">
+                        第 {video.episode_number} 集
+                      </div>
+                    )}
                   </div>
                 </Link>
                 <div className="p-4">
                   <h3 className="font-semibold text-sm line-clamp-2 mb-2">
-                    {video.episode_number ? `第 ${video.episode_number} 集 · ` : ''}{video.file_name}
+                    {video.file_name}
                   </h3>
                   <div className="flex gap-2 flex-wrap">
                     <Link to={`/player/${video.id}`} className="action-btn action-btn-primary text-center">播放</Link>
-                    <button onClick={() => handleRemoveEpisode(video.id)} className="action-btn">移出</button>
-                    <button onClick={() => handleDeleteEpisode(video.id)} className="action-btn action-btn-danger">删除</button>
+                    <button
+                      onClick={() => requestSecondConfirm(`remove-episode-${video.id}`, () => handleRemoveEpisode(video.id))}
+                      className="action-btn"
+                    >
+                      {pendingKey === `remove-episode-${video.id}` ? '再次确认移出' : '移出'}
+                    </button>
+                    <button
+                      onClick={() => requestSecondConfirm(`delete-episode-${video.id}`, () => handleDeleteEpisode(video.id))}
+                      className="action-btn action-btn-danger"
+                    >
+                      {pendingKey === `delete-episode-${video.id}` ? '再次确认删除' : '删除'}
+                    </button>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
 import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
@@ -7,6 +7,10 @@ import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '.
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const editFromUrl = searchParams.get('edit') === '1';
   const [actor, setActor] = useState<Actor | null>(null);
   const [resources, setResources] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +30,7 @@ const ActorDetail: React.FC = () => {
     if (id) {
       loadActor(parseInt(id));
     }
-  }, [id]);
+  }, [id, editFromUrl]);
 
   const loadActor = async (actorId: number) => {
     try {
@@ -48,6 +52,9 @@ const ActorDetail: React.FC = () => {
           measurements: actorData.measurements || '',
           japanese_name: actorData.japanese_name || '',
         });
+        if (editFromUrl) {
+          setEditing(true);
+        }
       }
     } catch (error) {
       console.error('[Actor] 加载演员详情失败:', error);
@@ -183,6 +190,16 @@ const ActorDetail: React.FC = () => {
     );
   }
 
+  const backState = location.state as { from?: string; backLabel?: string } | null;
+  const backLabel = backState?.backLabel || '返回演员列表';
+  const handleBack = () => {
+    if (backState?.from) {
+      navigate(-1);
+    } else {
+      navigate('/actors');
+    }
+  };
+
   const workItems = Array.from(
     resources.reduce((map, resource) => {
       const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
@@ -197,10 +214,10 @@ const ActorDetail: React.FC = () => {
     <div>
       {/* 返回按钮 */}
       <div className="mb-10">
-        <Link to="/actors" className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+        <button type="button" onClick={handleBack} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
           <span>←</span>
-          <span>返回演员列表</span>
-        </Link>
+          <span>{backLabel}</span>
+        </button>
       </div>
 
       {/* 演员信息 */}
@@ -375,7 +392,12 @@ const ActorDetail: React.FC = () => {
               const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
               const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/video/${resource.id}?fromActor=${actor.id}`;
               return (
-              <Link key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`} to={target} className="card block">
+              <Link
+                key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`}
+                to={target}
+                state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
+                className="card block"
+              >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {poster ? (
                     <img src={poster} alt={title} className="w-full h-full object-cover" />

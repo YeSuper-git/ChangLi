@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getActors, addActor, deleteActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
@@ -12,13 +13,17 @@ const Actors: React.FC = () => {
   const [newActor, setNewActor] = useState({ name: '', bio: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenu, setContextMenu] = useState<{ id: number; name: string; x: number; y: number } | null>(null);
+  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
   useEffect(() => {
     loadActors();
   }, []);
 
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null);
+    const closeMenu = () => {
+      setContextMenu(null);
+      clearPending();
+    };
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
@@ -53,8 +58,7 @@ const Actors: React.FC = () => {
   };
 
 
-  const handleDeleteActor = async (actorId: number, actorName: string) => {
-    if (!confirm(`确定要删除演员“${actorName}”吗？删除后会同步移除作品关联。`)) return;
+  const handleDeleteActor = async (actorId: number) => {
     try {
       await deleteActor(actorId);
       setContextMenu(null);
@@ -69,6 +73,14 @@ const Actors: React.FC = () => {
     event.preventDefault();
     event.stopPropagation();
     setContextMenu({ id: actor.id, name: actor.name, x: event.clientX, y: event.clientY });
+  };
+
+  const handleEditContextActor = () => {
+    if (!contextMenu) return;
+    const actorId = contextMenu.id;
+    setContextMenu(null);
+    clearPending();
+    navigate(`/actors/${actorId}?edit=1`, { state: { from: '/actors', backLabel: '返回演员列表' } });
   };
 
   const filteredActors = actors.filter(actor =>
@@ -115,6 +127,7 @@ const Actors: React.FC = () => {
             <Link
               key={actor.id}
               to={`/actors/${actor.id}`}
+              state={{ from: '/actors', backLabel: '返回演员列表' }}
               onContextMenu={(event) => openContextMenu(event, actor)}
               className="card block"
             >
@@ -128,10 +141,8 @@ const Actors: React.FC = () => {
                 ) : (
                   <StaticImagePlaceholder kind="actor" />
                 )}
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-black/60 text-white text-sm px-3 py-2 rounded-lg backdrop-blur-sm">
-                    {actor.work_count || 0} 部作品
-                  </div>
+                <div className="absolute bottom-3 right-3 inline-flex w-auto bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm">
+                  {actor.work_count || 0} 部作品
                 </div>
               </div>
               <div className="p-5">
@@ -139,7 +150,6 @@ const Actors: React.FC = () => {
                 <p className="text-sm text-gray-500 line-clamp-2 min-h-[2.5rem]">
                   {actor.bio || '暂无简介'}
                 </p>
-                <p className="text-xs text-gray-400 mt-2">{actor.work_count || 0} 部作品</p>
               </div>
             </Link>
           );
@@ -168,10 +178,16 @@ const Actors: React.FC = () => {
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            onClick={() => handleDeleteActor(contextMenu.id, contextMenu.name)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={handleEditContextActor}
           >
-            删除
+            编辑
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => requestSecondConfirm(`actor-${contextMenu.id}`, () => handleDeleteActor(contextMenu.id))}
+          >
+            {pendingKey === `actor-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
           </button>
         </div>
       )}

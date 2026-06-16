@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -10,6 +11,7 @@ const Settings: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   const [newTagName, setNewTagName] = useState('');
+  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
     loadSettingsData();
@@ -57,8 +59,6 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteSite = async (id: number) => {
-    if (!confirm('确定要删除这个网站吗？')) return;
-    
     try {
       await deleteSite(id);
       loadSites();
@@ -81,8 +81,6 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteTag = async (id: number) => {
-    if (!confirm('确定要删除这个标签吗？')) return;
-
     try {
       await deleteTag(id);
       loadTags();
@@ -181,11 +179,11 @@ const Settings: React.FC = () => {
               <div key={tag.id} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
                 <span className="text-sm text-gray-800">{tag.name}</span>
                 <button
-                  onClick={() => handleDeleteTag(tag.id)}
+                  onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
                   className="text-gray-400 hover:text-red-500"
                   aria-label={`删除标签 ${tag.name}`}
                 >
-                  ✕
+                  {pendingKey === `settings-tag-${tag.id}` ? '确认' : '✕'}
                 </button>
               </div>
             ))}
@@ -218,10 +216,10 @@ const Settings: React.FC = () => {
                     <p className="text-xs text-gray-400 mt-1">解析器: {site.parser_type}</p>
                   </div>
                   <button
-                    onClick={() => handleDeleteSite(site.id)}
+                    onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
                     className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                   >
-                    删除
+                    {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
                   </button>
                 </div>
               </div>
