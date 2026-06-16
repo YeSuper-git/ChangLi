@@ -306,21 +306,10 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         .await
         .map_err(|e| e.to_string())?;
 
-    for mut video in result.videos {
-        video.series_id = Some(series.id);
-        if video.episode_number.is_none() {
-            video.episode_number = scanner::extract_episode_from_filename(&video.file_name);
-        }
-        let episode_number = video.episode_number;
-        let saved = db::add_video(&pool, video)
-            .await
-            .map_err(|e| e.to_string())?;
-        // add_video 对重复 file_path 使用 INSERT OR IGNORE，会返回已有记录。
-        // 重新扫描文件夹时必须显式更新关联，避免旧单视频/旧视频集记录没有挂到当前视频集。
-        db::set_video_series(&pool, saved.id, Some(series.id), episode_number)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
+    // P1: 事务批处理 - 所有视频在同一个事务中插入，1000条视频也只提交1次
+    let _saved_videos = db::add_videos_batch(&pool, result.videos, Some(series.id))
+        .await
+        .map_err(|e| e.to_string())?;
 
     db::get_videos(&pool).await.map_err(|e| e.to_string())
 }

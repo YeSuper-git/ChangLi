@@ -208,6 +208,7 @@ export interface Video {
   metadata?: any;
   thumbnail?: string;
   thumbnail_data_url?: string;
+  thumbnail_base64?: string;
   series_title?: string;
   series_poster_data_url?: string;
   description?: string;

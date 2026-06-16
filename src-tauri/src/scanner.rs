@@ -1,9 +1,43 @@
 use anyhow::Result;
+use base64::Engine;
+use image::ImageReader;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::db::Video;
+
+/// 生成缩略图 Base64（最大 300px 宽，≤50KB）
+fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
+    let img = ImageReader::open(poster_path).ok()?;
+    let img = img.decode().ok()?;
+
+    // 缩放到最大 300px 宽
+    let max_width = 300;
+    let resized = if img.width() > max_width {
+        img.resize(max_width, max_width * img.height() / img.width(), image::imageops::FilterType::Lanczos3)
+    } else {
+        img
+    };
+
+    // 编码为 JPEG，质量控制在 50KB 以内
+    let mut buf = Vec::new();
+    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 70);
+    resized.write_with_encoder(encoder).ok()?;
+
+    // 如果超过 50KB，降低质量再试
+    if buf.len() > 50 * 1024 {
+        let mut buf2 = Vec::new();
+        let encoder2 = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf2, 50);
+        resized.write_with_encoder(encoder2).ok()?;
+        if buf2.len() <= 50 * 1024 {
+            buf = buf2;
+        }
+    }
+
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    Some(format!("data:image/jpeg;base64,{}", encoded))
+}
 
 // 支持的视频格式
 const VIDEO_EXTENSIONS: &[&str] = &[
@@ -223,6 +257,11 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         .map(|p| p.to_string())
         .or_else(|| find_poster_next_to_video(path));
 
+    // 生成缩略图 Base64（入库时生成一次，后续读取直接返回）
+    let thumbnail_base64 = poster
+        .as_ref()
+        .and_then(|p| generate_thumbnail_base64(Path::new(p)));
+
     Ok(Video {
         id: 0,
         file_path: path.to_string_lossy().to_string(),
@@ -237,6 +276,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         source_site: None,
         metadata: None,
         thumbnail: poster,
+        thumbnail_base64,
         thumbnail_data_url: None,
         series_title: None,
         series_poster_data_url: None,

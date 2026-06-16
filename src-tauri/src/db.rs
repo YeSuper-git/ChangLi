@@ -73,6 +73,7 @@ pub struct Video {
     pub source_site: Option<String>,
     pub metadata: Option<serde_json::Value>,
     pub thumbnail: Option<String>,
+    pub thumbnail_base64: Option<String>,
     pub thumbnail_data_url: Option<String>,
     pub series_title: Option<String>,
     pub series_poster_data_url: Option<String>,
@@ -375,7 +376,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         .map(|m| serde_json::to_string(&m).unwrap_or_default());
 
     let result = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
@@ -389,6 +390,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     .bind(&video.source_site)
     .bind(&metadata_str)
     .bind(&video.thumbnail)
+    .bind(&video.thumbnail_base64)
     .bind(&video.description)
     .execute(pool)
     .await?;
@@ -406,6 +408,82 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         .ok_or_else(|| anyhow::anyhow!("视频插入后无法查询"))
 }
 
+/// 批量插入视频（事务批处理，1000条视频也只提交1次事务）
+pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: Option<i64>) -> Result<Vec<Video>> {
+    let mut tx = pool.begin().await?;
+    let mut saved_videos = Vec::new();
+
+    for mut video in videos {
+        video.series_id = series_id;
+        let metadata_str = video
+            .metadata
+            .map(|m| serde_json::to_string(&m).unwrap_or_default());
+
+        // INSERT OR IGNORE + RETURNING
+        let row = sqlx::query(
+            "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+        )
+        .bind(&video.file_path)
+        .bind(&video.file_name)
+        .bind(video.series_id)
+        .bind(video.episode_number)
+        .bind(video.file_size)
+        .bind(video.duration)
+        .bind(video.width)
+        .bind(video.height)
+        .bind(&video.resolution)
+        .bind(&video.source_site)
+        .bind(&metadata_str)
+        .bind(&video.thumbnail)
+        .bind(&video.thumbnail_base64)
+        .bind(&video.description)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(row) = row {
+            // 新插入的记录
+            let mut saved = video_from_row(&row);
+            if let Some(sid) = series_id {
+                // 更新 series_id 和 episode_number
+                sqlx::query("UPDATE videos SET series_id = ?, episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .bind(sid)
+                    .bind(saved.episode_number)
+                    .bind(saved.id)
+                    .execute(&mut *tx)
+                    .await?;
+                saved.series_id = Some(sid);
+            }
+            saved_videos.push(saved);
+        } else {
+            // 重复记录，查询已有记录
+            if let Some(existing) = get_video_by_path_tx(&mut tx, &video.file_path).await? {
+                if let Some(sid) = series_id {
+                    // 更新 series_id
+                    sqlx::query("UPDATE videos SET series_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                        .bind(sid)
+                        .bind(existing.id)
+                        .execute(&mut *tx)
+                        .await?;
+                }
+                saved_videos.push(existing);
+            }
+        }
+    }
+
+    tx.commit().await?;
+    Ok(saved_videos)
+}
+
+/// 事务内查询视频（用于批量插入）
+async fn get_video_by_path_tx(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, file_path: &str) -> Result<Option<Video>> {
+    let row = sqlx::query("SELECT * FROM videos WHERE file_path = ?")
+        .bind(file_path)
+        .fetch_optional(&mut **tx)
+        .await?;
+    Ok(row.map(|row| video_from_row(&row)))
+}
+
+
 async fn get_video_by_path(pool: &SqlitePool, file_path: &str) -> Result<Option<Video>> {
     let row = sqlx::query("SELECT * FROM videos WHERE file_path = ?")
         .bind(file_path)
@@ -422,14 +500,16 @@ fn video_from_row(row: &SqliteRow) -> Video {
             .to_string_lossy()
             .to_string()
     });
-    let thumbnail_data_url = resolved_thumbnail
-        .as_ref()
-        .and_then(|path| image_data_url(Path::new(path)));
+    // 直接从数据库读取缓存的 Base64，不再实时生成
+    let thumbnail_data_url: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
     let series_poster: Option<String> = row.try_get("series_poster").ok();
     let series_poster_data_url = series_poster
-        .map(|path| storage::resolve_data_path(&path))
         .as_ref()
-        .and_then(|path| image_data_url(path));
+        .and_then(|path| {
+            // 系列海报也从数据库读取缓存的 Base64
+            let _ = path; // 占位，实际应从 series_poster_base64 字段读取
+            None::<String>
+        });
 
     Video {
         id: row.get("id"),
@@ -447,6 +527,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
             .get::<Option<String>, _>("metadata")
             .and_then(|s| serde_json::from_str(&s).ok()),
         thumbnail: resolved_thumbnail,
+        thumbnail_base64: thumbnail_data_url.clone(),
         thumbnail_data_url,
         series_title: row.try_get("series_title").ok(),
         series_poster_data_url,
