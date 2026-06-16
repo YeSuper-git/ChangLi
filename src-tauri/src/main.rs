@@ -302,7 +302,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     }
 
     let series_poster = result.posters.values().next().cloned();
-    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref())
+    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("ongoing"))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -458,13 +458,15 @@ async fn update_video_series(
     title: String,
     description: Option<String>,
     poster: Option<String>,
+    poster_orientation: Option<String>,
+    status: Option<String>,
 ) -> Result<db::VideoSeries, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let stored_poster = poster.as_deref().map(normalize_photo_path_for_storage);
-    db::update_video_series(&pool, id, title, description, stored_poster)
+    db::update_video_series(&pool, id, title, description, stored_poster, poster_orientation, status)
         .await
         .map_err(|e| e.to_string())
 }

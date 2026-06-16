@@ -89,6 +89,8 @@ pub struct VideoSeries {
     pub poster: Option<String>,
     pub poster_data_url: Option<String>,
     pub folder_path: Option<String>,
+    pub poster_orientation: Option<String>,
+    pub status: Option<String>,
     pub video_count: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -603,6 +605,8 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         poster_data_url,
         folder_path: row.get("folder_path"),
         video_count: row.try_get("video_count").unwrap_or(0),
+        poster_orientation: row.try_get("poster_orientation").ok(),
+        status: row.try_get("status").ok(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     }
@@ -613,11 +617,15 @@ pub async fn add_video_series(
     title: &str,
     folder_path: Option<&str>,
     poster: Option<&str>,
+    poster_orientation: Option<&str>,
+    status: Option<&str>,
 ) -> Result<VideoSeries> {
-    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster) VALUES (?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status) VALUES (?, ?, ?, ?, ?)")
         .bind(title)
         .bind(folder_path)
         .bind(poster)
+        .bind(poster_orientation.unwrap_or("landscape"))
+        .bind(status.unwrap_or("ongoing"))
         .execute(pool)
         .await?;
     if let Some(path) = folder_path {
@@ -696,11 +704,15 @@ pub async fn update_video_series(
     title: String,
     description: Option<String>,
     poster: Option<String>,
+    poster_orientation: Option<String>,
+    status: Option<String>,
 ) -> Result<VideoSeries> {
-    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(title)
         .bind(description)
         .bind(poster)
+        .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
+        .bind(status.unwrap_or_else(|| "ongoing".to_string()))
         .bind(id)
         .execute(pool)
         .await?;
@@ -1266,6 +1278,8 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 poster_data_url,
                 folder_path: row.get("s_folder_path"),
                 video_count: row.get("s_video_count"),
+                poster_orientation: row.try_get("s_poster_orientation").ok(),
+                status: row.try_get("s_status").ok(),
                 created_at: row.get("s_created_at"),
                 updated_at: row.get("s_updated_at"),
             }

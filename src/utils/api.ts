@@ -270,6 +270,8 @@ export interface VideoSeries {
   poster_data_url?: string;
   folder_path?: string;
   video_count: number;
+  poster_orientation?: string;
+  status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -307,8 +309,8 @@ export async function getVideoSeriesDetail(id: number): Promise<[VideoSeries | n
   return invoke<[VideoSeries | null, Video[]]>('get_video_series_detail', { id });
 }
 
-export async function updateVideoSeries(id: number, title: string, description?: string, poster?: string): Promise<VideoSeries> {
-  return invoke<VideoSeries>('update_video_series', { id, title, description, poster });
+export async function updateVideoSeries(id: number, title: string, description?: string, poster?: string, poster_orientation?: string, status?: string): Promise<VideoSeries> {
+  return invoke<VideoSeries>('update_video_series', { id, title, description, poster, poster_orientation, status });
 }
 
 export async function deleteVideoSeries(id: number, deleteVideos: boolean): Promise<void> {
