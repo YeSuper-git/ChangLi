@@ -1,47 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getActors, getDownloads, getTags, getVideos } from '../utils/api';
-import type { Actor, Download, Tag, Video } from '../utils/api';
+import {
+  getActors,
+  getRecentWatchItems,
+  getStandaloneVideos,
+  getStandaloneVideosByTag,
+  getTags,
+  getVideoSeriesByTag,
+  getVideoSeriesList,
+  playVideo,
+} from '../utils/api';
+import type { Actor, RecentWatchItem, Tag, Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+
+const formatWatchTime = (seconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(seconds || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainSeconds = safeSeconds % 60;
+  return `${minutes}分${remainSeconds.toString().padStart(2, '0')}秒`;
+};
 
 const Home: React.FC = () => {
   const [actors, setActors] = useState<Actor[]>([]);
-  const [downloads, setDownloads] = useState<Download[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
+  const [recentWatchItems, setRecentWatchItems] = useState<RecentWatchItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState('全部');
+  const [activeTagId, setActiveTagId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadData();
+    loadData(null);
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (tagId: number | null) => {
     try {
-      console.log('[Home] 开始加载数据...');
+      console.log('[Home] 开始加载数据, tagId:', tagId);
 
-      const [actorsList, downloadsList, tagsList, videosList] = await Promise.all([
+      const [actorsList, tagsList, recentList, videosList, series] = await Promise.all([
         getActors(),
-        getDownloads(),
         getTags(),
-        getVideos(),
+        getRecentWatchItems(3),
+        tagId ? getStandaloneVideosByTag(tagId) : getStandaloneVideos(),
+        tagId ? getVideoSeriesByTag(tagId) : getVideoSeriesList(),
       ]);
 
-      console.log('[Home] getActors 返回:', actorsList.length, '条');
-      console.log('[Home] getDownloads 返回:', downloadsList.length, '条');
-      console.log('[Home] getTags 返回:', tagsList.length, '条');
-      console.log('[Home] getVideos 返回:', videosList.length, '条');
-
       setActors(actorsList);
-      setDownloads(downloadsList);
       setTags(tagsList);
+      setRecentWatchItems(recentList);
       setVideos(videosList);
-      console.log('[Home] 数据加载完成');
+      setSeriesList(series);
+      setActiveTagId(tagId);
     } catch (error) {
       console.error('[Home] 加载数据失败:', error);
     } finally {
-      console.log('[Home] 设置 loading = false');
       setLoading(false);
+    }
+  };
+
+  const handleTagClick = (tagId: number | null) => {
+    setLoading(true);
+    loadData(tagId);
+  };
+
+  const handlePlay = async (videoId: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await playVideo(videoId);
+      await loadData(activeTagId);
+    } catch (error) {
+      console.error('[Home] 播放失败:', error);
+      alert('播放失败: ' + String(error));
     }
   };
 
@@ -56,18 +86,18 @@ const Home: React.FC = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-12">
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
-            onClick={() => setActiveCategory('全部')}
-            className={`category-btn ${activeCategory === '全部' ? 'active' : ''}`}
+            onClick={() => handleTagClick(null)}
+            className={`category-btn ${activeTagId === null ? 'active' : ''}`}
           >
             全部
           </button>
           {tags.map((tag) => (
             <button
               key={tag.id}
-              onClick={() => setActiveCategory(tag.name)}
-              className={`category-btn ${activeCategory === tag.name ? 'active' : ''}`}
+              onClick={() => handleTagClick(tag.id)}
+              className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
             >
               {tag.name}
             </button>
@@ -89,40 +119,38 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-8">
-          {downloads.filter(d => d.status === 'downloading' || d.status === 'paused').slice(0, 3).map((download) => (
-            <div key={download.id} className="card">
-              <div className="aspect-[16/10] bg-gradient-to-br from-orange-100 to-orange-200 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-2xl ml-1">▶️</span>
-                  </div>
+          {recentWatchItems.slice(0, 3).map((item) => {
+            const title = item.series ? item.series.title : item.video.file_name;
+            const poster = item.series?.poster_data_url || videoPosterDataUrl(item.video);
+            const watchText = item.series
+              ? `观看至第 ${item.video.episode_number || '?'} 集 ${formatWatchTime(item.last_position)}`
+              : `观看至 ${formatWatchTime(item.last_position)}`;
+            return (
+              <Link key={`${item.video.id}-${item.last_played}`} to={`/video/${item.video.id}`} className="card block">
+                <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                  {poster ? (
+                    <img src={poster} alt={title} className="w-full h-full object-cover" />
+                  ) : (
+                    <StaticImagePlaceholder kind="video" />
+                  )}
+                  <button
+                    onClick={(event) => handlePlay(item.video.id, event)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors"
+                    title="继续播放"
+                  >
+                    <span className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg text-2xl ml-1">▶️</span>
+                  </button>
                 </div>
-                <div className="absolute bottom-4 left-4 bg-black/80 text-white text-sm px-3 py-1.5 rounded-full">
-                  {download.progress.toFixed(0)}%
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{title}</h3>
+                  <div className="text-sm text-gray-500">{watchText}</div>
                 </div>
-              </div>
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">{download.file_name || '未知文件'}</h3>
-                <div className="flex gap-2 mb-4">
-                  <span className={`tag ${download.status === 'downloading' ? 'status-ongoing' : 'status-watching'}`}>
-                    {download.status === 'downloading' ? '下载中' : '已暂停'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-500 mb-4">
-                  {download.download_speed > 0 ? `${(download.download_speed / 1024 / 1024).toFixed(1)} MB/s` : ''}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${download.progress}%` }}></div>
-                  </div>
-                  <span className="text-sm text-gray-500">{download.progress.toFixed(0)}%</span>
-                </div>
-              </div>
-            </div>
-          ))}
-          {downloads.filter(d => d.status === 'downloading' || d.status === 'paused').length === 0 && (
+              </Link>
+            );
+          })}
+          {recentWatchItems.length === 0 && (
             <div className="col-span-3 text-center text-gray-500 py-12">
-              暂无下载中的任务
+              小主最近暂无观看记录哦~
             </div>
           )}
         </div>
@@ -136,17 +164,31 @@ const Home: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-6">
-          {videos.slice(0, 8).map((video) => {
+          {seriesList.slice(0, 8).map((series) => (
+            <Link key={`series-${series.id}`} to={`/series/${series.id}`} className="card block">
+              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                {series.poster_data_url ? (
+                  <img src={series.poster_data_url} alt={series.title} className="w-full h-full object-cover" />
+                ) : (
+                  <StaticImagePlaceholder kind="video" />
+                )}
+                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                  {series.video_count} 集
+                </div>
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{series.title}</h3>
+                <div className="text-xs text-gray-500">视频集</div>
+              </div>
+            </Link>
+          ))}
+          {videos.slice(0, Math.max(0, 8 - seriesList.length)).map((video) => {
             const thumbnailDataUrl = videoPosterDataUrl(video);
             return (
-              <Link key={video.id} to={`/video/${video.id}`} className="card block">
+              <Link key={`video-${video.id}`} to={`/video/${video.id}`} className="card block">
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {thumbnailDataUrl ? (
-                    <img
-                      src={thumbnailDataUrl}
-                      alt={video.file_name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={thumbnailDataUrl} alt={video.file_name} className="w-full h-full object-cover" />
                   ) : (
                     <StaticImagePlaceholder kind="video" />
                   )}
@@ -157,22 +199,16 @@ const Home: React.FC = () => {
                   )}
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">
-                    {video.file_name}
-                  </h3>
+                  <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{video.file_name}</h3>
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      {video.file_size
-                        ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB`
-                        : ''}
-                    </span>
-                    <span>{video.resolution || ''}</span>
+                    <span>{video.file_size ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB` : ''}</span>
+                    <span>{video.resolution || '单视频'}</span>
                   </div>
                 </div>
               </Link>
             );
           })}
-          {videos.length === 0 && (
+          {seriesList.length === 0 && videos.length === 0 && (
             <div className="col-span-4 text-center text-gray-500 py-12">
               <p className="text-lg mb-4">暂无视频</p>
               <p className="text-sm">点击"扫描文件夹"添加视频</p>
@@ -195,28 +231,20 @@ const Home: React.FC = () => {
               <Link key={actor.id} to={`/actors/${actor.id}`} className="card block">
                 <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
                   {photoDataUrl ? (
-                    <img
-                      src={photoDataUrl}
-                      alt={actor.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={photoDataUrl} alt={actor.name} className="w-full h-full object-cover" />
                   ) : (
                     <StaticImagePlaceholder kind="actor" />
                   )}
                 </div>
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                  <div className="text-sm text-gray-500">
-                    {actor.birthday ? `${actor.birthday}` : ''}
-                  </div>
+                  <div className="text-sm text-gray-500">{actor.birthday ? `${actor.birthday}` : ''}</div>
                 </div>
               </Link>
             );
           })}
           {actors.length === 0 && (
-            <div className="col-span-4 text-center text-gray-500 py-12">
-              暂无演员
-            </div>
+            <div className="col-span-4 text-center text-gray-500 py-12">暂无演员</div>
           )}
         </div>
       </section>

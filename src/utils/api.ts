@@ -279,6 +279,27 @@ export async function getStandaloneVideos(): Promise<Video[]> {
   return invoke<Video[]>('get_standalone_videos');
 }
 
+
+export async function getStandaloneVideosByTag(tagId: number): Promise<Video[]> {
+  return invoke<Video[]>('get_standalone_videos_by_tag', { tagId });
+}
+
+export async function getStandaloneVideosByTagName(tagName: string): Promise<Video[]> {
+  return invoke<Video[]>('get_standalone_videos_by_tag_name', { tagName });
+}
+
+export async function getVideoSeriesByTag(tagId: number): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_video_series_by_tag', { tagId });
+}
+
+export async function getVideoSeriesByTagName(tagName: string): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_video_series_by_tag_name', { tagName });
+}
+
+export async function getSeriesPlaybackVideo(seriesId: number): Promise<Video | null> {
+  return invoke<Video | null>('get_series_playback_video', { seriesId });
+}
+
 export async function getVideoSeriesDetail(id: number): Promise<[VideoSeries | null, Video[]]> {
   return invoke<[VideoSeries | null, Video[]]>('get_video_series_detail', { id });
 }
@@ -373,10 +394,10 @@ export async function deleteActor(id: number): Promise<void> {
   }
 }
 
-export async function getActorResources(actorId: number): Promise<Resource[]> {
+export async function getActorResources(actorId: number): Promise<Video[]> {
   console.log('[API] 调用 getActorResources, actorId:', actorId);
   try {
-    const result = await invoke<Resource[]>('get_actor_resources', { actorId });
+    const result = await invoke<Video[]>('get_actor_resources', { actorId });
     console.log('[API] getActorResources 返回:', result.length, '条');
     return result;
   } catch (err) {
@@ -566,6 +587,16 @@ export interface PlayHistory {
   last_played: string;
 }
 
+
+export interface RecentWatchItem {
+  video: Video;
+  series?: VideoSeries;
+  last_position: number;
+  total_duration?: number;
+  play_count: number;
+  last_played: string;
+}
+
 export async function getPlayHistory(): Promise<PlayHistory[]> {
   console.log('[API] 调用 getPlayHistory');
   try {
@@ -574,6 +605,19 @@ export async function getPlayHistory(): Promise<PlayHistory[]> {
     return result;
   } catch (err) {
     console.error('[API] getPlayHistory 失败:', err);
+    throw err;
+  }
+}
+
+
+export async function getRecentWatchItems(limit?: number): Promise<RecentWatchItem[]> {
+  console.log('[API] 调用 getRecentWatchItems, limit:', limit);
+  try {
+    const result = await invoke<RecentWatchItem[]>('get_recent_watch_items', { limit });
+    console.log('[API] getRecentWatchItems 返回:', result.length, '条');
+    return result;
+  } catch (err) {
+    console.error('[API] getRecentWatchItems 失败:', err);
     throw err;
   }
 }

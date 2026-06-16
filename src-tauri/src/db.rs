@@ -141,6 +141,16 @@ pub struct PlayHistory {
     pub last_played: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentWatchItem {
+    pub video: Video,
+    pub series: Option<VideoSeries>,
+    pub last_position: f64,
+    pub total_duration: Option<f64>,
+    pub play_count: i32,
+    pub last_played: String,
+}
+
 // 观看进度
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchProgress {
@@ -461,6 +471,29 @@ pub async fn get_standalone_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
     Ok(rows.iter().map(video_from_row).collect())
 }
 
+pub async fn get_standalone_videos_by_tag(pool: &SqlitePool, tag_id: i64) -> Result<Vec<Video>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT v.* FROM videos v JOIN video_tags vt ON vt.video_id = v.id WHERE v.series_id IS NULL AND vt.tag_id = ? ORDER BY v.created_at DESC",
+    )
+    .bind(tag_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(video_from_row).collect())
+}
+
+pub async fn get_standalone_videos_by_tag_name(
+    pool: &SqlitePool,
+    tag_name: &str,
+) -> Result<Vec<Video>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT v.* FROM videos v JOIN video_tags vt ON vt.video_id = v.id JOIN tags t ON t.id = vt.tag_id WHERE v.series_id IS NULL AND t.name = ? ORDER BY v.created_at DESC",
+    )
+    .bind(tag_name)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(video_from_row).collect())
+}
+
 fn series_from_row(row: &SqliteRow) -> VideoSeries {
     let poster: Option<String> = row.get("poster");
     let resolved_poster = poster.map(|path| {
@@ -524,6 +557,29 @@ pub async fn get_video_series_list(pool: &SqlitePool) -> Result<Vec<VideoSeries>
     let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC")
         .fetch_all(pool)
         .await?;
+    Ok(rows.iter().map(series_from_row).collect())
+}
+
+pub async fn get_video_series_by_tag(pool: &SqlitePool, tag_id: i64) -> Result<Vec<VideoSeries>> {
+    let rows = sqlx::query(
+        "SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id WHERE st.tag_id = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
+    )
+    .bind(tag_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(series_from_row).collect())
+}
+
+pub async fn get_video_series_by_tag_name(
+    pool: &SqlitePool,
+    tag_name: &str,
+) -> Result<Vec<VideoSeries>> {
+    let rows = sqlx::query(
+        "SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id JOIN tags t ON t.id = st.tag_id WHERE t.name = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
+    )
+    .bind(tag_name)
+    .fetch_all(pool)
+    .await?;
     Ok(rows.iter().map(series_from_row).collect())
 }
 
@@ -896,30 +952,21 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
     Ok(actors)
 }
 
-pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Resource>> {
+pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
     let rows = sqlx::query(
-        "SELECT r.* FROM resources r JOIN resource_actors ra ON r.id = ra.resource_id WHERE ra.actor_id = ? ORDER BY r.created_at DESC",
+        "SELECT DISTINCT v.*
+         FROM videos v
+         LEFT JOIN video_actors va ON va.video_id = v.id
+         LEFT JOIN series_actors sa ON sa.series_id = v.series_id
+         WHERE va.actor_id = ? OR sa.actor_id = ?
+         ORDER BY v.created_at DESC",
     )
+    .bind(actor_id)
     .bind(actor_id)
     .fetch_all(pool)
     .await?;
 
-    let resources = rows
-        .iter()
-        .map(|row| Resource {
-            id: row.get("id"),
-            site_id: row.get("site_id"),
-            title: row.get("title"),
-            url: row.get("url"),
-            magnet: row.get("magnet"),
-            info: row
-                .get::<Option<String>, _>("info")
-                .and_then(|s| serde_json::from_str(&s).ok()),
-            created_at: row.get("created_at"),
-        })
-        .collect();
-
-    Ok(resources)
+    Ok(rows.iter().map(video_from_row).collect())
 }
 
 pub async fn add_series_tag(pool: &SqlitePool, series_id: i64, tag_id: i64) -> Result<()> {
@@ -992,6 +1039,38 @@ pub async fn get_series_actors(pool: &SqlitePool, series_id: i64) -> Result<Vec<
 }
 
 // 播放记录操作
+pub async fn record_play_history(
+    pool: &SqlitePool,
+    video_id: i64,
+    last_position: f64,
+    total_duration: Option<f64>,
+) -> Result<()> {
+    let result = sqlx::query(
+        "UPDATE play_history
+         SET last_position = ?, total_duration = ?, play_count = play_count + 1, last_played = CURRENT_TIMESTAMP
+         WHERE video_id = ?",
+    )
+    .bind(last_position)
+    .bind(total_duration)
+    .bind(video_id)
+    .execute(pool)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        sqlx::query(
+            "INSERT INTO play_history (video_id, last_position, total_duration, play_count, last_played)
+             VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)",
+        )
+        .bind(video_id)
+        .bind(last_position)
+        .bind(total_duration)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
+}
+
 pub async fn get_play_history(pool: &SqlitePool) -> Result<Vec<PlayHistory>> {
     let rows = sqlx::query("SELECT * FROM play_history ORDER BY last_played DESC")
         .fetch_all(pool)
@@ -1010,6 +1089,75 @@ pub async fn get_play_history(pool: &SqlitePool) -> Result<Vec<PlayHistory>> {
         .collect();
 
     Ok(history)
+}
+
+pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec<RecentWatchItem>> {
+    let rows = sqlx::query(
+        "SELECT ph.id AS history_id, ph.last_position, ph.total_duration, ph.play_count, ph.last_played,
+                v.*, s.id AS s_id, s.title AS s_title, s.description AS s_description, s.poster AS s_poster,
+                s.folder_path AS s_folder_path, s.created_at AS s_created_at, s.updated_at AS s_updated_at,
+                (SELECT COUNT(*) FROM videos sv WHERE sv.series_id = s.id) AS s_video_count
+         FROM play_history ph
+         JOIN videos v ON v.id = ph.video_id
+         LEFT JOIN video_series s ON s.id = v.series_id
+         ORDER BY ph.last_played DESC
+         LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    let mut items = Vec::new();
+    for row in rows {
+        let video = video_from_row(&row);
+        let series = row.try_get::<i64, _>("s_id").ok().map(|_| {
+            let poster: Option<String> = row.get("s_poster");
+            let resolved_poster = poster.map(|path| {
+                storage::resolve_data_path(&path)
+                    .to_string_lossy()
+                    .to_string()
+            });
+            let poster_data_url = resolved_poster
+                .as_ref()
+                .and_then(|path| image_data_url(Path::new(path)));
+            VideoSeries {
+                id: row.get("s_id"),
+                title: row.get("s_title"),
+                description: row.get("s_description"),
+                poster: resolved_poster,
+                poster_data_url,
+                folder_path: row.get("s_folder_path"),
+                video_count: row.get("s_video_count"),
+                created_at: row.get("s_created_at"),
+                updated_at: row.get("s_updated_at"),
+            }
+        });
+        items.push(RecentWatchItem {
+            video,
+            series,
+            last_position: row.get("last_position"),
+            total_duration: row.get("total_duration"),
+            play_count: row.get("play_count"),
+            last_played: row.get("last_played"),
+        });
+    }
+
+    Ok(items)
+}
+
+pub async fn get_series_playback_video(pool: &SqlitePool, series_id: i64) -> Result<Option<Video>> {
+    let row = sqlx::query(
+        "SELECT v.* FROM videos v
+         LEFT JOIN play_history ph ON ph.video_id = v.id
+         WHERE v.series_id = ?
+         ORDER BY ph.last_played IS NULL, ph.last_played DESC, v.episode_number IS NULL, v.episode_number, v.file_name
+         LIMIT 1",
+    )
+    .bind(series_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|row| video_from_row(&row)))
 }
 
 // 观看进度操作

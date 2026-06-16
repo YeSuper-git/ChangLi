@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
-import type { Actor, Resource } from '../utils/api';
+import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
+import { actorPhotoDataUrl, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [actor, setActor] = useState<Actor | null>(null);
-  const [resources, setResources] = useState<Resource[]>([]);
+  const [resources, setResources] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -359,17 +359,26 @@ const ActorDetail: React.FC = () => {
 
         {resources.length > 0 ? (
           <div className="grid grid-cols-4 gap-6">
-            {resources.map((resource) => (
-              <Link key={resource.id} to={`/resources/${resource.id}`} className="card block">
-                <div className="aspect-[3/4] bg-gradient-to-br from-gray-100 to-gray-200"></div>
+            {resources.map((resource) => {
+              const poster = videoPosterDataUrl(resource);
+              return (
+              <Link key={resource.id} to={`/video/${resource.id}`} className="card block">
+                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                  {poster ? (
+                    <img src={poster} alt={resource.file_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <StaticImagePlaceholder kind="video" />
+                  )}
+                </div>
                 <div className="p-5">
-                  <h3 className="font-semibold text-gray-900 mb-2">{resource.title}</h3>
+                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{resource.file_name}</h3>
                   <div className="text-sm text-gray-500">
-                    {resource.created_at.split('T')[0]}
+                    {resource.series_id ? `第 ${resource.episode_number || '?'} 集` : '单视频'}
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-16">

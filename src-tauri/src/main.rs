@@ -364,6 +364,76 @@ async fn get_standalone_videos(state: State<'_, AppState>) -> Result<Vec<db::Vid
 }
 
 #[tauri::command]
+async fn get_standalone_videos_by_tag(
+    state: State<'_, AppState>,
+    tag_id: i64,
+) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_standalone_videos_by_tag(&pool, tag_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_standalone_videos_by_tag_name(
+    state: State<'_, AppState>,
+    tag_name: String,
+) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_standalone_videos_by_tag_name(&pool, &tag_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_video_series_by_tag(
+    state: State<'_, AppState>,
+    tag_id: i64,
+) -> Result<Vec<db::VideoSeries>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_by_tag(&pool, tag_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_video_series_by_tag_name(
+    state: State<'_, AppState>,
+    tag_name: String,
+) -> Result<Vec<db::VideoSeries>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_by_tag_name(&pool, &tag_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_series_playback_video(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<Option<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_series_playback_video(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_video_series_detail(
     state: State<'_, AppState>,
     id: i64,
@@ -626,7 +696,7 @@ async fn delete_actor(state: State<'_, AppState>, id: i64) -> Result<(), String>
 async fn get_actor_resources(
     state: State<'_, AppState>,
     actor_id: i64,
-) -> Result<Vec<db::Resource>, String> {
+) -> Result<Vec<db::Video>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -858,6 +928,9 @@ async fn play_video(
     let video = db::get_video(&pool, id).await.map_err(|e| e.to_string())?;
     if let Some(video) = video {
         player::play(&app, &video.file_path).map_err(|e| e.to_string())?;
+        db::record_play_history(&pool, video.id, 0.0, video.duration)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -870,6 +943,20 @@ async fn get_play_history(state: State<'_, AppState>) -> Result<Vec<db::PlayHist
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::get_play_history(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_recent_watch_items(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> Result<Vec<db::RecentWatchItem>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_recent_watch_items(&pool, limit.unwrap_or(6))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // 观看进度相关命令
@@ -959,6 +1046,11 @@ fn main() {
             delete_video,
             get_video_series_list,
             get_standalone_videos,
+            get_standalone_videos_by_tag,
+            get_standalone_videos_by_tag_name,
+            get_video_series_by_tag,
+            get_video_series_by_tag_name,
+            get_series_playback_video,
             get_video_series_detail,
             update_video_series,
             delete_video_series,
@@ -987,6 +1079,7 @@ fn main() {
             remove_series_actor,
             play_video,
             get_play_history,
+            get_recent_watch_items,
             update_watch_progress,
             get_watch_progress,
             get_resource_watch_progress,
