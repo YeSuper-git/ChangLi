@@ -219,10 +219,10 @@ const Library: React.FC = () => {
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className="card block cursor-pointer"
               >
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
                   <SmartPoster src={series.poster_data_url} alt={series.title} />
                   <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                    {series.video_count} 集
+                    {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
                   </div>
                 </div>
                 <div className="p-4">

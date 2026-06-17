@@ -68,7 +68,7 @@ const Search: React.FC = () => {
         type: 'series',
         id: series.id,
         title: series.title,
-        subtitle: `视频集 · ${series.video_count} 集`,
+        subtitle: `视频集 · ${series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}`,
         series,
       }));
 
@@ -161,7 +161,7 @@ const Search: React.FC = () => {
                     : actorPhotoDataUrl(item.actor);
                 return (
                   <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
-                    <div className="w-24 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    <div className={`${item.type === 'series' && item.series.poster_orientation === 'portrait' ? 'w-24 h-36' : item.type === 'series' ? 'w-40 h-[90px]' : 'w-24 h-32'} bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center`}>
                       {item.type === 'actor' ? (
                         imageDataUrl ? (
                           <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />

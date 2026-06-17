@@ -9,6 +9,7 @@ import {
   addVideoToSeries,
   deleteVideo,
   getActors,
+  getStandaloneVideos,
   getSeriesActors,
   getSeriesTags,
   getTags,
@@ -56,6 +57,9 @@ const SeriesDetail: React.FC = () => {
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [newActorName, setNewActorName] = useState('');
   const [seriesPosterOrientation, setSeriesPosterOrientation] = useState<ImageOrientation>('unknown');
+  const [episodeEditing, setEpisodeEditing] = useState(false);
+  const [standaloneVideos, setStandaloneVideos] = useState<Video[]>([]);
+  const [loadingStandalone, setLoadingStandalone] = useState(false);
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
@@ -235,6 +239,37 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const handleToggleEpisodeEditing = async () => {
+    if (episodeEditing) {
+      setEpisodeEditing(false);
+      setStandaloneVideos([]);
+      return;
+    }
+    setEpisodeEditing(true);
+    setLoadingStandalone(true);
+    try {
+      const standalone = await getStandaloneVideos();
+      setStandaloneVideos(standalone);
+    } catch (error) {
+      console.error('加载单视频失败:', error);
+    } finally {
+      setLoadingStandalone(false);
+    }
+  };
+
+  const handleAddStandaloneVideo = async (videoPath: string) => {
+    try {
+      await addVideoToSeries(seriesId, videoPath);
+      await loadSeries();
+      // 刷新单视频列表
+      const standalone = await getStandaloneVideos();
+      setStandaloneVideos(standalone);
+    } catch (error) {
+      console.error('添加分集失败:', error);
+      alert('添加分集失败: ' + String(error));
+    }
+  };
+
   const backState = location.state as { from?: string; backLabel?: string } | null;
   const fallbackBackTo = fromActor ? `/actors/${fromActor}` : '/library';
   const fallbackBackLabel = fromActor ? '返回演员详情' : '返回视频';
@@ -373,13 +408,75 @@ const SeriesDetail: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
-                  <button onClick={handleAddEpisode} className="action-btn">添加分集</button>
+                  <button onClick={handleToggleEpisodeEditing} className={`action-btn ${episodeEditing ? 'action-btn-primary' : ''}`}>{episodeEditing ? '完成编辑' : '编辑分集'}</button>
                 </div>
               </>
             )}
           </div>
         </div>
       </div>
+
+      {episodeEditing && (
+        <div className="card p-6 mb-8">
+          <h3 className="text-lg font-semibold mb-4">编辑分集</h3>
+          {videos.length > 0 ? (
+            <div className="space-y-2 mb-6">
+              {videos.map((video) => (
+                <div key={video.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <span className="text-sm font-medium text-gray-900 truncate block">
+                      {video.episode_number ? `第${video.episode_number}集 - ` : ''}{video.file_name}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => requestSecondConfirm(`remove-ep-${video.id}`, () => handleRemoveEpisode(video.id))}
+                      className="action-btn text-xs"
+                    >
+                      {pendingKey === `remove-ep-${video.id}` ? '确认移出' : '移出'}
+                    </button>
+                    <button
+                      onClick={() => requestSecondConfirm(`delete-ep-${video.id}`, () => handleDeleteEpisode(video.id))}
+                      className="action-btn action-btn-danger text-xs"
+                    >
+                      {pendingKey === `delete-ep-${video.id}` ? '确认删除' : '删除'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-gray-500 text-sm mb-6">暂无分集</div>
+          )}
+          <div className="border-t pt-4">
+            <div className="flex gap-3 mb-4">
+              <button onClick={handleAddEpisode} className="action-btn">从文件添加</button>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">从单视频添加</h4>
+              {loadingStandalone ? (
+                <div className="text-gray-500 text-sm">加载中...</div>
+              ) : standaloneVideos.length > 0 ? (
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {standaloneVideos.map((sv) => (
+                    <div key={sv.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                      <span className="text-sm text-gray-900 truncate mr-4">{sv.file_name}</span>
+                      <button
+                        onClick={() => handleAddStandaloneVideo(sv.file_path)}
+                        className="action-btn text-xs flex-shrink-0"
+                      >
+                        添加
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">暂无可添加的单视频</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <h2 className="text-xl font-semibold mb-4">分集</h2>
       {videos.length > 0 ? (
