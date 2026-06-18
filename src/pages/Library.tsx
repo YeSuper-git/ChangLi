@@ -273,6 +273,7 @@ const Library: React.FC = () => {
                     <SmartPoster
                       src={thumbnailDataUrl}
                       alt={video.file_name}
+                      posterOrientation={video.poster_orientation}
                       width={video.width}
                       height={video.height}
                     />
