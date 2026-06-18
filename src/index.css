@@ -283,3 +283,7 @@ body.player-window-document,
     transform: scale(1);
   }
 }
+
+/* 隐藏滚动条 */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

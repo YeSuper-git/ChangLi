@@ -1,42 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import loadingIcon from '../assets/icons/loading.svg';
+import favoriteIcon from '../assets/icons/favorite.svg';
 import {
-  getRecentWatchItems,
   getStandaloneVideosByTag,
   getVideoSeriesByTag,
-  playVideo,
 } from '../utils/api';
-import type { RecentWatchItem, Video, VideoSeries } from '../utils/api';
+import type { Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
-
-const formatWatchTime = (seconds: number) => {
-  const safeSeconds = Math.max(0, Math.floor(seconds || 0));
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainSeconds = safeSeconds % 60;
-  return `${minutes}分${remainSeconds.toString().padStart(2, '0')}秒`;
-};
+import { HorizontalScroll } from '../components/HorizontalScroll';
 
 const Home: React.FC = () => {
-  const { actors, tags, videos: storeVideos, series: storeSeries } = useLibraryStore();
+  const { actors, tags, videos: storeVideos, series: storeSeries, favorites } = useLibraryStore();
   const [videos, setVideos] = useState<Video[]>([]);
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
-  const [recentWatchItems, setRecentWatchItems] = useState<RecentWatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadRecentAndApplyTag(null);
+    loadAndApplyTag(null);
   }, []);
 
-  const loadRecentAndApplyTag = async (tagId: number | null) => {
+  const loadAndApplyTag = async (tagId: number | null) => {
     try {
-      console.log('[Home] 开始加载数据, tagId:', tagId);
-
-      const recentList = await getRecentWatchItems(3);
-      setRecentWatchItems(recentList);
-
       if (tagId) {
         const [videosList, series] = await Promise.all([
           getStandaloneVideosByTag(tagId),
@@ -45,8 +32,15 @@ const Home: React.FC = () => {
         setVideos(videosList);
         setSeriesList(series);
       } else {
-        setVideos(storeVideos);
-        setSeriesList(storeSeries);
+        // Sort by created_at DESC
+        const sortedVideos = [...storeVideos].sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const sortedSeries = [...storeSeries].sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setVideos(sortedVideos);
+        setSeriesList(sortedSeries);
       }
       setActiveTagId(tagId);
     } catch (error) {
@@ -58,19 +52,7 @@ const Home: React.FC = () => {
 
   const handleTagClick = (tagId: number | null) => {
     setLoading(true);
-    loadRecentAndApplyTag(tagId);
-  };
-
-  const handlePlay = async (videoId: number, event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    try {
-      await playVideo(videoId);
-      await loadRecentAndApplyTag(activeTagId);
-    } catch (error) {
-      console.error('[Home] 播放失败:', error);
-      alert('播放失败: ' + String(error));
-    }
+    loadAndApplyTag(tagId);
   };
 
   if (loading) {
@@ -109,53 +91,68 @@ const Home: React.FC = () => {
         </Link>
       </div>
 
-      <section className="mb-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">继续观看</h2>
-          <Link to="/library" className="text-blue-500 hover:text-blue-600 text-sm font-medium">
-            查看全部 →
-          </Link>
-        </div>
-        <div className="grid grid-cols-3 gap-8">
-          {recentWatchItems.slice(0, 3).map((item) => {
-            const title = item.series ? item.series.title : item.video.file_name;
-            const poster = item.series?.poster_data_url || videoPosterDataUrl(item.video);
-            const watchText = item.series
-              ? `观看至第 ${item.video.episode_number || '?'} 集 ${formatWatchTime(item.last_position)}`
-              : `观看至 ${formatWatchTime(item.last_position)}`;
-            return (
-              <Link
-                key={`${item.video.id}-${item.last_played}`}
-                to={`/video/${item.video.id}?fromHome=1`}
-                state={{ from: '/', backLabel: '返回首页' }}
-                className="card block"
-              >
-                <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  <SmartPoster src={poster} alt={title} />
-                  <button
-                    onClick={(event) => handlePlay(item.video.id, event)}
-                    className={`absolute inset-0 flex items-center justify-center transition-colors ${poster ? 'bg-transparent hover:bg-black/10' : 'bg-black/0 hover:bg-black/20'}`}
-                    title="继续播放"
+      {/* 我的追番 */}
+      {favorites.length > 0 && (
+        <section className="mb-16">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <img src={favoriteIcon} alt="追番" className="w-6 h-6" />
+              我的追番
+            </h2>
+          </div>
+          <HorizontalScroll
+            items={favorites}
+            renderItem={(item) => {
+              // Check if it's a VideoSeries (has 'title' and 'video_count')
+              const isSeries = 'video_count' in item;
+              if (isSeries) {
+                const series = item as VideoSeries;
+                return (
+                  <Link
+                    to={`/series/${series.id}`}
+                    state={{ from: '/', backLabel: '返回首页' }}
+                    className="card block"
                   >
-                    {!poster && (
-                      <span className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg text-2xl ml-1">▶️</span>
-                    )}
-                  </button>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{title}</h3>
-                  <div className="text-sm text-gray-500">{watchText}</div>
-                </div>
-              </Link>
-            );
-          })}
-          {recentWatchItems.length === 0 && (
-            <div className="col-span-3 text-center text-gray-500 py-12">
-              小主最近暂无观看记录哦~
-            </div>
-          )}
-        </div>
-      </section>
+                    <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
+                      <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                        {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{series.title}</h3>
+                      <div className="text-xs text-gray-500">视频集</div>
+                    </div>
+                  </Link>
+                );
+              } else {
+                const video = item as Video;
+                const thumbnailDataUrl = videoPosterDataUrl(video);
+                return (
+                  <Link
+                    to={`/video/${video.id}?fromHome=1`}
+                    state={{ from: '/', backLabel: '返回首页' }}
+                    className="card block"
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                      <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
+                      {video.duration && (
+                        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                          {Math.floor(video.duration / 60)}分钟
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{video.file_name}</h3>
+                      <div className="text-xs text-gray-500">单视频</div>
+                    </div>
+                  </Link>
+                );
+              }
+            }}
+          />
+        </section>
+      )}
 
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">

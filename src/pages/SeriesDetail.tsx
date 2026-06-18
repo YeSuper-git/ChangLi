@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { open } from '@tauri-apps/api/dialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
+import favoriteIcon from '../assets/icons/favorite.svg';
 import {
   addActor,
   addSeriesActor,
@@ -25,11 +26,13 @@ import {
 import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import { useLibraryStore } from '../store/libraryStore';
 
 const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { favorites, toggleFavorite } = useLibraryStore();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const editFromUrl = searchParams.get('edit') === '1';
@@ -463,6 +466,9 @@ const SeriesDetail: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <button onClick={() => toggleFavorite(series.id, 'series')} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={favorites.some(f => 'video_count' in f && f.id === series.id) ? '取消追番' : '加入追番'}>
+                    <img src={favoriteIcon} alt="追番" className={`w-6 h-6 transition-all ${favorites.some(f => 'video_count' in f && f.id === series.id) ? '' : 'grayscale opacity-40'}`} />
+                  </button>
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleToggleEpisodeEditing} className={`action-btn ${episodeEditing ? 'action-btn-primary' : ''}`}>{episodeEditing ? '完成编辑' : '编辑分集'}</button>
                 </div>

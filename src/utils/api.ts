@@ -215,6 +215,7 @@ export interface Video {
   poster_orientation?: string;
   season?: number;
   created_at: string;
+  is_favorite?: number;
 }
 
 export async function scanVideos(path: string): Promise<Video[]> {
@@ -276,6 +277,7 @@ export interface VideoSeries {
   status?: string;
   created_at: string;
   updated_at: string;
+  is_favorite?: number;
 }
 
 export async function getVideoSeriesList(): Promise<VideoSeries[]> {
@@ -325,6 +327,18 @@ export async function addVideoToSeries(seriesId: number, path: string): Promise<
 
 export async function removeVideoFromSeries(videoId: number): Promise<Video> {
   return invoke<Video>('remove_video_from_series', { videoId });
+}
+
+export async function toggleFavorite(id: number, type: 'video' | 'series'): Promise<void> {
+  await invoke('toggle_favorite', { id, favType: type });
+}
+
+export async function getFavoriteVideos(): Promise<Video[]> {
+  return invoke<Video[]>('get_favorite_videos_cmd');
+}
+
+export async function getFavoriteSeries(): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_favorite_series_cmd');
 }
 
 // 演员相关

@@ -1104,6 +1104,9 @@ fn main() {
             save_video_thumbnail,
             get_storage_info,
             open_data_dir,
+            toggle_favorite,
+            get_favorite_videos_cmd,
+            get_favorite_series_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1163,4 +1166,35 @@ async fn update_video(
     db::update_video(&pool, id, file_name, description, stored_thumbnail)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn toggle_favorite(state: State<'_, AppState>, id: i64, fav_type: String) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    match fav_type.as_str() {
+        "video" => db::toggle_favorite_video(&pool, id).await.map_err(|e| e.to_string()),
+        "series" => db::toggle_favorite_series(&pool, id).await.map_err(|e| e.to_string()),
+        _ => Err("无效类型".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn get_favorite_videos_cmd(state: State<'_, AppState>) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_favorite_videos(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_favorite_series_cmd(state: State<'_, AppState>) -> Result<Vec<db::VideoSeries>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_favorite_series(&pool).await.map_err(|e| e.to_string())
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
+import favoriteIcon from '../assets/icons/favorite.svg';
 import {
   getVideo,
   updateVideo,
@@ -21,11 +22,13 @@ import {
 import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
+import { useLibraryStore } from '../store/libraryStore';
 
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { favorites, toggleFavorite } = useLibraryStore();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const fromHome = searchParams.get('fromHome') === '1';
@@ -331,7 +334,20 @@ const VideoDetail: React.FC = () => {
 
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">视频详情</h1>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
+          {video && (
+            <button
+              onClick={() => toggleFavorite(video.id, 'video')}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title={favorites.some(f => 'file_name' in f && f.id === video.id) ? '取消追番' : '加入追番'}
+            >
+              <img
+                src={favoriteIcon}
+                alt="追番"
+                className={`w-6 h-6 transition-all ${favorites.some(f => 'file_name' in f && f.id === video.id) ? '' : 'grayscale opacity-40'}`}
+              />
+            </button>
+          )}
           {editing ? (
             <>
               <button

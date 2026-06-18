@@ -81,6 +81,7 @@ pub struct Video {
     pub description: Option<String>,
     pub poster_orientation: Option<String>,
     pub created_at: String,
+    pub is_favorite: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +98,7 @@ pub struct VideoSeries {
     pub video_count: i64,
     pub created_at: String,
     pub updated_at: String,
+    pub is_favorite: Option<i32>,
 }
 
 // 演员
@@ -549,6 +551,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         description: row.get("description"),
         poster_orientation: row.try_get("poster_orientation").ok(),
         created_at: row.get("created_at"),
+        is_favorite: row.try_get("is_favorite").ok(),
     }
 }
 
@@ -628,6 +631,7 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         status: row.try_get("status").ok(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+        is_favorite: row.try_get("is_favorite").ok(),
     }
 }
 
@@ -1318,6 +1322,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 status: row.try_get("s_status").ok(),
                 created_at: row.get("s_created_at"),
                 updated_at: row.get("s_updated_at"),
+                is_favorite: None,
             }
         });
         items.push(RecentWatchItem {
@@ -1591,4 +1596,34 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn toggle_favorite_video(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("UPDATE videos SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn toggle_favorite_series(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("UPDATE video_series SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_favorite_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
+    let rows = sqlx::query("SELECT * FROM videos WHERE is_favorite = 1 ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(video_from_row).collect())
+}
+
+pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
+    let rows = sqlx::query("SELECT * FROM video_series WHERE is_favorite = 1 ORDER BY created_at DESC")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(series_from_row).collect())
 }

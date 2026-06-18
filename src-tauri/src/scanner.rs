@@ -385,6 +385,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         description: None,
         poster_orientation,
         created_at: chrono::Utc::now().to_rfc3339(),
+        is_favorite: None,
     })
 }
 
