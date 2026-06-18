@@ -365,15 +365,17 @@ const VideoDetail: React.FC = () => {
       <div className="grid grid-cols-3 gap-8">
         <div className="col-span-2 space-y-6">
           <div className="card overflow-hidden">
-            <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative">
+            <div
+              className={`aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative group ${editing ? 'cursor-pointer' : ''}`}
+              onClick={editing ? handleSelectThumbnail : undefined}
+            >
               <SmartPoster src={displayThumbnailDataUrl} alt={video.file_name} />
               {editing && (
-                <button
-                  onClick={handleSelectThumbnail}
-                  className="absolute bottom-4 right-4 px-4 py-2 bg-black/60 text-white rounded-lg hover:bg-black/80"
-                >
-                  更换海报
-                </button>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">
+                    点击更换海报
+                  </span>
+                </div>
               )}
             </div>
           </div>

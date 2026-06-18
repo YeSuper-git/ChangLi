@@ -4,6 +4,7 @@ import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, g
 import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import DatePicker from '../components/DatePicker';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -234,8 +235,8 @@ const ActorDetail: React.FC = () => {
         {/* 写真 */}
         <div className="w-80 flex-shrink-0">
           <div 
-            className="aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden cursor-pointer relative group"
-            onClick={handlePhotoClick}
+            className={`aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden relative group ${editing ? 'cursor-pointer' : ''}`}
+            onClick={editing ? handlePhotoClick : undefined}
           >
             {actorPhotoDataUrl(actor) ? (
               <img
@@ -246,12 +247,14 @@ const ActorDetail: React.FC = () => {
             ) : (
               <StaticImagePlaceholder kind="actor" />
             )}
-            {/* 悬浮提示 */}
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {uploadingPhoto ? '上传中...' : '点击更换海报'}
-              </span>
-            </div>
+            {/* 悬浮提示 - 仅编辑状态显示 */}
+            {editing && (
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">
+                  {uploadingPhoto ? '上传中...' : '点击更换海报'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -280,32 +283,74 @@ const ActorDetail: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={editForm.birthday}
-                  onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  onChange={(val) => setEditForm({ ...editForm, birthday: val })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">身高</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">身高 (cm)</label>
                 <input
-                  type="text"
+                  type="number"
                   value={editForm.height}
                   onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="例: 160cm"
+                  placeholder="例: 160"
+                  min="0"
+                  max="300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">三围</label>
-                <input
-                  type="text"
-                  value={editForm.measurements}
-                  onChange={(e) => setEditForm({ ...editForm, measurements: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="例: B88 W58 H85"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">三围 (B-W-H)</label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-400 mb-1">胸围</label>
+                    <input
+                      type="number"
+                      value={editForm.measurements ? editForm.measurements.split('-')[0] || '' : ''}
+                      onChange={(e) => {
+                        const parts = (editForm.measurements || '').split('-');
+                        parts[0] = e.target.value;
+                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="B"
+                      min="0"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-400 mb-1">腰围</label>
+                    <input
+                      type="number"
+                      value={editForm.measurements ? editForm.measurements.split('-')[1] || '' : ''}
+                      onChange={(e) => {
+                        const parts = (editForm.measurements || '---').split('-');
+                        while (parts.length < 3) parts.push('');
+                        parts[1] = e.target.value;
+                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="W"
+                      min="0"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-400 mb-1">臀围</label>
+                    <input
+                      type="number"
+                      value={editForm.measurements ? editForm.measurements.split('-')[2] || '' : ''}
+                      onChange={(e) => {
+                        const parts = (editForm.measurements || '--').split('-');
+                        while (parts.length < 3) parts.push('');
+                        parts[2] = e.target.value;
+                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="H"
+                      min="0"
+                    />
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">简介</label>
@@ -348,13 +393,15 @@ const ActorDetail: React.FC = () => {
                 {actor.height && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">身高</span>
-                    <span className="font-medium">{actor.height}</span>
+                    <span className="font-medium">{actor.height}cm</span>
                   </div>
                 )}
                 {actor.measurements && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">三围</span>
-                    <span className="font-medium">{actor.measurements}</span>
+                    <span className="font-medium">
+                      {actor.measurements.split('-').filter(Boolean).join('-')}
+                    </span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">

@@ -309,8 +309,8 @@ const SeriesDetail: React.FC = () => {
         <div className="flex gap-6">
           <div className="w-80 aspect-video bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
             <div
-              className="relative w-full h-full"
-              onDoubleClick={editing ? handleSelectPoster : undefined}
+              className={`relative w-full h-full group ${editing ? 'cursor-pointer' : ''}`}
+              onClick={editing ? handleSelectPoster : undefined}
             >
               <SmartPoster
                 src={series.poster_data_url}
@@ -318,8 +318,8 @@ const SeriesDetail: React.FC = () => {
                 posterOrientation={series.poster_orientation}
               />
               {editing && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">双击更换海报</span>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">点击更换海报</span>
                 </div>
               )}
             </div>
