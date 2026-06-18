@@ -234,7 +234,7 @@ const Library: React.FC = () => {
                 key={series.id}
                 onClick={() => navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className="card block cursor-pointer"
+                className="card block cursor-pointer flex flex-col"
               >
                 <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
@@ -242,12 +242,12 @@ const Library: React.FC = () => {
                     {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
                   </div>
                 </div>
-                <div className="p-4">
+                <div className="p-4 flex flex-col flex-1">
                   <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2 hover:text-blue-600">
                     {series.title}
                   </h3>
                   {series.description && <p className="text-xs text-gray-500 line-clamp-2 mb-3">{series.description}</p>}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-auto">
                     <button onClick={(event) => handlePlaySeries(series.id, event)} className="flex-1 action-btn action-btn-primary text-center">播放</button>
                   </div>
                 </div>
@@ -269,7 +269,7 @@ const Library: React.FC = () => {
                   key={video.id}
                   onClick={() => navigate(`/video/${video.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
                   onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
-                  className="card cursor-pointer"
+                  className="card cursor-pointer flex flex-col"
                 >
                   <div className={`${isPortrait ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
                     <SmartPoster
@@ -280,7 +280,7 @@ const Library: React.FC = () => {
                       height={video.height}
                     />
                   </div>
-                  <div className="p-4">
+                  <div className="p-4 flex flex-col flex-1">
                     <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2 hover:text-blue-600">
                       {video.file_name}
                     </h3>
@@ -288,7 +288,7 @@ const Library: React.FC = () => {
                       <span>{video.file_size ? `${(video.file_size / 1024 / 1024 / 1024).toFixed(1)} GB` : ''}</span>
                       <span>{video.resolution || ''}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-auto">
                       <button onClick={(event) => handlePlayVideo(video.id, event)} className="flex-1 action-btn action-btn-primary text-center">播放</button>
                     </div>
                   </div>

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open } from '@tauri-apps/api/dialog';
+import backIcon from '../assets/icons/back.svg';
+import loadingIcon from '../assets/icons/loading.svg';
 import {
   addActor,
   addSeriesActor,
@@ -294,14 +296,14 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="text-gray-500">加载中...</div>;
+  if (loading) return <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   return (
     <div>
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline">
-          ← {backLabel}
+        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+          <img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}
         </button>
       </div>
 
@@ -509,7 +511,7 @@ const SeriesDetail: React.FC = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">从单视频添加</h4>
               {loadingStandalone ? (
-                <div className="text-gray-500 text-sm">加载中...</div>
+                <div className="text-gray-500 text-sm flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-5 h-5" /> 加载中...</div>
               ) : standaloneVideos.length > 0 ? (
                 <div className="max-h-60 overflow-y-auto space-y-1">
                   {standaloneVideos.map((sv) => (

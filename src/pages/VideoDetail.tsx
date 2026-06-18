@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import backIcon from '../assets/icons/back.svg';
+import loadingIcon from '../assets/icons/loading.svg';
 import {
   getVideo,
   updateVideo,
@@ -288,7 +290,7 @@ const VideoDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
+        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
       </div>
     );
   }
@@ -324,7 +326,7 @@ const VideoDetail: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline">← {backLabel}</button>
+        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}</button>
       </div>
 
       <div className="flex items-center justify-between mb-8">

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import settingsIcon from '../assets/icons/settings.svg';
+import searchIcon from '../assets/icons/search.svg';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -65,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-900"
                     aria-label="搜索"
                   >
-                    🔍
+                    <img src={searchIcon} alt="搜索" className="w-4 h-4" />
                   </button>
                 </form>
               )}
@@ -74,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
                 aria-label="打开设置"
               >
-                <span>⚙️</span>
+                <img src={settingsIcon} alt="设置" className="w-5 h-5" />
               </button>
             </div>
           </div>

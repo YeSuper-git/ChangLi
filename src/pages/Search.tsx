@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getActors, getStandaloneVideos, getVideoSeriesList } from '../utils/api';
 import type { Actor, Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import loadingIcon from '../assets/icons/loading.svg';
 
 type SearchItem =
   | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
@@ -140,14 +141,14 @@ const Search: React.FC = () => {
           disabled={loading || !keyword.trim()}
           className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
         >
-          {loading ? '搜索中...' : '搜索'}
+          {loading ? <span className="flex items-center gap-2"><img src={loadingIcon} alt="搜索中" className="w-4 h-4" /> 搜索中...</span> : '搜索'}
         </button>
       </form>
 
       {searched && (
         <div>
           <div className="text-gray-500 mb-8">
-            {loading ? '搜索中...' : `找到 ${results.length} 个本地结果`}
+            {loading ? <span className="flex items-center gap-2"><img src={loadingIcon} alt="搜索中" className="w-4 h-4" /> 搜索中...</span> : `找到 ${results.length} 个本地结果`}
           </div>
 
           {results.length > 0 ? (

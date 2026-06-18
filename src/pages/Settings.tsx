@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import loadingIcon from '../assets/icons/loading.svg';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -92,7 +93,7 @@ const Settings: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
+        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
       </div>
     );
   }

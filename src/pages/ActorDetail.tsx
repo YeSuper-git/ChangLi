@@ -6,6 +6,8 @@ import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 import DatePicker from '../components/DatePicker';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import backIcon from '../assets/icons/back.svg';
+import loadingIcon from '../assets/icons/loading.svg';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -238,7 +240,7 @@ const ActorDetail: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
+        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
       </div>
     );
   }
@@ -276,7 +278,7 @@ const ActorDetail: React.FC = () => {
       {/* 返回按钮 */}
       <div className="mb-10">
         <button type="button" onClick={handleBack} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
-          <span>←</span>
+          <img src={backIcon} alt="返回" className="w-4 h-4" />
           <span>{backLabel}</span>
         </button>
       </div>
