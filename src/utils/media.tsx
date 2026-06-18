@@ -57,7 +57,8 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
   onOrientationChange,
 }) => {
   const [orientation, setOrientation] = useState<ImageOrientation>('unknown');
-  const shouldContain = orientation === 'portrait' || orientation === 'square';
+  // 横版海报用 object-contain 展示完整海报，竖版海报用 object-cover 等比放大填充
+  const isPortrait = orientation === 'portrait';
 
   useEffect(() => {
     setOrientation('unknown');
@@ -72,7 +73,7 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 ${className}`}>
-      {shouldContain && (
+      {isPortrait && (
         <>
           <img
             src={src}
@@ -91,9 +92,9 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
           setOrientation(next);
           onOrientationChange?.(next);
         }}
-        className={shouldContain
-          ? `relative z-10 w-full h-full object-contain p-3 ${imageClassName}`
-          : `w-full h-full object-cover ${imageClassName}`}
+        className={isPortrait
+          ? `w-full h-full object-cover ${imageClassName}`
+          : `relative z-10 w-full h-full object-contain p-2 ${imageClassName}`}
       />
     </div>
   );

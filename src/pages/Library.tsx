@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getStandaloneVideos,
@@ -28,6 +28,14 @@ const Library: React.FC = () => {
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
+
+  const hasPortraitSeries = useMemo(
+    () => seriesList.some((s) => s.poster_orientation === 'portrait'),
+    [seriesList]
+  );
+  const seriesGridClass = hasPortraitSeries
+    ? 'grid grid-cols-5 gap-5'
+    : 'grid grid-cols-4 gap-6';
 
   useEffect(() => {
     loadLibrary(null);
@@ -211,7 +219,7 @@ const Library: React.FC = () => {
       {filteredSeries.length > 0 && (
         <div className="mb-12">
           <h2 className="text-xl font-semibold mb-4">视频集</h2>
-          <div className="grid grid-cols-4 gap-6">
+          <div className={seriesGridClass}>
             {filteredSeries.map((series) => (
               <div
                 key={series.id}

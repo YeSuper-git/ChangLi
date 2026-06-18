@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   getActors,
@@ -28,6 +28,14 @@ const Home: React.FC = () => {
   const [recentWatchItems, setRecentWatchItems] = useState<RecentWatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
+
+  const hasPortraitSeries = useMemo(
+    () => seriesList.some((s) => s.poster_orientation === 'portrait'),
+    [seriesList]
+  );
+  const seriesGridClass = hasPortraitSeries
+    ? 'grid grid-cols-5 gap-5'
+    : 'grid grid-cols-4 gap-6';
 
   useEffect(() => {
     loadData(null);
@@ -166,7 +174,7 @@ const Home: React.FC = () => {
             查看全部 →
           </Link>
         </div>
-        <div className="grid grid-cols-4 gap-6">
+        <div className={seriesGridClass}>
           {seriesList.slice(0, 8).map((series) => (
             <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block">
               <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>

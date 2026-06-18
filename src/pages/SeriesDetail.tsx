@@ -483,10 +483,6 @@ const SeriesDetail: React.FC = () => {
         <VideoGrid
           videos={videos}
           posterOrientation={seriesPosterOrientation}
-          pendingKey={pendingKey}
-          requestSecondConfirm={requestSecondConfirm}
-          handleRemoveEpisode={handleRemoveEpisode}
-          handleDeleteEpisode={handleDeleteEpisode}
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
@@ -505,19 +501,11 @@ function getSeasonLabel(season: number): string {
 interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
-  pendingKey: string | null;
-  requestSecondConfirm: (key: string, onConfirm: () => void) => void;
-  handleRemoveEpisode: (videoId: number) => void;
-  handleDeleteEpisode: (videoId: number) => void;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
-  pendingKey,
-  requestSecondConfirm,
-  handleRemoveEpisode,
-  handleDeleteEpisode,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -553,55 +541,23 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   const renderVideoCard = (video: Video) => {
     const poster = videoPosterDataUrl(video);
     return (
-      <div key={video.id} className="card">
-        <Link to={`/player/${video.id}`}>
-          <div
-            className={`${
-              posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
-            } bg-gray-100 overflow-hidden relative`}
-          >
-            <SmartPoster src={poster} alt={video.file_name} />
-            {video.episode_number && (
-              <div className="absolute bottom-2 right-2 bg-gray-700/70 text-white text-xs px-2.5 py-1 rounded-full">
-                第 {video.episode_number} 集
-              </div>
-            )}
-          </div>
-        </Link>
-        <div className="p-4">
-          <h3 className="font-semibold text-sm line-clamp-2 mb-2">
-            {video.file_name}
-          </h3>
-          <div className="flex gap-2 flex-wrap">
-            <Link
-              to={`/player/${video.id}`}
-              className="action-btn action-btn-primary text-center"
-            >
-              播放
-            </Link>
-            <button
-              onClick={() =>
-                requestSecondConfirm(`remove-episode-${video.id}`, () =>
-                  handleRemoveEpisode(video.id)
-                )
-              }
-              className="action-btn"
-            >
-              {pendingKey === `remove-episode-${video.id}` ? '再次确认移出' : '移出'}
-            </button>
-            <button
-              onClick={() =>
-                requestSecondConfirm(`delete-episode-${video.id}`, () =>
-                  handleDeleteEpisode(video.id)
-                )
-              }
-              className="action-btn action-btn-danger"
-            >
-              {pendingKey === `delete-episode-${video.id}` ? '再次确认删除' : '删除'}
-            </button>
-          </div>
+      <Link key={video.id} to={`/player/${video.id}`} className="card block cursor-pointer">
+        <div
+          className={`${
+            posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
+          } bg-gray-100 overflow-hidden relative`}
+        >
+          <SmartPoster src={poster} alt={video.file_name} />
         </div>
-      </div>
+        <div className="p-2">
+          <h3 className="font-medium text-xs line-clamp-1 mb-1">
+            {video.episode_number ? `第${video.episode_number}集` : video.file_name}
+          </h3>
+          {video.episode_number && (
+            <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>
+          )}
+        </div>
+      </Link>
     );
   };
 
