@@ -9,8 +9,21 @@ use crate::db::Video;
 
 /// 生成缩略图 Base64（最大 300px 宽，≤50KB）
 fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
-    let img = ImageReader::open(poster_path).ok()?;
-    let img = img.decode().ok()?;
+    let reader = match ImageReader::open(poster_path) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[Scanner] open failed: {} ({})", poster_path.display(), e);
+            return None;
+        }
+    };
+
+    let img = match reader.decode() {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("[Decoder] Failed to decode image: {} ({:?})", poster_path.display(), e);
+            return None;
+        }
+    };
 
     // 缩放到最大 300px 宽
     let max_width = 300;
@@ -41,8 +54,22 @@ fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
 
 /// 读取图片尺寸并判断方向：portrait / landscape / square
 fn get_image_orientation(poster_path: &Path) -> Option<String> {
-    let img = ImageReader::open(poster_path).ok()?;
-    let (w, h) = img.into_dimensions().ok()?;
+    let reader = match ImageReader::open(poster_path) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[Scanner] open failed for dimensions: {} ({})", poster_path.display(), e);
+            return None;
+        }
+    };
+
+    let (w, h) = match reader.into_dimensions() {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("[Decoder] Failed to read dimensions: {} ({:?})", poster_path.display(), e);
+            return None;
+        }
+    };
+
     let orientation = if h as f64 > w as f64 * 1.15 {
         "portrait"
     } else if w as f64 > h as f64 * 1.15 {
