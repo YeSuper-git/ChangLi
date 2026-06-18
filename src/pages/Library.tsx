@@ -16,6 +16,7 @@ import type { Tag, Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import ScrollToTop from '../components/ScrollToTop';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Library: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
@@ -171,6 +173,7 @@ const Library: React.FC = () => {
   }
 
   return (
+    <>
     <div>
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">视频</h1>
@@ -198,6 +201,12 @@ const Library: React.FC = () => {
         ))}
       </div>
 
+      <div className="mb-6 flex gap-3 flex-wrap">
+        <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
+        <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
+        <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>单视频</button>
+      </div>
+
       <div className="mb-10">
         <input
           type="text"
@@ -208,7 +217,7 @@ const Library: React.FC = () => {
         />
       </div>
 
-      {filteredSeries.length > 0 && (
+      {typeFilter !== 'video' && filteredSeries.length > 0 && (
         <div className="mb-12">
           <h2 className="text-xl font-semibold mb-4">视频集</h2>
           <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
@@ -240,7 +249,7 @@ const Library: React.FC = () => {
         </div>
       )}
 
-      {filteredVideos.length > 0 && (
+      {typeFilter !== 'series' && filteredVideos.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-4">单视频</h2>
           <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
@@ -314,6 +323,9 @@ const Library: React.FC = () => {
         </div>
       )}
     </div>
+
+    <ScrollToTop />
+    </>
   );
 };
 

@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries } from '../utils/api';
 import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 import DatePicker from '../components/DatePicker';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
+  const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const editFromUrl = searchParams.get('edit') === '1';
@@ -44,6 +47,12 @@ const ActorDetail: React.FC = () => {
       setEditing(true);
     }
   }, [editFromUrl, actor]);
+  useEffect(() => {
+    const closeMenu = () => { setContextMenu(null); clearPending(); };
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
+
 
   const loadActor = async (actorId: number) => {
     try {
@@ -185,6 +194,44 @@ const ActorDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('[Actor] 打开文件夹选择器失败:', error);
+    }
+  };
+
+  const openContextMenu = (event: React.MouseEvent, type: 'video' | 'series', id: number, name: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
+  };
+
+  const handleEditContextItem = () => {
+    if (!contextMenu) return;
+    const target = contextMenu.type === 'video'
+      ? `/video/${contextMenu.id}?edit=1`
+      : `/series/${contextMenu.id}?edit=1`;
+    setContextMenu(null);
+    clearPending();
+    navigate(target, { state: { from: `/actors/${actor?.id}`, backLabel: '返回演员详情' } });
+  };
+
+  const handleDeleteVideo = async (id: number) => {
+    try {
+      await deleteVideo(id);
+      setContextMenu(null);
+      if (actor) loadActor(actor.id);
+    } catch (error) {
+      console.error('[Actor] 删除视频失败:', error);
+      alert('删除失败: ' + String(error));
+    }
+  };
+
+  const handleDeleteSeries = async (id: number) => {
+    try {
+      await deleteVideoSeries(id, true);
+      setContextMenu(null);
+      if (actor) loadActor(actor.id);
+    } catch (error) {
+      console.error('[Actor] 删除视频集失败:', error);
+      alert('删除失败: ' + String(error));
     }
   };
 
@@ -476,6 +523,7 @@ const ActorDetail: React.FC = () => {
                 key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`}
                 to={target}
                 state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
+                onContextMenu={(event) => openContextMenu(event, isSeries ? 'series' : 'video', isSeries ? resource.series_id! : resource.id, title)}
                 className="card block"
               >
                 <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
@@ -498,8 +546,34 @@ const ActorDetail: React.FC = () => {
           </div>
         )}
       </section>
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={handleEditContextItem}
+          >
+            编辑
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => {
+              const key = `${contextMenu.type}-${contextMenu.id}`;
+              requestSecondConfirm(key, () => contextMenu.type === 'video'
+                ? handleDeleteVideo(contextMenu.id)
+                : handleDeleteSeries(contextMenu.id));
+            }}
+          >
+            {pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ActorDetail;
+

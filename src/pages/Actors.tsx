@@ -4,6 +4,7 @@ import { getActors, addActor, deleteActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import ScrollToTop from '../components/ScrollToTop';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
@@ -96,6 +97,7 @@ const Actors: React.FC = () => {
   }
 
   return (
+    <>
     <div>
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-bold">演员库</h1>
@@ -237,6 +239,9 @@ const Actors: React.FC = () => {
         </div>
       )}
     </div>
+
+    <ScrollToTop />
+    </>
   );
 };
 
