@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getStandaloneVideos,
@@ -14,7 +14,7 @@ import {
 } from '../utils/api';
 import type { Tag, Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { SmartPoster, videoPosterDataUrl } from '../utils/media';
+import { SmartPoster, videoPosterDataUrl, type ImageOrientation } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Library: React.FC = () => {
@@ -29,13 +29,15 @@ const Library: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
-  const hasPortraitSeries = useMemo(
-    () => seriesList.some((s) => s.poster_orientation === 'portrait'),
-    [seriesList]
-  );
-  const seriesGridClass = hasPortraitSeries
-    ? 'grid grid-cols-5 gap-5'
-    : 'grid grid-cols-4 gap-6';
+  // 每个单视频卡片独立维护自己的海报方向
+  const [videoOrientations, setVideoOrientations] = useState<Record<number, ImageOrientation>>({});
+
+  const handleVideoOrientationChange = useCallback((videoId: number, orientation: ImageOrientation) => {
+    setVideoOrientations((prev) => {
+      if (prev[videoId] === orientation) return prev;
+      return { ...prev, [videoId]: orientation };
+    });
+  }, []);
 
   useEffect(() => {
     loadLibrary(null);
@@ -170,6 +172,18 @@ const Library: React.FC = () => {
     (series.description || '').toLowerCase().includes(normalizedSearch)
   );
 
+  // 根据当前筛选的视频集判断 grid 布局（per-section，非全局）
+  const seriesGridClass = useMemo(() => {
+    const hasPortrait = filteredSeries.some((s) => s.poster_orientation === 'portrait');
+    return hasPortrait ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6';
+  }, [filteredSeries]);
+
+  // 根据当前筛选的单视频及其检测到的方向判断 grid 布局（per-section）
+  const videosGridClass = useMemo(() => {
+    const hasPortrait = filteredVideos.some((v) => videoOrientations[v.id] === 'portrait');
+    return hasPortrait ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6';
+  }, [filteredVideos, videoOrientations]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -251,9 +265,11 @@ const Library: React.FC = () => {
       {filteredVideos.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-4">单视频</h2>
-          <div className="grid grid-cols-4 gap-6">
+          <div className={videosGridClass}>
             {filteredVideos.map((video) => {
               const thumbnailDataUrl = videoPosterDataUrl(video);
+              const orientation = videoOrientations[video.id];
+              const aspectClass = orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video';
               return (
                 <div
                   key={video.id}
@@ -261,8 +277,12 @@ const Library: React.FC = () => {
                   onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
                   className="card cursor-pointer"
                 >
-                  <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                    <SmartPoster src={thumbnailDataUrl} alt={video.file_name} />
+                  <div className={`${aspectClass} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
+                    <SmartPoster
+                      src={thumbnailDataUrl}
+                      alt={video.file_name}
+                      onOrientationChange={(ori) => handleVideoOrientationChange(video.id, ori)}
+                    />
                   </div>
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2 hover:text-blue-600">
@@ -286,7 +306,7 @@ const Library: React.FC = () => {
       {filteredSeries.length === 0 && filteredVideos.length === 0 && (
         <div className="text-center py-16">
           <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : '暂无视频'}</p>
-          {!searchTerm && <p className="text-gray-400 text-sm">点击“添加”选择文件夹添加视频</p>}
+          {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
         </div>
       )}
 
