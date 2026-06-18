@@ -255,7 +255,7 @@ const Library: React.FC = () => {
           <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
             {filteredVideos.map((video) => {
               const thumbnailDataUrl = videoPosterDataUrl(video);
-              const isPortrait = (video.height && video.width) ? video.height > video.width * 1.15 : false;
+              const isPortrait = video.poster_orientation === 'portrait';
               return (
                 <div
                   key={video.id}

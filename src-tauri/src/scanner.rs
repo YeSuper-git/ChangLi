@@ -39,6 +39,20 @@ fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     Some(format!("data:image/jpeg;base64,{}", encoded))
 }
 
+/// 读取图片尺寸并判断方向：portrait / landscape / square
+fn get_image_orientation(poster_path: &Path) -> Option<String> {
+    let img = ImageReader::open(poster_path).ok()?;
+    let (w, h) = img.into_dimensions().ok()?;
+    let orientation = if h as f64 > w as f64 * 1.15 {
+        "portrait"
+    } else if w as f64 > h as f64 * 1.15 {
+        "landscape"
+    } else {
+        "square"
+    };
+    Some(orientation.to_string())
+}
+
 // 支持的视频格式
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mkv", "avi", "flv", "mov", "wmv", "webm", "m4v", "mpg", "mpeg", "3gp", "ts", "rmvb",
@@ -317,6 +331,11 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         .as_ref()
         .and_then(|p| generate_thumbnail_base64(Path::new(p)));
 
+    // 根据海报图片尺寸判断方向
+    let poster_orientation = poster
+        .as_ref()
+        .and_then(|p| get_image_orientation(Path::new(p)));
+
     Ok(Video {
         id: 0,
         file_path: path.to_string_lossy().to_string(),
@@ -337,6 +356,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         series_title: None,
         series_poster_data_url: None,
         description: None,
+        poster_orientation,
         created_at: chrono::Utc::now().to_rfc3339(),
     })
 }

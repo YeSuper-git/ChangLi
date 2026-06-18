@@ -79,6 +79,7 @@ pub struct Video {
     pub series_title: Option<String>,
     pub series_poster_data_url: Option<String>,
     pub description: Option<String>,
+    pub poster_orientation: Option<String>,
     pub created_at: String,
 }
 
@@ -541,6 +542,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         series_title: row.try_get("series_title").ok(),
         series_poster_data_url,
         description: row.get("description"),
+        poster_orientation: row.try_get("poster_orientation").ok(),
         created_at: row.get("created_at"),
     }
 }

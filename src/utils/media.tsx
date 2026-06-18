@@ -89,23 +89,12 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 ${className}`}>
-      {isPortrait && (
-        <>
-          <img
-            src={src}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-35"
-          />
-          <div className="absolute inset-0 bg-white/25" />
-        </>
-      )}
       <img
         src={src}
         alt={alt}
         className={
           isPortrait
-            ? `w-full h-full object-cover ${imageClassName}`
+            ? `w-full h-full object-contain ${imageClassName}`
             : `relative z-10 w-full h-full object-cover ${imageClassName}`
         }
       />
