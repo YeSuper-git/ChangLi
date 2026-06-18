@@ -53,11 +53,12 @@ const SeriesDetail: React.FC = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [creatingTag, setCreatingTag] = useState(false);
-  const [creatingActor, setCreatingActor] = useState(false);
+  const [showNewActorModal, setShowNewActorModal] = useState(false);
   const [allActors, setAllActors] = useState<Actor[]>([]);
   const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [newActorName, setNewActorName] = useState('');
+  const [actorNotice, setActorNotice] = useState('');
   const [seriesPosterOrientation, setSeriesPosterOrientation] = useState<ImageOrientation>('unknown');
   const [episodeEditing, setEpisodeEditing] = useState(false);
   const [standaloneVideos, setStandaloneVideos] = useState<Video[]>([]);
@@ -147,31 +148,45 @@ const SeriesDetail: React.FC = () => {
   const handleCreateTag = async () => {
     const name = newTagName.trim();
     if (!name) return;
-    const existing = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
-    if (existing) {
-      setSelectedTagIds((current) => current.includes(existing.id) ? current : [...current, existing.id]);
-      setNewTagName('');
+    const duplicated = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicated) {
+      alert(`标签"${name}"已存在，不能重复添加。`);
       return;
     }
-    const tag = await addTag(name);
-    setAllTags((current) => [...current, tag].sort((a, b) => a.name.localeCompare(b.name)));
-    setSelectedTagIds((current) => [...current, tag.id]);
-    setNewTagName('');
+    try {
+      const tag = await addTag(name);
+      setAllTags((current) => [...current, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedTagIds((current) => [...current, tag.id]);
+      setNewTagName('');
+      setCreatingTag(false);
+    } catch (error) {
+      console.error('新建标签失败:', error);
+      alert(`新建标签失败：${String(error)}`);
+    }
   };
 
   const handleCreateActor = async () => {
     const name = newActorName.trim();
     if (!name) return;
-    const existing = allActors.find((actor) => actor.name.trim().toLowerCase() === name.toLowerCase());
-    if (existing) {
-      setSelectedActorIds((current) => current.includes(existing.id) ? current : [...current, existing.id]);
+    const duplicated = allActors.find((actor) => actor.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicated) {
+      setActorNotice(`演员"${name}"已存在，已为你选中该演员。`);
+      setSelectedActorIds((current) => current.includes(duplicated.id) ? current : [...current, duplicated.id]);
+      setShowNewActorModal(false);
       setNewActorName('');
       return;
     }
-    const actor = await addActor(name);
-    setAllActors((current) => [...current, actor].sort((a, b) => a.name.localeCompare(b.name)));
-    setSelectedActorIds((current) => [...current, actor.id]);
-    setNewActorName('');
+    try {
+      const actor = await addActor(name);
+      setAllActors((current) => [...current, actor].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedActorIds((current) => [...current, actor.id]);
+      setShowNewActorModal(false);
+      setNewActorName('');
+      setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
+    } catch (error) {
+      console.error('新建演员失败:', error);
+      alert(`新建演员失败：${String(error)}`);
+    }
   };
 
   const toggleTag = (tagId: number) => {
@@ -409,39 +424,12 @@ const SeriesDetail: React.FC = () => {
                     })}
                     <button
                       type="button"
-                      onClick={() => setCreatingActor(true)}
+                      onClick={() => setShowNewActorModal(true)}
                       className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
                     >
                       + 新建演员
                     </button>
                   </div>
-                  {creatingActor && (
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        type="text"
-                        value={newActorName}
-                        onChange={(e) => setNewActorName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCreateActor();
-                          if (e.key === 'Escape') {
-                            setCreatingActor(false);
-                            setNewActorName('');
-                          }
-                        }}
-                        placeholder="输入演员名"
-                        className="search-input"
-                        autoFocus
-                      />
-                      <button onClick={handleCreateActor} className="action-btn">完成</button>
-                      <button
-                        onClick={() => {
-                          setCreatingActor(false);
-                          setNewActorName('');
-                        }}
-                        className="action-btn"
-                      >取消</button>
-                    </div>
-                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
@@ -451,6 +439,11 @@ const SeriesDetail: React.FC = () => {
             ) : (
               <>
                 <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
+                <div className="mb-2">
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {series.status === 'completed' ? '已完结' : '连载中'}
+                  </span>
+                </div>
                 <p className="text-gray-500 mb-4">{series.video_count} 集</p>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
@@ -554,6 +547,74 @@ const SeriesDetail: React.FC = () => {
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
+      )}
+
+      {actorNotice && (
+        <div className="fixed right-6 top-6 z-50 max-w-sm rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">✓</div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-gray-900">演员已更新</div>
+              <div className="mt-1 text-sm text-gray-500">{actorNotice}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActorNotice('')}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="关闭提示"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showNewActorModal && (
+        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">演员资料</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">新建演员</h2>
+              <p className="mt-2 text-sm text-gray-500">新建后会自动选中，保存视频集详情时同步关联。</p>
+            </div>
+            <div className="px-6 py-5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">姓名 *</label>
+              <input
+                type="text"
+                value={newActorName}
+                onChange={(e) => setNewActorName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateActor();
+                  if (e.key === 'Escape') {
+                    setShowNewActorModal(false);
+                    setNewActorName('');
+                  }
+                }}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                placeholder="输入演员姓名"
+                autoFocus
+              />
+              <p className="text-xs text-gray-400 mt-2">新建后会自动选中，稍后可去演员中补充海报和详细信息。</p>
+            </div>
+            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+              <button
+                onClick={() => {
+                  setShowNewActorModal(false);
+                  setNewActorName('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateActor}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
