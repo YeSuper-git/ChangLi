@@ -19,19 +19,14 @@ import { useLibraryStore } from '../store/libraryStore';
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const { tags, videos: storeVideos, series: storeSeries, refreshVideos, refreshSeries } = useLibraryStore();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
-  const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
+  const [tagFilteredVideos, setTagFilteredVideos] = useState<Video[] | null>(null);
+  const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
-
-  useEffect(() => {
-    loadLibrary(null);
-  }, []);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -42,26 +37,36 @@ const Library: React.FC = () => {
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  const loadLibrary = async (tagId: number | null = activeTagId) => {
+  // 当 store 数据变化且当前无标签筛选时，清空 filtered 状态（避免 stale）
+  useEffect(() => {
+    if (activeTagId === null) {
+      setTagFilteredVideos(null);
+      setTagFilteredSeries(null);
+    }
+  }, [storeVideos, storeSeries, activeTagId]);
+
+  const filterByTag = async (tagId: number | null) => {
+    if (tagId === null) {
+      setActiveTagId(null);
+      setTagFilteredVideos(null);
+      setTagFilteredSeries(null);
+      return;
+    }
     try {
-      if (tagId) {
-        const [videosList, series] = await Promise.all([
-          getStandaloneVideosByTag(tagId),
-          getVideoSeriesByTag(tagId),
-        ]);
-        setVideos(videosList);
-        setSeriesList(series);
-      } else {
-        setVideos(storeVideos);
-        setSeriesList(storeSeries);
-      }
+      const [videosList, series] = await Promise.all([
+        getStandaloneVideosByTag(tagId),
+        getVideoSeriesByTag(tagId),
+      ]);
+      setTagFilteredVideos(videosList);
+      setTagFilteredSeries(series);
       setActiveTagId(tagId);
     } catch (error) {
-      console.error('[Library] 加载视频失败:', error);
-    } finally {
-      setLoading(false);
+      console.error('[Library] 按标签筛选失败:', error);
     }
   };
+
+  const videos: Video[] = tagFilteredVideos ?? storeVideos;
+  const seriesList: VideoSeries[] = tagFilteredSeries ?? storeSeries;
 
   const importPath = async () => {
     try {
@@ -77,7 +82,9 @@ const Library: React.FC = () => {
           await scanVideos(selected as string);
           await refreshVideos();
           await refreshSeries();
-          await loadLibrary(activeTagId);
+          if (activeTagId !== null) {
+            await filterByTag(activeTagId);
+          }
         } catch (error) {
           console.error('[Library] 导入失败:', error);
           alert('导入失败: ' + String(error));
@@ -95,7 +102,9 @@ const Library: React.FC = () => {
       await deleteVideo(id);
       setContextMenu(null);
       await refreshVideos();
-      await loadLibrary(activeTagId);
+      if (activeTagId !== null) {
+        await filterByTag(activeTagId);
+      }
     } catch (error) {
       console.error('[Library] 删除失败:', error);
       alert('删除失败: ' + String(error));
@@ -108,7 +117,9 @@ const Library: React.FC = () => {
       setContextMenu(null);
       await refreshVideos();
       await refreshSeries();
-      await loadLibrary(activeTagId);
+      if (activeTagId !== null) {
+        await filterByTag(activeTagId);
+      }
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
       alert('删除视频集失败: ' + String(error));
@@ -157,8 +168,7 @@ const Library: React.FC = () => {
   };
 
   const handleTagClick = (tagId: number | null) => {
-    setLoading(true);
-    loadLibrary(tagId);
+    filterByTag(tagId);
   };
 
   const normalizedSearch = searchTerm.toLowerCase();
@@ -169,14 +179,6 @@ const Library: React.FC = () => {
     series.title.toLowerCase().includes(normalizedSearch) ||
     (series.description || '').toLowerCase().includes(normalizedSearch)
   );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
-  }
 
   return (
     <>

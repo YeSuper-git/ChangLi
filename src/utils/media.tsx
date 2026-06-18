@@ -95,7 +95,7 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
         className={
           isPortrait
             ? `w-full h-full object-contain ${imageClassName}`
-            : `relative z-10 w-full h-full object-cover ${imageClassName}`
+            : `w-full h-full object-cover ${imageClassName}`
         }
       />
     </div>

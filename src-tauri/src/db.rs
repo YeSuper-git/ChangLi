@@ -1534,5 +1534,61 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
         eprintln!("[ChangLi] 回填头像缓存: 成功回填 {} 条 actors", actors_filled);
     }
 
+    // 回填 video_series 的 poster_orientation
+    let series_orientation_rows = sqlx::query(
+        "SELECT id, poster FROM video_series WHERE poster_orientation IS NULL AND poster IS NOT NULL"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    if !series_orientation_rows.is_empty() {
+        eprintln!("[ChangLi] 回填海报方向: 发现 {} 条 video_series 记录需要处理", series_orientation_rows.len());
+        let mut orientation_filled = 0;
+        for row in &series_orientation_rows {
+            let id: i64 = row.get("id");
+            let poster: String = row.get("poster");
+            let resolved = storage::resolve_data_path(&poster);
+            if let Some(orientation) = crate::scanner::get_image_orientation(Path::new(&resolved)) {
+                sqlx::query("UPDATE video_series SET poster_orientation = ? WHERE id = ?")
+                    .bind(&orientation)
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+                orientation_filled += 1;
+            }
+        }
+        if orientation_filled > 0 {
+            eprintln!("[ChangLi] 回填海报方向: 成功回填 {} 条 video_series", orientation_filled);
+        }
+    }
+
+    // 回填 videos 的 poster_orientation
+    let video_orientation_rows = sqlx::query(
+        "SELECT id, thumbnail FROM videos WHERE poster_orientation IS NULL AND thumbnail IS NOT NULL"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    if !video_orientation_rows.is_empty() {
+        eprintln!("[ChangLi] 回填海报方向: 发现 {} 条 videos 记录需要处理", video_orientation_rows.len());
+        let mut orientation_filled = 0;
+        for row in &video_orientation_rows {
+            let id: i64 = row.get("id");
+            let thumbnail: String = row.get("thumbnail");
+            let resolved = storage::resolve_data_path(&thumbnail);
+            if let Some(orientation) = crate::scanner::get_image_orientation(Path::new(&resolved)) {
+                sqlx::query("UPDATE videos SET poster_orientation = ? WHERE id = ?")
+                    .bind(&orientation)
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+                orientation_filled += 1;
+            }
+        }
+        if orientation_filled > 0 {
+            eprintln!("[ChangLi] 回填海报方向: 成功回填 {} 条 videos", orientation_filled);
+        }
+    }
+
     Ok(())
 }

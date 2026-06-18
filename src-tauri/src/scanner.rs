@@ -53,7 +53,7 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
 }
 
 /// 读取图片尺寸并判断方向：portrait / landscape / square
-fn get_image_orientation(poster_path: &Path) -> Option<String> {
+pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
         Err(e) => {
