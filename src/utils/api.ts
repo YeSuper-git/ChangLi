@@ -337,6 +337,7 @@ export interface Actor {
   height?: string;
   measurements?: string;
   japanese_name?: string;
+  cup_size?: string;
   work_count: number;
   created_at: string;
   updated_at: string;
@@ -366,10 +367,10 @@ export async function getActor(id: number): Promise<Actor | null> {
   }
 }
 
-export async function addActor(name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string): Promise<Actor> {
-  console.log('[API] 调用 addActor, name:', name, 'photo:', photo, 'japaneseName:', japaneseName);
+export async function addActor(name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string): Promise<Actor> {
+  console.log('[API] 调用 addActor, name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize);
   try {
-    const result = await invoke<Actor>('add_actor', { name, photo, bio, birthday, height, measurements, japaneseName });
+    const result = await invoke<Actor>('add_actor', { name, photo, bio, birthday, height, measurements, japaneseName, cupSize });
     console.log('[API] addActor 成功, 返回:', result);
     return result;
   } catch (err) {
@@ -378,10 +379,10 @@ export async function addActor(name: string, photo?: string, bio?: string, birth
   }
 }
 
-export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string): Promise<Actor> {
-  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName);
+export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string): Promise<Actor> {
+  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize);
   try {
-    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName });
+    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName, cupSize });
     console.log('[API] updateActor 成功, 返回:', result);
     return result;
   } catch (err) {

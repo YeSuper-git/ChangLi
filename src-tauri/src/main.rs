@@ -555,6 +555,7 @@ async fn add_actor(
     height: Option<String>,
     measurements: Option<String>,
     japanese_name: Option<String>,
+    cup_size: Option<String>,
 ) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -570,6 +571,7 @@ async fn add_actor(
         height.as_deref(),
         measurements.as_deref(),
         japanese_name.as_deref(),
+        cup_size.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -586,6 +588,7 @@ async fn update_actor(
     height: Option<String>,
     measurements: Option<String>,
     japanese_name: Option<String>,
+    cup_size: Option<String>,
 ) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -602,6 +605,7 @@ async fn update_actor(
         height.as_deref(),
         measurements.as_deref(),
         japanese_name.as_deref(),
+        cup_size.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())

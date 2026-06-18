@@ -109,6 +109,7 @@ pub struct Actor {
     pub height: Option<String>,
     pub measurements: Option<String>,
     pub japanese_name: Option<String>,
+    pub cup_size: Option<String>,
     pub work_count: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -876,9 +877,10 @@ pub async fn add_actor(
     height: Option<&str>,
     measurements: Option<&str>,
     japanese_name: Option<&str>,
+    cup_size: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name, cup_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -887,6 +889,7 @@ pub async fn add_actor(
     .bind(height)
     .bind(measurements)
     .bind(japanese_name)
+    .bind(cup_size)
     .fetch_one(pool)
     .await?;
 
@@ -903,9 +906,10 @@ pub async fn update_actor(
     height: Option<&str>,
     measurements: Option<&str>,
     japanese_name: Option<&str>,
+    cup_size: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -914,6 +918,7 @@ pub async fn update_actor(
     .bind(height)
     .bind(measurements)
     .bind(japanese_name)
+    .bind(cup_size)
     .bind(id)
     .fetch_one(pool)
     .await?;
@@ -973,6 +978,7 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
         height: row.get("height"),
         measurements: row.get("measurements"),
         japanese_name: row.get("japanese_name"),
+        cup_size: row.get("cup_size"),
         work_count: row.try_get("work_count").unwrap_or(0),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),

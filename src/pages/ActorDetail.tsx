@@ -28,6 +28,7 @@ const ActorDetail: React.FC = () => {
     height: '',
     measurements: '',
     japanese_name: '',
+    cup_size: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
@@ -63,6 +64,7 @@ const ActorDetail: React.FC = () => {
           height: actorData.height || '',
           measurements: actorData.measurements || '',
           japanese_name: actorData.japanese_name || '',
+          cup_size: actorData.cup_size || '',
         });
       }
     } catch (error) {
@@ -84,7 +86,8 @@ const ActorDetail: React.FC = () => {
         editForm.birthday || undefined,
         editForm.height || undefined,
         editForm.measurements || undefined,
-        editForm.japanese_name || undefined
+        editForm.japanese_name || undefined,
+        editForm.cup_size || undefined
       );
       clearEditQuery();
       setEditing(false);
@@ -123,7 +126,8 @@ const ActorDetail: React.FC = () => {
             actor.birthday || undefined,
             actor.height || undefined,
             actor.measurements || undefined,
-            actor.japanese_name || undefined
+            actor.japanese_name || undefined,
+            actor.cup_size || undefined
           );
           loadActor(actor.id);
         } catch (error) {
@@ -353,6 +357,20 @@ const ActorDetail: React.FC = () => {
                 </div>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
+                <input
+                  type="text"
+                  value={editForm.cup_size}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                    setEditForm({ ...editForm, cup_size: val });
+                  }}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="如 C、D、E、F"
+                  maxLength={5}
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">简介</label>
                 <textarea
                   value={editForm.bio}
@@ -402,6 +420,12 @@ const ActorDetail: React.FC = () => {
                     <span className="font-medium">
                       {actor.measurements.split('-').filter(Boolean).join('-')}
                     </span>
+                  </div>
+                )}
+                {actor.cup_size && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-500 w-20">数值</span>
+                    <span className="font-medium">{actor.cup_size}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">

@@ -268,6 +268,7 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("actors", "height", "TEXT"),
         Column::new("actors", "measurements", "TEXT"),
         Column::new("actors", "japanese_name", "TEXT"),
+        Column::new("actors", "cup_size", "TEXT"),
         Column::new("actors", "created_at", "TEXT"),
         Column::new("actors", "updated_at", "TEXT"),
         Column::new("tags", "name", "TEXT NOT NULL DEFAULT ''"),
@@ -814,6 +815,7 @@ mod tests {
             "height",
             "measurements",
             "japanese_name",
+            "cup_size",
             "created_at",
             "updated_at",
         ] {
