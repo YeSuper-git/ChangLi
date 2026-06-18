@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 export function imageDataUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -32,21 +32,43 @@ export const StaticImagePlaceholder: React.FC<PlaceholderProps> = ({ kind, class
   );
 };
 
+/**
+ * 判断海报方向：优先使用后端返回的 poster_orientation 字段，
+ * 其次根据 width/height 判断，最后回退到 unknown。
+ */
+function resolveOrientation(
+  posterOrientation?: string | null,
+  width?: number | null,
+  height?: number | null,
+): ImageOrientation {
+  // 优先使用后端明确返回的方向
+  if (posterOrientation === 'portrait') return 'portrait';
+  if (posterOrientation === 'landscape') return 'landscape';
+  if (posterOrientation === 'square') return 'square';
+
+  // 根据宽高比判断
+  if (width && height) {
+    if (height > width * 1.15) return 'portrait';
+    if (width > height * 1.15) return 'landscape';
+    return 'square';
+  }
+
+  return 'unknown';
+}
+
 interface SmartPosterProps {
   src?: string | null;
   alt: string;
   kind?: 'video' | 'actor';
   className?: string;
   imageClassName?: string;
-  onOrientationChange?: (orientation: ImageOrientation) => void;
+  /** 后端返回的海报方向（如 VideoSeries.poster_orientation） */
+  posterOrientation?: string | null;
+  /** 视频/图片宽度（如 Video.width） */
+  width?: number | null;
+  /** 视频/图片高度（如 Video.height） */
+  height?: number | null;
 }
-
-const getOrientation = (width: number, height: number): ImageOrientation => {
-  if (!width || !height) return 'unknown';
-  if (height > width * 1.15) return 'portrait';
-  if (width > height * 1.15) return 'landscape';
-  return 'square';
-};
 
 export const SmartPoster: React.FC<SmartPosterProps> = ({
   src,
@@ -54,18 +76,12 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
   kind = 'video',
   className = '',
   imageClassName = '',
-  onOrientationChange,
+  posterOrientation,
+  width,
+  height,
 }) => {
-  const [orientation, setOrientation] = useState<ImageOrientation>('unknown');
-  // 横版海报用 object-contain 展示完整海报，竖版海报用 object-cover 等比放大填充
+  const orientation = resolveOrientation(posterOrientation, width, height);
   const isPortrait = orientation === 'portrait';
-
-  useEffect(() => {
-    setOrientation('unknown');
-    if (!src) {
-      onOrientationChange?.('unknown');
-    }
-  }, [src, onOrientationChange]);
 
   if (!src) {
     return <StaticImagePlaceholder kind={kind} className={className} />;
@@ -87,14 +103,11 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
       <img
         src={src}
         alt={alt}
-        onLoad={(event) => {
-          const next = getOrientation(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
-          setOrientation(next);
-          onOrientationChange?.(next);
-        }}
-        className={isPortrait
-          ? `w-full h-full object-cover ${imageClassName}`
-          : `relative z-10 w-full h-full object-contain p-2 ${imageClassName}`}
+        className={
+          isPortrait
+            ? `w-full h-full object-cover ${imageClassName}`
+            : `relative z-10 w-full h-full object-cover ${imageClassName}`
+        }
       />
     </div>
   );

@@ -22,7 +22,6 @@ import {
 } from '../utils/api';
 import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
-import type { ImageOrientation } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const SeriesDetail: React.FC = () => {
@@ -59,7 +58,7 @@ const SeriesDetail: React.FC = () => {
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
   const [newActorName, setNewActorName] = useState('');
   const [actorNotice, setActorNotice] = useState('');
-  const [seriesPosterOrientation, setSeriesPosterOrientation] = useState<ImageOrientation>('unknown');
+  // 使用后端返回的 poster_orientation 字段，不再动态检测
   const [episodeEditing, setEpisodeEditing] = useState(false);
   const [standaloneVideos, setStandaloneVideos] = useState<Video[]>([]);
   const [loadingStandalone, setLoadingStandalone] = useState(false);
@@ -76,12 +75,6 @@ const SeriesDetail: React.FC = () => {
       setEditing(true);
     }
   }, [editFromUrl, series]);
-
-  useEffect(() => {
-    if (!series?.poster_data_url) {
-      setSeriesPosterOrientation('unknown');
-    }
-  }, [series?.poster_data_url]);
 
   const loadSeries = async () => {
     try {
@@ -322,7 +315,7 @@ const SeriesDetail: React.FC = () => {
               <SmartPoster
                 src={series.poster_data_url}
                 alt={series.title}
-                onOrientationChange={setSeriesPosterOrientation}
+                posterOrientation={series.poster_orientation}
               />
               {editing && (
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -543,7 +536,7 @@ const SeriesDetail: React.FC = () => {
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
-          posterOrientation={seriesPosterOrientation}
+          posterOrientation={series?.poster_orientation || 'unknown'}
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
@@ -661,10 +654,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
     return entries;
   }, [videos, hasSeason]);
 
-  const gridClass =
-    posterOrientation === 'portrait'
-      ? 'grid grid-cols-5 gap-5'
-      : 'grid grid-cols-4 gap-6';
+  const gridClass = 'grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max';
 
   /** 渲染单个视频卡片 */
   const renderVideoCard = (video: Video) => {
@@ -676,7 +666,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
             posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
           } bg-gray-100 overflow-hidden relative`}
         >
-          <SmartPoster src={poster} alt={video.file_name} />
+          <SmartPoster src={poster} alt={video.file_name} posterOrientation={posterOrientation} />
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">

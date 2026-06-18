@@ -169,7 +169,13 @@ const Search: React.FC = () => {
                           <StaticImagePlaceholder kind="actor" />
                         )
                       ) : (
-                        <SmartPoster src={imageDataUrl} alt={item.title} />
+                        <SmartPoster
+                          src={imageDataUrl}
+                          alt={item.title}
+                          posterOrientation={item.type === 'series' ? item.series.poster_orientation : undefined}
+                          width={item.type === 'video' ? item.video.width : undefined}
+                          height={item.type === 'video' ? item.video.height : undefined}
+                        />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getStandaloneVideos,
@@ -14,7 +14,7 @@ import {
 } from '../utils/api';
 import type { Tag, Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { SmartPoster, videoPosterDataUrl, type ImageOrientation } from '../utils/media';
+import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 const Library: React.FC = () => {
@@ -28,16 +28,6 @@ const Library: React.FC = () => {
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
-
-  // 每个单视频卡片独立维护自己的海报方向
-  const [videoOrientations, setVideoOrientations] = useState<Record<number, ImageOrientation>>({});
-
-  const handleVideoOrientationChange = useCallback((videoId: number, orientation: ImageOrientation) => {
-    setVideoOrientations((prev) => {
-      if (prev[videoId] === orientation) return prev;
-      return { ...prev, [videoId]: orientation };
-    });
-  }, []);
 
   useEffect(() => {
     loadLibrary(null);
@@ -172,18 +162,6 @@ const Library: React.FC = () => {
     (series.description || '').toLowerCase().includes(normalizedSearch)
   );
 
-  // 根据当前筛选的视频集判断 grid 布局（per-section，非全局）
-  const seriesGridClass = useMemo(() => {
-    const hasPortrait = filteredSeries.some((s) => s.poster_orientation === 'portrait');
-    return hasPortrait ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6';
-  }, [filteredSeries]);
-
-  // 根据当前筛选的单视频及其检测到的方向判断 grid 布局（per-section）
-  const videosGridClass = useMemo(() => {
-    const hasPortrait = filteredVideos.some((v) => videoOrientations[v.id] === 'portrait');
-    return hasPortrait ? 'grid grid-cols-5 gap-5' : 'grid grid-cols-4 gap-6';
-  }, [filteredVideos, videoOrientations]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -233,7 +211,7 @@ const Library: React.FC = () => {
       {filteredSeries.length > 0 && (
         <div className="mb-12">
           <h2 className="text-xl font-semibold mb-4">视频集</h2>
-          <div className={seriesGridClass}>
+          <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
             {filteredSeries.map((series) => (
               <div
                 key={series.id}
@@ -242,7 +220,7 @@ const Library: React.FC = () => {
                 className="card block cursor-pointer"
               >
                 <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
-                  <SmartPoster src={series.poster_data_url} alt={series.title} />
+                  <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                     {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
                   </div>
@@ -265,11 +243,10 @@ const Library: React.FC = () => {
       {filteredVideos.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-4">单视频</h2>
-          <div className={videosGridClass}>
+          <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
             {filteredVideos.map((video) => {
               const thumbnailDataUrl = videoPosterDataUrl(video);
-              const orientation = videoOrientations[video.id];
-              const aspectClass = orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video';
+              const isPortrait = (video.height && video.width) ? video.height > video.width * 1.15 : false;
               return (
                 <div
                   key={video.id}
@@ -277,11 +254,12 @@ const Library: React.FC = () => {
                   onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
                   className="card cursor-pointer"
                 >
-                  <div className={`${aspectClass} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
+                  <div className={`${isPortrait ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
                     <SmartPoster
                       src={thumbnailDataUrl}
                       alt={video.file_name}
-                      onOrientationChange={(ori) => handleVideoOrientationChange(video.id, ori)}
+                      width={video.width}
+                      height={video.height}
                     />
                   </div>
                   <div className="p-4">
