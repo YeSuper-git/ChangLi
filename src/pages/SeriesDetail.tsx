@@ -47,11 +47,13 @@ const SeriesDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editData, setEditData] = useState({ title: '', description: '', poster: '' });
+  const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed' }>({ title: '', description: '', poster: '', status: 'ongoing' });
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [seriesTags, setSeriesTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [newTagName, setNewTagName] = useState('');
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [creatingActor, setCreatingActor] = useState(false);
   const [allActors, setAllActors] = useState<Actor[]>([]);
   const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
   const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
@@ -102,6 +104,7 @@ const SeriesDetail: React.FC = () => {
           title: seriesData.title,
           description: seriesData.description || '',
           poster: seriesData.poster || '',
+          status: seriesData.status === 'completed' ? 'completed' : 'ongoing',
         });
       }
     } catch (error) {
@@ -188,7 +191,7 @@ const SeriesDetail: React.FC = () => {
     }
     setSaving(true);
     try {
-      await updateVideoSeries(series.id, title, editData.description, editData.poster);
+      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status);
       await syncSeriesRelations();
       clearEditQuery();
       setEditing(false);
@@ -297,11 +300,21 @@ const SeriesDetail: React.FC = () => {
       <div className="card p-6 mb-8">
         <div className="flex gap-6">
           <div className="w-80 aspect-video bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-            <SmartPoster
-              src={series.poster_data_url}
-              alt={series.title}
-              onOrientationChange={setSeriesPosterOrientation}
-            />
+            <div
+              className="relative w-full h-full"
+              onDoubleClick={editing ? handleSelectPoster : undefined}
+            >
+              <SmartPoster
+                src={series.poster_data_url}
+                alt={series.title}
+                onOrientationChange={setSeriesPosterOrientation}
+              />
+              {editing && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-full">双击更换海报</span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex-1">
             {editing ? (
@@ -312,6 +325,14 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
+                <select
+                  value={editData.status}
+                  onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
+                  className="search-input"
+                >
+                  <option value="ongoing">连载中</option>
+                  <option value="completed">已完结</option>
+                </select>
                 <textarea
                   value={editData.description}
                   onChange={(e) => setEditData({ ...editData, description: e.target.value })}
@@ -319,7 +340,7 @@ const SeriesDetail: React.FC = () => {
                   placeholder="简介"
                 />
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">视频集标签</div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {allTags.map((tag) => {
                       const selected = selectedTagIds.includes(tag.id);
@@ -334,20 +355,44 @@ const SeriesDetail: React.FC = () => {
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => setCreatingTag(true)}
+                      className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      + 新建标签
+                    </button>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTag(); }}
-                      className="search-input"
-                      placeholder="新建标签"
-                    />
-                    <button type="button" onClick={handleCreateTag} className="action-btn">添加标签</button>
-                  </div>
+                  {creatingTag && (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={newTagName}
+                        onChange={(e) => setNewTagName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateTag();
+                          if (e.key === 'Escape') {
+                            setCreatingTag(false);
+                            setNewTagName('');
+                          }
+                        }}
+                        placeholder="输入标签名"
+                        className="search-input"
+                        autoFocus
+                      />
+                      <button onClick={handleCreateTag} className="action-btn">完成</button>
+                      <button
+                        onClick={() => {
+                          setCreatingTag(false);
+                          setNewTagName('');
+                        }}
+                        className="action-btn"
+                      >取消</button>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">视频集演员</div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {allActors.map((actor) => {
                       const selected = selectedActorIds.includes(actor.id);
@@ -362,20 +407,43 @@ const SeriesDetail: React.FC = () => {
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => setCreatingActor(true)}
+                      className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      + 新建演员
+                    </button>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      value={newActorName}
-                      onChange={(e) => setNewActorName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleCreateActor(); }}
-                      className="search-input"
-                      placeholder="新建演员"
-                    />
-                    <button type="button" onClick={handleCreateActor} className="action-btn">添加演员</button>
-                  </div>
+                  {creatingActor && (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={newActorName}
+                        onChange={(e) => setNewActorName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateActor();
+                          if (e.key === 'Escape') {
+                            setCreatingActor(false);
+                            setNewActorName('');
+                          }
+                        }}
+                        placeholder="输入演员名"
+                        className="search-input"
+                        autoFocus
+                      />
+                      <button onClick={handleCreateActor} className="action-btn">完成</button>
+                      <button
+                        onClick={() => {
+                          setCreatingActor(false);
+                          setNewActorName('');
+                        }}
+                        className="action-btn"
+                      >取消</button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleSelectPoster} className="action-btn">选择海报</button>
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); }} className="action-btn">取消</button>
                 </div>
