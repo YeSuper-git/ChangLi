@@ -14,11 +14,13 @@ import Tags from './pages/Tags';
 import VideoDetail from './pages/VideoDetail';
 import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
+import { useLibraryStore } from './store/libraryStore';
 
 function App() {
   const isPlayerWindow = appWindow.label === 'player';
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadAll = useLibraryStore((s) => s.loadAll);
 
   useEffect(() => {
     if (isPlayerWindow) {
@@ -31,13 +33,14 @@ function App() {
         await invoke('init_db');
         console.log('[App] init_db 成功');
         setDbReady(true);
+        await loadAll();
       } catch (err) {
         console.error('[App] 数据库初始化失败:', err);
         setError(String(err));
       }
     };
     initDatabase();
-  }, [isPlayerWindow]);
+  }, [isPlayerWindow, loadAll]);
 
   if (isPlayerWindow) {
     return <Player embeddedWindow />;

@@ -1,28 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getStandaloneVideos,
   getStandaloneVideosByTag,
   getVideoSeriesByTag,
-  getVideoSeriesList,
   getSeriesPlaybackVideo,
   scanVideos,
   deleteVideo,
   deleteVideoSeries,
-  getTags,
   playVideo,
 } from '../utils/api';
-import type { Tag, Video, VideoSeries } from '../utils/api';
+import type { Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import ScrollToTop from '../components/ScrollToTop';
+import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
+  const { tags, videos: storeVideos, series: storeSeries, refreshVideos, refreshSeries } = useLibraryStore();
   const [videos, setVideos] = useState<Video[]>([]);
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,14 +44,17 @@ const Library: React.FC = () => {
 
   const loadLibrary = async (tagId: number | null = activeTagId) => {
     try {
-      const [videosList, series, tagsList] = await Promise.all([
-        tagId ? getStandaloneVideosByTag(tagId) : getStandaloneVideos(),
-        tagId ? getVideoSeriesByTag(tagId) : getVideoSeriesList(),
-        getTags(),
-      ]);
-      setVideos(videosList);
-      setSeriesList(series);
-      setTags(tagsList);
+      if (tagId) {
+        const [videosList, series] = await Promise.all([
+          getStandaloneVideosByTag(tagId),
+          getVideoSeriesByTag(tagId),
+        ]);
+        setVideos(videosList);
+        setSeriesList(series);
+      } else {
+        setVideos(storeVideos);
+        setSeriesList(storeSeries);
+      }
       setActiveTagId(tagId);
     } catch (error) {
       console.error('[Library] 加载视频失败:', error);
@@ -74,6 +75,8 @@ const Library: React.FC = () => {
         setScanning(true);
         try {
           await scanVideos(selected as string);
+          await refreshVideos();
+          await refreshSeries();
           await loadLibrary(activeTagId);
         } catch (error) {
           console.error('[Library] 导入失败:', error);
@@ -91,6 +94,7 @@ const Library: React.FC = () => {
     try {
       await deleteVideo(id);
       setContextMenu(null);
+      await refreshVideos();
       await loadLibrary(activeTagId);
     } catch (error) {
       console.error('[Library] 删除失败:', error);
@@ -102,6 +106,8 @@ const Library: React.FC = () => {
     try {
       await deleteVideoSeries(id, true);
       setContextMenu(null);
+      await refreshVideos();
+      await refreshSeries();
       await loadLibrary(activeTagId);
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);

@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 use crate::db::Video;
 
 /// 生成缩略图 Base64（最大 300px 宽，≤50KB）
-fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
+pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
         Err(e) => {

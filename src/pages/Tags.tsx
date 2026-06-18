@@ -1,29 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { getTags, addTag, deleteTag } from '../utils/api';
-import type { Tag } from '../utils/api';
+import React, { useState } from 'react';
+import { addTag, deleteTag } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import { useLibraryStore } from '../store/libraryStore';
 
 const Tags: React.FC = () => {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { tags, refreshTags } = useLibraryStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
-
-  useEffect(() => {
-    loadTags();
-  }, []);
-
-  const loadTags = async () => {
-    try {
-      const tagsList = await getTags();
-      setTags(tagsList);
-    } catch (error) {
-      console.error('加载标签失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddTag = async () => {
     if (!newTagName.trim()) return;
@@ -32,7 +16,7 @@ const Tags: React.FC = () => {
       await addTag(newTagName);
       setShowAddModal(false);
       setNewTagName('');
-      loadTags();
+      await refreshTags();
     } catch (error) {
       console.error('添加标签失败:', error);
     }
@@ -41,19 +25,12 @@ const Tags: React.FC = () => {
   const handleDeleteTag = async (id: number) => {
     try {
       await deleteTag(id);
-      loadTags();
+      await refreshTags();
     } catch (error) {
       console.error('删除标签失败:', error);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
-  }
 
   return (
     <div>

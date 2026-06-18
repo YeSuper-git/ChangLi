@@ -302,7 +302,9 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     }
 
     let series_poster = result.posters.values().next().cloned();
-    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("ongoing"))
+    let series_poster_base64 = series_poster.as_deref()
+        .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("ongoing"), series_poster_base64.as_deref())
         .await
         .map_err(|e| e.to_string())?;
 
@@ -466,7 +468,9 @@ async fn update_video_series(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let stored_poster = poster.as_deref().map(normalize_photo_path_for_storage);
-    db::update_video_series(&pool, id, title, description, stored_poster, poster_orientation, status)
+    let poster_base64 = stored_poster.as_deref()
+        .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+    db::update_video_series(&pool, id, title, description, stored_poster, poster_orientation, status, poster_base64)
         .await
         .map_err(|e| e.to_string())
 }
@@ -562,6 +566,8 @@ async fn add_actor(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    let avatar_base64 = stored_photo.as_deref()
+        .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
     db::add_actor(
         &pool,
         &name,
@@ -572,6 +578,7 @@ async fn add_actor(
         measurements.as_deref(),
         japanese_name.as_deref(),
         cup_size.as_deref(),
+        avatar_base64.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -595,6 +602,8 @@ async fn update_actor(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    let avatar_base64 = stored_photo.as_deref()
+        .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
     db::update_actor(
         &pool,
         id,
@@ -606,6 +615,7 @@ async fn update_actor(
         measurements.as_deref(),
         japanese_name.as_deref(),
         cup_size.as_deref(),
+        avatar_base64.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())

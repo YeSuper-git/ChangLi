@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getActors, addActor, deleteActor } from '../utils/api';
+import { addActor, deleteActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import ScrollToTop from '../components/ScrollToTop';
+import { useLibraryStore } from '../store/libraryStore';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
-  const [actors, setActors] = useState<Actor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { actors, refreshActors } = useLibraryStore();
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [newActor, setNewActor] = useState({ name: '', bio: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenu, setContextMenu] = useState<{ id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
-
-  useEffect(() => {
-    loadActors();
-  }, []);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -28,17 +25,6 @@ const Actors: React.FC = () => {
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
-
-  const loadActors = async () => {
-    try {
-      const actorsList = await getActors();
-      setActors(actorsList);
-    } catch (error) {
-      console.error('加载演员失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddActor = async () => {
     if (!newActor.name.trim()) return;
@@ -63,7 +49,7 @@ const Actors: React.FC = () => {
     try {
       await deleteActor(actorId);
       setContextMenu(null);
-      await loadActors();
+      await refreshActors();
     } catch (error) {
       console.error('删除演员失败:', error);
       alert('删除演员失败: ' + String(error));
@@ -88,13 +74,6 @@ const Actors: React.FC = () => {
     actor.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">加载中...</div>
-      </div>
-    );
-  }
 
   return (
     <>

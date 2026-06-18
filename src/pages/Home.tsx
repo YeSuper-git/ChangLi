@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  getActors,
   getRecentWatchItems,
-  getStandaloneVideos,
   getStandaloneVideosByTag,
-  getTags,
   getVideoSeriesByTag,
-  getVideoSeriesList,
   playVideo,
 } from '../utils/api';
-import type { Actor, RecentWatchItem, Tag, Video, VideoSeries } from '../utils/api';
+import type { RecentWatchItem, Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { useLibraryStore } from '../store/libraryStore';
 
 const formatWatchTime = (seconds: number) => {
   const safeSeconds = Math.max(0, Math.floor(seconds || 0));
@@ -21,8 +18,7 @@ const formatWatchTime = (seconds: number) => {
 };
 
 const Home: React.FC = () => {
-  const [actors, setActors] = useState<Actor[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const { actors, tags, videos: storeVideos, series: storeSeries } = useLibraryStore();
   const [videos, setVideos] = useState<Video[]>([]);
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
   const [recentWatchItems, setRecentWatchItems] = useState<RecentWatchItem[]>([]);
@@ -30,26 +26,27 @@ const Home: React.FC = () => {
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadData(null);
+    loadRecentAndApplyTag(null);
   }, []);
 
-  const loadData = async (tagId: number | null) => {
+  const loadRecentAndApplyTag = async (tagId: number | null) => {
     try {
       console.log('[Home] 开始加载数据, tagId:', tagId);
 
-      const [actorsList, tagsList, recentList, videosList, series] = await Promise.all([
-        getActors(),
-        getTags(),
-        getRecentWatchItems(3),
-        tagId ? getStandaloneVideosByTag(tagId) : getStandaloneVideos(),
-        tagId ? getVideoSeriesByTag(tagId) : getVideoSeriesList(),
-      ]);
-
-      setActors(actorsList);
-      setTags(tagsList);
+      const recentList = await getRecentWatchItems(3);
       setRecentWatchItems(recentList);
-      setVideos(videosList);
-      setSeriesList(series);
+
+      if (tagId) {
+        const [videosList, series] = await Promise.all([
+          getStandaloneVideosByTag(tagId),
+          getVideoSeriesByTag(tagId),
+        ]);
+        setVideos(videosList);
+        setSeriesList(series);
+      } else {
+        setVideos(storeVideos);
+        setSeriesList(storeSeries);
+      }
       setActiveTagId(tagId);
     } catch (error) {
       console.error('[Home] 加载数据失败:', error);
@@ -60,7 +57,7 @@ const Home: React.FC = () => {
 
   const handleTagClick = (tagId: number | null) => {
     setLoading(true);
-    loadData(tagId);
+    loadRecentAndApplyTag(tagId);
   };
 
   const handlePlay = async (videoId: number, event: React.MouseEvent) => {
@@ -68,7 +65,7 @@ const Home: React.FC = () => {
     event.stopPropagation();
     try {
       await playVideo(videoId);
-      await loadData(activeTagId);
+      await loadRecentAndApplyTag(activeTagId);
     } catch (error) {
       console.error('[Home] 播放失败:', error);
       alert('播放失败: ' + String(error));

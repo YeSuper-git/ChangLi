@@ -90,6 +90,7 @@ pub struct VideoSeries {
     pub description: Option<String>,
     pub poster: Option<String>,
     pub poster_data_url: Option<String>,
+    pub poster_base64: Option<String>,
     pub folder_path: Option<String>,
     pub poster_orientation: Option<String>,
     pub status: Option<String>,
@@ -105,6 +106,7 @@ pub struct Actor {
     pub name: String,
     pub photo: Option<String>,
     pub photo_data_url: Option<String>,
+    pub avatar_base64: Option<String>,
     pub bio: Option<String>,
     pub birthday: Option<String>,
     pub height: Option<String>,
@@ -603,15 +605,14 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
             .to_string_lossy()
             .to_string()
     });
-    let poster_data_url = resolved_poster
-        .as_ref()
-        .and_then(|path| image_data_url(Path::new(path)));
+    let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten();
     VideoSeries {
         id: row.get("id"),
         title: row.get("title"),
         description: row.get("description"),
         poster: resolved_poster,
-        poster_data_url,
+        poster_data_url: poster_data_url.clone(),
+        poster_base64: poster_data_url,
         folder_path: row.get("folder_path"),
         video_count: row.try_get("video_count").unwrap_or(0),
         poster_orientation: row.try_get("poster_orientation").ok(),
@@ -628,13 +629,15 @@ pub async fn add_video_series(
     poster: Option<&str>,
     poster_orientation: Option<&str>,
     status: Option<&str>,
+    poster_base64: Option<&str>,
 ) -> Result<VideoSeries> {
-    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status) VALUES (?, ?, ?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status, poster_base64) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(title)
         .bind(folder_path)
         .bind(poster)
         .bind(poster_orientation.unwrap_or("landscape"))
         .bind(status.unwrap_or("ongoing"))
+        .bind(poster_base64)
         .execute(pool)
         .await?;
     if let Some(path) = folder_path {
@@ -715,13 +718,15 @@ pub async fn update_video_series(
     poster: Option<String>,
     poster_orientation: Option<String>,
     status: Option<String>,
+    poster_base64: Option<String>,
 ) -> Result<VideoSeries> {
-    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(title)
         .bind(description)
         .bind(poster)
         .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
         .bind(status.unwrap_or_else(|| "ongoing".to_string()))
+        .bind(poster_base64)
         .bind(id)
         .execute(pool)
         .await?;
@@ -880,9 +885,10 @@ pub async fn add_actor(
     measurements: Option<&str>,
     japanese_name: Option<&str>,
     cup_size: Option<&str>,
+    avatar_base64: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name, cup_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name, cup_size, avatar_base64) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -892,6 +898,7 @@ pub async fn add_actor(
     .bind(measurements)
     .bind(japanese_name)
     .bind(cup_size)
+    .bind(avatar_base64)
     .fetch_one(pool)
     .await?;
 
@@ -909,9 +916,10 @@ pub async fn update_actor(
     measurements: Option<&str>,
     japanese_name: Option<&str>,
     cup_size: Option<&str>,
+    avatar_base64: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, avatar_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -921,6 +929,7 @@ pub async fn update_actor(
     .bind(measurements)
     .bind(japanese_name)
     .bind(cup_size)
+    .bind(avatar_base64)
     .bind(id)
     .fetch_one(pool)
     .await?;
@@ -966,15 +975,14 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
             .to_string_lossy()
             .to_string()
     });
-    let photo_data_url = resolved_photo
-        .as_ref()
-        .and_then(|path| image_data_url(Path::new(path)));
+    let photo_data_url: Option<String> = row.try_get("avatar_base64").ok().flatten();
 
     Actor {
         id: row.get("id"),
         name: row.get("name"),
         photo: resolved_photo,
-        photo_data_url,
+        photo_data_url: photo_data_url.clone(),
+        avatar_base64: photo_data_url,
         bio: row.get("bio"),
         birthday: row.get("birthday"),
         height: row.get("height"),
@@ -1259,7 +1267,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
     let rows = sqlx::query(
         "SELECT ph.id AS history_id, ph.last_position, ph.total_duration, ph.play_count, ph.last_played,
                 v.*, s.id AS s_id, s.title AS s_title, s.description AS s_description, s.poster AS s_poster,
-                s.folder_path AS s_folder_path, s.created_at AS s_created_at, s.updated_at AS s_updated_at,
+                s.folder_path AS s_folder_path, s.poster_base64 AS s_poster_base64, s.created_at AS s_created_at, s.updated_at AS s_updated_at,
                 (SELECT COUNT(*) FROM videos sv WHERE sv.series_id = s.id) AS s_video_count
          FROM play_history ph
          JOIN videos v ON v.id = ph.video_id
@@ -1281,15 +1289,14 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                     .to_string_lossy()
                     .to_string()
             });
-            let poster_data_url = resolved_poster
-                .as_ref()
-                .and_then(|path| image_data_url(Path::new(path)));
+            let poster_data_url: Option<String> = row.try_get("s_poster_base64").ok().flatten();
             VideoSeries {
                 id: row.get("s_id"),
                 title: row.get("s_title"),
                 description: row.get("s_description"),
                 poster: resolved_poster,
-                poster_data_url,
+                poster_data_url: poster_data_url.clone(),
+                poster_base64: poster_data_url,
                 folder_path: row.get("s_folder_path"),
                 video_count: row.get("s_video_count"),
                 poster_orientation: row.try_get("s_poster_orientation").ok(),
