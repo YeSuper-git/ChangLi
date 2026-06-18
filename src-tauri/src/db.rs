@@ -199,6 +199,9 @@ pub async fn init_database() -> Result<SqlitePool> {
         .execute(&pool)
         .await?;
 
+    // 启动时回填旧数据的 Base64 缓存（一次性迁移）
+    backfill_base64_cache(&pool).await?;
+
     Ok(pool)
 }
 
@@ -600,12 +603,18 @@ pub async fn get_standalone_videos_by_tag_name(
 
 fn series_from_row(row: &SqliteRow) -> VideoSeries {
     let poster: Option<String> = row.get("poster");
-    let resolved_poster = poster.map(|path| {
+    let resolved_poster = poster.clone().map(|path| {
         storage::resolve_data_path(&path)
             .to_string_lossy()
             .to_string()
     });
-    let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten();
+    // 双读兜底：优先读 poster_base64，如果为 NULL，降级使用 image_data_url
+    let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten()
+        .or_else(|| {
+            let p = poster?;
+            let resolved = storage::resolve_data_path(&p);
+            image_data_url(Path::new(&resolved))
+        });
     VideoSeries {
         id: row.get("id"),
         title: row.get("title"),
@@ -970,12 +979,18 @@ fn image_data_url(path: &Path) -> Option<String> {
 
 fn actor_from_row(row: &SqliteRow) -> Actor {
     let photo: Option<String> = row.get("photo");
-    let resolved_photo = photo.map(|path| {
+    let resolved_photo = photo.clone().map(|path| {
         storage::resolve_data_path(&path)
             .to_string_lossy()
             .to_string()
     });
-    let photo_data_url: Option<String> = row.try_get("avatar_base64").ok().flatten();
+    // 双读兜底：优先读 avatar_base64，如果为 NULL，降级使用 image_data_url
+    let photo_data_url: Option<String> = row.try_get("avatar_base64").ok().flatten()
+        .or_else(|| {
+            let p = photo?;
+            let resolved = storage::resolve_data_path(&p);
+            image_data_url(Path::new(&resolved))
+        });
 
     Actor {
         id: row.get("id"),
@@ -1462,4 +1477,62 @@ pub async fn get_recent_resources(pool: &SqlitePool, limit: i64) -> Result<Vec<R
         .collect();
 
     Ok(resources)
+}
+
+/// 一次性迁移：回填 poster_base64 / avatar_base64 缓存
+/// 为旧数据（poster_base64/avatar_base64 为 NULL）生成 Base64 缓存
+pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
+    // 回填 video_series 的 poster_base64
+    let series_rows = sqlx::query(
+        "SELECT id, poster FROM video_series WHERE poster_base64 IS NULL AND poster IS NOT NULL"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    eprintln!("[ChangLi] 回填海报缓存: 发现 {} 条 video_series 记录需要处理", series_rows.len());
+    let mut series_filled = 0;
+    for row in &series_rows {
+        let id: i64 = row.get("id");
+        let poster: String = row.get("poster");
+        let resolved = storage::resolve_data_path(&poster);
+        if let Some(data_url) = image_data_url(Path::new(&resolved)) {
+            sqlx::query("UPDATE video_series SET poster_base64 = ? WHERE id = ?")
+                .bind(&data_url)
+                .bind(id)
+                .execute(pool)
+                .await?;
+            series_filled += 1;
+        }
+    }
+    if series_filled > 0 {
+        eprintln!("[ChangLi] 回填海报缓存: 成功回填 {} 条 video_series", series_filled);
+    }
+
+    // 回填 actors 的 avatar_base64
+    let actor_rows = sqlx::query(
+        "SELECT id, photo FROM actors WHERE avatar_base64 IS NULL AND photo IS NOT NULL"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    eprintln!("[ChangLi] 回填头像缓存: 发现 {} 条 actors 记录需要处理", actor_rows.len());
+    let mut actors_filled = 0;
+    for row in &actor_rows {
+        let id: i64 = row.get("id");
+        let photo: String = row.get("photo");
+        let resolved = storage::resolve_data_path(&photo);
+        if let Some(data_url) = image_data_url(Path::new(&resolved)) {
+            sqlx::query("UPDATE actors SET avatar_base64 = ? WHERE id = ?")
+                .bind(&data_url)
+                .bind(id)
+                .execute(pool)
+                .await?;
+            actors_filled += 1;
+        }
+    }
+    if actors_filled > 0 {
+        eprintln!("[ChangLi] 回填头像缓存: 成功回填 {} 条 actors", actors_filled);
+    }
+
+    Ok(())
 }
