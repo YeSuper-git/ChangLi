@@ -344,23 +344,27 @@ async fn delete_video(state: State<'_, AppState>, id: i64) -> Result<(), String>
 }
 
 #[tauri::command]
-async fn get_video_series_list(state: State<'_, AppState>) -> Result<Vec<db::VideoSeries>, String> {
+async fn get_video_series_list(state: State<'_, AppState>, sort_by: Option<String>, sort_order: Option<String>) -> Result<Vec<db::VideoSeries>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_video_series_list(&pool)
+    let sort_by = sort_by.as_deref().unwrap_or("created_at");
+    let sort_order = sort_order.as_deref().unwrap_or("desc");
+    db::get_video_series_list(&pool, sort_by, sort_order)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn get_standalone_videos(state: State<'_, AppState>) -> Result<Vec<db::Video>, String> {
+async fn get_standalone_videos(state: State<'_, AppState>, sort_by: Option<String>, sort_order: Option<String>) -> Result<Vec<db::Video>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_standalone_videos(&pool)
+    let sort_by = sort_by.as_deref().unwrap_or("created_at");
+    let sort_order = sort_order.as_deref().unwrap_or("desc");
+    db::get_standalone_videos(&pool, sort_by, sort_order)
         .await
         .map_err(|e| e.to_string())
 }

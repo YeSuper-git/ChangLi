@@ -280,12 +280,12 @@ export interface VideoSeries {
   is_favorite?: number;
 }
 
-export async function getVideoSeriesList(): Promise<VideoSeries[]> {
-  return invoke<VideoSeries[]>('get_video_series_list');
+export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_video_series_list', { sortBy, sortOrder });
 }
 
-export async function getStandaloneVideos(): Promise<Video[]> {
-  return invoke<Video[]>('get_standalone_videos');
+export async function getStandaloneVideos(sortBy?: string, sortOrder?: string): Promise<Video[]> {
+  return invoke<Video[]>('get_standalone_videos', { sortBy, sortOrder });
 }
 
 

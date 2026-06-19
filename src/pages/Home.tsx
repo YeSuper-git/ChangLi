@@ -93,8 +93,7 @@ const Home: React.FC = () => {
       {/* 我的追番 */}
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 ">
-            
+          <h2 className="text-2xl font-bold text-gray-900">
             我的追番
           </h2>
         </div>
@@ -109,7 +108,7 @@ const Home: React.FC = () => {
                   <Link
                     to={`/series/${series.id}`}
                     state={{ from: '/', backLabel: '返回首页' }}
-                    className="card block"
+                    className="card block flex flex-col h-full"
                   >
                     <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
@@ -117,9 +116,9 @@ const Home: React.FC = () => {
                         {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
                       </div>
                     </div>
-                    <div className="p-6">
+                    <div className="p-6 flex flex-col flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{series.title}</h3>
-                      <div className="text-sm text-gray-500">视频集</div>
+                      <div className="text-sm text-gray-500 mt-auto">视频集</div>
                     </div>
                   </Link>
                 );
@@ -130,7 +129,7 @@ const Home: React.FC = () => {
                   <Link
                     to={`/video/${video.id}?fromHome=1`}
                     state={{ from: '/', backLabel: '返回首页' }}
-                    className="card block"
+                    className="card block flex flex-col h-full"
                   >
                     <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                       <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
@@ -140,9 +139,9 @@ const Home: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <div className="p-6">
+                    <div className="p-6 flex flex-col flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{video.file_name}</h3>
-                      <div className="text-sm text-gray-500">单视频</div>
+                      <div className="text-sm text-gray-500 mt-auto">单视频</div>
                     </div>
                   </Link>
                 );

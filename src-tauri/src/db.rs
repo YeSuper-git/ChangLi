@@ -574,8 +574,15 @@ pub async fn get_video(pool: &SqlitePool, id: i64) -> Result<Option<Video>> {
     Ok(row.map(|row| video_from_row(&row)))
 }
 
-pub async fn get_standalone_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
-    let rows = sqlx::query("SELECT * FROM videos WHERE series_id IS NULL ORDER BY created_at DESC")
+pub async fn get_standalone_videos(pool: &SqlitePool, sort_by: &str, sort_order: &str) -> Result<Vec<Video>> {
+    let order_clause = match (sort_by, sort_order) {
+        ("title", "asc") => "ORDER BY title COLLATE NOCASE ASC",
+        ("title", "desc") => "ORDER BY title COLLATE NOCASE DESC",
+        ("created_at", "asc") => "ORDER BY created_at ASC",
+        _ => "ORDER BY created_at DESC",
+    };
+    let sql = format!("SELECT * FROM videos WHERE series_id IS NULL {}", order_clause);
+    let rows = sqlx::query(&sql)
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(video_from_row).collect())
@@ -677,8 +684,15 @@ pub async fn get_video_series_by_folder_path(
     Ok(row.map(|row| series_from_row(&row)))
 }
 
-pub async fn get_video_series_list(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
-    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC")
+pub async fn get_video_series_list(pool: &SqlitePool, sort_by: &str, sort_order: &str) -> Result<Vec<VideoSeries>> {
+    let order_clause = match (sort_by, sort_order) {
+        ("title", "asc") => "ORDER BY s.title COLLATE NOCASE ASC",
+        ("title", "desc") => "ORDER BY s.title COLLATE NOCASE DESC",
+        ("created_at", "asc") => "ORDER BY s.created_at ASC",
+        _ => "ORDER BY s.created_at DESC",
+    };
+    let sql = format!("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id {}", order_clause);
+    let rows = sqlx::query(&sql)
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(series_from_row).collect())
@@ -1622,7 +1636,7 @@ pub async fn get_favorite_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
 }
 
 pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
-    let rows = sqlx::query("SELECT * FROM video_series WHERE is_favorite = 1 ORDER BY created_at DESC")
+    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(series_from_row).collect())

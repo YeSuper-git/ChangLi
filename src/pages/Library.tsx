@@ -18,7 +18,7 @@ import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
-  const { tags, videos: storeVideos, series: storeSeries, refreshVideos, refreshSeries } = useLibraryStore();
+  const { tags, videos: storeVideos, series: storeSeries, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
@@ -196,17 +196,35 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-6 flex gap-3 flex-wrap">
-        <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
-        {tags.map((tag) => (
-          <button
-            key={tag.id}
-            onClick={() => handleTagClick(tag.id)}
-            className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+      <div className="mb-6 flex justify-between items-center">
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              onClick={() => handleTagClick(tag.id)}
+              className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => { setSortBy(e.target.value as 'created_at' | 'title'); refreshVideos(); refreshSeries(); }}
+            className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
           >
-            {tag.name}
+            <option value="created_at">添加时间</option>
+            <option value="title">名称</option>
+          </select>
+          <button
+            onClick={() => { toggleSortOrder(); refreshVideos(); refreshSeries(); }}
+            className="p-1.5 bg-zinc-800 border border-zinc-700 rounded hover:bg-zinc-700 text-white text-sm"
+          >
+            {sortOrder === 'desc' ? '↓' : '↑'}
           </button>
-        ))}
+        </div>
       </div>
 
       <div className="mb-6 flex gap-3 flex-wrap">
