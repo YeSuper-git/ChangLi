@@ -50,8 +50,7 @@ const Home: React.FC = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-12">
-        <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap mb-12">
           <button
             onClick={() => setActiveTagId(null)}
             className={`category-btn ${activeTagId === null ? 'active' : ''}`}
@@ -67,13 +66,6 @@ const Home: React.FC = () => {
               {tag.name}
             </button>
           ))}
-        </div>
-        <Link
-          to="/settings"
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
-        >
-          + 添加资源
-        </Link>
       </div>
 
       {/* 我的追番 */}

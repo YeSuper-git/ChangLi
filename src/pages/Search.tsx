@@ -126,18 +126,18 @@ const Search: React.FC = () => {
           disabled={!keyword.trim()}
           className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
         >
-          '搜索'
+          搜索
         </button>
       </form>
 
       {searched && (
         <div>
           <div className="text-gray-500 mb-8">
-            `找到 ${results.length} 个本地结果`
+            找到 {results.length} 个本地结果
           </div>
 
           {results.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               {results.map((item) => {
                 const target = item.type === 'video' ? `/video/${item.id}` : item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
                 const imageDataUrl = item.type === 'video'
@@ -145,9 +145,14 @@ const Search: React.FC = () => {
                   : item.type === 'series'
                     ? item.series.poster_data_url
                     : actorPhotoDataUrl(item.actor);
+                const aspectClass = item.type === 'series'
+                  ? (item.series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video')
+                  : item.type === 'actor'
+                    ? 'aspect-[3/4]'
+                    : 'aspect-video';
                 return (
-                  <Link key={`${item.type}-${item.id}`} to={target} className="card p-5 flex gap-5 no-underline">
-                    <div className={`${item.type === 'series' && item.series.poster_orientation === 'portrait' ? 'w-24 h-36' : item.type === 'series' ? 'w-40 h-[90px]' : 'w-24 h-32'} bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center`}>
+                  <Link key={`${item.type}-${item.id}`} to={target} className="card flex flex-col no-underline group">
+                    <div className={`relative w-full ${aspectClass} bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-xl overflow-hidden flex items-center justify-center`}>
                       {item.type === 'actor' ? (
                         imageDataUrl ? (
                           <img src={imageDataUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -164,21 +169,12 @@ const Search: React.FC = () => {
                         />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-3">
+                    <div className="p-3 min-w-0">
+                      <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-2">
                         {item.type === 'video' ? '视频' : item.type === 'series' ? '视频集' : '演员'}
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2 truncate">{item.title}</h3>
-                      <p className="text-sm text-gray-500">{item.subtitle}</p>
-                      {item.type === 'video' && item.video.description && (
-                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.video.description}</p>
-                      )}
-                      {item.type === 'series' && item.series.description && (
-                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.series.description}</p>
-                      )}
-                      {item.type === 'actor' && item.actor.bio && (
-                        <p className="text-sm text-gray-600 mt-3 line-clamp-2">{item.actor.bio}</p>
-                      )}
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">{item.title}</h3>
+                      <p className="text-xs text-gray-500 line-clamp-1">{item.subtitle}</p>
                     </div>
                   </Link>
                 );
