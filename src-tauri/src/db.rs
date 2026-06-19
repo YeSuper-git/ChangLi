@@ -1054,6 +1054,18 @@ pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
     Ok(tags)
 }
 
+/// 按名称精确匹配演员（忽略首尾空格和大小写）
+pub async fn get_actor_by_name(pool: &SqlitePool, name: &str) -> Result<Option<Actor>> {
+    let row = sqlx::query("SELECT * FROM actors WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))")
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    match row {
+        Some(row) => Ok(Some(actor_from_row(&row))),
+        None => Ok(None),
+    }
+}
+
 /// 按名称精确匹配标签（忽略首尾空格和大小写）
 pub async fn get_tag_by_name(pool: &SqlitePool, name: &str) -> Result<Option<Tag>> {
     let row = sqlx::query("SELECT * FROM tags WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))")
