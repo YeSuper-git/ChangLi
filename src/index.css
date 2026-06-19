@@ -287,3 +287,14 @@ body.player-window-document,
 /* 隐藏滚动条 */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 爱心图标红色滤镜 */
+.filter-red {
+  filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%);
+}
+
+/* 爱心图标浅红色滤镜（未收藏） */
+.filter-red-light {
+  filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%);
+  opacity: 0.5;
+}

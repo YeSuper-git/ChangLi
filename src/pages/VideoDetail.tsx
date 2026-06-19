@@ -344,7 +344,7 @@ const VideoDetail: React.FC = () => {
               <img
                 src={favoriteIcon}
                 alt="追番"
-                className={`w-6 h-6 transition-all ${favorites.some(f => 'file_name' in f && f.id === video.id) ? '' : 'grayscale opacity-40'}`}
+                className={`w-6 h-6 transition-all ${favorites.some(f => 'file_name' in f && f.id === video.id) ? 'filter-red' : 'filter-red-light'}`}
               />
             </button>
           )}

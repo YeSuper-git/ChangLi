@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import loadingIcon from '../assets/icons/loading.svg';
-import favoriteIcon from '../assets/icons/favorite.svg';
 import {
   getStandaloneVideosByTag,
   getVideoSeriesByTag,
@@ -58,7 +57,7 @@ const Home: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
+        <div className="text-gray-500 "><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
       </div>
     );
   }
@@ -92,18 +91,17 @@ const Home: React.FC = () => {
       </div>
 
       {/* 我的追番 */}
-      {favorites.length > 0 && (
-        <section className="mb-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <img src={favoriteIcon} alt="追番" className="w-6 h-6" />
-              我的追番
-            </h2>
-          </div>
+      <section className="mb-16">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 ">
+            
+            我的追番
+          </h2>
+        </div>
+        {favorites.length > 0 ? (
           <HorizontalScroll
             items={favorites}
             renderItem={(item) => {
-              // Check if it's a VideoSeries (has 'title' and 'video_count')
               const isSeries = 'video_count' in item;
               if (isSeries) {
                 const series = item as VideoSeries;
@@ -113,15 +111,15 @@ const Home: React.FC = () => {
                     state={{ from: '/', backLabel: '返回首页' }}
                     className="card block"
                   >
-                    <div className={`${series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden`}>
+                    <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                       <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
                         {series.status === 'completed' ? `${series.video_count}集全` : `更新至${series.video_count}集`}
                       </div>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{series.title}</h3>
-                      <div className="text-xs text-gray-500">视频集</div>
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{series.title}</h3>
+                      <div className="text-sm text-gray-500">视频集</div>
                     </div>
                   </Link>
                 );
@@ -134,7 +132,7 @@ const Home: React.FC = () => {
                     state={{ from: '/', backLabel: '返回首页' }}
                     className="card block"
                   >
-                    <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                    <div className="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                       <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
                       {video.duration && (
                         <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
@@ -142,17 +140,21 @@ const Home: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{video.file_name}</h3>
-                      <div className="text-xs text-gray-500">单视频</div>
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">{video.file_name}</h3>
+                      <div className="text-sm text-gray-500">单视频</div>
                     </div>
                   </Link>
                 );
               }
             }}
           />
-        </section>
-      )}
+        ) : (
+          <div className="text-center text-gray-500 py-12">
+            暂无追番
+          </div>
+        )}
+      </section>
 
       <section className="mb-16">
         <div className="flex items-center justify-between mb-8">

@@ -467,7 +467,7 @@ const SeriesDetail: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => toggleFavorite(series.id, 'series')} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={favorites.some(f => 'video_count' in f && f.id === series.id) ? '取消追番' : '加入追番'}>
-                    <img src={favoriteIcon} alt="追番" className={`w-6 h-6 transition-all ${favorites.some(f => 'video_count' in f && f.id === series.id) ? '' : 'grayscale opacity-40'}`} />
+                    <img src={favoriteIcon} alt="追番" className={`w-6 h-6 transition-all ${favorites.some(f => 'video_count' in f && f.id === series.id) ? 'filter-red' : 'filter-red-light'}`} />
                   </button>
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleToggleEpisodeEditing} className={`action-btn ${episodeEditing ? 'action-btn-primary' : ''}`}>{episodeEditing ? '完成编辑' : '编辑分集'}</button>
