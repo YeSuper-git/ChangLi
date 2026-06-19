@@ -12,9 +12,10 @@ import {
   addTag,
   addVideoToSeries,
   deleteVideo,
+  deleteSeason,
   getActors,
-  getStandaloneVideos,
   getSeriesActors,
+  getSeriesSeasons,
   getSeriesTags,
   getTags,
   getVideoSeriesDetail,
@@ -24,7 +25,7 @@ import {
   saveVideoThumbnail,
   updateVideoSeries,
 } from '../utils/api';
-import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
+import type { Actor, SeasonInfo, Tag, Video, VideoSeries } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -65,10 +66,13 @@ const SeriesDetail: React.FC = () => {
   const [newActorName, setNewActorName] = useState('');
   const [actorNotice, setActorNotice] = useState('');
   // 使用后端返回的 poster_orientation 字段，不再动态检测
-  const [episodeEditing, setEpisodeEditing] = useState(false);
-  const [standaloneVideos, setStandaloneVideos] = useState<Video[]>([]);
-  const [loadingStandalone, setLoadingStandalone] = useState(false);
-  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
+  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
+  // 右键菜单
+  const [contextMenu, setContextMenu] = useState<{ videoId: number; videoName: string; x: number; y: number } | null>(null);
+  // 管理季
+  const [showSeasonManager, setShowSeasonManager] = useState(false);
+  const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
 
   useEffect(() => {
     if (seriesId) {
@@ -81,6 +85,18 @@ const SeriesDetail: React.FC = () => {
       setEditing(true);
     }
   }, [editFromUrl, series]);
+
+  // 点击空白关闭右键菜单
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => { setContextMenu(null); clearPending(); };
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+    };
+  }, [contextMenu, clearPending]);
 
   const loadSeries = async () => {
     try {
@@ -239,6 +255,7 @@ const SeriesDetail: React.FC = () => {
   const handleRemoveEpisode = async (videoId: number) => {
     try {
       await removeVideoFromSeries(videoId);
+      setContextMenu(null);
       await loadSeries();
     } catch (error) {
       console.error('移除分集失败:', error);
@@ -249,6 +266,7 @@ const SeriesDetail: React.FC = () => {
   const handleDeleteEpisode = async (videoId: number) => {
     try {
       await deleteVideo(videoId);
+      setContextMenu(null);
       await loadSeries();
     } catch (error) {
       console.error('删除分集失败:', error);
@@ -256,34 +274,29 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleToggleEpisodeEditing = async () => {
-    if (episodeEditing) {
-      setEpisodeEditing(false);
-      setStandaloneVideos([]);
-      return;
-    }
-    setEpisodeEditing(true);
-    setLoadingStandalone(true);
+  // 管理季
+  const handleOpenSeasonManager = async () => {
+    setShowSeasonManager(true);
+    setLoadingSeasons(true);
     try {
-      const standalone = await getStandaloneVideos();
-      setStandaloneVideos(standalone);
+      const data = await getSeriesSeasons(seriesId);
+      setSeasons(data);
     } catch (error) {
-      console.error('加载单视频失败:', error);
+      console.error('加载季信息失败:', error);
     } finally {
-      setLoadingStandalone(false);
+      setLoadingSeasons(false);
     }
   };
 
-  const handleAddStandaloneVideo = async (videoPath: string) => {
+  const handleDeleteSeason = async (season: number) => {
     try {
-      await addVideoToSeries(seriesId, videoPath);
+      await deleteSeason(seriesId, season);
+      const data = await getSeriesSeasons(seriesId);
+      setSeasons(data);
       await loadSeries();
-      // 刷新单视频列表
-      const standalone = await getStandaloneVideos();
-      setStandaloneVideos(standalone);
     } catch (error) {
-      console.error('添加分集失败:', error);
-      alert('添加分集失败: ' + String(error));
+      console.error('删除季失败:', error);
+      alert('删除季失败: ' + String(error));
     }
   };
 
@@ -485,7 +498,8 @@ const SeriesDetail: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
-                  <button onClick={handleToggleEpisodeEditing} className={`action-btn ${episodeEditing ? 'action-btn-primary' : ''}`}>{episodeEditing ? '完成编辑' : '编辑分集'}</button>
+                  <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
+                  <button onClick={handleAddEpisode} className="action-btn">添加分集</button>
                 </div>
               </>
             )}
@@ -493,76 +507,97 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
-      {episodeEditing && (
-        <div className="card p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4">编辑分集</h3>
-          {videos.length > 0 ? (
-            <div className="space-y-2 mb-6">
-              {videos.map((video) => (
-                <div key={video.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1 min-w-0 mr-4">
-                    <span className="text-sm font-medium text-gray-900 truncate block">
-                      {video.episode_number ? `第${video.episode_number}集 - ` : ''}{video.file_name}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => requestSecondConfirm(`remove-ep-${video.id}`, () => handleRemoveEpisode(video.id))}
-                      className="action-btn text-xs"
-                    >
-                      {pendingKey === `remove-ep-${video.id}` ? '确认移出' : '移出'}
-                    </button>
-                    <button
-                      onClick={() => requestSecondConfirm(`delete-ep-${video.id}`, () => handleDeleteEpisode(video.id))}
-                      className="action-btn action-btn-danger text-xs"
-                    >
-                      {pendingKey === `delete-ep-${video.id}` ? '确认删除' : '删除'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-gray-500 text-sm mb-6">暂无分集</div>
-          )}
-          <div className="border-t pt-4">
-            <div className="flex gap-3 mb-4">
-              <button onClick={handleAddEpisode} className="action-btn">从文件添加</button>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">从单视频添加</h4>
-              {loadingStandalone ? (
-                <div className="text-gray-500 text-sm flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-5 h-5" /> 加载中...</div>
-              ) : standaloneVideos.length > 0 ? (
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {standaloneVideos.map((sv) => (
-                    <div key={sv.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-900 truncate mr-4">{sv.file_name}</span>
-                      <button
-                        onClick={() => handleAddStandaloneVideo(sv.file_path)}
-                        className="action-btn text-xs flex-shrink-0"
-                      >
-                        添加
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-gray-500 text-sm">暂无可添加的单视频</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <h2 className="text-xl font-semibold mb-4">分集</h2>
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
           posterOrientation={series?.poster_orientation || 'unknown'}
+          onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
+      )}
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+            onClick={() => {
+              requestSecondConfirm(`remove-${contextMenu.videoId}`, () => handleRemoveEpisode(contextMenu.videoId));
+            }}
+          >
+            {pendingKey === `remove-${contextMenu.videoId}` ? '确认移出' : '移出视频集'}
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => {
+              requestSecondConfirm(`delete-${contextMenu.videoId}`, () => handleDeleteEpisode(contextMenu.videoId));
+            }}
+          >
+            {pendingKey === `delete-${contextMenu.videoId}` ? '确认删除' : '删除视频'}
+          </button>
+        </div>
+      )}
+
+      {/* 管理季面板 */}
+      {showSeasonManager && (
+        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">管理</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">季管理</h2>
+            </div>
+            <div className="px-6 py-5 max-h-96 overflow-y-auto">
+              {loadingSeasons ? (
+                <div className="text-gray-500 text-sm flex items-center gap-2 py-4">
+                  <img src={loadingIcon} alt="加载中" className="w-5 h-5" /> 加载中...
+                </div>
+              ) : seasons.length > 0 ? (
+                <div className="space-y-3">
+                  {seasons.map((s) => (
+                    <div key={`${s.season}-${s.subtitle || ''}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`}
+                        </span>
+                        {s.season === 999 && s.subtitle && (
+                          <span className="ml-2 text-xs text-gray-400">(剧场版)</span>
+                        )}
+                        <span className="ml-3 text-xs text-gray-500">{s.video_count} 个视频</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const label = s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`;
+                          if (confirm(`确定要删除"${label}"吗？该季下所有 ${s.video_count} 个视频将被删除。`)) {
+                            handleDeleteSeason(s.season);
+                          }
+                        }}
+                        className="action-btn action-btn-danger text-xs"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm py-4">暂无季信息</div>
+              )}
+            </div>
+            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+              <button
+                onClick={() => setShowSeasonManager(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {actorNotice && (
@@ -637,8 +672,8 @@ const SeriesDetail: React.FC = () => {
 };
 
 /** 获取季标题 */
-function getSeasonLabel(season: number): string {
-  if (season === 999) return '剧场版';
+function getSeasonLabel(season: number, subtitle?: string): string {
+  if (season === 999) return subtitle || '剧场版';
   if (season >= 1 && season <= 998) return `第${season}季`;
   return `第${season}季`;
 }
@@ -646,11 +681,13 @@ function getSeasonLabel(season: number): string {
 interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
+  onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
+  onContextMenu,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -661,18 +698,27 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   // 按 season 分组并排序
   const seasonGroups = useMemo(() => {
     if (!hasSeason) return [];
-    const map = new Map<number, Video[]>();
+    // 对于 season=999（剧场版），按 subtitle 再分组
+    const map = new Map<string, { season: number; subtitle?: string; videos: Video[] }>();
     for (const v of videos) {
       const s = v.season ?? 0;
-      if (!map.has(s)) map.set(s, []);
-      map.get(s)!.push(v);
+      if (s === 999) {
+        // 剧场版按 subtitle 分组
+        const key = `999-${v.subtitle || ''}`;
+        if (!map.has(key)) map.set(key, { season: 999, subtitle: v.subtitle, videos: [] });
+        map.get(key)!.videos.push(v);
+      } else {
+        const key = `${s}`;
+        if (!map.has(key)) map.set(key, { season: s, videos: [] });
+        map.get(key)!.videos.push(v);
+      }
     }
     const entries = Array.from(map.entries());
     // 排序：普通季（1,2,3...）在前，999 在最后
-    entries.sort(([a], [b]) => {
-      if (a === 999 && b !== 999) return 1;
-      if (b === 999 && a !== 999) return -1;
-      return a - b;
+    entries.sort(([, a], [, b]) => {
+      if (a.season === 999 && b.season !== 999) return 1;
+      if (b.season === 999 && a.season !== 999) return -1;
+      return a.season - b.season;
     });
     return entries;
   }, [videos, hasSeason]);
@@ -683,7 +729,17 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   const renderVideoCard = (video: Video) => {
     const poster = videoPosterDataUrl(video);
     return (
-      <Link key={video.id} to={`/player/${video.id}`} className="card block cursor-pointer">
+      <Link
+        key={video.id}
+        to={`/player/${video.id}`}
+        className="card block cursor-pointer"
+        onContextMenu={(e) => {
+          if (onContextMenu) {
+            e.preventDefault();
+            onContextMenu(video.id, video.file_name, e.clientX, e.clientY);
+          }
+        }}
+      >
         <div
           className={`${
             posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
@@ -715,11 +771,13 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   // 按季分组展示
   return (
     <div className="space-y-8">
-      {seasonGroups.map(([season, groupVideos]) => (
-        <div key={season}>
-          <h3 className="text-xl font-semibold mb-4">{getSeasonLabel(season)}</h3>
+      {seasonGroups.map(([, group]) => (
+        <div key={`${group.season}-${group.subtitle || ''}`}>
+          <h3 className="text-xl font-semibold mb-4">{getSeasonLabel(group.season, group.subtitle)}</h3>
           <div className={gridClass}>
-            {groupVideos.map((video) => renderVideoCard(video))}
+            {group.videos
+              .sort((a, b) => (a.episode_number ?? 0) - (b.episode_number ?? 0))
+              .map((video) => renderVideoCard(video))}
           </div>
         </div>
       ))}

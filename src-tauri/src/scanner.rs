@@ -126,7 +126,7 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
 
     if subdirs.is_empty() {
         // 扁平模式：没有子文件夹，直接扫描根目录
-        process_directory_videos(path, None, &mut videos, &mut posters).await?;
+        process_directory_videos(path, None, None, &mut videos, &mut posters).await?;
     } else {
         // 多季模式：每个子文件夹为一季或剧场版
         // 按文件夹名称排序，保证季数顺序一致
@@ -152,12 +152,14 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
             }
 
             // ≤3 部作品 → 剧场版（season = 999），多部 → 正常季
-            let season = if count <= 3 { 999 } else {
+            let (season, subtitle) = if count <= 3 {
+                let movie_title = subdir.file_name().unwrap_or_default().to_string_lossy().to_string();
+                (999, Some(movie_title))
+            } else {
                 season_counter += 1;
-                season_counter
+                (season_counter, None)
             };
-
-            process_directory_videos(subdir, Some(season), &mut videos, &mut posters).await?;
+            process_directory_videos(subdir, Some(season), subtitle.as_deref(), &mut videos, &mut posters).await?;
         }
     }
 
@@ -168,6 +170,7 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
 async fn process_directory_videos(
     dir: &Path,
     season: Option<i32>,
+    subtitle: Option<&str>,
     videos: &mut Vec<Video>,
     posters: &mut HashMap<String, String>,
 ) -> Result<()> {
@@ -221,6 +224,7 @@ async fn process_directory_videos(
             match scan_video_file(video_path, poster_path.as_deref()).await {
                 Ok(mut video) => {
                     video.season = season;
+                    video.subtitle = subtitle.map(|s| s.to_string());
                     if folder_uses_fixed_episode_names(&sorted_videos) {
                         video.episode_number = video_path
                             .file_stem()
@@ -371,6 +375,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         episode_number: episode,
         file_size: Some(file_size),
         season: None,
+        subtitle: None,
         duration: None,
         width: None,
         height: None,

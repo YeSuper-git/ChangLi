@@ -1147,6 +1147,39 @@ async fn get_resource_watch_progress(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_series_seasons(state: State<'_, AppState>, series_id: i64) -> Result<Vec<db::SeasonInfo>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_series_seasons(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_season(state: State<'_, AppState>, series_id: i64, season: i32) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_season(&pool, series_id, season)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_video_subtitle(state: State<'_, AppState>, video_id: i64, subtitle: Option<String>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_video_subtitle(&pool, video_id, subtitle)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
@@ -1233,6 +1266,9 @@ fn main() {
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
             delete_all_videos,
+            get_series_seasons,
+            delete_season,
+            update_video_subtitle,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

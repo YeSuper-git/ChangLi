@@ -67,6 +67,7 @@ pub struct Video {
     pub episode_number: Option<i32>,
     pub file_size: Option<i64>,
     pub season: Option<i32>,
+    pub subtitle: Option<String>,
     pub duration: Option<f64>,
     pub width: Option<i32>,
     pub height: Option<i32>,
@@ -389,7 +390,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
         .map(|m| serde_json::to_string(&m).unwrap_or_default());
 
     let result = sqlx::query(
-        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description, subtitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&video.file_path)
     .bind(&video.file_name)
@@ -406,6 +407,7 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
     .bind(&video.thumbnail)
     .bind(&video.thumbnail_base64)
     .bind(&video.description)
+    .bind(&video.subtitle)
     .execute(pool)
     .await?;
 
@@ -435,7 +437,7 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
 
         // INSERT OR IGNORE + RETURNING
         let row = sqlx::query(
-            "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+            "INSERT OR IGNORE INTO videos (file_path, file_name, series_id, episode_number, season, file_size, duration, width, height, resolution, source_site, metadata, thumbnail, thumbnail_base64, description, subtitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
         )
         .bind(&video.file_path)
         .bind(&video.file_name)
@@ -452,6 +454,7 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
         .bind(&video.thumbnail)
         .bind(&video.thumbnail_base64)
         .bind(&video.description)
+        .bind(&video.subtitle)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -538,6 +541,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         duration: row.get("duration"),
         width: row.get("width"),
         season: row.try_get("season").ok(),
+        subtitle: row.try_get("subtitle").ok(),
         height: row.get("height"),
         resolution: row.get("resolution"),
         source_site: row.get("source_site"),
@@ -1702,4 +1706,45 @@ pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
     sqlx::query("DELETE FROM video_series").execute(pool).await?;
 
     Ok((video_count, series_count))
+}
+
+// 季管理
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeasonInfo {
+    pub season: i32,
+    pub subtitle: Option<String>,
+    pub video_count: i64,
+}
+
+pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec<SeasonInfo>> {
+    let rows = sqlx::query(
+        "SELECT season, subtitle, COUNT(*) as video_count FROM videos WHERE series_id = ? GROUP BY season, subtitle ORDER BY season"
+    )
+    .bind(series_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.iter().map(|row| SeasonInfo {
+        season: row.get("season"),
+        subtitle: row.try_get("subtitle").ok(),
+        video_count: row.get("video_count"),
+    }).collect())
+}
+
+pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32) -> Result<()> {
+    sqlx::query("DELETE FROM videos WHERE series_id = ? AND season = ?")
+        .bind(series_id)
+        .bind(season)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_video_subtitle(pool: &SqlitePool, video_id: i64, subtitle: Option<String>) -> Result<()> {
+    sqlx::query("UPDATE videos SET subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(subtitle)
+        .bind(video_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }

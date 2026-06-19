@@ -214,6 +214,7 @@ export interface Video {
   description?: string;
   poster_orientation?: string;
   season?: number;
+  subtitle?: string;
   created_at: string;
   is_favorite?: number;
 }
@@ -340,6 +341,25 @@ export async function getFavoriteVideos(): Promise<Video[]> {
 
 export async function getFavoriteSeries(): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_favorite_series_cmd');
+}
+
+// 季管理
+export interface SeasonInfo {
+  season: number;
+  subtitle?: string;
+  video_count: number;
+}
+
+export async function getSeriesSeasons(seriesId: number): Promise<SeasonInfo[]> {
+  return invoke<SeasonInfo[]>('get_series_seasons', { seriesId });
+}
+
+export async function deleteSeason(seriesId: number, season: number): Promise<void> {
+  return invoke('delete_season', { seriesId, season });
+}
+
+export async function updateVideoSubtitle(videoId: number, subtitle?: string): Promise<void> {
+  return invoke('update_video_subtitle', { videoId, subtitle });
 }
 
 export async function deleteAllVideos(): Promise<{ videoCount: number; seriesCount: number }> {
