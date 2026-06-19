@@ -110,7 +110,7 @@ const Home: React.FC = () => {
                     state={{ from: '/', backLabel: '返回首页' }}
                     className="card flex flex-col h-full group"
                   >
-                    <div className="relative w-full aspect-[2/3] overflow-hidden">
+                    <div className="relative w-full h-80 overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                       <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                         {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
@@ -165,7 +165,7 @@ const Home: React.FC = () => {
         <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
           {seriesList.slice(0, 8).map((series) => (
             <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
-              <div className="aspect-[2/3] relative w-full overflow-hidden">
+              <div className="relative w-full h-80 overflow-hidden">
                 <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                 <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                   {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}

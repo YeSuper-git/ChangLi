@@ -13,8 +13,6 @@ export function actorPhotoDataUrl(actor: { photo_data_url?: string | null }): st
   return imageDataUrl(actor.photo_data_url);
 }
 
-export type ImageOrientation = 'landscape' | 'portrait' | 'square' | 'unknown';
-
 interface PlaceholderProps {
   kind: 'video' | 'actor';
   className?: string;
@@ -32,41 +30,17 @@ export const StaticImagePlaceholder: React.FC<PlaceholderProps> = ({ kind, class
   );
 };
 
-/**
- * 判断海报方向：优先使用后端返回的 poster_orientation 字段，
- * 其次根据 width/height 判断，最后回退到 unknown。
- */
-function resolveOrientation(
-  posterOrientation?: string | null,
-  width?: number | null,
-  height?: number | null,
-): ImageOrientation {
-  // 优先使用后端明确返回的方向
-  if (posterOrientation === 'portrait') return 'portrait';
-  if (posterOrientation === 'landscape') return 'landscape';
-  if (posterOrientation === 'square') return 'square';
-
-  // 根据宽高比判断
-  if (width && height) {
-    if (height > width * 1.15) return 'portrait';
-    if (width > height * 1.15) return 'landscape';
-    return 'square';
-  }
-
-  return 'unknown';
-}
-
 interface SmartPosterProps {
   src?: string | null;
   alt: string;
   kind?: 'video' | 'actor';
   className?: string;
   imageClassName?: string;
-  /** 后端返回的海报方向（如 VideoSeries.poster_orientation） */
+  /** 后端返回的海报方向（保留接口兼容，内部不再使用） */
   posterOrientation?: string | null;
-  /** 视频/图片宽度（如 Video.width） */
+  /** 视频/图片宽度（保留接口兼容，内部不再使用） */
   width?: number | null;
-  /** 视频/图片高度（如 Video.height） */
+  /** 视频/图片高度（保留接口兼容，内部不再使用） */
   height?: number | null;
 }
 
@@ -76,13 +50,7 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
   kind = 'video',
   className = '',
   imageClassName = '',
-  posterOrientation,
-  width,
-  height,
 }) => {
-  const orientation = resolveOrientation(posterOrientation, width, height);
-  const isPortrait = orientation === 'portrait';
-
   if (!src) {
     return <StaticImagePlaceholder kind={kind} className={className} />;
   }
@@ -92,11 +60,7 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
       <img
         src={src}
         alt={alt}
-        className={
-          isPortrait
-            ? `w-full h-full object-contain ${imageClassName}`
-            : `w-full h-full object-cover ${imageClassName}`
-        }
+        className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${imageClassName}`}
       />
     </div>
   );

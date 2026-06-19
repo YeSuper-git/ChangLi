@@ -228,7 +228,7 @@ const Library: React.FC = () => {
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className="card cursor-pointer flex flex-col group"
               >
-                <div className="relative w-full aspect-[2/3] overflow-hidden">
+                <div className="relative w-full h-80 overflow-hidden">
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
