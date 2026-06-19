@@ -287,11 +287,68 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         .and_then(|name| name.to_str())
         .unwrap_or("未命名视频集")
         .to_string();
+
+    // 如果文件夹名匹配已有标签，自动拆子文件夹为视频集并关联标签
+    if let Ok(Some(tag)) = db::get_tag_by_name(&pool, folder_name.trim()).await {
+        eprintln!("[ChangLi] 文件夹名 '{}' 匹配标签 '{}'，自动拆分子文件夹", folder_name, tag.name);
+        let mut all_videos: Vec<db::Video> = Vec::new();
+
+        let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let entry_path = entry.path();
+            let entry_name = entry.file_name().to_string_lossy().to_string();
+
+            if entry_path.is_dir() {
+                // 子文件夹当视频集
+                let sub_result = scanner::scan_directory(&entry_path.to_string_lossy())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                if sub_result.videos.is_empty() {
+                    continue;
+                }
+                let sub_poster = sub_result.posters.values().next().cloned();
+                let sub_poster_base64 = sub_poster.as_deref()
+                    .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+                let series = db::add_video_series(
+                    &pool,
+                    &entry_name,
+                    Some(&entry_path.to_string_lossy()),
+                    sub_poster.as_deref(),
+                    Some("landscape"),
+                    Some("ongoing"),
+                    sub_poster_base64.as_deref(),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                let saved = db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
+                    .await
+                    .map_err(|e| e.to_string())?;
+                // 自动关联标签
+                if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
+                    eprintln!("[ChangLi] 关联标签失败: {}", e);
+                }
+                all_videos.extend(saved);
+            } else if entry_path.is_file() && scanner::is_video_file(&entry_path) {
+                // 根目录下的视频当单视频
+                let video = scanner::scan_video_file(&entry_path, None)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let saved = db::add_video(&pool, video)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                all_videos.push(saved);
+            }
+        }
+
+        return Ok(all_videos);
+    }
+
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;
 
-    // UI 现在只有“添加”入口并选择文件夹：当前文件夹扫描到 1 个视频时按单视频导入；
+    // UI 现在只有"添加"入口并选择文件夹：当前文件夹扫描到 1 个视频时按单视频导入；
     // 0 个或多个视频时保持视频集扫描逻辑。
     if result.videos.len() == 1 {
         let video = result.videos.into_iter().next().expect("len checked");

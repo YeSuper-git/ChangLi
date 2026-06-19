@@ -1054,6 +1054,22 @@ pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
     Ok(tags)
 }
 
+/// 按名称精确匹配标签（忽略首尾空格和大小写）
+pub async fn get_tag_by_name(pool: &SqlitePool, name: &str) -> Result<Option<Tag>> {
+    let row = sqlx::query("SELECT * FROM tags WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))")
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    match row {
+        Some(row) => Ok(Some(Tag {
+            id: row.get("id"),
+            name: row.get("name"),
+            created_at: row.get("created_at"),
+        })),
+        None => Ok(None),
+    }
+}
+
 pub async fn add_tag(pool: &SqlitePool, name: &str) -> Result<Tag> {
     let row = sqlx::query("INSERT INTO tags (name) VALUES (?) RETURNING *")
         .bind(name)
