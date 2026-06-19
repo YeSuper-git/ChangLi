@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getActors, getStandaloneVideos, getVideoSeriesList } from '../utils/api';
 import type { Actor, Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
-import loadingIcon from '../assets/icons/loading.svg';
+import { useLibraryStore } from '../store/libraryStore';
 
 type SearchItem =
   | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
@@ -29,14 +28,17 @@ const fuzzyMatch = (source: string, keyword: string) => {
 const Search: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { videos: storeVideos, series: storeSeries, actors: storeActors, loadAll, loaded } = useLibraryStore();
   const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
   const [keyword, setKeyword] = useState(queryKeyword);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
-  const [actors, setActors] = useState<Actor[]>([]);
   const [results, setResults] = useState<SearchItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  
   const [searched, setSearched] = useState(false);
+
+  // 首次进入时确保 store 已加载
+  useEffect(() => {
+    if (!loaded) loadAll();
+  }, [loaded, loadAll]);
 
   useEffect(() => {
     setKeyword(queryKeyword);
@@ -90,31 +92,14 @@ const Search: React.FC = () => {
     return [...seriesResults, ...videoResults, ...actorResults];
   };
 
-  const handleSearch = async (inputKeyword = keyword) => {
+  const handleSearch = (inputKeyword = keyword) => {
     const nextKeyword = inputKeyword.trim();
     if (!nextKeyword) return;
 
-    setLoading(true);
     setSearched(true);
-
-    try {
-      const [videoList, seriesItems, actorList] = await Promise.all([
-        videos.length ? Promise.resolve(videos) : getStandaloneVideos(),
-        seriesList.length ? Promise.resolve(seriesList) : getVideoSeriesList(),
-        actors.length ? Promise.resolve(actors) : getActors(),
-      ]);
-      setVideos(videoList);
-      setSeriesList(seriesItems);
-      setActors(actorList);
-      setResults(buildResults(nextKeyword, videoList, seriesItems, actorList));
-      if (nextKeyword !== queryKeyword) {
-        navigate(`/search?q=${encodeURIComponent(nextKeyword)}`, { replace: true });
-      }
-    } catch (error) {
-      console.error('搜索失败:', error);
-      setResults([]);
-    } finally {
-      setLoading(false);
+    setResults(buildResults(nextKeyword, storeVideos, storeSeries, storeActors));
+    if (nextKeyword !== queryKeyword) {
+      navigate(`/search?q=${encodeURIComponent(nextKeyword)}`, { replace: true });
     }
   };
 
@@ -138,17 +123,17 @@ const Search: React.FC = () => {
         />
         <button
           type="submit"
-          disabled={loading || !keyword.trim()}
+          disabled={!keyword.trim()}
           className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
         >
-          {loading ? <span className="flex items-center gap-2"><img src={loadingIcon} alt="搜索中" className="w-4 h-4" /> 搜索中...</span> : '搜索'}
+          '搜索'
         </button>
       </form>
 
       {searched && (
         <div>
           <div className="text-gray-500 mb-8">
-            {loading ? <span className="flex items-center gap-2"><img src={loadingIcon} alt="搜索中" className="w-4 h-4" /> 搜索中...</span> : `找到 ${results.length} 个本地结果`}
+            `找到 ${results.length} 个本地结果`
           </div>
 
           {results.length > 0 ? (
