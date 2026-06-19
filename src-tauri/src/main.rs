@@ -1168,6 +1168,7 @@ fn main() {
             toggle_favorite,
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
+            delete_all_videos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1258,4 +1259,13 @@ async fn get_favorite_series_cmd(state: State<'_, AppState>) -> Result<Vec<db::V
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::get_favorite_series(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_all_videos(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_all_videos(&pool).await.map_err(|e| e.to_string())
 }

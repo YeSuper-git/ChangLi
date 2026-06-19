@@ -342,6 +342,11 @@ export async function getFavoriteSeries(): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_favorite_series_cmd');
 }
 
+export async function deleteAllVideos(): Promise<{ videoCount: number; seriesCount: number }> {
+  const [videoCount, seriesCount] = await invoke<[number, number]>('delete_all_videos');
+  return { videoCount, seriesCount };
+}
+
 // 演员相关
 export interface Actor {
   id: number;

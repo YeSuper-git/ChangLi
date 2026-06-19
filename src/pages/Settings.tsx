@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllVideos } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 
 const Settings: React.FC = () => {
@@ -90,6 +91,29 @@ const Settings: React.FC = () => {
     }
   };
 
+  const [deletingVideos, setDeletingVideos] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
+  const refreshVideos = useLibraryStore((s) => s.refreshVideos);
+  const refreshSeries = useLibraryStore((s) => s.refreshSeries);
+
+  const handleDeleteAllVideos = async () => {
+    if (!window.confirm('确定要删除所有视频数据吗？\n\n此操作将删除所有视频、视频集、播放记录和关联关系，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
+      return;
+    }
+    setDeletingVideos(true);
+    setDeleteResult(null);
+    try {
+      const result = await deleteAllVideos();
+      setDeleteResult(result);
+      await Promise.all([refreshVideos(), refreshSeries()]);
+    } catch (error) {
+      console.error('删除所有视频失败:', error);
+      alert('删除失败: ' + String(error));
+    } finally {
+      setDeletingVideos(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,6 +163,35 @@ const Settings: React.FC = () => {
             <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
               {storageInfo?.db_path || '加载中...'}
             </code>
+          </div>
+        </div>
+      </section>
+
+      {/* 视频管理 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">视频管理</h2>
+            <p className="text-sm text-gray-500 mt-1">一键删除所有添加的视频数据（不删除本地源文件）</p>
+          </div>
+        </div>
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">删除数据库中所有视频和视频集记录，保留演员和标签数据。</p>
+              {deleteResult && (
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ 已删除 {deleteResult.videoCount} 个视频，{deleteResult.seriesCount} 个视频集
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleDeleteAllVideos}
+              disabled={deletingVideos}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+            >
+              {deletingVideos ? '删除中...' : '删除所有视频'}
+            </button>
           </div>
         </div>
       </section>

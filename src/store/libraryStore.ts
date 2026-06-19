@@ -70,8 +70,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   refreshVideos: async () => {
     try {
       const { sortBy, sortOrder } = get();
-      const videos = await getStandaloneVideos(sortBy, sortOrder);
-      set({ videos });
+      const [videos, favVideos, favSeries] = await Promise.all([
+        getStandaloneVideos(sortBy, sortOrder),
+        getFavoriteVideos(),
+        getFavoriteSeries(),
+      ]);
+      const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
+      set({ videos, favorites });
     } catch (error) {
       console.error('[LibraryStore] refreshVideos failed:', error);
     }
@@ -80,8 +85,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   refreshSeries: async () => {
     try {
       const { sortBy, sortOrder } = get();
-      const series = await getVideoSeriesList(sortBy, sortOrder);
-      set({ series });
+      const [series, favVideos, favSeries] = await Promise.all([
+        getVideoSeriesList(sortBy, sortOrder),
+        getFavoriteVideos(),
+        getFavoriteSeries(),
+      ]);
+      const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
+      set({ series, favorites });
     } catch (error) {
       console.error('[LibraryStore] refreshSeries failed:', error);
     }

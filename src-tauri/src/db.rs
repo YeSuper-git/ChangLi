@@ -1658,3 +1658,26 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
         .await?;
     Ok(rows.iter().map(series_from_row).collect())
 }
+
+/// 删除所有视频数据（不删除本地源文件，保留 actors 和 tags）
+/// 返回 (删除的视频数, 删除的视频集数)
+pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let video_count = sqlx::query("SELECT COUNT(*) FROM videos")
+        .fetch_one(pool)
+        .await?
+        .get::<i64, _>(0);
+    let series_count = sqlx::query("SELECT COUNT(*) FROM video_series")
+        .fetch_one(pool)
+        .await?
+        .get::<i64, _>(0);
+
+    sqlx::query("DELETE FROM play_history").execute(pool).await?;
+    sqlx::query("DELETE FROM video_tags").execute(pool).await?;
+    sqlx::query("DELETE FROM video_actors").execute(pool).await?;
+    sqlx::query("DELETE FROM series_tags").execute(pool).await?;
+    sqlx::query("DELETE FROM series_actors").execute(pool).await?;
+    sqlx::query("DELETE FROM videos").execute(pool).await?;
+    sqlx::query("DELETE FROM video_series").execute(pool).await?;
+
+    Ok((video_count, series_count))
+}

@@ -4,7 +4,7 @@ import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, g
 import type { Actor, Video } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
-import DatePicker from '../components/DatePicker';
+
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -336,9 +336,12 @@ const ActorDetail: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
-                <DatePicker
+                <input
+                  type="text"
                   value={editForm.birthday}
-                  onChange={(val) => setEditForm({ ...editForm, birthday: val })}
+                  onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })}
+                  placeholder="YYYY-MM-DD"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
