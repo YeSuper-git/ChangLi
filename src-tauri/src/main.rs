@@ -1274,6 +1274,7 @@ fn main() {
             get_storage_info,
             open_data_dir,
             toggle_favorite,
+            toggle_watched,
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
             delete_all_videos,
@@ -1353,6 +1354,15 @@ async fn toggle_favorite(state: State<'_, AppState>, id: i64, fav_type: String) 
         "series" => db::toggle_favorite_series(&pool, id).await.map_err(|e| e.to_string()),
         _ => Err("无效类型".to_string()),
     }
+}
+
+#[tauri::command]
+async fn toggle_watched(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::toggle_watched_series(&pool, id).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

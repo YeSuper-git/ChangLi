@@ -279,6 +279,7 @@ export interface VideoSeries {
   created_at: string;
   updated_at: string;
   is_favorite?: number;
+  is_watched?: number;
   last_watched_episode?: number;
 }
 
@@ -333,6 +334,10 @@ export async function removeVideoFromSeries(videoId: number): Promise<Video> {
 
 export async function toggleFavorite(id: number, type: 'video' | 'series'): Promise<void> {
   await invoke('toggle_favorite', { id, favType: type });
+}
+
+export async function toggleWatched(id: number): Promise<void> {
+  await invoke('toggle_watched', { id });
 }
 
 export async function getFavoriteVideos(): Promise<Video[]> {

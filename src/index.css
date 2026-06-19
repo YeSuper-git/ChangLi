@@ -299,3 +299,7 @@ body.player-window-document,
   filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%);
   opacity: 0.5;
 }
+
+.filter-gold {
+  filter: invert(70%) sepia(50%) saturate(500%) hue-rotate(5deg) brightness(95%) contrast(90%);
+}

@@ -5,6 +5,7 @@ import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 import favoriteIcon from '../assets/icons/favorite.svg';
 import notFavoriteIcon from '../assets/icons/not-favorite.svg';
+import watchedIcon from '../assets/icons/watched.svg';
 import {
   addActor,
   addSeriesActor,
@@ -24,6 +25,7 @@ import {
   removeVideoFromSeries,
   saveVideoThumbnail,
   updateVideoSeries,
+  toggleWatched,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
@@ -315,6 +317,17 @@ const SeriesDetail: React.FC = () => {
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+  const isWatched = series?.is_watched === 1;
+
+  const handleToggleWatched = async () => {
+    if (!series) return;
+    try {
+      await toggleWatched(series.id);
+      setSeries(prev => prev ? { ...prev, is_watched: prev.is_watched === 1 ? 0 : 1 } : prev);
+    } catch (error) {
+      console.error('切换已看完状态失败:', error);
+    }
+  };
 
   return (
     <div>
@@ -463,6 +476,19 @@ const SeriesDetail: React.FC = () => {
                     />
                     <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
                       {isFavorite ? '已追番' : '追番'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={handleToggleWatched}
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                  >
+                    <img
+                      src={watchedIcon}
+                      alt="已看完"
+                      className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
+                    />
+                    <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
+                      {isWatched ? '已看完' : '看完'}
                     </span>
                   </button>
                 </div>

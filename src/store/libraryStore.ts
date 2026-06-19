@@ -18,6 +18,7 @@ interface LibraryState {
   actors: Actor[];
   tags: Tag[];
   favorites: FavoriteItem[];
+  watchedIds: Set<number>;
   loading: boolean;
   loaded: boolean;
   sortBy: 'created_at' | 'title';
@@ -28,6 +29,7 @@ interface LibraryState {
   refreshActors: () => Promise<void>;
   refreshTags: () => Promise<void>;
   loadFavorites: () => Promise<void>;
+  loadWatched: () => void;
   toggleFavorite: (id: number, type: 'video' | 'series') => Promise<void>;
   setSortBy: (sortBy: 'created_at' | 'title') => void;
   setSortOrder: (sortOrder: 'asc' | 'desc') => void;
@@ -40,6 +42,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   actors: [],
   tags: [],
   favorites: [],
+  watchedIds: new Set<number>(),
   loading: false,
   loaded: false,
   sortBy: 'created_at',
@@ -59,7 +62,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         getFavoriteSeries(),
       ]);
       const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
-      set({ videos, series, actors, tags, favorites, loaded: true });
+      const watchedIds = new Set<number>();
+      for (const s of series) {
+        if (s.is_watched === 1) watchedIds.add(s.id);
+      }
+      set({ videos, series, actors, tags, favorites, watchedIds, loaded: true });
     } catch (error) {
       console.error('[LibraryStore] loadAll failed:', error);
     } finally {
@@ -91,7 +98,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         getFavoriteSeries(),
       ]);
       const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
-      set({ series, favorites });
+      const watchedIds = new Set<number>();
+      for (const s of series) {
+        if (s.is_watched === 1) watchedIds.add(s.id);
+      }
+      set({ series, favorites, watchedIds });
     } catch (error) {
       console.error('[LibraryStore] refreshSeries failed:', error);
     }
@@ -126,6 +137,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     } catch (error) {
       console.error('[LibraryStore] loadFavorites failed:', error);
     }
+  },
+
+  loadWatched: () => {
+    const { series } = get();
+    const watchedIds = new Set<number>();
+    for (const s of series) {
+      if (s.is_watched === 1) watchedIds.add(s.id);
+    }
+    set({ watchedIds });
   },
 
   toggleFavorite: async (id: number, type: 'video' | 'series') => {

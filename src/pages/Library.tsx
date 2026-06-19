@@ -17,12 +17,13 @@ import { useLibraryStore } from '../store/libraryStore';
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { tags, videos: storeVideos, series: storeSeries, favorites, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
+  const { tags, videos: storeVideos, series: storeSeries, favorites, watchedIds, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
+  const [watchedFilter, setWatchedFilter] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredVideos, setTagFilteredVideos] = useState<Video[] | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
@@ -162,7 +163,7 @@ const Library: React.FC = () => {
   );
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id))
   );
 
   return (
@@ -217,6 +218,7 @@ const Library: React.FC = () => {
         <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
         <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>单视频</button>
         <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+        <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
       </div>
 
       <div className="mb-10">

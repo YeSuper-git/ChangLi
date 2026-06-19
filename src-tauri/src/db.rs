@@ -100,6 +100,7 @@ pub struct VideoSeries {
     pub created_at: String,
     pub updated_at: String,
     pub is_favorite: Option<i32>,
+    pub is_watched: Option<i32>,
     pub last_watched_episode: Option<i32>,
 }
 
@@ -644,6 +645,7 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
         is_favorite: row.try_get("is_favorite").ok(),
+        is_watched: row.try_get("is_watched").ok(),
         last_watched_episode: row.try_get("last_watched_episode").ok(),
     }
 }
@@ -1379,6 +1381,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 created_at: row.get("s_created_at"),
                 updated_at: row.get("s_updated_at"),
                 is_favorite: None,
+                is_watched: None,
                 last_watched_episode: None,
             }
         });
@@ -1665,6 +1668,14 @@ pub async fn toggle_favorite_video(pool: &SqlitePool, id: i64) -> Result<()> {
 
 pub async fn toggle_favorite_series(pool: &SqlitePool, id: i64) -> Result<()> {
     sqlx::query("UPDATE video_series SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn toggle_watched_series(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("UPDATE video_series SET is_watched = CASE WHEN is_watched = 1 THEN 0 ELSE 1 END WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
