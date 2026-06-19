@@ -1,72 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import {
-  getStandaloneVideosByTag,
-  getVideoSeriesByTag,
-} from '../utils/api';
 import type { Video, VideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import { HorizontalScroll } from '../components/HorizontalScroll';
 
 const Home: React.FC = () => {
-  const { actors, tags, videos: storeVideos, series: storeSeries, favorites } = useLibraryStore();
-  const [activeTagId, setActiveTagId] = useState<number | null>(null);
-  const [filteredVideos, setFilteredVideos] = useState<Video[] | null>(null);
-  const [filteredSeries, setFilteredSeries] = useState<VideoSeries[] | null>(null);
+  const { actors, videos: storeVideos, series: storeSeries, favorites } = useLibraryStore();
 
-  // 当标签变化时，加载筛选数据
-  useEffect(() => {
-    if (activeTagId === null) {
-      setFilteredVideos(null);
-      setFilteredSeries(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const [videosList, series] = await Promise.all([
-          getStandaloneVideosByTag(activeTagId),
-          getVideoSeriesByTag(activeTagId),
-        ]);
-        if (!cancelled) {
-          setFilteredVideos(videosList);
-          setFilteredSeries(series);
-        }
-      } catch (error) {
-        console.error('[Home] 按标签加载数据失败:', error);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeTagId]);
-
-  // 活跃数据：无标签时用 store（按创建时间倒序），有标签时用 API 筛选结果
-  const videos = activeTagId === null
-    ? [...storeVideos].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : (filteredVideos ?? []);
-  const seriesList = activeTagId === null
-    ? [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : (filteredSeries ?? []);
+  const videos = [...storeVideos].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const seriesList = [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
     <div>
-      <div className="flex gap-3 flex-wrap mb-12">
-          <button
-            onClick={() => setActiveTagId(null)}
-            className={`category-btn ${activeTagId === null ? 'active' : ''}`}
-          >
-            全部
-          </button>
-          {tags.map((tag) => (
-            <button
-              key={tag.id}
-              onClick={() => setActiveTagId(tag.id)}
-              className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
-            >
-              {tag.name}
-            </button>
-          ))}
-      </div>
 
       {/* 我的追番 */}
       <section className="mb-16">
@@ -74,6 +20,9 @@ const Home: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">
             我的追番
           </h2>
+          <Link to="/library?favorite=1" className="text-blue-500 hover:text-blue-600 text-sm font-medium">
+            查看全部 →
+          </Link>
         </div>
         {favorites.length > 0 ? (
           <HorizontalScroll
@@ -86,17 +35,17 @@ const Home: React.FC = () => {
                   <Link
                     to={`/series/${series.id}`}
                     state={{ from: '/', backLabel: '返回首页' }}
-                    className="card flex flex-col h-full group"
+                    className="group"
                   >
-                    <div className="relative w-full h-80 overflow-hidden">
+                    <div className="card relative w-full aspect-[4/3] overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                       <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                         {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                       </div>
                     </div>
-                    <div className="p-3">
-                      <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{series.title}</h3>
-                      <div className="text-xs text-zinc-500 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+                    <div className="mt-2">
+                      <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>{series.title}</h3>
+                      <div className="text-xs text-zinc-500 mt-0.5">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
                     </div>
                   </Link>
                 );
@@ -142,16 +91,16 @@ const Home: React.FC = () => {
         </div>
         <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
           {seriesList.slice(0, 8).map((series) => (
-            <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
-              <div className="relative w-full h-80 overflow-hidden">
+            <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="group">
+              <div className="card relative w-full aspect-[4/3] overflow-hidden">
                 <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                 <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                   {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                 </div>
               </div>
-              <div className="p-3">
-                <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{series.title}</h3>
-                <div className="text-xs text-zinc-500 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+              <div className="mt-2">
+                <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>{series.title}</h3>
+                <div className="text-xs text-zinc-500 mt-0.5">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
               </div>
             </Link>
           ))}

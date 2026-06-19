@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getStandaloneVideosByTag,
   getVideoSeriesByTag,
@@ -16,11 +16,13 @@ import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
-  const { tags, videos: storeVideos, series: storeSeries, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
+  const [searchParams] = useSearchParams();
+  const { tags, videos: storeVideos, series: storeSeries, favorites, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
+  const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredVideos, setTagFilteredVideos] = useState<Video[] | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
@@ -145,13 +147,22 @@ const Library: React.FC = () => {
     filterByTag(tagId);
   };
 
+  const favoriteIds = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const item of favorites) {
+      if ('video_count' in item) set.add(`s-${(item as VideoSeries).id}`);
+      else set.add(`v-${(item as Video).id}`);
+    }
+    return set;
+  }, [favorites]);
+
   const normalizedSearch = searchTerm.toLowerCase();
   const filteredVideos = videos.filter((video) =>
-    video.file_name.toLowerCase().includes(normalizedSearch)
+    video.file_name.toLowerCase().includes(normalizedSearch) && (!favoriteFilter || favoriteIds.has(`v-${video.id}`))
   );
   const filteredSeries = seriesList.filter((series) =>
-    series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)
+    (series.title.toLowerCase().includes(normalizedSearch) ||
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`))
   );
 
   return (
@@ -205,6 +216,7 @@ const Library: React.FC = () => {
         <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
         <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
         <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>单视频</button>
+        <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
       </div>
 
       <div className="mb-10">
@@ -226,19 +238,19 @@ const Library: React.FC = () => {
                 key={series.id}
                 onClick={() => navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className="card cursor-pointer flex flex-col group"
+                className="cursor-pointer group"
               >
-                <div className="relative w-full h-80 overflow-hidden">
+                <div className="card relative w-full aspect-[4/3] overflow-hidden">
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
                 </div>
-                <div className="p-3">
-                  <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">
+                <div className="mt-2">
+                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>
                     {series.title}
                   </h3>
-                  <div className="text-xs text-zinc-500 mt-1">
+                  <div className="text-xs text-zinc-500 mt-0.5">
                     {series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
                   </div>
                 </div>
