@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries } from '../utils/api';
 import type { Actor, Video } from '../utils/api';
@@ -37,6 +37,8 @@ const ActorDetail: React.FC = () => {
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
+
+  const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
   useEffect(() => {
     if (id) {
@@ -94,7 +96,7 @@ const ActorDetail: React.FC = () => {
         editForm.name,
         actor.photo,
         editForm.bio || undefined,
-        editForm.birthday || undefined,
+        editForm.birthday ? normalizeBirthday(editForm.birthday) : undefined,
         editForm.height || undefined,
         editForm.measurements || undefined,
         editForm.japanese_name || undefined,
@@ -237,6 +239,57 @@ const ActorDetail: React.FC = () => {
     }
   };
 
+  // 辅助函数
+  const getMaxDay = (month: number): number => {
+    if ([1, 3, 5, 7, 8, 10, 12].includes(month)) return 31;
+    if ([4, 6, 9, 11].includes(month)) return 30;
+    if (month === 2) return 29;
+    return 31;
+  };
+
+  const bParts = (editForm.birthday || '').split('-');
+  while (bParts.length < 3) bParts.push('');
+  const maxDay = getMaxDay(parseInt(bParts[1], 10) || 0);
+
+  const numOrEmpty = (s: string): number | '' => {
+    const n = parseInt(s, 10);
+    return isNaN(n) ? '' : n;
+  };
+
+  const updateBirthday = (idx: number, val: string) => {
+    const parts = (editForm.birthday || '').split('-');
+    while (parts.length < 3) parts.push('');
+    parts[idx] = val;
+    setEditForm({ ...editForm, birthday: parts.join('-') });
+  };
+
+  const measureParts = (editForm.measurements || '').split('-');
+  while (measureParts.length < 3) measureParts.push('');
+
+  const handleMeasureChange = (index: number, value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const parts = (editForm.measurements || '').split('-');
+    while (parts.length < 3) parts.push('');
+    let maxLen = 2;
+    if (digits.length > 0 && digits[0] === '1') maxLen = 3;
+    const clamped = digits.slice(0, maxLen);
+    parts[index] = clamped;
+    setEditForm({ ...editForm, measurements: parts.join('-') });
+    if (clamped.length === maxLen && index < 2) {
+      measureRefs.current[index + 1]?.focus();
+      measureRefs.current[index + 1]?.select();
+    }
+  };
+
+  const normalizeBirthday = (bd: string): string => {
+    const parts = bd.split('-');
+    if (parts.length !== 3) return bd;
+    const y = parts[0].padStart(4, '0');
+    const m = parts[1].padStart(2, '0');
+    const d = parts[2].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -315,152 +368,123 @@ const ActorDetail: React.FC = () => {
         <div className="flex-1">
           {editing ? (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">日本名</label>
-                <input
-                  type="text"
-                  value={editForm.japanese_name}
-                  onChange={(e) => setEditForm({ ...editForm, japanese_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="例: なにか なにか"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
-                <div className="flex gap-2 items-center">
+              {/* 姓名 + 日本名 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
                   <input
                     type="text"
-                    value={editForm.birthday?.split('-')[0] || ''}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 4);
-                      const parts = (editForm.birthday || '').split('-');
-                      parts[0] = v;
-                      setEditForm({ ...editForm, birthday: parts.join('-') });
-                      if (v.length === 4) document.getElementById('birth-month')?.focus();
-                    }}
-                    placeholder="年"
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                   />
-                  <span className="text-gray-400">-</span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">日本名</label>
                   <input
-                    id="birth-month"
                     type="text"
-                    value={editForm.birthday?.split('-')[1] || ''}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      const parts = (editForm.birthday || '--').split('-');
-                      while (parts.length < 3) parts.push('');
-                      parts[1] = v;
-                      setEditForm({ ...editForm, birthday: parts.join('-') });
-                      if (v.length === 2) document.getElementById('birth-day')?.focus();
-                    }}
-                    placeholder="月"
-                    className="w-16 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                  />
-                  <span className="text-gray-400">-</span>
-                  <input
-                    id="birth-day"
-                    type="text"
-                    value={editForm.birthday?.split('-')[2] || ''}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 2);
-                      const parts = (editForm.birthday || '--').split('-');
-                      while (parts.length < 3) parts.push('');
-                      parts[2] = v;
-                      setEditForm({ ...editForm, birthday: parts.join('-') });
-                    }}
-                    placeholder="日"
-                    className="w-16 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                    value={editForm.japanese_name}
+                    onChange={(e) => setEditForm({ ...editForm, japanese_name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">身高 (cm)</label>
-                <input
-                  type="number"
-                  value={editForm.height}
-                  onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="例: 160"
-                  min="0"
-                  max="300"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">三围 (B-W-H)</label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-400 mb-1">胸围</label>
+
+              {/* 出生日期 + 身高 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
+                  <div className="flex gap-1 items-center">
                     <input
                       type="number"
-                      value={editForm.measurements ? editForm.measurements.split('-')[0] || '' : ''}
+                      min={1900}
+                      max={2100}
+                      value={numOrEmpty(bParts[0])}
                       onChange={(e) => {
-                        const parts = (editForm.measurements || '').split('-');
-                        parts[0] = e.target.value;
-                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                        updateBirthday(0, v);
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="B"
-                      min="0"
+                      className="flex-1 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-400 mb-1">腰围</label>
+                    <span className="text-gray-400">-</span>
                     <input
                       type="number"
-                      value={editForm.measurements ? editForm.measurements.split('-')[1] || '' : ''}
+                      min={1}
+                      max={12}
+                      value={numOrEmpty(bParts[1])}
                       onChange={(e) => {
-                        const parts = (editForm.measurements || '---').split('-');
-                        while (parts.length < 3) parts.push('');
-                        parts[1] = e.target.value;
-                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                        let v = e.target.value.replace(/[^0-9]/g, '');
+                        if (v !== '' && parseInt(v, 10) > 12) v = '12';
+                        updateBirthday(1, v);
+                        const newMaxDay = getMaxDay(parseInt(v, 10) || 0);
+                        const currentDay = parseInt(bParts[2], 10);
+                        if (currentDay > newMaxDay) updateBirthday(2, String(newMaxDay));
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="W"
-                      min="0"
+                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-400 mb-1">臀围</label>
+                    <span className="text-gray-400">-</span>
                     <input
                       type="number"
-                      value={editForm.measurements ? editForm.measurements.split('-')[2] || '' : ''}
+                      min={1}
+                      max={maxDay || 31}
+                      value={numOrEmpty(bParts[2])}
                       onChange={(e) => {
-                        const parts = (editForm.measurements || '--').split('-');
-                        while (parts.length < 3) parts.push('');
-                        parts[2] = e.target.value;
-                        setEditForm({ ...editForm, measurements: parts.join('-') });
+                        let v = e.target.value.replace(/[^0-9]/g, '');
+                        const md = maxDay || 31;
+                        if (v !== '' && parseInt(v, 10) > md) v = String(md);
+                        updateBirthday(2, v);
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="H"
-                      min="0"
+                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">身高 (cm)</label>
+                  <input
+                    type="number"
+                    value={editForm.height}
+                    onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    min="0"
+                    max="300"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
-                <input
-                  type="text"
-                  value={editForm.cup_size}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-                    setEditForm({ ...editForm, cup_size: val });
-                  }}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="如 C、D、E、F"
-                  maxLength={5}
-                />
+
+              {/* 数值 + 车灯 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => { measureRefs.current[idx] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        value={measureParts[idx]}
+                        onChange={(e) => handleMeasureChange(idx, e.target.value)}
+                        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">车灯</label>
+                  <input
+                    type="text"
+                    value={editForm.cup_size}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                      setEditForm({ ...editForm, cup_size: val });
+                    }}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    maxLength={5}
+                  />
+                </div>
               </div>
+
+              {/* 简介 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">简介</label>
                 <textarea
@@ -470,6 +494,8 @@ const ActorDetail: React.FC = () => {
                   rows={4}
                 />
               </div>
+
+              {/* 按钮 */}
               <div className="flex gap-4">
                 <button
                   onClick={() => { setEditing(false); clearEditQuery(); }}
@@ -507,7 +533,7 @@ const ActorDetail: React.FC = () => {
                 )}
                 {actor.measurements && (
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-500 w-20">三围</span>
+                    <span className="text-gray-500 w-20">数值</span>
                     <span className="font-medium">
                       {actor.measurements.split('-').filter(Boolean).join('-')}
                     </span>
@@ -515,7 +541,7 @@ const ActorDetail: React.FC = () => {
                 )}
                 {actor.cup_size && (
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-500 w-20">数值</span>
+                    <span className="text-gray-500 w-20">车灯</span>
                     <span className="font-medium">{actor.cup_size}</span>
                   </div>
                 )}

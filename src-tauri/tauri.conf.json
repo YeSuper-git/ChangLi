@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "ChangLi",
-    "version": "0.5.61"
+    "version": "0.5.62"
   },
   "tauri": {
     "allowlist": {
