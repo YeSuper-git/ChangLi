@@ -91,10 +91,8 @@ const SeriesDetail: React.FC = () => {
     if (!contextMenu) return;
     const close = () => { setContextMenu(null); clearPending(); };
     window.addEventListener('click', close);
-    window.addEventListener('contextmenu', close);
     return () => {
       window.removeEventListener('click', close);
-      window.removeEventListener('contextmenu', close);
     };
   }, [contextMenu, clearPending]);
 

@@ -404,7 +404,7 @@ const ActorDetail: React.FC = () => {
                         const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
                         updateBirthday(0, v);
                       }}
-                      className="flex-1 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                      className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
                     <span className="text-gray-400">-</span>
                     <input
@@ -420,7 +420,7 @@ const ActorDetail: React.FC = () => {
                         const currentDay = parseInt(bParts[2], 10);
                         if (currentDay > newMaxDay) updateBirthday(2, String(newMaxDay));
                       }}
-                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                      className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
                     <span className="text-gray-400">-</span>
                     <input
@@ -434,7 +434,7 @@ const ActorDetail: React.FC = () => {
                         if (v !== '' && parseInt(v, 10) > md) v = String(md);
                         updateBirthday(2, v);
                       }}
-                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                      className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
                   </div>
                 </div>
@@ -444,7 +444,7 @@ const ActorDetail: React.FC = () => {
                     type="number"
                     value={editForm.height}
                     onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     min="0"
                     max="300"
                   />
@@ -464,7 +464,7 @@ const ActorDetail: React.FC = () => {
                         inputMode="numeric"
                         value={measureParts[idx]}
                         onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                        className="flex-1 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                       />
                     ))}
                   </div>
@@ -478,8 +478,8 @@ const ActorDetail: React.FC = () => {
                       const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
                       setEditForm({ ...editForm, cup_size: val });
                     }}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                    maxLength={5}
+                    className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                    maxLength={1}
                   />
                 </div>
               </div>
@@ -498,16 +498,30 @@ const ActorDetail: React.FC = () => {
               {/* 按钮 */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => { setEditing(false); clearEditQuery(); }}
-                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  取消
-                </button>
-                <button
                   onClick={handleSave}
                   className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                 >
                   保存
+                </button>
+                <button
+                  onClick={() => {
+                    if (actor) {
+                      setEditForm({
+                        name: actor.name,
+                        bio: actor.bio || '',
+                        birthday: actor.birthday || '',
+                        height: actor.height || '',
+                        measurements: actor.measurements || '',
+                        japanese_name: actor.japanese_name || '',
+                        cup_size: actor.cup_size || '',
+                      });
+                    }
+                    setEditing(false);
+                    clearEditQuery();
+                  }}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  取消
                 </button>
               </div>
             </div>

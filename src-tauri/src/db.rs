@@ -1740,6 +1740,37 @@ pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32) -> Re
     Ok(())
 }
 
+pub async fn create_season(pool: &SqlitePool, series_id: i64, season: i32, subtitle: Option<&str>) -> Result<()> {
+    // 获取当前最大 season 编号（排除 999）
+    // 如果 season 参数传 0，自动分配下一个季号
+    // 如果 season 参数传 999，创建剧场版
+    let target_season = if season == 0 {
+        let max_season: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(season), 0) FROM videos WHERE series_id = ? AND season < 999"
+        )
+        .bind(series_id)
+        .fetch_one(pool)
+        .await?;
+        max_season + 1
+    } else {
+        season
+    };
+
+    // 插入一个占位视频记录，season 字段标记季号
+    // 使用一个特殊的占位路径，后续可被真实视频覆盖
+    sqlx::query(
+        "INSERT INTO videos (file_path, file_name, series_id, season, subtitle) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind(format!("__placeholder__/series_{}/season_{}", series_id, target_season))
+    .bind(format!("占位-第{}季", target_season))
+    .bind(series_id)
+    .bind(target_season)
+    .bind(subtitle)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn update_video_subtitle(pool: &SqlitePool, video_id: i64, subtitle: Option<String>) -> Result<()> {
     sqlx::query("UPDATE videos SET subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(subtitle)

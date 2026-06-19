@@ -1170,6 +1170,17 @@ async fn delete_season(state: State<'_, AppState>, series_id: i64, season: i32) 
 }
 
 #[tauri::command]
+async fn create_season(state: State<'_, AppState>, series_id: i64, season: i32, subtitle: Option<String>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::create_season(&pool, series_id, season, subtitle.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn update_video_subtitle(state: State<'_, AppState>, video_id: i64, subtitle: Option<String>) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -1268,6 +1279,7 @@ fn main() {
             delete_all_videos,
             get_series_seasons,
             delete_season,
+            create_season,
             update_video_subtitle,
         ])
         .run(tauri::generate_context!())
