@@ -230,7 +230,7 @@ const Library: React.FC = () => {
               >
                 <div className="relative w-full h-80 overflow-hidden">
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                  <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
+                  <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
                 </div>
@@ -270,7 +270,7 @@ const Library: React.FC = () => {
                       height={video.height}
                     />
                     {video.duration && (
-                      <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
+                      <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                         {Math.floor(video.duration / 60)}分钟
                       </div>
                     )}

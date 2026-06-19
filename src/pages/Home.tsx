@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import loadingIcon from '../assets/icons/loading.svg';
 import {
   getStandaloneVideosByTag,
   getVideoSeriesByTag,
@@ -12,62 +11,49 @@ import { HorizontalScroll } from '../components/HorizontalScroll';
 
 const Home: React.FC = () => {
   const { actors, tags, videos: storeVideos, series: storeSeries, favorites } = useLibraryStore();
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
+  const [filteredVideos, setFilteredVideos] = useState<Video[] | null>(null);
+  const [filteredSeries, setFilteredSeries] = useState<VideoSeries[] | null>(null);
 
+  // 当标签变化时，加载筛选数据
   useEffect(() => {
-    loadAndApplyTag(null);
-  }, []);
-
-  const loadAndApplyTag = async (tagId: number | null) => {
-    try {
-      if (tagId) {
-        const [videosList, series] = await Promise.all([
-          getStandaloneVideosByTag(tagId),
-          getVideoSeriesByTag(tagId),
-        ]);
-        setVideos(videosList);
-        setSeriesList(series);
-      } else {
-        // Sort by created_at DESC
-        const sortedVideos = [...storeVideos].sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        const sortedSeries = [...storeSeries].sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        setVideos(sortedVideos);
-        setSeriesList(sortedSeries);
-      }
-      setActiveTagId(tagId);
-    } catch (error) {
-      console.error('[Home] 加载数据失败:', error);
-    } finally {
-      setLoading(false);
+    if (activeTagId === null) {
+      setFilteredVideos(null);
+      setFilteredSeries(null);
+      return;
     }
-  };
+    let cancelled = false;
+    (async () => {
+      try {
+        const [videosList, series] = await Promise.all([
+          getStandaloneVideosByTag(activeTagId),
+          getVideoSeriesByTag(activeTagId),
+        ]);
+        if (!cancelled) {
+          setFilteredVideos(videosList);
+          setFilteredSeries(series);
+        }
+      } catch (error) {
+        console.error('[Home] 按标签加载数据失败:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTagId]);
 
-  const handleTagClick = (tagId: number | null) => {
-    setLoading(true);
-    loadAndApplyTag(tagId);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 "><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
-      </div>
-    );
-  }
+  // 活跃数据：无标签时用 store（按创建时间倒序），有标签时用 API 筛选结果
+  const videos = activeTagId === null
+    ? [...storeVideos].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : (filteredVideos ?? []);
+  const seriesList = activeTagId === null
+    ? [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : (filteredSeries ?? []);
 
   return (
     <div>
       <div className="flex items-center justify-between mb-12">
         <div className="flex gap-3 flex-wrap">
           <button
-            onClick={() => handleTagClick(null)}
+            onClick={() => setActiveTagId(null)}
             className={`category-btn ${activeTagId === null ? 'active' : ''}`}
           >
             全部
@@ -75,7 +61,7 @@ const Home: React.FC = () => {
           {tags.map((tag) => (
             <button
               key={tag.id}
-              onClick={() => handleTagClick(tag.id)}
+              onClick={() => setActiveTagId(tag.id)}
               className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
             >
               {tag.name}
@@ -112,7 +98,7 @@ const Home: React.FC = () => {
                   >
                     <div className="relative w-full h-80 overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                      <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
+                      <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                         {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                       </div>
                     </div>
@@ -167,7 +153,7 @@ const Home: React.FC = () => {
             <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
               <div className="relative w-full h-80 overflow-hidden">
                 <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
+                <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                   {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                 </div>
               </div>
@@ -198,8 +184,7 @@ const Home: React.FC = () => {
           })}
           {seriesList.length === 0 && videos.length === 0 && (
             <div className="col-span-4 md:col-span-5 text-center text-gray-500 py-12">
-              <p className="text-lg mb-4">暂无视频</p>
-              <p className="text-sm">点击"扫描文件夹"添加视频</p>
+              暂无视频
             </div>
           )}
         </div>
