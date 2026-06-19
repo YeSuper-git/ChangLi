@@ -151,8 +151,8 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
                 continue;
             }
 
-            // 仅一部作品 → 剧场版（season = 999），多部 → 正常季
-            let season = if count == 1 { 999 } else {
+            // ≤3 部作品 → 剧场版（season = 999），多部 → 正常季
+            let season = if count <= 3 { 999 } else {
                 season_counter += 1;
                 season_counter
             };
@@ -251,7 +251,7 @@ fn file_stem_lower(path: &Path) -> String {
 
 fn fixed_episode_from_path(path: &Path) -> Option<i32> {
     let stem = path.file_stem()?.to_str()?;
-    if stem.len() == 2 && stem.chars().all(|c| c.is_ascii_digit()) {
+    if !stem.is_empty() && stem.chars().all(|c| c.is_ascii_digit()) {
         stem.parse::<i32>().ok()
     } else {
         None

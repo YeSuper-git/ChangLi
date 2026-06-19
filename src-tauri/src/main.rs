@@ -337,6 +337,10 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 let saved = db::add_video(&pool, video)
                     .await
                     .map_err(|e| e.to_string())?;
+                // 单视频也关联标签
+                if let Err(e) = db::add_video_tag(&pool, saved.id, tag.id).await {
+                    eprintln!("[ChangLi] 关联标签失败: {}", e);
+                }
                 all_videos.push(saved);
             }
         }

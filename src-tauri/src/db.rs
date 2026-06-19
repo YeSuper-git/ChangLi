@@ -1092,6 +1092,16 @@ pub async fn delete_tag(pool: &SqlitePool, id: i64) -> Result<()> {
 }
 
 // 资源标签关联
+// 视频标签关联（单视频打标签用）
+pub async fn add_video_tag(pool: &SqlitePool, video_id: i64, tag_id: i64) -> Result<()> {
+    sqlx::query("INSERT OR IGNORE INTO video_tags (video_id, tag_id) VALUES (?, ?)")
+        .bind(video_id)
+        .bind(tag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn add_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i64) -> Result<()> {
     sqlx::query("INSERT OR IGNORE INTO video_tags (video_id, tag_id) VALUES (?, ?)")
         .bind(resource_id)
