@@ -658,7 +658,7 @@ pub async fn add_video_series(
         .bind(folder_path)
         .bind(poster)
         .bind(poster_orientation.unwrap_or("landscape"))
-        .bind(status.unwrap_or("ongoing"))
+        .bind(status.unwrap_or("completed"))
         .bind(poster_base64)
         .execute(pool)
         .await?;
@@ -752,7 +752,7 @@ pub async fn update_video_series(
         .bind(description)
         .bind(poster)
         .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
-        .bind(status.unwrap_or_else(|| "ongoing".to_string()))
+        .bind(status.unwrap_or_else(|| "completed".to_string()))
         .bind(poster_base64)
         .bind(id)
         .execute(pool)

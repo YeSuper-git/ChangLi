@@ -316,7 +316,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                     Some(&entry_path.to_string_lossy()),
                     sub_poster.as_deref(),
                     Some("landscape"),
-                    Some("ongoing"),
+                    Some("completed"),
                     sub_poster_base64.as_deref(),
                 )
                 .await
@@ -361,7 +361,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     let series_poster = result.posters.values().next().cloned();
     let series_poster_base64 = series_poster.as_deref()
         .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("ongoing"), series_poster_base64.as_deref())
+    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref())
         .await
         .map_err(|e| e.to_string())?;
 

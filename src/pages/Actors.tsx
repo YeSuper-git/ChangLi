@@ -4,7 +4,7 @@ import { addActor, deleteActor } from '../utils/api';
 import type { Actor } from '../utils/api';
 import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
-import ScrollToTop from '../components/ScrollToTop';
+import FloatingActions from '../components/FloatingActions';
 import { useLibraryStore } from '../store/libraryStore';
 
 const Actors: React.FC = () => {
@@ -219,7 +219,7 @@ const Actors: React.FC = () => {
       )}
     </div>
 
-    <ScrollToTop />
+    <FloatingActions onRefresh={refreshActors} refreshLabel="刷新演员" />
     </>
   );
 };

@@ -11,7 +11,7 @@ import type { Video, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
-import ScrollToTop from '../components/ScrollToTop';
+import FloatingActions from '../components/FloatingActions';
 import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
@@ -336,7 +336,7 @@ const Library: React.FC = () => {
       )}
     </div>
 
-    <ScrollToTop />
+    <FloatingActions onRefresh={async () => { await refreshVideos(); await refreshSeries(); }} refreshLabel="刷新视频" />
     </>
   );
 };
