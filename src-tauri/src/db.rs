@@ -99,6 +99,7 @@ pub struct VideoSeries {
     pub created_at: String,
     pub updated_at: String,
     pub is_favorite: Option<i32>,
+    pub last_watched_episode: Option<i32>,
 }
 
 // 演员
@@ -639,6 +640,7 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
         is_favorite: row.try_get("is_favorite").ok(),
+        last_watched_episode: row.try_get("last_watched_episode").ok(),
     }
 }
 
@@ -665,9 +667,7 @@ pub async fn add_video_series(
             return Ok(series);
         }
     }
-    let row = sqlx::query(
-        "SELECT video_series.*, 0 AS video_count FROM video_series WHERE id = last_insert_rowid()",
-    )
+    let row = sqlx::query("SELECT video_series.*, 0 AS video_count, NULL AS last_watched_episode FROM video_series WHERE id = last_insert_rowid()")
     .fetch_one(pool)
     .await?;
     Ok(series_from_row(&row))
@@ -677,7 +677,7 @@ pub async fn get_video_series_by_folder_path(
     pool: &SqlitePool,
     folder_path: &str,
 ) -> Result<Option<VideoSeries>> {
-    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.folder_path = ? GROUP BY s.id")
+    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.folder_path = ? GROUP BY s.id")
         .bind(folder_path)
         .fetch_optional(pool)
         .await?;
@@ -691,7 +691,7 @@ pub async fn get_video_series_list(pool: &SqlitePool, sort_by: &str, sort_order:
         ("created_at", "asc") => "ORDER BY s.created_at ASC",
         _ => "ORDER BY s.created_at DESC",
     };
-    let sql = format!("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id {}", order_clause);
+    let sql = format!("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql)
         .fetch_all(pool)
         .await?;
@@ -700,7 +700,7 @@ pub async fn get_video_series_list(pool: &SqlitePool, sort_by: &str, sort_order:
 
 pub async fn get_video_series_by_tag(pool: &SqlitePool, tag_id: i64) -> Result<Vec<VideoSeries>> {
     let rows = sqlx::query(
-        "SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id WHERE st.tag_id = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
+        "SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id WHERE st.tag_id = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
     )
     .bind(tag_id)
     .fetch_all(pool)
@@ -713,7 +713,7 @@ pub async fn get_video_series_by_tag_name(
     tag_name: &str,
 ) -> Result<Vec<VideoSeries>> {
     let rows = sqlx::query(
-        "SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id JOIN tags t ON t.id = st.tag_id WHERE t.name = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
+        "SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_tags st ON st.series_id = s.id JOIN tags t ON t.id = st.tag_id WHERE t.name = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
     )
     .bind(tag_name)
     .fetch_all(pool)
@@ -722,7 +722,7 @@ pub async fn get_video_series_by_tag_name(
 }
 
 pub async fn get_video_series(pool: &SqlitePool, id: i64) -> Result<Option<VideoSeries>> {
-    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.id = ? GROUP BY s.id")
+    let row = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.id = ? GROUP BY s.id")
         .bind(id)
         .fetch_optional(pool)
         .await?;
@@ -1337,6 +1337,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 created_at: row.get("s_created_at"),
                 updated_at: row.get("s_updated_at"),
                 is_favorite: None,
+                last_watched_episode: None,
             }
         });
         items.push(RecentWatchItem {
@@ -1636,7 +1637,7 @@ pub async fn get_favorite_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
 }
 
 pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
-    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
+    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode FROM video_series s LEFT JOIN videos v ON v.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(series_from_row).collect())

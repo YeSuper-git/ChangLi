@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/api/dialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 import favoriteIcon from '../assets/icons/favorite.svg';
+import notFavoriteIcon from '../assets/icons/not-favorite.svg';
 import {
   addActor,
   addSeriesActor,
@@ -302,6 +303,8 @@ const SeriesDetail: React.FC = () => {
   if (loading) return <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
+  const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+
   return (
     <div>
       <div className="mb-6">
@@ -436,7 +439,22 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-3xl font-bold">{series.title}</h1>
+                  <button
+                    onClick={() => toggleFavorite(series.id, 'series')}
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                  >
+                    <img
+                      src={isFavorite ? favoriteIcon : notFavoriteIcon}
+                      alt="追番"
+                      className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
+                    />
+                    <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
+                      {isFavorite ? '已追番' : '追番'}
+                    </span>
+                  </button>
+                </div>
                 <div className="mb-2">
                   <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                     {series.status === 'completed' ? '已完结' : '连载中'}
@@ -466,9 +484,6 @@ const SeriesDetail: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => toggleFavorite(series.id, 'series')} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={favorites.some(f => 'video_count' in f && f.id === series.id) ? '取消追番' : '加入追番'}>
-                    <img src={favoriteIcon} alt="追番" className={`w-6 h-6 transition-all ${favorites.some(f => 'video_count' in f && f.id === series.id) ? 'filter-red' : 'filter-red-light'}`} />
-                  </button>
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleToggleEpisodeEditing} className={`action-btn ${episodeEditing ? 'action-btn-primary' : ''}`}>{episodeEditing ? '完成编辑' : '编辑分集'}</button>
                 </div>

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'reac
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 import favoriteIcon from '../assets/icons/favorite.svg';
+import notFavoriteIcon from '../assets/icons/not-favorite.svg';
 import {
   getVideo,
   updateVideo,
@@ -310,6 +311,7 @@ const VideoDetail: React.FC = () => {
   }
 
   const isSeriesEpisode = Boolean(video.series_id);
+  const isFavorite = video ? favorites.some(f => 'file_name' in f && f.id === video.id) : false;
   const backState = location.state as { from?: string; backLabel?: string } | null;
   const fallbackBackTo = fromActor ? `/actors/${fromActor}` : fromHome ? '/' : '/library';
   const fallbackBackLabel = fromActor ? '返回演员详情' : fromHome ? '返回首页' : '返回视频';
@@ -335,19 +337,7 @@ const VideoDetail: React.FC = () => {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">视频详情</h1>
         <div className="flex gap-4 items-center">
-          {video && (
-            <button
-              onClick={() => toggleFavorite(video.id, 'video')}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              title={favorites.some(f => 'file_name' in f && f.id === video.id) ? '取消追番' : '加入追番'}
-            >
-              <img
-                src={favoriteIcon}
-                alt="追番"
-                className={`w-6 h-6 transition-all ${favorites.some(f => 'file_name' in f && f.id === video.id) ? 'filter-red' : 'filter-red-light'}`}
-              />
-            </button>
-          )}
+          
           {editing ? (
             <>
               <button
@@ -408,7 +398,24 @@ const VideoDetail: React.FC = () => {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
               />
             ) : (
-              <p className="text-gray-900">{video.file_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-gray-900">{video.file_name}</p>
+                {video && (
+                  <button
+                    onClick={() => toggleFavorite(video.id, 'video')}
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                  >
+                    <img
+                      src={isFavorite ? favoriteIcon : notFavoriteIcon}
+                      alt="追番"
+                      className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
+                    />
+                    <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
+                      {isFavorite ? '已追番' : '追番'}
+                    </span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

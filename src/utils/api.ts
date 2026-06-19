@@ -278,6 +278,7 @@ export interface VideoSeries {
   created_at: string;
   updated_at: string;
   is_favorite?: number;
+  last_watched_episode?: number;
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
