@@ -128,15 +128,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
   },
 
-  setSortBy: (sortBy: 'created_at' | 'title') => {
+  setSortBy: async (sortBy: 'created_at' | 'title') => {
     set({ sortBy });
+    // 串行刷新，避免 SQLite 并发锁
+    await get().refreshVideos();
+    await get().refreshSeries();
   },
 
-  setSortOrder: (sortOrder: 'asc' | 'desc') => {
+  setSortOrder: async (sortOrder: 'asc' | 'desc') => {
     set({ sortOrder });
+    await get().refreshVideos();
+    await get().refreshSeries();
   },
 
-  toggleSortOrder: () => {
+  toggleSortOrder: async () => {
     set((state) => ({ sortOrder: state.sortOrder === 'desc' ? 'asc' : 'desc' }));
+    await get().refreshVideos();
+    await get().refreshSeries();
   },
 }));

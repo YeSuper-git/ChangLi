@@ -25,16 +25,16 @@ body.player-window-document,
 
 /* 卡片样式 */ 
 .card { 
-  background: transparent; 
-  border-radius: 8px; 
+  background: #fff;
+  border-radius: 12px;
   overflow: hidden; 
   transition: transform 0.2s ease-out;
-  border: none;
+  border: 1px solid #f0f0f0;
   box-shadow: none;
 }
 .card:hover { 
-  transform: scale(1.05);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 /* 标签样式 */

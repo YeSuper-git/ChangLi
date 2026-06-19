@@ -170,77 +170,51 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 rounded-xl mb-10">
-        {/* 左侧：标签 + 类型筛选 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => handleTagClick(null)}
-            className={`rounded-full px-5 py-1.5 text-sm transition-colors ${activeTagId === null ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
-          >
-            全部
-          </button>
+      <div className="mb-6 flex justify-between items-center">
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
           {tags.map((tag) => (
             <button
               key={tag.id}
               onClick={() => handleTagClick(tag.id)}
-              className={`rounded-full px-5 py-1.5 text-sm transition-colors ${activeTagId === tag.id ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
+              className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
             >
               {tag.name}
             </button>
           ))}
-          <span className="w-px h-5 bg-zinc-700 mx-1" />
-          <button
-            onClick={() => setTypeFilter('all')}
-            className={`rounded-full px-5 py-1.5 text-sm transition-colors ${typeFilter === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
-          >
-            全部类型
-          </button>
-          <button
-            onClick={() => setTypeFilter('series')}
-            className={`rounded-full px-5 py-1.5 text-sm transition-colors ${typeFilter === 'series' ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
-          >
-            视频集
-          </button>
-          <button
-            onClick={() => setTypeFilter('video')}
-            className={`rounded-full px-5 py-1.5 text-sm transition-colors ${typeFilter === 'video' ? 'bg-blue-600 text-white shadow-md' : 'bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
-          >
-            单视频
-          </button>
         </div>
-
-        {/* 右侧：搜索框 + 排序 */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="搜索..."
-              className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 w-64 placeholder-zinc-500"
-            />
-          </div>
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => { setSortBy(e.target.value as 'created_at' | 'title'); refreshVideos(); refreshSeries(); }}
-              className="appearance-none bg-zinc-800 border border-zinc-700 rounded-lg pl-3 pr-8 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500 w-40 hover:bg-zinc-700"
-            >
-              <option value="created_at">添加时间</option>
-              <option value="title">名称</option>
-            </select>
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs pointer-events-none">▼</span>
-          </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          >
+            <option value="created_at">添加时间</option>
+            <option value="title">名称</option>
+          </select>
           <button
-            onClick={() => { toggleSortOrder(); refreshVideos(); refreshSeries(); }}
-            className="p-1.5 bg-zinc-800 border border-zinc-700 rounded-lg hover:bg-zinc-700 text-white text-sm"
+            onClick={() => toggleSortOrder()}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none"
           >
             {sortOrder === 'desc' ? '↓' : '↑'}
           </button>
         </div>
+      </div>
+
+      <div className="mb-6 flex gap-3 flex-wrap">
+        <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
+        <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
+        <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>单视频</button>
+      </div>
+
+      <div className="mb-10">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="搜索视频或视频集..."
+          className="search-input"
+        />
       </div>
 
       {typeFilter !== 'video' && filteredSeries.length > 0 && (
@@ -254,18 +228,17 @@ const Library: React.FC = () => {
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className="card cursor-pointer flex flex-col group"
               >
-                <div className="relative w-full aspect-[2/3]">
+                <div className="relative w-full aspect-[2/3] overflow-hidden">
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                   <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
                 </div>
-                <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                  <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">
+                <div className="p-3">
+                  <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">
                     {series.title}
                   </h3>
-                  <div className="text-xs text-white/70 mt-1">
+                  <div className="text-xs text-zinc-500 mt-1">
                     {series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
                   </div>
                 </div>
@@ -288,7 +261,7 @@ const Library: React.FC = () => {
                   onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
                   className="card cursor-pointer flex flex-col group"
                 >
-                  <div className="relative w-full aspect-video">
+                  <div className="relative w-full aspect-video overflow-hidden">
                     <SmartPoster
                       src={thumbnailDataUrl}
                       alt={video.file_name}
@@ -296,18 +269,17 @@ const Library: React.FC = () => {
                       width={video.width}
                       height={video.height}
                     />
-                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                     {video.duration && (
                       <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                         {Math.floor(video.duration / 60)}分钟
                       </div>
                     )}
                   </div>
-                  <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                    <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">
                       {video.file_name}
                     </h3>
-                    <div className="text-xs text-white/70 mt-1">
+                    <div className="text-xs text-zinc-500 mt-1">
                       尚未观看
                     </div>
                   </div>

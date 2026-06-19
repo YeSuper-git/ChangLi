@@ -110,16 +110,15 @@ const Home: React.FC = () => {
                     state={{ from: '/', backLabel: '返回首页' }}
                     className="card flex flex-col h-full group"
                   >
-                    <div className="relative w-full aspect-[2/3]">
+                    <div className="relative w-full aspect-[2/3] overflow-hidden">
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                       <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                         {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                       </div>
                     </div>
-                    <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                      <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">{series.title}</h3>
-                      <div className="text-xs text-white/70 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+                    <div className="p-3">
+                      <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{series.title}</h3>
+                      <div className="text-xs text-zinc-500 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
                     </div>
                   </Link>
                 );
@@ -132,18 +131,17 @@ const Home: React.FC = () => {
                     state={{ from: '/', backLabel: '返回首页' }}
                     className="card flex flex-col h-full group"
                   >
-                    <div className="relative w-full aspect-video">
+                    <div className="relative w-full aspect-video overflow-hidden">
                       <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
-                      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                       {video.duration && (
                         <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                           {Math.floor(video.duration / 60)}分钟
                         </div>
                       )}
                     </div>
-                    <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                      <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">{video.file_name}</h3>
-                      <div className="text-xs text-white/70 mt-1">尚未观看</div>
+                    <div className="p-3">
+                      <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{video.file_name}</h3>
+                      <div className="text-xs text-zinc-500 mt-1">尚未观看</div>
                     </div>
                   </Link>
                 );
@@ -167,16 +165,15 @@ const Home: React.FC = () => {
         <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
           {seriesList.slice(0, 8).map((series) => (
             <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
-              <div className="aspect-[2/3] relative w-full">
+              <div className="aspect-[2/3] relative w-full overflow-hidden">
                 <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                   {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                 </div>
               </div>
-              <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">{series.title}</h3>
-                <div className="text-xs text-white/70 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+              <div className="p-3">
+                <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{series.title}</h3>
+                <div className="text-xs text-zinc-500 mt-1">{series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
               </div>
             </Link>
           ))}
@@ -184,18 +181,17 @@ const Home: React.FC = () => {
             const thumbnailDataUrl = videoPosterDataUrl(video);
             return (
               <Link key={`video-${video.id}`} to={`/video/${video.id}?fromHome=1`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
-                <div className="relative w-full aspect-video">
+                <div className="relative w-full aspect-video overflow-hidden">
                   <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
-                  <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
                   {video.duration && (
                     <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
                       {Math.floor(video.duration / 60)}分钟
                     </div>
                   )}
                 </div>
-                <div className="relative -mt-14 p-2 flex flex-col justify-end h-20">
-                  <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-blue-400">{video.file_name}</h3>
-                  <div className="text-xs text-white/70 mt-1">尚未观看</div>
+                <div className="p-3">
+                  <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{video.file_name}</h3>
+                  <div className="text-xs text-zinc-500 mt-1">尚未观看</div>
                 </div>
               </Link>
             );
