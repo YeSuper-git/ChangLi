@@ -336,13 +336,52 @@ const ActorDetail: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
-                <input
-                  type="text"
-                  value={editForm.birthday}
-                  onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })}
-                  placeholder="YYYY-MM-DD"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={editForm.birthday?.split('-')[0] || ''}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      const parts = (editForm.birthday || '').split('-');
+                      parts[0] = v;
+                      setEditForm({ ...editForm, birthday: parts.join('-') });
+                      if (v.length === 4) document.getElementById('birth-month')?.focus();
+                    }}
+                    placeholder="年"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                  />
+                  <span className="text-gray-400">-</span>
+                  <input
+                    id="birth-month"
+                    type="text"
+                    value={editForm.birthday?.split('-')[1] || ''}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+                      const parts = (editForm.birthday || '--').split('-');
+                      while (parts.length < 3) parts.push('');
+                      parts[1] = v;
+                      setEditForm({ ...editForm, birthday: parts.join('-') });
+                      if (v.length === 2) document.getElementById('birth-day')?.focus();
+                    }}
+                    placeholder="月"
+                    className="w-16 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                  />
+                  <span className="text-gray-400">-</span>
+                  <input
+                    id="birth-day"
+                    type="text"
+                    value={editForm.birthday?.split('-')[2] || ''}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+                      const parts = (editForm.birthday || '--').split('-');
+                      while (parts.length < 3) parts.push('');
+                      parts[2] = v;
+                      setEditForm({ ...editForm, birthday: parts.join('-') });
+                    }}
+                    placeholder="日"
+                    className="w-16 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">身高 (cm)</label>
