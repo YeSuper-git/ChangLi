@@ -394,6 +394,7 @@ const ActorDetail: React.FC = () => {
               {/* 出生日期 + 身高 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
                   <div className="flex gap-1 items-center">
                     <input
                       type="text"
@@ -463,9 +464,11 @@ const ActorDetail: React.FC = () => {
               {/* 数值 + 车灯 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
                   <div className="flex gap-1 items-center">
                     {[0, 1, 2].map((idx) => (
                       <React.Fragment key={idx}>
+                        <span className="text-gray-500 text-sm">{['B', 'W', 'H'][idx]}</span>
                         <input
                           ref={(el) => { measureRefs.current[idx] = el; }}
                           type="text"
@@ -474,7 +477,6 @@ const ActorDetail: React.FC = () => {
                           onChange={(e) => handleMeasureChange(idx, e.target.value)}
                           className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                         />
-                        <span className="text-gray-500 text-sm">{['B', 'W', 'H'][idx]}</span>
                       </React.Fragment>
                     ))}
                   </div>
