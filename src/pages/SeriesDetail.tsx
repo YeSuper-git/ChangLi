@@ -32,6 +32,27 @@ import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 
+function extractCode(folderName: string): { code: string; hasChineseSub: boolean } {
+  const match = folderName.match(/[A-Za-z]+-\d+[A-Za-z]*/);
+  if (!match) return { code: '', hasChineseSub: false };
+
+  let raw = match[0];
+  let hasChineseSub = false;
+
+  // 检查末尾 ch/CH/Ch/cH
+  if (/[cC][hH]$/.test(raw)) {
+    raw = raw.slice(0, -2);
+    hasChineseSub = true;
+  }
+  // 检查末尾 C/c
+  else if (/[cC]$/.test(raw)) {
+    raw = raw.slice(0, -1);
+    hasChineseSub = true;
+  }
+
+  return { code: raw.toUpperCase(), hasChineseSub };
+}
+
 const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,7 +76,7 @@ const SeriesDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed' }>({ title: '', description: '', poster: '', status: 'ongoing' });
+  const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed'; code: string; has_chinese_sub: boolean }>({ title: '', description: '', poster: '', status: 'ongoing', code: '', has_chinese_sub: false });
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [seriesTags, setSeriesTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
@@ -87,6 +108,17 @@ const SeriesDetail: React.FC = () => {
       setEditing(true);
     }
   }, [editFromUrl, series]);
+
+  // 编辑模式打开时自动识别车牌
+  useEffect(() => {
+    if (editing && series && !editData.code) {
+      const source = series.folder_path || series.title;
+      const { code, hasChineseSub } = extractCode(source);
+      if (code) {
+        setEditData((prev) => ({ ...prev, code, has_chinese_sub: hasChineseSub }));
+      }
+    }
+  }, [editing]);
 
   // 点击空白关闭右键菜单
   useEffect(() => {
@@ -121,6 +153,8 @@ const SeriesDetail: React.FC = () => {
           description: seriesData.description || '',
           poster: seriesData.poster || '',
           status: seriesData.status === 'completed' ? 'completed' : 'ongoing',
+          code: seriesData.code || '',
+          has_chinese_sub: seriesData.has_chinese_sub === 1,
         });
       }
     } catch (error) {
@@ -221,7 +255,7 @@ const SeriesDetail: React.FC = () => {
     }
     setSaving(true);
     try {
-      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status);
+      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
       await syncSeriesRelations();
       clearEditQuery();
       setEditing(false);
@@ -431,31 +465,56 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {allActors.map((actor) => {
-                      const selected = selectedActorIds.includes(actor.id);
-                      return (
+                {series?.has_actor && (
+                  <>
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {allActors.map((actor) => {
+                          const selected = selectedActorIds.includes(actor.id);
+                          return (
+                            <button
+                              key={actor.id}
+                              type="button"
+                              onClick={() => toggleActor(actor.id)}
+                              className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                            >
+                              {actor.name}
+                            </button>
+                          );
+                        })}
                         <button
-                          key={actor.id}
                           type="button"
-                          onClick={() => toggleActor(actor.id)}
-                          className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                          onClick={() => setShowNewActorModal(true)}
+                          className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
                         >
-                          {actor.name}
+                          + 新建演员
                         </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setShowNewActorModal(true)}
-                      className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
-                    >
-                      + 新建演员
-                    </button>
-                  </div>
-                </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
+                      <input
+                        type="text"
+                        value={editData.code}
+                        onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                        className="search-input"
+                        placeholder="如 JJK-098"
+                        style={{ textTransform: 'uppercase' }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-500">中文字幕</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.has_chinese_sub ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.has_chinese_sub ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                  </>
+                )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); }} className="action-btn">取消</button>
@@ -465,6 +524,12 @@ const SeriesDetail: React.FC = () => {
               <>
                 <div className="flex items-center gap-3 mb-3">
                   <h1 className="text-3xl font-bold">{series.title}</h1>
+                  {series.code && (
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-gray-100 text-gray-700">{series.code}</span>
+                  )}
+                  {series.has_chinese_sub === 1 && (
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
+                  )}
                   <button
                     onClick={() => toggleFavorite(series.id, 'series')}
                     className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"

@@ -282,6 +282,8 @@ export interface VideoSeries {
   is_watched?: number;
   last_watched_episode?: number;
   has_actor?: boolean;
+  code?: string;
+  has_chinese_sub?: number;
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
@@ -325,8 +327,8 @@ export async function getVideoSeriesDetail(id: number): Promise<[VideoSeries | n
   return invoke<[VideoSeries | null, Video[]]>('get_video_series_detail', { id });
 }
 
-export async function updateVideoSeries(id: number, title: string, description?: string, poster?: string, poster_orientation?: string, status?: string): Promise<VideoSeries> {
-  return invoke<VideoSeries>('update_video_series', { id, title, description, poster, poster_orientation, status });
+export async function updateVideoSeries(id: number, title: string, description?: string, poster?: string, poster_orientation?: string, status?: string, code?: string, has_chinese_sub?: number): Promise<VideoSeries> {
+  return invoke<VideoSeries>('update_video_series', { id, title, description, poster, poster_orientation, status, code, has_chinese_sub });
 }
 
 export async function deleteVideoSeries(id: number, deleteVideos: boolean): Promise<void> {

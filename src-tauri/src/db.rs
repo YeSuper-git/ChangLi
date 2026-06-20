@@ -103,6 +103,8 @@ pub struct VideoSeries {
     pub is_watched: Option<i32>,
     pub last_watched_episode: Option<i32>,
     pub has_actor: bool,
+    pub code: Option<String>,
+    pub has_chinese_sub: Option<i32>,
 }
 
 // 演员
@@ -659,6 +661,8 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         is_watched: row.try_get("is_watched").ok(),
         last_watched_episode: row.try_get("last_watched_episode").ok(),
         has_actor: row.try_get::<i64, _>("has_actor").unwrap_or(0) != 0,
+        code: row.try_get("code").ok().flatten(),
+        has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
     }
 }
 
@@ -774,14 +778,18 @@ pub async fn update_video_series(
     poster_orientation: Option<String>,
     status: Option<String>,
     poster_base64: Option<String>,
+    code: Option<String>,
+    has_chinese_sub: Option<i32>,
 ) -> Result<VideoSeries> {
-    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, code = ?, has_chinese_sub = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(title)
         .bind(description)
         .bind(poster)
         .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
         .bind(status.unwrap_or_else(|| "completed".to_string()))
         .bind(poster_base64)
+        .bind(code)
+        .bind(has_chinese_sub.unwrap_or(0))
         .bind(id)
         .execute(pool)
         .await?;
@@ -1406,6 +1414,8 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 is_watched: None,
                 last_watched_episode: None,
                 has_actor: false,
+                code: None,
+                has_chinese_sub: None,
             }
         });
         items.push(RecentWatchItem {

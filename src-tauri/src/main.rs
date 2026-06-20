@@ -637,6 +637,8 @@ async fn update_video_series(
     poster: Option<String>,
     poster_orientation: Option<String>,
     status: Option<String>,
+    code: Option<String>,
+    has_chinese_sub: Option<i32>,
 ) -> Result<db::VideoSeries, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -645,7 +647,7 @@ async fn update_video_series(
     let stored_poster = poster.as_deref().map(normalize_photo_path_for_storage);
     let poster_base64 = stored_poster.as_deref()
         .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-    db::update_video_series(&pool, id, title, description, stored_poster, poster_orientation, status, poster_base64)
+    db::update_video_series(&pool, id, title, description, stored_poster, poster_orientation, status, poster_base64, code, has_chinese_sub)
         .await
         .map_err(|e| e.to_string())
 }
