@@ -514,6 +514,31 @@ pub struct FolderInfo {
 }
 
 /// 成人视频文件名解析结果
+/// 查找文件夹的海报图片（公开版本，自动收集文件夹内的图片文件）
+pub fn find_folder_poster(folder: &Path) -> Option<String> {
+    let folder_name = folder
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let mut image_files: Vec<PathBuf> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(folder) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    let ext = ext.to_string_lossy().to_lowercase();
+                    if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+                        image_files.push(path);
+                    }
+                }
+            }
+        }
+    }
+    find_poster_for_folder(folder, &folder_name, &image_files)
+}
+
+/// 成人视频文件名解析结果
 #[derive(Debug, Clone)]
 pub struct AdultFileInfo {
     /// 车牌号（大写），如 "ABC-123"

@@ -5,6 +5,7 @@ import {
   getVideoSeriesByActor,
   scanVideos,
   deleteVideoSeries,
+  rescanSingleSeriesMetadata,
 } from '../utils/api';
 import type { VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
@@ -228,6 +229,21 @@ const Library: React.FC = () => {
     setContextMenu(null);
     clearPending();
     navigate(target, { state: { from: '/library', backLabel: '返回视频', filterSearch } });
+  };
+
+  const handleRescanMetadata = async (seriesId: number) => {
+    try {
+      const matched = await rescanSingleSeriesMetadata(seriesId);
+      setContextMenu(null);
+      clearPending();
+      await refreshSeries();
+      if (activeTagId !== null) await filterByTag(activeTagId);
+      if (activeActorId !== null) await filterByActor(activeActorId);
+      setToast({ message: matched ? '元数据更新成功' : '未匹配到成人格式，未更新', type: matched ? 'success' : 'info' });
+    } catch (error) {
+      console.error('[Library] 重新扫描元数据失败:', error);
+      setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });
+    }
   };
 
 
@@ -550,6 +566,12 @@ const Library: React.FC = () => {
             onClick={handleEditContextItem}
           >
             编辑
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={() => handleRescanMetadata(contextMenu.id)}
+          >
+            重新扫描元数据
           </button>
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"

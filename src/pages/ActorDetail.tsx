@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap, rescanSingleSeriesMetadata } from '../utils/api';
 import type { Actor, Video, ActorPeriod } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
@@ -269,6 +269,19 @@ const ActorDetail: React.FC = () => {
     } catch (error) {
       console.error('[Actor] 删除视频集失败:', error);
       alert('删除失败: ' + String(error));
+    }
+  };
+
+  const handleRescanMetadata = async (seriesId: number) => {
+    try {
+      const matched = await rescanSingleSeriesMetadata(seriesId);
+      setContextMenu(null);
+      clearPending();
+      if (actor) loadActor(actor.id);
+      setToast({ message: matched ? '元数据更新成功' : '未匹配到成人格式，未更新', type: matched ? 'success' : 'info' });
+    } catch (error) {
+      console.error('[Actor] 重新扫描元数据失败:', error);
+      setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -820,6 +833,14 @@ const ActorDetail: React.FC = () => {
           >
             编辑
           </button>
+          {contextMenu.type === 'series' && (
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => handleRescanMetadata(contextMenu.id)}
+            >
+              重新扫描元数据
+            </button>
+          )}
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
             onClick={() => {

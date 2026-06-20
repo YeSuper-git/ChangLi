@@ -403,6 +403,10 @@ export async function rescanAllSeriesMetadata(): Promise<[number, number]> {
   return invoke<[number, number]>('rescan_all_series_metadata');
 }
 
+export async function rescanSingleSeriesMetadata(seriesId: number): Promise<boolean> {
+  return invoke<boolean>('rescan_single_series_metadata', { seriesId });
+}
+
 // 演员相关
 export interface Actor {
   id: number;

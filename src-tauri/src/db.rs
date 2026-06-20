@@ -1912,6 +1912,59 @@ pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
 }
 
 /// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
+/// 重新扫描单个视频集的元数据（车牌、中字、标题、海报）
+pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) -> Result<bool> {
+    let row = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, folder_path FROM video_series WHERE id = ?"
+    )
+    .bind(series_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (id, title, folder_path) = match row {
+        Some(r) => r,
+        None => return Ok(false),
+    };
+
+    let source = folder_path.as_deref().unwrap_or(&title);
+    let folder_name = std::path::Path::new(source)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| title.clone());
+
+    if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+        let code = info.code;
+        let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+        let new_title = match info.title {
+            Some(t) => format!("[{}] {}", code, t),
+            None => format!("[{}] {}", code, folder_name),
+        };
+
+        // 重新生成海报
+        let folder_path_std = std::path::Path::new(source);
+        let poster = crate::scanner::find_folder_poster(folder_path_std);
+        let poster_base64 = poster
+            .as_deref()
+            .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+
+        sqlx::query(
+            "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
+        )
+        .bind(&code)
+        .bind(has_chinese_sub)
+        .bind(&new_title)
+        .bind(poster)
+        .bind(poster_base64)
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
         "SELECT id, title, folder_path FROM video_series"

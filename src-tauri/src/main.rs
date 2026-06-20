@@ -1346,6 +1346,15 @@ async fn rescan_all_series_metadata(state: State<'_, AppState>) -> Result<(i64, 
     db::rescan_all_series_metadata(&pool).await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn rescan_single_series_metadata(state: State<'_, AppState>, series_id: i64) -> Result<bool, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::rescan_single_series_metadata(&pool, series_id).await.map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
@@ -1437,6 +1446,7 @@ fn main() {
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
             rescan_all_series_metadata,
+            rescan_single_series_metadata,
             delete_all_videos,
             get_series_seasons,
             delete_season,
