@@ -369,6 +369,13 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
     // 从文件名提取集数信息。固定两位数字文件名 01/02/03 直接作为集数。
     let episode =
         fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name));
+
+    // 解析成人视频文件名（车牌、中文字幕、标题）
+    let adult_info = parse_adult_filename(&file_name);
+
+    // 如果解析到成人视频标题，用作 subtitle
+    let subtitle = adult_info.as_ref().and_then(|info| info.title.clone());
+
     let poster = poster
         .map(|p| p.to_string())
         .or_else(|| find_poster_next_to_video(path));
@@ -391,7 +398,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         episode_number: episode,
         file_size: Some(file_size),
         season: None,
-        subtitle: None,
+        subtitle,
         duration: None,
         width: None,
         height: None,
@@ -408,6 +415,7 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
         created_at: chrono::Utc::now().to_rfc3339(),
         is_favorite: None,
         series_has_chinese_sub: None,
+        series_code: None,
     })
 }
 
@@ -503,6 +511,57 @@ pub struct FolderInfo {
     pub name: String,
     pub path: String,
     pub video_count: usize,
+}
+
+/// 成人视频文件名解析结果
+#[derive(Debug, Clone)]
+pub struct AdultFileInfo {
+    /// 车牌号（大写），如 "ABC-123"
+    pub code: String,
+    /// 是否有中文字幕
+    pub has_chinese_sub: bool,
+    /// 方括号中的标题（如果有）
+    pub title: Option<String>,
+}
+
+/// 从文件名解析成人视频信息
+/// 支持格式：
+///   xxx-000c[标题]  xxx-000[标题]  xxx-000-c[标题]  xxx-000ch[标题]
+pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
+    let re = regex::Regex::new(r"(?i)([A-Za-z]+-\d+)").ok()?;
+    let caps = re.captures(filename)?;
+    let code_match = caps.get(1)?;
+    let code_raw = code_match.as_str();
+    let after_code = &filename[code_match.end()..];
+
+    // 检查车牌后是否有中文字幕标记（c/ch/CH 等），前面可能有 -
+    let (sub_suffix_len, has_chinese_sub) = if let Some(m) = regex::Regex::new(r"(?i)^-?[cC][hH]")
+        .ok()
+        .and_then(|re| re.find(after_code))
+    {
+        (m.len(), true)
+    } else if let Some(m) = regex::Regex::new(r"(?i)^-?[cC](?![hH])")
+        .ok()
+        .and_then(|re| re.find(after_code))
+    {
+        (m.len(), true)
+    } else {
+        (0, false)
+    };
+
+    // 提取 [] 中的标题
+    let rest = &after_code[sub_suffix_len..];
+    let title = regex::Regex::new(r"\[([^\]]*)\]")
+        .ok()
+        .and_then(|re| re.captures(rest))
+        .and_then(|caps| caps.get(1))
+        .map(|m| m.as_str().to_string());
+
+    Some(AdultFileInfo {
+        code: code_raw.to_uppercase(),
+        has_chinese_sub,
+        title,
+    })
 }
 
 #[cfg(test)]

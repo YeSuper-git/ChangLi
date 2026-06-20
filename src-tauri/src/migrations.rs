@@ -4,6 +4,10 @@ use sqlx::{sqlite::SqlitePool, Row};
 pub async fn run(pool: &SqlitePool) -> Result<()> {
     create_base_tables(pool).await?;
     migrate_existing_tables(pool).await?;
+    // actor_periods table and period_id columns must exist before cascade rebuild,
+    // because rebuild copies data using SELECT period_id FROM old tables.
+    create_actor_periods_table(pool).await?;
+    migrate_period_id_columns(pool).await?;
     migrate_cascade_foreign_keys(pool).await?;
     create_video_and_series_relation_tables(pool).await?;
     migrate_legacy_video_relations(pool).await?;
@@ -444,11 +448,12 @@ async fn migrate_cascade_foreign_keys(pool: &SqlitePool) -> Result<()> {
             video_id INTEGER REFERENCES videos(id) ON DELETE CASCADE,
             actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
             role TEXT,
+            period_id INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL,
             PRIMARY KEY (video_id, actor_id)
         )
         "#,
-        "INSERT OR IGNORE INTO video_actors_new (video_id, actor_id, role)
-         SELECT video_id, actor_id, role FROM video_actors
+        "INSERT OR IGNORE INTO video_actors_new (video_id, actor_id, role, period_id)
+         SELECT video_id, actor_id, role, period_id FROM video_actors
          WHERE EXISTS (SELECT 1 FROM videos v WHERE v.id = video_actors.video_id)
            AND EXISTS (SELECT 1 FROM actors a WHERE a.id = video_actors.actor_id)",
     )
@@ -479,11 +484,12 @@ async fn migrate_cascade_foreign_keys(pool: &SqlitePool) -> Result<()> {
             series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
             actor_id INTEGER REFERENCES actors(id) ON DELETE CASCADE,
             role TEXT,
+            period_id INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL,
             PRIMARY KEY (series_id, actor_id)
         )
         "#,
-        "INSERT OR IGNORE INTO series_actors_new (series_id, actor_id, role)
-         SELECT series_id, actor_id, role FROM series_actors
+        "INSERT OR IGNORE INTO series_actors_new (series_id, actor_id, role, period_id)
+         SELECT series_id, actor_id, role, period_id FROM series_actors
          WHERE EXISTS (SELECT 1 FROM video_series s WHERE s.id = series_actors.series_id)
            AND EXISTS (SELECT 1 FROM actors a WHERE a.id = series_actors.actor_id)",
     )
@@ -731,6 +737,32 @@ async fn seed_default_actors_if_empty(pool: &SqlitePool) -> Result<()> {
             .with_context(|| format!("seed default actor {name}"))?;
     }
 
+    Ok(())
+}
+
+async fn create_actor_periods_table(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS actor_periods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (actor_id) REFERENCES actors(id) ON DELETE CASCADE
+        )
+        "#,
+        "create actor_periods table",
+    )
+    .await?;
+    Ok(())
+}
+
+async fn migrate_period_id_columns(pool: &SqlitePool) -> Result<()> {
+    // Add period_id to video_actors (legacy name: resource_actors)
+    add_column_if_not_exists(pool, "video_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
+    add_column_if_not_exists(pool, "series_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
+    add_column_if_not_exists(pool, "resource_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
     Ok(())
 }
 

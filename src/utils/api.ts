@@ -218,6 +218,7 @@ export interface Video {
   created_at: string;
   is_favorite?: number;
   series_has_chinese_sub?: number;
+  series_code?: string;
 }
 
 export interface ScanResult {
@@ -415,6 +416,14 @@ export interface Actor {
   updated_at: string;
 }
 
+// 演员时期
+export interface ActorPeriod {
+  id: number;
+  actor_id: number;
+  name: string;
+  created_at: string;
+}
+
 export async function getActors(): Promise<Actor[]> {
   console.log('[API] 调用 getActors');
   try {
@@ -599,10 +608,10 @@ export async function getResourceActors(resourceId: number): Promise<Actor[]> {
   }
 }
 
-export async function addResourceActor(resourceId: number, actorId: number, role?: string): Promise<void> {
-  console.log('[API] 调用 addResourceActor, resourceId:', resourceId, 'actorId:', actorId, 'role:', role);
+export async function addResourceActor(resourceId: number, actorId: number, role?: string, periodId?: number): Promise<void> {
+  console.log('[API] 调用 addResourceActor, resourceId:', resourceId, 'actorId:', actorId, 'role:', role, 'periodId:', periodId);
   try {
-    await invoke('add_resource_actor', { resourceId, actorId, role });
+    await invoke('add_resource_actor', { resourceId, actorId, role, periodId });
     console.log('[API] addResourceActor 成功');
   } catch (err) {
     console.error('[API] addResourceActor 失败:', err);
@@ -644,6 +653,27 @@ export async function addSeriesActor(seriesId: number, actorId: number, role?: s
 
 export async function removeSeriesActor(seriesId: number, actorId: number): Promise<void> {
   return invoke('remove_series_actor', { seriesId, actorId });
+}
+
+// 演员时期相关
+export async function getActorPeriods(actorId: number): Promise<ActorPeriod[]> {
+  return invoke<ActorPeriod[]>('get_actor_periods', { actorId });
+}
+
+export async function addActorPeriod(actorId: number, name: string): Promise<ActorPeriod> {
+  return invoke<ActorPeriod>('add_actor_period', { actorId, name });
+}
+
+export async function updateActorPeriod(id: number, name: string): Promise<void> {
+  return invoke('update_actor_period', { id, name });
+}
+
+export async function deleteActorPeriod(id: number): Promise<void> {
+  return invoke('delete_actor_period', { id });
+}
+
+export async function getActorWorkPeriodMap(actorId: number): Promise<Record<string, number>> {
+  return invoke<Record<string, number>>('get_actor_work_period_map', { actorId });
 }
 
 // 播放器相关

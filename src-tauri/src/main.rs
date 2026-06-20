@@ -392,7 +392,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 } else {
                     let series = db::add_video_series(&pool, &entry_name, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
                     db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
-                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
+                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None, None).await {
                         eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
                     }
                     added += 1;
@@ -415,7 +415,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 } else {
                     let series = db::add_video_series(&pool, &file_stem, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
                     db::add_videos_batch(&pool, vec![video], Some(series.id)).await.map_err(|e| e.to_string())?;
-                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
+                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None, None).await {
                         eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
                     }
                     added += 1;
@@ -898,6 +898,75 @@ async fn get_actor_resources(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_actor_periods(
+    state: State<'_, AppState>,
+    actor_id: i64,
+) -> Result<Vec<db::ActorPeriod>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_actor_periods(&pool, actor_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_actor_period(
+    state: State<'_, AppState>,
+    actor_id: i64,
+    name: String,
+) -> Result<db::ActorPeriod, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::add_actor_period(&pool, actor_id, &name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_actor_period(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_actor_period(&pool, id, &name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_actor_period(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_actor_period(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_actor_work_period_map(
+    state: State<'_, AppState>,
+    actor_id: i64,
+) -> Result<std::collections::HashMap<String, i64>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_actor_work_period_map(&pool, actor_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // 标签相关命令
 #[tauri::command]
 async fn get_tags(state: State<'_, AppState>) -> Result<Vec<db::Tag>, String> {
@@ -991,12 +1060,13 @@ async fn add_resource_actor(
     resource_id: i64,
     actor_id: i64,
     role: Option<String>,
+    period_id: Option<i64>,
 ) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_resource_actor(&pool, resource_id, actor_id, role.as_deref())
+    db::add_resource_actor(&pool, resource_id, actor_id, role.as_deref(), period_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1080,12 +1150,13 @@ async fn add_series_actor(
     series_id: i64,
     actor_id: i64,
     role: Option<String>,
+    period_id: Option<i64>,
 ) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_series_actor(&pool, series_id, actor_id, role.as_deref())
+    db::add_series_actor(&pool, series_id, actor_id, role.as_deref(), period_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1337,6 +1408,11 @@ fn main() {
             delete_season,
             create_season,
             update_video_subtitle,
+            get_actor_periods,
+            add_actor_period,
+            update_actor_period,
+            delete_actor_period,
+            get_actor_work_period_map,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

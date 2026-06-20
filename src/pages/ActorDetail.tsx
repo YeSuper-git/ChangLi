@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries } from '../utils/api';
-import type { Actor, Video } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap } from '../utils/api';
+import type { Actor, Video, ActorPeriod } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
@@ -38,6 +38,14 @@ const ActorDetail: React.FC = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [periods, setPeriods] = useState<ActorPeriod[]>([]);
+  const [workPeriodMap, setWorkPeriodMap] = useState<Record<string, number>>({});
+  const [activePeriodId, setActivePeriodId] = useState<number | null>(null); // null = 未分类/全部
+  const [editingPeriodId, setEditingPeriodId] = useState<number | null>(null);
+  const [editingPeriodName, setEditingPeriodName] = useState('');
+  const [addingPeriod, setAddingPeriod] = useState(false);
+  const [newPeriodName, setNewPeriodName] = useState('');
+  const [deletingPeriodId, setDeletingPeriodId] = useState<number | null>(null);
 
   const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
@@ -69,14 +77,18 @@ const ActorDetail: React.FC = () => {
   const loadActor = async (actorId: number) => {
     try {
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
-      const [actorData, resourcesData] = await Promise.all([
+      const [actorData, resourcesData, periodsData, periodMap] = await Promise.all([
         getActor(actorId),
         getActorResources(actorId),
+        getActorPeriods(actorId),
+        getActorWorkPeriodMap(actorId),
       ]);
       console.log('[Actor] getActor 返回:', actorData ? `name: ${actorData.name}, photo: ${actorData.photo || '无'}` : 'null');
       console.log('[Actor] getActorResources 返回:', resourcesData.length, '条');
       setActor(actorData);
       setResources(resourcesData);
+      setPeriods(periodsData);
+      setWorkPeriodMap(periodMap);
       if (actorData) {
         setEditForm({
           name: actorData.name,
@@ -190,10 +202,11 @@ const ActorDetail: React.FC = () => {
           const newVideos = allVideos.filter(v => !existingIds.has(v.id));
           console.log('[ActorDetail] 新增视频数量:', newVideos.length);
           
-          // 将新视频关联到当前演员
+          // 将新视频关联到当前演员（如果有活跃时期，自动关联 period_id）
           for (const video of newVideos) {
             console.log('[ActorDetail] 关联视频:', video.id, video.file_name);
-            await addResourceActor(video.id, actor.id);
+            const periodId = activePeriodId || undefined;
+            await addResourceActor(video.id, actor.id, undefined, periodId);
           }
           
           // 刷新资源列表
@@ -310,6 +323,76 @@ const ActorDetail: React.FC = () => {
     return `${y}-${m}-${d}`;
   };
 
+  // 时期管理函数
+  const handleAddPeriod = async () => {
+    if (!actor || !newPeriodName.trim()) return;
+    try {
+      const period = await addActorPeriod(actor.id, newPeriodName.trim());
+      setPeriods(prev => [...prev, period]);
+      setNewPeriodName('');
+      setAddingPeriod(false);
+      setActivePeriodId(period.id);
+      setToast({ message: `时期"${period.name}"已创建`, type: 'success' });
+    } catch (error) {
+      console.error('[Actor] 添加时期失败:', error);
+    }
+  };
+
+  const handleUpdatePeriod = async (periodId: number) => {
+    if (!editingPeriodName.trim()) return;
+    try {
+      await updateActorPeriod(periodId, editingPeriodName.trim());
+      setPeriods(prev => prev.map(p => p.id === periodId ? { ...p, name: editingPeriodName.trim() } : p));
+      setEditingPeriodId(null);
+      setToast({ message: '时期名称已更新', type: 'success' });
+    } catch (error) {
+      console.error('[Actor] 更新时期失败:', error);
+    }
+  };
+
+  const handleDeletePeriod = async (periodId: number) => {
+    if (deletingPeriodId !== periodId) {
+      setDeletingPeriodId(periodId);
+      return;
+    }
+    try {
+      await deleteActorPeriod(periodId);
+      setPeriods(prev => prev.filter(p => p.id !== periodId));
+      if (activePeriodId === periodId) setActivePeriodId(null);
+      setDeletingPeriodId(null);
+      // 重新加载以刷新 workPeriodMap
+      if (actor) {
+        const periodMap = await getActorWorkPeriodMap(actor.id);
+        setWorkPeriodMap(periodMap);
+      }
+      setToast({ message: '时期已删除，作品变为未分类', type: 'info' });
+    } catch (error) {
+      console.error('[Actor] 删除时期失败:', error);
+    }
+  };
+
+  // 获取作品的 period_id
+  const getWorkPeriodId = (resource: Video): number | null => {
+    const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
+    return workPeriodMap[key] || null;
+  };
+
+  // 按时期分组作品
+  const workItems = Array.from(
+    resources.reduce((map, resource) => {
+      const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
+      if (!map.has(key)) {
+        map.set(key, resource);
+      }
+      return map;
+    }, new Map<string, Video>()).values()
+  );
+
+  // 根据 activePeriodId 过滤作品
+  const filteredWorkItems = activePeriodId === null
+    ? workItems
+    : workItems.filter(item => getWorkPeriodId(item) === activePeriodId);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -335,17 +418,6 @@ const ActorDetail: React.FC = () => {
       navigate('/actors');
     }
   };
-
-  const workItems = Array.from(
-    resources.reduce((map, resource) => {
-      // 所有视频现在都属于视频集，按 series_id 分组
-      const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
-      if (!map.has(key)) {
-        map.set(key, resource);
-      }
-      return map;
-    }, new Map<string, Video>()).values()
-  );
 
   return (
     <>
@@ -617,22 +689,92 @@ const ActorDetail: React.FC = () => {
 
       {/* 参演作品 */}
       <section>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">参演作品</h2>
-          <button
-            onClick={handleAddWork}
-            disabled={addingWork}
-            className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
-          >
-            {addingWork ? '添加中...' : '添加作品'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setAddingPeriod(true); setNewPeriodName(''); }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            >
+              + 添加时期
+            </button>
+            <button
+              onClick={handleAddWork}
+              disabled={addingWork}
+              className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
+            >
+              {addingWork ? '添加中...' : '添加作品'}
+            </button>
+          </div>
         </div>
 
-        {workItems.length > 0 ? (
+        {/* 添加时期输入框 */}
+        {addingPeriod && (
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="text"
+              value={newPeriodName}
+              onChange={e => setNewPeriodName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddPeriod(); if (e.key === 'Escape') setAddingPeriod(false); }}
+              placeholder="时期名称"
+              autoFocus
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            />
+            <button onClick={handleAddPeriod} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm">确定</button>
+            <button onClick={() => setAddingPeriod(false)} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">取消</button>
+          </div>
+        )}
+
+        {/* 时期标签栏 */}
+        {periods.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              onClick={() => setActivePeriodId(null)}
+              className={`px-4 py-1.5 rounded-full text-sm transition-all ${activePeriodId === null ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              全部 ({workItems.length})
+            </button>
+            {periods.map(period => (
+              <div key={period.id} className="flex items-center gap-1 group">
+                {editingPeriodId === period.id ? (
+                  <input
+                    type="text"
+                    value={editingPeriodName}
+                    onChange={e => setEditingPeriodName(e.target.value)}
+                    onBlur={() => handleUpdatePeriod(period.id)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleUpdatePeriod(period.id); if (e.key === 'Escape') setEditingPeriodId(null); }}
+                    autoFocus
+                    className="px-3 py-1.5 border border-blue-300 rounded-full text-sm focus:outline-none"
+                    style={{ width: `${Math.max(editingPeriodName.length * 14 + 24, 60)}px` }}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setActivePeriodId(activePeriodId === period.id ? null : period.id)}
+                    onDoubleClick={() => { setEditingPeriodId(period.id); setEditingPeriodName(period.name); }}
+                    className={`px-4 py-1.5 rounded-full text-sm transition-all ${activePeriodId === period.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    {period.name}
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDeletePeriod(period.id)}
+                  className={`text-xs px-1.5 py-0.5 rounded transition-all ${deletingPeriodId === period.id ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100'}`}
+                  title={deletingPeriodId === period.id ? '再次点击确认删除' : '删除时期'}
+                >
+                  {deletingPeriodId === period.id ? '确认?' : '×'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filteredWorkItems.length > 0 ? (
           <div className="grid grid-cols-4 gap-6">
-            {workItems.map((resource) => {
+            {filteredWorkItems.map((resource) => {
               const isSeries = Boolean(resource.series_id);
-              const title = isSeries ? (resource.series_title || '视频集') : resource.file_name;
+              const code = resource.series_code || '';
+              const rawTitle = isSeries ? (resource.series_title || '视频集') : resource.file_name;
+              const title = code ? `[${code}] ${rawTitle}` : rawTitle;
               const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
               const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/series/${resource.series_id || resource.id}?fromActor=${actor.id}`;
               return (
@@ -661,7 +803,7 @@ const ActorDetail: React.FC = () => {
           </div>
         ) : (
           <div className="text-center py-16">
-            <p className="text-gray-500">暂无参演作品</p>
+            <p className="text-gray-500">{activePeriodId !== null ? '该时期暂无作品' : '暂无参演作品'}</p>
             <p className="text-gray-400 text-sm mt-2">点击"添加作品"按钮添加</p>
           </div>
         )}

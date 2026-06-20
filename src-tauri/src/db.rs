@@ -84,6 +84,7 @@ pub struct Video {
     pub created_at: String,
     pub is_favorite: Option<i32>,
     pub series_has_chinese_sub: Option<i32>,
+    pub series_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,6 +157,15 @@ pub struct ResourceActor {
     pub resource_id: i64,
     pub actor_id: i64,
     pub role: Option<String>,
+}
+
+// 演员时期
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorPeriod {
+    pub id: i64,
+    pub actor_id: i64,
+    pub name: String,
+    pub created_at: String,
 }
 
 // 播放记录
@@ -571,6 +581,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         created_at: row.get("created_at"),
         is_favorite: row.try_get("is_favorite").ok(),
         series_has_chinese_sub: row.try_get("series_has_chinese_sub").ok().flatten(),
+        series_code: row.try_get("series_code").ok().flatten(),
     }
 }
 
@@ -1107,6 +1118,54 @@ pub async fn delete_actor(pool: &SqlitePool, id: i64) -> Result<()> {
     Ok(())
 }
 
+// 演员时期操作
+pub async fn get_actor_periods(pool: &SqlitePool, actor_id: i64) -> Result<Vec<ActorPeriod>> {
+    let rows = sqlx::query("SELECT * FROM actor_periods WHERE actor_id = ? ORDER BY created_at ASC")
+        .bind(actor_id)
+        .fetch_all(pool)
+        .await?;
+    let periods = rows.iter().map(|row| ActorPeriod {
+        id: row.get("id"),
+        actor_id: row.get("actor_id"),
+        name: row.get("name"),
+        created_at: row.get("created_at"),
+    }).collect();
+    Ok(periods)
+}
+
+pub async fn add_actor_period(pool: &SqlitePool, actor_id: i64, name: &str) -> Result<ActorPeriod> {
+    let row = sqlx::query(
+        "INSERT INTO actor_periods (actor_id, name) VALUES (?, ?) RETURNING *",
+    )
+    .bind(actor_id)
+    .bind(name)
+    .fetch_one(pool)
+    .await?;
+    Ok(ActorPeriod {
+        id: row.get("id"),
+        actor_id: row.get("actor_id"),
+        name: row.get("name"),
+        created_at: row.get("created_at"),
+    })
+}
+
+pub async fn update_actor_period(pool: &SqlitePool, id: i64, name: &str) -> Result<()> {
+    sqlx::query("UPDATE actor_periods SET name = ? WHERE id = ?")
+        .bind(name)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_actor_period(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM actor_periods WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 // 标签操作
 pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
     let rows = sqlx::query("SELECT * FROM tags ORDER BY name")
@@ -1229,11 +1288,13 @@ pub async fn add_resource_actor(
     resource_id: i64,
     actor_id: i64,
     role: Option<&str>,
+    period_id: Option<i64>,
 ) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO video_actors (video_id, actor_id, role) VALUES (?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_actors (video_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)")
         .bind(resource_id)
         .bind(actor_id)
         .bind(role)
+        .bind(period_id)
         .execute(pool)
         .await?;
     Ok(())
@@ -1267,7 +1328,7 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
 
 pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
     let rows = sqlx::query(
-        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.has_chinese_sub AS series_has_chinese_sub
+        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.has_chinese_sub AS series_has_chinese_sub, s.code AS series_code
          FROM videos v
          LEFT JOIN video_series s ON s.id = v.series_id
          LEFT JOIN video_actors va ON va.video_id = v.id
@@ -1281,6 +1342,63 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
     .await?;
 
     Ok(rows.iter().map(video_from_row).collect())
+}
+
+/// 返回演员参演作品的时期映射：work_key -> period_id
+/// work_key 格式: "series-{id}" 或 "video-{id}"
+pub async fn get_actor_work_period_map(pool: &SqlitePool, actor_id: i64) -> Result<std::collections::HashMap<String, i64>> {
+    let mut map = std::collections::HashMap::new();
+
+    // 从 video_actors 获取独立视频的 period_id
+    let rows = sqlx::query(
+        "SELECT va.video_id, va.period_id FROM video_actors va
+         JOIN videos v ON v.id = va.video_id
+         WHERE va.actor_id = ? AND va.period_id IS NOT NULL AND v.series_id IS NULL"
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    for row in rows {
+        if let Ok(Some(period_id)) = row.try_get::<Option<i64>, _>("period_id") {
+            let video_id: i64 = row.get("video_id");
+            map.insert(format!("video-{}", video_id), period_id);
+        }
+    }
+
+    // 从 video_actors 获取系列视频的 period_id（取第一个视频的 period_id）
+    let rows = sqlx::query(
+        "SELECT v.series_id, va.period_id FROM video_actors va
+         JOIN videos v ON v.id = va.video_id
+         WHERE va.actor_id = ? AND va.period_id IS NOT NULL AND v.series_id IS NOT NULL
+         GROUP BY v.series_id"
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    for row in rows {
+        if let Ok(Some(period_id)) = row.try_get::<Option<i64>, _>("period_id") {
+            if let Ok(Some(series_id)) = row.try_get::<Option<i64>, _>("series_id") {
+                map.entry(format!("series-{}", series_id)).or_insert(period_id);
+            }
+        }
+    }
+
+    // 从 series_actors 获取系列的 period_id（优先级更高，覆盖 video_actors 的值）
+    let rows = sqlx::query(
+        "SELECT sa.series_id, sa.period_id FROM series_actors sa
+         WHERE sa.actor_id = ? AND sa.period_id IS NOT NULL"
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    for row in rows {
+        if let Ok(Some(period_id)) = row.try_get::<Option<i64>, _>("period_id") {
+            let series_id: i64 = row.get("series_id");
+            map.insert(format!("series-{}", series_id), period_id);
+        }
+    }
+
+    Ok(map)
 }
 
 pub async fn add_series_tag(pool: &SqlitePool, series_id: i64, tag_id: i64) -> Result<()> {
@@ -1323,11 +1441,13 @@ pub async fn add_series_actor(
     series_id: i64,
     actor_id: i64,
     role: Option<&str>,
+    period_id: Option<i64>,
 ) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO series_actors (series_id, actor_id, role) VALUES (?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO series_actors (series_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)")
         .bind(series_id)
         .bind(actor_id)
         .bind(role)
+        .bind(period_id)
         .execute(pool)
         .await?;
     Ok(())
