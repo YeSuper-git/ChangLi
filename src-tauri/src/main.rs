@@ -627,6 +627,7 @@ async fn update_video_series(
     code: Option<String>,
     has_chinese_sub: Option<i32>,
 ) -> Result<db::VideoSeries, String> {
+    eprintln!("[update_video_series] id={}, has_chinese_sub={:?}", id, has_chinese_sub);
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()

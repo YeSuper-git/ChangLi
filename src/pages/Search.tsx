@@ -71,7 +71,7 @@ const Search: React.FC = () => {
         type: 'series',
         id: series.id,
         title: series.title,
-        subtitle: `视频集 · ${series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}`,
+        subtitle: `${(series.has_actor || series.display_type === 'adult') ? '视频' : '视频集'} · ${series.status === 'completed' ? `全${series.video_count}${(series.has_actor || series.display_type === 'adult') ? '部' : '话'}` : `更新至第${series.video_count}${(series.has_actor || series.display_type === 'adult') ? '部' : '话'}`}`,
         series,
       }));
 

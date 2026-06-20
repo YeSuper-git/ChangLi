@@ -515,7 +515,7 @@ const Library: React.FC = () => {
                   )}
                   {typeFilter !== 'video' && (
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
+                      {series.status === 'completed' ? `全${series.video_count}部` : `更新至第${series.video_count}部`}
                     </div>
                   )}
                 </div>
@@ -524,7 +524,7 @@ const Library: React.FC = () => {
                     {series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
+                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}部` : '尚未观看'}
                   </div>
                 </div>
               </div>

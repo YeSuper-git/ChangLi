@@ -255,7 +255,9 @@ const SeriesDetail: React.FC = () => {
     }
     setSaving(true);
     try {
-      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
+      console.log('[Save] has_chinese_sub:', editData.has_chinese_sub, '→ sending:', editData.has_chinese_sub ? 1 : 0);
+      const result = await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
+      console.log('[Save] returned has_chinese_sub:', result.has_chinese_sub);
       await syncSeriesRelations();
       clearEditQuery();
       setEditing(false);
@@ -401,7 +403,66 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
-                {!isAdult && (
+                {isAdult ? (
+                  <>
+                    {series?.has_actor && (
+                      <>
+                        <div>
+                          <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {allActors.map((actor) => {
+                              const selected = selectedActorIds.includes(actor.id);
+                              return (
+                                <button
+                                  key={actor.id}
+                                  type="button"
+                                  onClick={() => toggleActor(actor.id)}
+                                  className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                                >
+                                  {actor.name}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => setShowNewActorModal(true)}
+                              className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                            >
+                              + 新建演员
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
+                          <input
+                            type="text"
+                            value={editData.code}
+                            onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                            className="search-input"
+                            placeholder="如 JJK-098"
+                            style={{ textTransform: 'uppercase' }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-gray-500">中文字幕</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.has_chinese_sub ? 'bg-blue-500' : 'bg-gray-300'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.has_chinese_sub ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    <textarea
+                      value={editData.description}
+                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                      className="search-input min-h-[120px]"
+                      placeholder="简介"
+                    />
+                  </>
+                ) : (
                   <select
                     value={editData.status}
                     onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
@@ -411,12 +472,6 @@ const SeriesDetail: React.FC = () => {
                     <option value="completed">已完结</option>
                   </select>
                 )}
-                <textarea
-                  value={editData.description}
-                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                  className="search-input min-h-[120px]"
-                  placeholder="简介"
-                />
                 {!isAdult && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
@@ -471,55 +526,13 @@ const SeriesDetail: React.FC = () => {
                     )}
                   </div>
                 )}
-                {series?.has_actor && (
-                  <>
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {allActors.map((actor) => {
-                          const selected = selectedActorIds.includes(actor.id);
-                          return (
-                            <button
-                              key={actor.id}
-                              type="button"
-                              onClick={() => toggleActor(actor.id)}
-                              className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
-                            >
-                              {actor.name}
-                            </button>
-                          );
-                        })}
-                        <button
-                          type="button"
-                          onClick={() => setShowNewActorModal(true)}
-                          className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
-                        >
-                          + 新建演员
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
-                      <input
-                        type="text"
-                        value={editData.code}
-                        onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
-                        className="search-input"
-                        placeholder="如 JJK-098"
-                        style={{ textTransform: 'uppercase' }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-500">中文字幕</span>
-                      <button
-                        type="button"
-                        onClick={() => setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.has_chinese_sub ? 'bg-blue-500' : 'bg-gray-300'}`}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.has_chinese_sub ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
-                    </div>
-                  </>
+                {!isAdult && (
+                  <textarea
+                    value={editData.description}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                    className="search-input min-h-[120px]"
+                    placeholder="简介"
+                  />
                 )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
@@ -638,7 +651,7 @@ const SeriesDetail: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
-                  <button onClick={handleAddEpisode} className="action-btn">添加分集</button>
+                  <button onClick={handleAddEpisode} className="action-btn">{isAdult ? '添加分部' : '添加分集'}</button>
                 </div>
               </>
             )}
@@ -646,12 +659,13 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">分集</h2>
+      <h2 className="text-xl font-semibold mb-4">{isAdult ? '分部' : '分集'}</h2>
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
           posterOrientation={series?.poster_orientation || 'unknown'}
           onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
+          isAdult={!!isAdult}
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
@@ -821,12 +835,14 @@ interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
   onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
+  isAdult?: boolean;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
   onContextMenu,
+  isAdult,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -888,7 +904,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">
-            {video.episode_number ? `第${video.episode_number}集` : video.file_name}
+            {video.episode_number ? `第${video.episode_number}${isAdult ? '部' : '集'}` : video.file_name}
           </h3>
           {video.episode_number && (
             <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>

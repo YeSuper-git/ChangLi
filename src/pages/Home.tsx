@@ -10,6 +10,8 @@ const Home: React.FC = () => {
 
   const seriesList = [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
+
   return (
     <div>
 
@@ -39,12 +41,12 @@ const Home: React.FC = () => {
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                       <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                        {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
+                        {series.status === 'completed' ? `全${series.video_count}${isAdult(series) ? '部' : '话'}` : `更新至第${series.video_count}${isAdult(series) ? '部' : '话'}`}
                       </div>
                     </div>
                     <div className="mt-2">
                       <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>{series.title}</h3>
-                      <div className="text-xs text-zinc-500 mt-0.5">{series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+                      <div className="text-xs text-zinc-500 mt-0.5">{series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${isAdult(series) ? '部' : '话'}` : '尚未观看'}</div>
                     </div>
                   </Link>
                 );
@@ -71,12 +73,12 @@ const Home: React.FC = () => {
                 <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                  {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
+                  {series.status === 'completed' ? `全${series.video_count}${isAdult(series) ? '部' : '话'}` : `更新至第${series.video_count}${isAdult(series) ? '部' : '话'}`}
                 </div>
               </div>
               <div className="mt-2">
                 <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>{series.title}</h3>
-                <div className="text-xs text-zinc-500 mt-0.5">{series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}</div>
+                <div className="text-xs text-zinc-500 mt-0.5">{series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${isAdult(series) ? '部' : '话'}` : '尚未观看'}</div>
               </div>
             </Link>
           ))}
