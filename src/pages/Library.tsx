@@ -450,7 +450,7 @@ const Library: React.FC = () => {
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   {series.has_chinese_sub === 1 && (
-                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                    <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
                       中字
                     </span>
                   )}
@@ -509,7 +509,7 @@ const Library: React.FC = () => {
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   {series.has_chinese_sub === 1 && (
-                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                    <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
                       中字
                     </span>
                   )}
