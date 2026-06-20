@@ -437,6 +437,17 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
     if let Some(existing) = db::get_video_series_by_folder_path(&pool, &path).await.map_err(|e| e.to_string())? {
         // 已存在：更新海报
         db::update_video_series_poster(&pool, existing.id, series_poster.as_deref(), series_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+        // 自动更新元数据（code、has_chinese_sub）
+        if existing.code.is_none() || existing.code.as_deref() == Some("") {
+            if let Some(info) = scanner::parse_adult_filename(&folder_name) {
+                let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ? AND (code IS NULL OR code = '')")
+                    .bind(&info.code)
+                    .bind(has_chinese_sub)
+                    .bind(existing.id)
+                    .execute(&pool).await;
+            }
+        }
         db::add_videos_batch(&pool, result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 0, updated: 1 })
     } else {
@@ -1313,6 +1324,15 @@ async fn update_video_subtitle(state: State<'_, AppState>, video_id: i64, subtit
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn rescan_all_series_metadata(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::rescan_all_series_metadata(&pool).await.map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
@@ -1403,6 +1423,7 @@ fn main() {
             toggle_watched,
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
+            rescan_all_series_metadata,
             delete_all_videos,
             get_series_seasons,
             delete_season,

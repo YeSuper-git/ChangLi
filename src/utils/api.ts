@@ -399,6 +399,10 @@ export async function deleteAllVideos(): Promise<{ videoCount: number; seriesCou
   return { videoCount, seriesCount };
 }
 
+export async function rescanAllSeriesMetadata(): Promise<[number, number]> {
+  return invoke<[number, number]>('rescan_all_series_metadata');
+}
+
 // 演员相关
 export interface Actor {
   id: number;

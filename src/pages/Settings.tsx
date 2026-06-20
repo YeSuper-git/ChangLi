@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllVideos } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllVideos, rescanAllSeriesMetadata } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -114,6 +114,23 @@ const Settings: React.FC = () => {
     }
   };
 
+  const [rescanning, setRescanning] = useState(false);
+  const [rescanResult, setRescanResult] = useState<[number, number] | null>(null);
+
+  const handleRescanMetadata = async () => {
+    setRescanning(true);
+    setRescanResult(null);
+    try {
+      const result = await rescanAllSeriesMetadata();
+      setRescanResult(result);
+    } catch (error) {
+      console.error('重新扫描元数据失败:', error);
+      alert('扫描失败: ' + String(error));
+    } finally {
+      setRescanning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -191,6 +208,26 @@ const Settings: React.FC = () => {
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
             >
               {deletingVideos ? '删除中...' : '删除所有视频'}
+            </button>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">重新解析所有视频集的文件名，补充缺失的番号（code）和中文字幕标记。</p>
+              {rescanResult && (
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ 已更新 {rescanResult[0]} 部，跳过 {rescanResult[1]} 部
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleRescanMetadata}
+              disabled={rescanning}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              {rescanning ? '扫描中...' : '重新扫描元数据'}
             </button>
           </div>
         </div>

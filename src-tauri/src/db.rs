@@ -1896,24 +1896,56 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
 /// 删除所有视频数据（不删除本地源文件，保留 actors 和 tags）
 /// 返回 (删除的视频数, 删除的视频集数)
 pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
-    let video_count = sqlx::query("SELECT COUNT(*) FROM videos")
+    let video_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM videos")
         .fetch_one(pool)
-        .await?
-        .get::<i64, _>(0);
-    let series_count = sqlx::query("SELECT COUNT(*) FROM video_series")
+        .await?;
+    let series_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM video_series")
         .fetch_one(pool)
-        .await?
-        .get::<i64, _>(0);
-
+        .await?;
     sqlx::query("DELETE FROM play_history").execute(pool).await?;
-    sqlx::query("DELETE FROM video_tags").execute(pool).await?;
-    sqlx::query("DELETE FROM video_actors").execute(pool).await?;
+    sqlx::query("DELETE FROM watch_progress").execute(pool).await?;
+    sqlx::query("DELETE FROM videos").execute(pool).await?;
     sqlx::query("DELETE FROM series_tags").execute(pool).await?;
     sqlx::query("DELETE FROM series_actors").execute(pool).await?;
-    sqlx::query("DELETE FROM videos").execute(pool).await?;
     sqlx::query("DELETE FROM video_series").execute(pool).await?;
+    Ok((video_count.0, series_count.0))
+}
 
-    Ok((video_count, series_count))
+/// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
+pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, folder_path FROM video_series"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut updated: i64 = 0;
+    let mut skipped: i64 = 0;
+
+    for (id, title, folder_path) in series_list {
+        let source = folder_path.as_deref().unwrap_or(&title);
+        let folder_name = std::path::Path::new(source)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| title.clone());
+        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+            let code = info.code;
+            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+            sqlx::query(
+                "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ? AND (code IS NULL OR code = '')"
+            )
+            .bind(&code)
+            .bind(has_chinese_sub)
+            .bind(id)
+            .execute(pool)
+            .await?;
+            updated += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    Ok((updated, skipped))
 }
 
 // 季管理
