@@ -545,14 +545,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
     });
     // 直接从数据库读取缓存的 Base64，不再实时生成
     let thumbnail_data_url: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
-    let series_poster: Option<String> = row.try_get("series_poster").ok();
-    let series_poster_data_url = series_poster
-        .as_ref()
-        .and_then(|path| {
-            // 系列海报也从数据库读取缓存的 Base64
-            let _ = path; // 占位，实际应从 series_poster_base64 字段读取
-            None::<String>
-        });
+    let series_poster_data_url: Option<String> = row.try_get("series_poster_base64").ok().flatten();
 
     Video {
         id: row.get("id"),
