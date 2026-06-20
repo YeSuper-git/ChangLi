@@ -1931,11 +1931,16 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
         if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
             let code = info.code;
             let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+            let new_title = match info.title {
+                Some(t) => format!("[{}] {}", code, t),
+                None => format!("[{}] {}", code, folder_name),
+            };
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ? AND (code IS NULL OR code = '')"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')"
             )
             .bind(&code)
             .bind(has_chinese_sub)
+            .bind(&new_title)
             .bind(id)
             .execute(pool)
             .await?;

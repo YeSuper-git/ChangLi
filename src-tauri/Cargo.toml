@@ -1,6 +1,6 @@
 [package]
 name = "changli"
-version = "0.5.81"
+version = "0.5.82"
 description = "长离 - 全功能视频管理播放平台"
 authors = ["YeSuper"]
 license = "MIT"

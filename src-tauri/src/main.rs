@@ -441,9 +441,14 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         if existing.code.is_none() || existing.code.as_deref() == Some("") {
             if let Some(info) = scanner::parse_adult_filename(&folder_name) {
                 let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ? AND (code IS NULL OR code = '')")
+                let new_title = match &info.title {
+                    Some(t) => format!("[{}] {}", info.code, t),
+                    None => format!("[{}] {}", info.code, folder_name),
+                };
+                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')")
                     .bind(&info.code)
                     .bind(has_chinese_sub)
+                    .bind(&new_title)
                     .bind(existing.id)
                     .execute(&pool).await;
             }
@@ -451,7 +456,15 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         db::add_videos_batch(&pool, result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 0, updated: 1 })
     } else {
-        let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+        let series_title = if let Some(info) = scanner::parse_adult_filename(&folder_name) {
+            match info.title {
+                Some(t) => format!("[{}] {}", info.code, t),
+                None => format!("[{}] {}", info.code, folder_name),
+            }
+        } else {
+            folder_name.clone()
+        };
+        let series = db::add_video_series(&pool, &series_title, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
         db::add_videos_batch(&pool, result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 1, updated: 0 })
     }
