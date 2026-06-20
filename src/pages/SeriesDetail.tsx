@@ -59,7 +59,7 @@ const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { favorites, toggleFavorite } = useLibraryStore();
+  const { favorites, toggleFavorite, refreshSeries } = useLibraryStore();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const editFromUrl = searchParams.get('edit') === '1';
@@ -375,6 +375,7 @@ const SeriesDetail: React.FC = () => {
     try {
       await toggleChineseSub(series.id);
       setSeries(prev => prev ? { ...prev, has_chinese_sub: prev.has_chinese_sub === 1 ? 0 : 1 } : prev);
+      await refreshSeries();
     } catch (error) {
       console.error('切换中文字幕状态失败:', error);
     }
