@@ -352,6 +352,7 @@ const SeriesDetail: React.FC = () => {
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
   const isWatched = series?.is_watched === 1;
+  const isAdult = series ? (series.has_actor || series.display_type === 'adult') : false;
 
   const handleToggleWatched = async () => {
     if (!series) return;
@@ -373,7 +374,7 @@ const SeriesDetail: React.FC = () => {
 
       <div className="card p-6 mb-8">
         <div className="flex gap-6">
-          <div className="w-80 aspect-video bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+          <div className={`w-80 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 ${editing && isAdult ? 'h-80' : 'aspect-video'}`}>
             <div
               className={`relative w-full h-full group ${editing ? 'cursor-pointer' : ''}`}
               onClick={editing ? handleSelectPoster : undefined}
@@ -382,6 +383,7 @@ const SeriesDetail: React.FC = () => {
                 src={series.poster_data_url}
                 alt={series.title}
                 posterOrientation={series.poster_orientation}
+                imageClassName={editing && isAdult ? '!object-contain' : ''}
               />
               {editing && (
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -399,72 +401,76 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
-                <select
-                  value={editData.status}
-                  onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
-                  className="search-input"
-                >
-                  <option value="ongoing">连载中</option>
-                  <option value="completed">已完结</option>
-                </select>
+                {!isAdult && (
+                  <select
+                    value={editData.status}
+                    onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
+                    className="search-input"
+                  >
+                    <option value="ongoing">连载中</option>
+                    <option value="completed">已完结</option>
+                  </select>
+                )}
                 <textarea
                   value={editData.description}
                   onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                   className="search-input min-h-[120px]"
                   placeholder="简介"
                 />
-                <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {allTags.map((tag) => {
-                      const selected = selectedTagIds.includes(tag.id);
-                      return (
+                {!isAdult && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {allTags.map((tag) => {
+                        const selected = selectedTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => toggleTag(tag.id)}
+                            className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                          >
+                            {tag.name}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setCreatingTag(true)}
+                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                      >
+                        + 新建标签
+                      </button>
+                    </div>
+                    {creatingTag && (
+                      <div className="mt-3 flex gap-2">
+                        <input
+                          type="text"
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCreateTag();
+                            if (e.key === 'Escape') {
+                              setCreatingTag(false);
+                              setNewTagName('');
+                            }
+                          }}
+                          placeholder="输入标签名"
+                          className="search-input"
+                          autoFocus
+                        />
+                        <button onClick={handleCreateTag} className="action-btn">完成</button>
                         <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => toggleTag(tag.id)}
-                          className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
-                        >
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setCreatingTag(true)}
-                      className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
-                    >
-                      + 新建标签
-                    </button>
-                  </div>
-                  {creatingTag && (
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        type="text"
-                        value={newTagName}
-                        onChange={(e) => setNewTagName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCreateTag();
-                          if (e.key === 'Escape') {
+                          onClick={() => {
                             setCreatingTag(false);
                             setNewTagName('');
-                          }
-                        }}
-                        placeholder="输入标签名"
-                        className="search-input"
-                        autoFocus
-                      />
-                      <button onClick={handleCreateTag} className="action-btn">完成</button>
-                      <button
-                        onClick={() => {
-                          setCreatingTag(false);
-                          setNewTagName('');
-                        }}
-                        className="action-btn"
-                      >取消</button>
-                    </div>
-                  )}
-                </div>
+                          }}
+                          className="action-btn"
+                        >取消</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {series?.has_actor && (
                   <>
                     <div>
@@ -522,55 +528,93 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-3">
-                  <h1 className="text-3xl font-bold">{series.title}</h1>
-                  {series.code && (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-gray-100 text-gray-700">{series.code}</span>
-                  )}
-                  {series.has_chinese_sub === 1 && (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
-                  )}
-                  <button
-                    onClick={() => toggleFavorite(series.id, 'series')}
-                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                  >
-                    <img
-                      src={isFavorite ? favoriteIcon : notFavoriteIcon}
-                      alt="追番"
-                      className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
-                    />
-                    <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
-                      {isFavorite ? '已追番' : '追番'}
-                    </span>
-                  </button>
-                  <button
-                    onClick={handleToggleWatched}
-                    className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                  >
-                    <img
-                      src={watchedIcon}
-                      alt="已看完"
-                      className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
-                    />
-                    <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
-                      {isWatched ? '已看完' : '看完'}
-                    </span>
-                  </button>
-                </div>
-                <div className="mb-2">
-                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {series.status === 'completed' ? '已完结' : '连载中'}
-                  </span>
-                </div>
+                {isAdult ? (
+                  <>
+                    <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
+                    <div className="flex items-center gap-2 mb-3">
+                      {series.has_chinese_sub === 1 && (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
+                      )}
+                      <button
+                        onClick={() => toggleFavorite(series.id, 'series')}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
+                          alt="追番"
+                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
+                        />
+                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
+                          {isFavorite ? '已追番' : '追番'}
+                        </span>
+                      </button>
+                      <button
+                        onClick={handleToggleWatched}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={watchedIcon}
+                          alt="已看完"
+                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
+                        />
+                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
+                          {isWatched ? '已看完' : '看完'}
+                        </span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 mb-3">
+                      <h1 className="text-3xl font-bold">{series.title}</h1>
+                      {series.has_chinese_sub === 1 && (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
+                      )}
+                      <button
+                        onClick={() => toggleFavorite(series.id, 'series')}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
+                          alt="追番"
+                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
+                        />
+                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
+                          {isFavorite ? '已追番' : '追番'}
+                        </span>
+                      </button>
+                      <button
+                        onClick={handleToggleWatched}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={watchedIcon}
+                          alt="已看完"
+                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
+                        />
+                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
+                          {isWatched ? '已看完' : '看完'}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="mb-2">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {series.status === 'completed' ? '已完结' : '连载中'}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <p className="text-gray-500 mb-4">{series.video_count} 集</p>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
-                  <div>
-                    <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
-                    {seriesTags.length > 0 ? seriesTags.map((tag) => (
-                      <span key={tag.id} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{tag.name}</span>
-                    )) : <span className="text-sm text-gray-400">暂无</span>}
-                  </div>
+                  {!isAdult && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
+                      {seriesTags.length > 0 ? seriesTags.map((tag) => (
+                        <span key={tag.id} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{tag.name}</span>
+                      )) : <span className="text-sm text-gray-400">暂无</span>}
+                    </div>
+                  )}
                   <div>
                     <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
                     {seriesActors.length > 0 ? seriesActors.map((actor) => (
@@ -584,6 +628,12 @@ const SeriesDetail: React.FC = () => {
                       </Link>
                     )) : <span className="text-sm text-gray-400">暂无</span>}
                   </div>
+                  {isAdult && series.code && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-500 mr-2">车牌：</span>
+                      <span className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 font-mono">{series.code}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
