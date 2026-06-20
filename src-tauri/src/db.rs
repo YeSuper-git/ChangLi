@@ -1328,7 +1328,7 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
 
 pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
     let rows = sqlx::query(
-        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.has_chinese_sub AS series_has_chinese_sub, s.code AS series_code
+        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.poster_base64 AS series_poster_base64, s.has_chinese_sub AS series_has_chinese_sub, s.code AS series_code
          FROM videos v
          LEFT JOIN video_series s ON s.id = v.series_id
          LEFT JOIN video_actors va ON va.video_id = v.id
