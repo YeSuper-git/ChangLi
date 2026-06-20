@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  getStandaloneVideosByTag,
   getVideoSeriesByTag,
+  getVideoSeriesByActor,
   scanVideos,
-  deleteVideo,
   deleteVideoSeries,
 } from '../utils/api';
-import type { Video, VideoSeries } from '../utils/api';
+import type { VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
-import { SmartPoster, videoPosterDataUrl } from '../utils/media';
+import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import { useLibraryStore } from '../store/libraryStore';
@@ -17,16 +16,19 @@ import { useLibraryStore } from '../store/libraryStore';
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { tags, videos: storeVideos, series: storeSeries, favorites, watchedIds, refreshVideos, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
+  const { tags, actors, series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTagId, setActiveTagId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
-  const [tagFilteredVideos, setTagFilteredVideos] = useState<Video[] | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
+  const [activeActorId, setActiveActorId] = useState<number | null>(null);
+  const [actorFilteredSeries, setActorFilteredSeries] = useState<VideoSeries[] | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
   useEffect(() => {
@@ -41,24 +43,21 @@ const Library: React.FC = () => {
   // 当 store 数据变化且当前无标签筛选时，清空 filtered 状态（避免 stale）
   useEffect(() => {
     if (activeTagId === null) {
-      setTagFilteredVideos(null);
       setTagFilteredSeries(null);
     }
-  }, [storeVideos, storeSeries, activeTagId]);
+    if (activeActorId === null) {
+      setActorFilteredSeries(null);
+    }
+  }, [storeSeries, activeTagId, activeActorId]);
 
   const filterByTag = async (tagId: number | null) => {
     if (tagId === null) {
       setActiveTagId(null);
-      setTagFilteredVideos(null);
       setTagFilteredSeries(null);
       return;
     }
     try {
-      const [videosList, series] = await Promise.all([
-        getStandaloneVideosByTag(tagId),
-        getVideoSeriesByTag(tagId),
-      ]);
-      setTagFilteredVideos(videosList);
+      const series = await getVideoSeriesByTag(tagId);
       setTagFilteredSeries(series);
       setActiveTagId(tagId);
     } catch (error) {
@@ -66,8 +65,26 @@ const Library: React.FC = () => {
     }
   };
 
-  const videos: Video[] = tagFilteredVideos ?? storeVideos;
-  const seriesList: VideoSeries[] = tagFilteredSeries ?? storeSeries;
+  const filterByActor = async (actorId: number | null) => {
+    if (actorId === null) {
+      setActiveActorId(null);
+      setActorFilteredSeries(null);
+      return;
+    }
+    try {
+      const series = await getVideoSeriesByActor(actorId);
+      setActorFilteredSeries(series);
+      setActiveActorId(actorId);
+    } catch (error) {
+      console.error('[Library] 按演员筛选失败:', error);
+    }
+  };
+
+  const handleActorClick = (actorId: number) => {
+    filterByActor(activeActorId === actorId ? null : actorId);
+  };
+
+  const seriesList: VideoSeries[] = actorFilteredSeries ?? tagFilteredSeries ?? storeSeries;
 
   const importPath = async () => {
     try {
@@ -81,10 +98,12 @@ const Library: React.FC = () => {
         setScanning(true);
         try {
           await scanVideos(selected as string);
-          await refreshVideos();
           await refreshSeries();
           if (activeTagId !== null) {
             await filterByTag(activeTagId);
+          }
+          if (activeActorId !== null) {
+            await filterByActor(activeActorId);
           }
         } catch (error) {
           console.error('[Library] 导入失败:', error);
@@ -98,28 +117,17 @@ const Library: React.FC = () => {
     }
   };
 
-  const handleDeleteVideo = async (id: number) => {
-    try {
-      await deleteVideo(id);
-      setContextMenu(null);
-      await refreshVideos();
-      if (activeTagId !== null) {
-        await filterByTag(activeTagId);
-      }
-    } catch (error) {
-      console.error('[Library] 删除失败:', error);
-      alert('删除失败: ' + String(error));
-    }
-  };
 
   const handleDeleteSeries = async (id: number) => {
     try {
       await deleteVideoSeries(id, true);
       setContextMenu(null);
-      await refreshVideos();
       await refreshSeries();
       if (activeTagId !== null) {
         await filterByTag(activeTagId);
+      }
+      if (activeActorId !== null) {
+        await filterByActor(activeActorId);
       }
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
@@ -127,7 +135,7 @@ const Library: React.FC = () => {
     }
   };
 
-  const openContextMenu = (event: React.MouseEvent, type: 'video' | 'series', id: number, name: string) => {
+  const openContextMenu = (event: React.MouseEvent, type: 'series', id: number, name: string) => {
     event.preventDefault();
     event.stopPropagation();
     setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
@@ -135,9 +143,7 @@ const Library: React.FC = () => {
 
   const handleEditContextItem = () => {
     if (!contextMenu) return;
-    const target = contextMenu.type === 'video'
-      ? `/video/${contextMenu.id}?edit=1`
-      : `/series/${contextMenu.id}?edit=1`;
+    const target = `/series/${contextMenu.id}?edit=1`;
     setContextMenu(null);
     clearPending();
     navigate(target, { state: { from: '/library', backLabel: '返回视频' } });
@@ -152,19 +158,52 @@ const Library: React.FC = () => {
     const set = new Set<string>();
     for (const item of favorites) {
       if ('video_count' in item) set.add(`s-${(item as VideoSeries).id}`);
-      else set.add(`v-${(item as Video).id}`);
     }
     return set;
   }, [favorites]);
 
   const normalizedSearch = searchTerm.toLowerCase();
-  const filteredVideos = videos.filter((video) =>
-    video.file_name.toLowerCase().includes(normalizedSearch) && (!favoriteFilter || favoriteIds.has(`v-${video.id}`))
-  );
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (typeFilter === 'all' || (typeFilter === 'series' && !series.has_actor) || (typeFilter === 'video' && series.has_actor))
   );
+
+  const toggleSelect = (key: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    const allKeys = new Set<string>();
+    filteredSeries.forEach(s => allKeys.add(`s-${s.id}`));
+    setSelectedIds(allKeys);
+  };
+
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const handleBatchDelete = async () => {
+    if (!confirm(`确定删除选中的 ${selectedIds.size} 个项目？`)) return;
+    for (const key of selectedIds) {
+      const [type, idStr] = key.split('-');
+      const id = parseInt(idStr);
+      if (type === 's') {
+        await deleteVideoSeries(id, true);
+      }
+    }
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    await refreshSeries();
+    if (activeTagId !== null) {
+      await filterByTag(activeTagId);
+    }
+    if (activeActorId !== null) {
+      await filterByActor(activeActorId);
+    }
+  };
 
   return (
     <>
@@ -213,6 +252,20 @@ const Library: React.FC = () => {
         </div>
       </div>
 
+      {actors.length > 0 && (
+        <div className="flex gap-2 flex-wrap mb-3">
+          {actors.map((actor) => (
+            <button
+              key={actor.id}
+              onClick={() => handleActorClick(actor.id)}
+              className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
+            >
+              {actor.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="mb-6 flex gap-3 flex-wrap">
         <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
         <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
@@ -222,14 +275,58 @@ const Library: React.FC = () => {
       </div>
 
       <div className="mb-10">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="搜索视频或视频集..."
-          className="search-input"
-        />
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="搜索视频或视频集..."
+            className="search-input flex-1"
+          />
+          <button
+            onClick={() => {
+              if (selectMode) {
+                setSelectMode(false);
+                setSelectedIds(new Set());
+              } else {
+                setSelectMode(true);
+              }
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${selectMode ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+          >
+            {selectMode ? '取消选择' : '选择'}
+          </button>
+        </div>
       </div>
+
+      {selectMode && (
+        <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={selectedIds.size === filteredSeries.length ? deselectAll : selectAll}
+              className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-100"
+            >
+              {selectedIds.size === filteredSeries.length ? '取消全选' : '全选'}
+            </button>
+            <span className="text-sm text-gray-500">已选 {selectedIds.size} 项</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBatchDelete}
+              disabled={selectedIds.size === 0}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              删除选中{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+            </button>
+            <button
+              onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
+              className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-100"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {typeFilter !== 'video' && filteredSeries.length > 0 && (
         <div className="mb-12">
@@ -238,11 +335,31 @@ const Library: React.FC = () => {
             {filteredSeries.map((series) => (
               <div
                 key={series.id}
-                onClick={() => navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
+                onClick={() => { if (!selectMode) navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } }); }}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className="cursor-pointer group"
+                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
                 <div className="card relative w-full aspect-[3/4] overflow-hidden">
+                  {selectMode && (
+                    <div
+                      className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
+                      style={{
+                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : 'white',
+                        borderColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : '#d1d5db',
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleSelect(`s-${series.id}`);
+                      }}
+                    >
+                      {selectedIds.has(`s-${series.id}`) && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
@@ -263,49 +380,8 @@ const Library: React.FC = () => {
         </div>
       )}
 
-      {typeFilter !== 'series' && filteredVideos.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">单视频</h2>
-          <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
-            {filteredVideos.map((video) => {
-              const thumbnailDataUrl = videoPosterDataUrl(video);
-              return (
-                <div
-                  key={video.id}
-                  onClick={() => navigate(`/video/${video.id}`, { state: { from: '/library', backLabel: '返回视频' } })}
-                  onContextMenu={(event) => openContextMenu(event, 'video', video.id, video.file_name)}
-                  className="card cursor-pointer flex flex-col group"
-                >
-                  <div className="relative w-full aspect-video overflow-hidden">
-                    <SmartPoster
-                      src={thumbnailDataUrl}
-                      alt={video.file_name}
-                      posterOrientation={video.poster_orientation}
-                      width={video.width}
-                      height={video.height}
-                    />
-                    {video.duration && (
-                      <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                        {Math.floor(video.duration / 60)}分钟
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">
-                      {video.file_name}
-                    </h3>
-                    <div className="text-xs text-zinc-500 mt-1">
-                      尚未观看
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {filteredSeries.length === 0 && filteredVideos.length === 0 && (
+      {filteredSeries.length === 0 && (
         <div className="text-center py-16">
           <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : '暂无视频'}</p>
           {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
@@ -328,9 +404,7 @@ const Library: React.FC = () => {
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
             onClick={() => {
               const key = `${contextMenu.type}-${contextMenu.id}`;
-              requestSecondConfirm(key, () => contextMenu.type === 'video'
-                ? handleDeleteVideo(contextMenu.id)
-                : handleDeleteSeries(contextMenu.id));
+              requestSecondConfirm(key, () => handleDeleteSeries(contextMenu.id));
             }}
           >
             {pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
@@ -339,7 +413,7 @@ const Library: React.FC = () => {
       )}
     </div>
 
-    <FloatingActions onRefresh={async () => { await refreshVideos(); await refreshSeries(); }} refreshLabel="刷新视频" />
+    <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新视频" />
     </>
   );
 };

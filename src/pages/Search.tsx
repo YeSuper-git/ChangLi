@@ -139,7 +139,7 @@ const Search: React.FC = () => {
           {results.length > 0 ? (
             <div className="grid grid-cols-2 gap-4">
               {results.map((item) => {
-                const target = item.type === 'video' ? `/video/${item.id}` : item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
+                const target = item.type === 'video' ? (item.video.series_id ? `/series/${item.video.series_id}` : `/video/${item.id}`) : item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
                 const imageDataUrl = item.type === 'video'
                   ? videoPosterDataUrl(item.video)
                   : item.type === 'series'

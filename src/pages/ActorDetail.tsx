@@ -318,6 +318,7 @@ const ActorDetail: React.FC = () => {
 
   const workItems = Array.from(
     resources.reduce((map, resource) => {
+      // 所有视频现在都属于视频集，按 series_id 分组
       const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
       if (!map.has(key)) {
         map.set(key, resource);
@@ -610,7 +611,7 @@ const ActorDetail: React.FC = () => {
               const isSeries = Boolean(resource.series_id);
               const title = isSeries ? (resource.series_title || '视频集') : resource.file_name;
               const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
-              const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/video/${resource.id}?fromActor=${actor.id}`;
+              const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/series/${resource.series_id || resource.id}?fromActor=${actor.id}`;
               return (
               <Link
                 key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`}

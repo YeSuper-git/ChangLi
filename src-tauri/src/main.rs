@@ -330,18 +330,33 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 }
                 all_videos.extend(saved);
             } else if entry_path.is_file() && scanner::is_video_file(&entry_path) {
-                // 根目录下的视频当单视频
+                // 根目录下的视频也创建视频集
                 let video = scanner::scan_video_file(&entry_path, None)
                     .await
                     .map_err(|e| e.to_string())?;
-                let saved = db::add_video(&pool, video)
+                let file_stem = entry_path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| entry_name.clone());
+                let thumb = video.thumbnail.as_deref()
+                    .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
+                let series = db::add_video_series(
+                    &pool,
+                    &file_stem,
+                    Some(&entry_path.to_string_lossy()),
+                    video.thumbnail.as_deref(),
+                    Some("landscape"),
+                    Some("completed"),
+                    thumb.as_deref(),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                let saved = db::add_videos_batch(&pool, vec![video], Some(series.id))
                     .await
                     .map_err(|e| e.to_string())?;
-                // 单视频也关联标签
-                if let Err(e) = db::add_video_tag(&pool, saved.id, tag.id).await {
+                if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
                     eprintln!("[ChangLi] 关联标签失败: {}", e);
                 }
-                all_videos.push(saved);
+                all_videos.extend(saved);
             }
         }
 
@@ -360,7 +375,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
             let entry_name = entry.file_name().to_string_lossy().to_string();
 
             if entry_path.is_dir() {
-                // 子文件夹当视频集
+                // 子文件夹
                 let sub_result = scanner::scan_directory(&entry_path.to_string_lossy())
                     .await
                     .map_err(|e| e.to_string())?;
@@ -370,6 +385,8 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 let sub_poster = sub_result.posters.values().next().cloned();
                 let sub_poster_base64 = sub_poster.as_deref()
                     .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+
+                // 统一走视频集创建逻辑
                 let series = db::add_video_series(
                     &pool,
                     &entry_name,
@@ -384,24 +401,38 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 let saved = db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
                     .await
                     .map_err(|e| e.to_string())?;
-                // 自动关联演员到视频集
                 if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
                     eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
                 }
                 all_videos.extend(saved);
             } else if entry_path.is_file() && scanner::is_video_file(&entry_path) {
-                // 根目录下的视频当单视频
+                // 根目录下的视频也创建视频集并关联演员
                 let video = scanner::scan_video_file(&entry_path, None)
                     .await
                     .map_err(|e| e.to_string())?;
-                let saved = db::add_video(&pool, video)
+                let file_stem = entry_path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| entry_name.clone());
+                let thumb = video.thumbnail.as_deref()
+                    .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
+                let series = db::add_video_series(
+                    &pool,
+                    &file_stem,
+                    Some(&entry_path.to_string_lossy()),
+                    video.thumbnail.as_deref(),
+                    Some("landscape"),
+                    Some("completed"),
+                    thumb.as_deref(),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                let saved = db::add_videos_batch(&pool, vec![video], Some(series.id))
                     .await
                     .map_err(|e| e.to_string())?;
-                // 单视频也关联演员
-                if let Err(e) = db::add_resource_actor(&pool, saved.id, actor.id, None).await {
-                    eprintln!("[ChangLi] 关联演员到视频失败: {}", e);
+                if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
+                    eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
                 }
-                all_videos.push(saved);
+                all_videos.extend(saved);
             }
         }
 
@@ -412,16 +443,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         .await
         .map_err(|e| e.to_string())?;
 
-    // UI 现在只有"添加"入口并选择文件夹：当前文件夹扫描到 1 个视频时按单视频导入；
-    // 0 个或多个视频时保持视频集扫描逻辑。
-    if result.videos.len() == 1 {
-        let video = result.videos.into_iter().next().expect("len checked");
-        db::add_video(&pool, video)
-            .await
-            .map_err(|e| e.to_string())?;
-        return db::get_videos(&pool).await.map_err(|e| e.to_string());
-    }
-
+    // 统一走视频集创建逻辑
     let series_poster = result.posters.values().next().cloned();
     let series_poster_base64 = series_poster.as_deref()
         .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
@@ -519,6 +541,20 @@ async fn get_standalone_videos_by_tag_name(
 }
 
 #[tauri::command]
+async fn get_standalone_videos_by_actor(
+    state: State<'_, AppState>,
+    actor_id: i64,
+) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_standalone_videos_by_actor(&pool, actor_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_video_series_by_tag(
     state: State<'_, AppState>,
     tag_id: i64,
@@ -542,6 +578,20 @@ async fn get_video_series_by_tag_name(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::get_video_series_by_tag_name(&pool, &tag_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_video_series_by_actor(
+    state: State<'_, AppState>,
+    actor_id: i64,
+) -> Result<Vec<db::VideoSeries>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_by_actor(&pool, actor_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1233,8 +1283,10 @@ fn main() {
             get_standalone_videos,
             get_standalone_videos_by_tag,
             get_standalone_videos_by_tag_name,
+            get_standalone_videos_by_actor,
             get_video_series_by_tag,
             get_video_series_by_tag_name,
+            get_video_series_by_actor,
             get_series_playback_video,
             get_video_series_detail,
             update_video_series,

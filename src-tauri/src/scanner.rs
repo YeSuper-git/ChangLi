@@ -280,9 +280,25 @@ fn sort_episode_files(files: &mut Vec<PathBuf>) {
 fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<String> {
     let video_parent = video_path.parent()?;
     let video_stem = file_stem_lower(video_path);
-    image_files.iter().find_map(|image_path| {
+    // 1. 找和视频同名的图片
+    if let Some(found) = image_files.iter().find_map(|image_path| {
         if image_path.parent() == Some(video_parent) && file_stem_lower(image_path) == video_stem {
             Some(image_path.to_string_lossy().to_string())
+        } else {
+            None
+        }
+    }) {
+        return Some(found);
+    }
+    // 2. 找文件名包含 "pl" 的图片
+    image_files.iter().find_map(|image_path| {
+        if image_path.parent() == Some(video_parent) {
+            let name = image_path.file_stem()?.to_str()?.to_lowercase();
+            if name.contains("pl") {
+                Some(image_path.to_string_lossy().to_string())
+            } else {
+                None
+            }
         } else {
             None
         }

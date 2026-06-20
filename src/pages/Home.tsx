@@ -1,14 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { Video, VideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import type { VideoSeries } from '../utils/api';
+import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import { HorizontalScroll } from '../components/HorizontalScroll';
 
 const Home: React.FC = () => {
-  const { actors, videos: storeVideos, series: storeSeries, favorites } = useLibraryStore();
+  const { actors, series: storeSeries, favorites } = useLibraryStore();
 
-  const videos = [...storeVideos].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const seriesList = [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return (
@@ -28,10 +27,9 @@ const Home: React.FC = () => {
           <HorizontalScroll
             items={favorites}
             renderItem={(item) => {
-              const isSeries = 'video_count' in item;
-              if (isSeries) {
-                const series = item as VideoSeries;
-                return (
+              // 所有追番项都是视频集
+              const series = item as VideoSeries;
+              return (
                   <Link
                     to={`/series/${series.id}`}
                     state={{ from: '/', backLabel: '返回首页' }}
@@ -50,30 +48,6 @@ const Home: React.FC = () => {
                     </div>
                   </Link>
                 );
-              } else {
-                const video = item as Video;
-                const thumbnailDataUrl = videoPosterDataUrl(video);
-                return (
-                  <Link
-                    to={`/video/${video.id}?fromHome=1`}
-                    state={{ from: '/', backLabel: '返回首页' }}
-                    className="card flex flex-col h-full group"
-                  >
-                    <div className="relative w-full aspect-video overflow-hidden">
-                      <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
-                      {video.duration && (
-                        <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
-                          {Math.floor(video.duration / 60)}分钟
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{video.file_name}</h3>
-                      <div className="text-xs text-zinc-500 mt-1">尚未观看</div>
-                    </div>
-                  </Link>
-                );
-              }
             }}
           />
         ) : (
@@ -106,26 +80,7 @@ const Home: React.FC = () => {
               </div>
             </Link>
           ))}
-          {videos.slice(0, Math.max(0, 8 - seriesList.length)).map((video) => {
-            const thumbnailDataUrl = videoPosterDataUrl(video);
-            return (
-              <Link key={`video-${video.id}`} to={`/video/${video.id}?fromHome=1`} state={{ from: '/', backLabel: '返回首页' }} className="card flex flex-col group">
-                <div className="relative w-full aspect-video overflow-hidden">
-                  <SmartPoster src={thumbnailDataUrl} alt={video.file_name} width={video.width} height={video.height} />
-                  {video.duration && (
-                    <div className="absolute bottom-2 right-2 bg-black/60 rounded-md text-white text-xs px-2 py-0.5">
-                      {Math.floor(video.duration / 60)}分钟
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <h3 className="text-sm font-medium text-zinc-900 line-clamp-2 group-hover:text-blue-600">{video.file_name}</h3>
-                  <div className="text-xs text-zinc-500 mt-1">尚未观看</div>
-                </div>
-              </Link>
-            );
-          })}
-          {seriesList.length === 0 && videos.length === 0 && (
+          {seriesList.length === 0 && (
             <div className="col-span-4 md:col-span-5 text-center text-gray-500 py-12">
               暂无视频
             </div>

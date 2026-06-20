@@ -281,6 +281,7 @@ export interface VideoSeries {
   is_favorite?: number;
   is_watched?: number;
   last_watched_episode?: number;
+  has_actor?: boolean;
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
@@ -306,6 +307,14 @@ export async function getVideoSeriesByTag(tagId: number): Promise<VideoSeries[]>
 
 export async function getVideoSeriesByTagName(tagName: string): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_video_series_by_tag_name', { tagName });
+}
+
+export async function getStandaloneVideosByActor(actorId: number): Promise<Video[]> {
+  return invoke<Video[]>('get_standalone_videos_by_actor', { actorId });
+}
+
+export async function getVideoSeriesByActor(actorId: number): Promise<VideoSeries[]> {
+  return invoke<VideoSeries[]>('get_video_series_by_actor', { actorId });
 }
 
 export async function getSeriesPlaybackVideo(seriesId: number): Promise<Video | null> {
