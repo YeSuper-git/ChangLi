@@ -168,6 +168,9 @@ const Library: React.FC = () => {
     (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (typeFilter === 'all' || (typeFilter === 'series' && !series.has_actor) || (typeFilter === 'video' && series.has_actor))
   );
 
+  const animeSeries = filteredSeries.filter(s => !s.has_actor);
+  const adultSeries = filteredSeries.filter(s => s.has_actor);
+
   const toggleSelect = (key: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -268,8 +271,8 @@ const Library: React.FC = () => {
 
       <div className="mb-6 flex gap-3 flex-wrap">
         <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
-        <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>视频集</button>
-        <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>单视频</button>
+        <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>动漫</button>
+        <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>成人</button>
         <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
         <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
       </div>
@@ -328,11 +331,10 @@ const Library: React.FC = () => {
         </div>
       )}
 
-      {typeFilter !== 'video' && filteredSeries.length > 0 && (
+      {typeFilter !== 'video' && animeSeries.length > 0 && (
         <div className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">视频集</h2>
           <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
-            {filteredSeries.map((series) => (
+            {animeSeries.map((series) => (
               <div
                 key={series.id}
                 onClick={() => { if (!selectMode) navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } }); }}
@@ -340,6 +342,57 @@ const Library: React.FC = () => {
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
                 <div className="card relative w-full aspect-[3/4] overflow-hidden">
+                  {selectMode && (
+                    <div
+                      className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
+                      style={{
+                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : 'white',
+                        borderColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : '#d1d5db',
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleSelect(`s-${series.id}`);
+                      }}
+                    >
+                      {selectedIds.has(`s-${series.id}`) && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  )}
+                  <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+                  <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
+                  <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
+                    {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>
+                    {series.title}
+                  </h3>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {typeFilter !== 'series' && adultSeries.length > 0 && (
+        <div className="mb-12">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-5 auto-rows-max">
+            {adultSeries.map((series) => (
+              <div
+                key={series.id}
+                onClick={() => { if (!selectMode) navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } }); }}
+                onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
+                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
+              >
+                <div className="card relative w-full aspect-video overflow-hidden">
                   {selectMode && (
                     <div
                       className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"

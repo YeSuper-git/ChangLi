@@ -626,7 +626,7 @@ const ActorDetail: React.FC = () => {
                 <div className="p-5">
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
                   <div className="text-sm text-gray-500">
-                    {isSeries ? '视频集' : '单视频'}
+                    
                   </div>
                 </div>
               </Link>
