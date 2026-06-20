@@ -6,6 +6,7 @@ import {
   scanVideos,
   deleteVideoSeries,
   rescanSingleSeriesMetadata,
+  switchSeriesType,
 } from '../utils/api';
 import type { VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
@@ -31,6 +32,7 @@ const Library: React.FC = () => {
   });
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
+  const [chineseSubFilter, setChineseSubFilter] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
   const [activeActorId, setActiveActorId] = useState<number | null>(() => {
@@ -246,6 +248,18 @@ const Library: React.FC = () => {
     }
   };
 
+  const handleSwitchType = async (seriesId: number) => {
+    try {
+      await switchSeriesType(seriesId);
+      setContextMenu(null);
+      clearPending();
+      await refreshSeries();
+      setToast({ message: '类型已切换', type: 'success' });
+    } catch (error) {
+      console.error('[Library] 切换类型失败:', error);
+      setToast({ message: '切换类型失败: ' + String(error), type: 'info' });
+    }
+  };
 
   const handleTagClick = (tagId: number | null) => {
     filterByTag(tagId);
@@ -263,7 +277,7 @@ const Library: React.FC = () => {
   const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (typeFilter === 'all' || (typeFilter === 'series' && !isAdult(series)) || (typeFilter === 'video' && isAdult(series)))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (typeFilter === 'all' || (typeFilter === 'series' && !isAdult(series)) || (typeFilter === 'video' && isAdult(series)))
   );
 
   const animeSeries = filteredSeries.filter(s => !isAdult(s));
@@ -369,10 +383,11 @@ const Library: React.FC = () => {
 
       <div className="mb-6 flex gap-3 flex-wrap">
         <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
-        <button onClick={() => setTypeFilter('series')} className={`category-btn ${typeFilter === 'series' ? 'active' : ''}`}>动漫</button>
+        <button onClick={() => { if (chineseSubFilter) return; setTypeFilter('series'); }} className={`category-btn ${typeFilter === 'series' ? 'active' : ''} ${chineseSubFilter ? 'opacity-50 cursor-not-allowed' : ''}`}>动漫</button>
         <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>成人</button>
         <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
         <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
+        <button onClick={() => { if (typeFilter === 'series') return; setChineseSubFilter(!chineseSubFilter); }} className={`category-btn ${chineseSubFilter ? 'active' : ''} ${typeFilter === 'series' ? 'opacity-50 cursor-not-allowed' : ''}`}>中文字幕</button>
       </div>
 
       <div className="mb-10">
@@ -465,11 +480,6 @@ const Library: React.FC = () => {
                   )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  {series.has_chinese_sub === 1 && (
-                    <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
-                      中字
-                    </span>
-                  )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
@@ -572,6 +582,15 @@ const Library: React.FC = () => {
             onClick={() => handleRescanMetadata(contextMenu.id)}
           >
             重新扫描元数据
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              const key = `switch-${contextMenu.id}`;
+              requestSecondConfirm(key, () => handleSwitchType(contextMenu.id));
+            }}
+          >
+            {pendingKey === `switch-${contextMenu.id}` ? '确认切换' : '切换类型'}
           </button>
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"

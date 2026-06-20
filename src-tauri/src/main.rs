@@ -282,7 +282,28 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         let video = scanner::scan_video_file(import_path, None)
             .await
             .map_err(|e| e.to_string())?;
-        db::add_video(&pool, video)
+        let file_stem = import_path.file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "未命名视频".to_string());
+        let parent_dir = import_path.parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "/".to_string());
+        let thumb = video.thumbnail.as_deref()
+            .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
+        let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&file_stem) {
+            let title = info.title.unwrap_or_else(|| file_stem.clone());
+            (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
+        } else {
+            (file_stem.clone(), None, 0)
+        };
+        let series = db::add_video_series(&pool, &series_title, Some(&parent_dir), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref())
+            .await
+            .map_err(|e| e.to_string())?;
+        if let Some(c) = code {
+            let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+        }
+        db::add_videos_batch(&pool, vec![video], Some(series.id))
             .await
             .map_err(|e| e.to_string())?;
         return Ok(ScanResult { added: 1, updated: 0 });
