@@ -655,6 +655,17 @@ async fn delete_video_series(
 }
 
 #[tauri::command]
+async fn switch_series_type(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::switch_series_type(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn add_video_to_series(
     state: State<'_, AppState>,
     series_id: i64,
@@ -1280,6 +1291,7 @@ fn main() {
             get_video_series_detail,
             update_video_series,
             delete_video_series,
+            switch_series_type,
             add_video_to_series,
             remove_video_from_series,
             get_actors,

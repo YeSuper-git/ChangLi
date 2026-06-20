@@ -290,6 +290,7 @@ export interface VideoSeries {
   has_actor?: boolean;
   code?: string;
   has_chinese_sub?: number;
+  display_type?: string;
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
@@ -339,6 +340,10 @@ export async function updateVideoSeries(id: number, title: string, description?:
 
 export async function deleteVideoSeries(id: number, deleteVideos: boolean): Promise<void> {
   return invoke('delete_video_series', { id, deleteVideos });
+}
+
+export async function switchSeriesType(seriesId: number): Promise<void> {
+  return invoke('switch_series_type', { seriesId });
 }
 
 export async function addVideoToSeries(seriesId: number, path: string): Promise<Video> {

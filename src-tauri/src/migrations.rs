@@ -269,6 +269,7 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("video_series", "is_watched", "INTEGER DEFAULT 0"),
         Column::new("video_series", "code", "TEXT"),
         Column::new("video_series", "has_chinese_sub", "INTEGER DEFAULT 0"),
+        Column::new("video_series", "display_type", "TEXT DEFAULT ''"),
         Column::new("actors", "name", "TEXT NOT NULL DEFAULT ''"),
         Column::new("actors", "photo", "TEXT"),
         Column::new("actors", "avatar_base64", "TEXT"),

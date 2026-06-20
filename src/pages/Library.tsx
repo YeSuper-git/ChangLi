@@ -244,13 +244,14 @@ const Library: React.FC = () => {
   }, [favorites]);
 
   const normalizedSearch = searchTerm.toLowerCase();
+  const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (typeFilter === 'all' || (typeFilter === 'series' && !series.has_actor) || (typeFilter === 'video' && series.has_actor))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (typeFilter === 'all' || (typeFilter === 'series' && !isAdult(series)) || (typeFilter === 'video' && isAdult(series)))
   );
 
-  const animeSeries = filteredSeries.filter(s => !s.has_actor);
-  const adultSeries = filteredSeries.filter(s => s.has_actor);
+  const animeSeries = filteredSeries.filter(s => !isAdult(s));
+  const adultSeries = filteredSeries.filter(s => isAdult(s));
 
   const toggleSelect = (key: string) => {
     setSelectedIds(prev => {

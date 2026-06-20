@@ -106,6 +106,7 @@ pub struct VideoSeries {
     pub has_actor: bool,
     pub code: Option<String>,
     pub has_chinese_sub: Option<i32>,
+    pub display_type: Option<String>,
 }
 
 // 演员
@@ -672,6 +673,7 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
         has_actor: row.try_get::<i64, _>("has_actor").unwrap_or(0) != 0,
         code: row.try_get("code").ok().flatten(),
         has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
+        display_type: row.try_get("display_type").ok().flatten(),
     }
 }
 
@@ -829,6 +831,13 @@ pub async fn delete_video_series(pool: &SqlitePool, id: i64, _delete_videos: boo
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub async fn switch_series_type(pool: &SqlitePool, series_id: i64) -> Result<()> {
+    sqlx::query("UPDATE video_series SET display_type = CASE WHEN display_type = 'adult' THEN 'anime' WHEN display_type = 'anime' THEN 'adult' WHEN EXISTS (SELECT 1 FROM series_actors WHERE series_id = ?) THEN 'anime' ELSE 'adult' END WHERE id = ?")
+        .bind(series_id).bind(series_id)
+        .execute(pool).await?;
     Ok(())
 }
 
@@ -1442,6 +1451,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
                 has_actor: false,
                 code: None,
                 has_chinese_sub: None,
+                display_type: None,
             }
         });
         items.push(RecentWatchItem {
