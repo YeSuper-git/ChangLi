@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { Actor, Video, VideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import type { Actor, VideoSeries } from '../utils/api';
+import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 
 type SearchItem =
-  | { type: 'video'; id: number; title: string; subtitle: string; video: Video }
   | { type: 'series'; id: number; title: string; subtitle: string; series: VideoSeries }
   | { type: 'actor'; id: number; title: string; subtitle: string; actor: Actor };
 
@@ -28,7 +27,7 @@ const fuzzyMatch = (source: string, keyword: string) => {
 const Search: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { videos: storeVideos, series: storeSeries, actors: storeActors, loadAll, loaded } = useLibraryStore();
+  const { series: storeSeries, actors: storeActors, loadAll, loaded } = useLibraryStore();
   const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
   const [keyword, setKeyword] = useState(queryKeyword);
   const [results, setResults] = useState<SearchItem[]>([]);
@@ -47,21 +46,7 @@ const Search: React.FC = () => {
     }
   }, [queryKeyword]);
 
-  const buildResults = (searchKeyword: string, videoList: Video[], seriesItems: VideoSeries[], actorList: Actor[]) => {
-    const videoResults: SearchItem[] = videoList
-      .filter((video) =>
-        fuzzyMatch(video.file_name, searchKeyword) ||
-        fuzzyMatch(video.description || '', searchKeyword) ||
-        fuzzyMatch(video.source_site || '', searchKeyword)
-      )
-      .map((video) => ({
-        type: 'video',
-        id: video.id,
-        title: video.file_name,
-        subtitle: video.resolution ? `视频 · ${video.resolution}` : '视频',
-        video,
-      }));
-
+  const buildResults = (searchKeyword: string, seriesItems: VideoSeries[], actorList: Actor[]) => {
     const seriesResults: SearchItem[] = seriesItems
       .filter((series) =>
         fuzzyMatch(series.title, searchKeyword) ||
@@ -89,7 +74,7 @@ const Search: React.FC = () => {
         actor,
       }));
 
-    return [...seriesResults, ...videoResults, ...actorResults];
+    return [...seriesResults, ...actorResults];
   };
 
   const handleSearch = (inputKeyword = keyword) => {
@@ -97,7 +82,7 @@ const Search: React.FC = () => {
     if (!nextKeyword) return;
 
     setSearched(true);
-    setResults(buildResults(nextKeyword, storeVideos, storeSeries, storeActors));
+    setResults(buildResults(nextKeyword, storeSeries, storeActors));
     if (nextKeyword !== queryKeyword) {
       navigate(`/search?q=${encodeURIComponent(nextKeyword)}`, { replace: true });
     }
@@ -139,10 +124,8 @@ const Search: React.FC = () => {
           {results.length > 0 ? (
             <div className="grid grid-cols-2 gap-4">
               {results.map((item) => {
-                const target = item.type === 'video' ? (item.video.series_id ? `/series/${item.video.series_id}` : `/video/${item.id}`) : item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
-                const imageDataUrl = item.type === 'video'
-                  ? videoPosterDataUrl(item.video)
-                  : item.type === 'series'
+                const target = item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
+                const imageDataUrl = item.type === 'series'
                     ? item.series.poster_data_url
                     : actorPhotoDataUrl(item.actor);
                 const aspectClass = item.type === 'series'
@@ -164,14 +147,12 @@ const Search: React.FC = () => {
                           src={imageDataUrl}
                           alt={item.title}
                           posterOrientation={item.type === 'series' ? item.series.poster_orientation : undefined}
-                          width={item.type === 'video' ? item.video.width : undefined}
-                          height={item.type === 'video' ? item.video.height : undefined}
                         />
                       )}
                     </div>
                     <div className="p-3 min-w-0">
                       <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-2">
-                        {item.type === 'video' ? '视频' : item.type === 'series' ? '视频集' : '演员'}
+                        {item.type === 'series' ? '视频集' : '演员'}
                       </div>
                       <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">{item.title}</h3>
                       <p className="text-xs text-gray-500 line-clamp-1">{item.subtitle}</p>

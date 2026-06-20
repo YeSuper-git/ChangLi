@@ -260,6 +260,16 @@ async fn remove_download(state: State<'_, AppState>, id: i64) -> Result<(), Stri
     Ok(())
 }
 
+/// 从文件名提取成人视频元数据（标题、车牌、中文字幕）
+fn extract_adult_metadata(name: &str) -> (String, Option<String>, i32) {
+    if let Some(info) = scanner::parse_adult_filename(name) {
+        let title = info.title.unwrap_or_else(|| name.to_string());
+        (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
+    } else {
+        (name.to_string(), None, 0)
+    }
+}
+
 // 视频相关命令
 #[derive(serde::Serialize)]
 struct ScanResult {
@@ -290,12 +300,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
             .unwrap_or_else(|| "/".to_string());
         let thumb = video.thumbnail.as_deref()
             .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
-        let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&file_stem) {
-            let title = info.title.unwrap_or_else(|| file_stem.clone());
-            (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
-        } else {
-            (file_stem.clone(), None, 0)
-        };
+        let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
         let series = db::add_video_series(&pool, &series_title, Some(&parent_dir), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref())
             .await
             .map_err(|e| e.to_string())?;
@@ -411,12 +416,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                     db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
                     updated += 1;
                 } else {
-                    let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&entry_name) {
-                        let title = info.title.unwrap_or_else(|| entry_name.clone());
-                        (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
-                    } else {
-                        (entry_name.clone(), None, 0)
-                    };
+                    let (series_title, code, has_chinese_sub) = extract_adult_metadata(&entry_name);
                     let series = db::add_video_series(&pool, &series_title, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
                     // 设置 code 和 has_chinese_sub
                     if let Some(c) = code {
@@ -445,12 +445,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                     db::add_videos_batch(&pool, vec![video], Some(existing.id)).await.map_err(|e| e.to_string())?;
                     updated += 1;
                 } else {
-                    let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&file_stem) {
-                        let title = info.title.unwrap_or_else(|| file_stem.clone());
-                        (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
-                    } else {
-                        (file_stem.clone(), None, 0)
-                    };
+                    let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
                     let series = db::add_video_series(&pool, &series_title, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
                     // 设置 code 和 has_chinese_sub
                     if let Some(c) = code {
@@ -482,11 +477,10 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         db::update_video_series_poster(&pool, existing.id, series_poster.as_deref(), series_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
         // 自动更新元数据（code、has_chinese_sub）
         if existing.code.is_none() || existing.code.as_deref() == Some("") {
-            if let Some(info) = scanner::parse_adult_filename(&folder_name) {
-                let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-                let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+            let (new_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
+            if let Some(c) = code {
                 let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')")
-                    .bind(&info.code)
+                    .bind(&c)
                     .bind(has_chinese_sub)
                     .bind(&new_title)
                     .bind(existing.id)
@@ -496,12 +490,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         db::add_videos_batch(&pool, result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 0, updated: 1 })
     } else {
-        let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&folder_name) {
-            let title = info.title.unwrap_or_else(|| folder_name.clone());
-            (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
-        } else {
-            (folder_name.clone(), None, 0)
-        };
+        let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
         let series = db::add_video_series(&pool, &series_title, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
         // 设置 code 和 has_chinese_sub
         if let Some(c) = code {
@@ -549,61 +538,6 @@ async fn get_video_series_list(state: State<'_, AppState>, sort_by: Option<Strin
     let sort_by = sort_by.as_deref().unwrap_or("created_at");
     let sort_order = sort_order.as_deref().unwrap_or("desc");
     db::get_video_series_list(&pool, sort_by, sort_order)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_standalone_videos(state: State<'_, AppState>, sort_by: Option<String>, sort_order: Option<String>) -> Result<Vec<db::Video>, String> {
-    let pool = {
-        let guard = state.db.lock().await;
-        guard.as_ref().ok_or("数据库未初始化")?.clone()
-    };
-    let sort_by = sort_by.as_deref().unwrap_or("created_at");
-    let sort_order = sort_order.as_deref().unwrap_or("desc");
-    db::get_standalone_videos(&pool, sort_by, sort_order)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_standalone_videos_by_tag(
-    state: State<'_, AppState>,
-    tag_id: i64,
-) -> Result<Vec<db::Video>, String> {
-    let pool = {
-        let guard = state.db.lock().await;
-        guard.as_ref().ok_or("数据库未初始化")?.clone()
-    };
-    db::get_standalone_videos_by_tag(&pool, tag_id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_standalone_videos_by_tag_name(
-    state: State<'_, AppState>,
-    tag_name: String,
-) -> Result<Vec<db::Video>, String> {
-    let pool = {
-        let guard = state.db.lock().await;
-        guard.as_ref().ok_or("数据库未初始化")?.clone()
-    };
-    db::get_standalone_videos_by_tag_name(&pool, &tag_name)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_standalone_videos_by_actor(
-    state: State<'_, AppState>,
-    actor_id: i64,
-) -> Result<Vec<db::Video>, String> {
-    let pool = {
-        let guard = state.db.lock().await;
-        guard.as_ref().ok_or("数据库未初始化")?.clone()
-    };
-    db::get_standalone_videos_by_actor(&pool, actor_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -1437,10 +1371,6 @@ fn main() {
             get_video,
             delete_video,
             get_video_series_list,
-            get_standalone_videos,
-            get_standalone_videos_by_tag,
-            get_standalone_videos_by_tag_name,
-            get_standalone_videos_by_actor,
             get_video_series_by_tag,
             get_video_series_by_tag_name,
             get_video_series_by_actor,

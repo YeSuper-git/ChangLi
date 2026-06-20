@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import {
   getActors,
   getTags,
-  getStandaloneVideos,
   getVideoSeriesList,
   getFavoriteVideos,
   getFavoriteSeries,
@@ -13,7 +12,6 @@ import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
 export type FavoriteItem = Video | VideoSeries;
 
 interface LibraryState {
-  videos: Video[];
   series: VideoSeries[];
   actors: Actor[];
   tags: Tag[];
@@ -24,7 +22,6 @@ interface LibraryState {
   sortBy: 'created_at' | 'title';
   sortOrder: 'asc' | 'desc';
   loadAll: () => Promise<void>;
-  refreshVideos: () => Promise<void>;
   refreshSeries: () => Promise<void>;
   refreshActors: () => Promise<void>;
   refreshTags: () => Promise<void>;
@@ -37,7 +34,6 @@ interface LibraryState {
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
-  videos: [],
   series: [],
   actors: [],
   tags: [],
@@ -53,8 +49,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ loading: true });
     try {
       const { sortBy, sortOrder } = get();
-      const [videos, series, actors, tags, favVideos, favSeries] = await Promise.all([
-        getStandaloneVideos(sortBy, sortOrder),
+      const [series, actors, tags, favVideos, favSeries] = await Promise.all([
         getVideoSeriesList(sortBy, sortOrder),
         getActors(),
         getTags(),
@@ -66,26 +61,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       for (const s of series) {
         if (s.is_watched === 1) watchedIds.add(s.id);
       }
-      set({ videos, series, actors, tags, favorites, watchedIds, loaded: true });
+      set({ series, actors, tags, favorites, watchedIds, loaded: true });
     } catch (error) {
       console.error('[LibraryStore] loadAll failed:', error);
     } finally {
       set({ loading: false });
-    }
-  },
-
-  refreshVideos: async () => {
-    try {
-      const { sortBy, sortOrder } = get();
-      const [videos, favVideos, favSeries] = await Promise.all([
-        getStandaloneVideos(sortBy, sortOrder),
-        getFavoriteVideos(),
-        getFavoriteSeries(),
-      ]);
-      const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
-      set({ videos, favorites });
-    } catch (error) {
-      console.error('[LibraryStore] refreshVideos failed:', error);
     }
   },
 
@@ -161,19 +141,16 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   setSortBy: async (sortBy: 'created_at' | 'title') => {
     set({ sortBy });
     // 串行刷新，避免 SQLite 并发锁
-    await get().refreshVideos();
     await get().refreshSeries();
   },
 
   setSortOrder: async (sortOrder: 'asc' | 'desc') => {
     set({ sortOrder });
-    await get().refreshVideos();
     await get().refreshSeries();
   },
 
   toggleSortOrder: async () => {
     set((state) => ({ sortOrder: state.sortOrder === 'desc' ? 'asc' : 'desc' }));
-    await get().refreshVideos();
     await get().refreshSeries();
   },
 }));

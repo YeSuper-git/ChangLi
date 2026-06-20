@@ -597,53 +597,6 @@ pub async fn get_video(pool: &SqlitePool, id: i64) -> Result<Option<Video>> {
     Ok(row.map(|row| video_from_row(&row)))
 }
 
-pub async fn get_standalone_videos(pool: &SqlitePool, sort_by: &str, sort_order: &str) -> Result<Vec<Video>> {
-    let order_clause = match (sort_by, sort_order) {
-        ("title", "asc") => "ORDER BY title COLLATE NOCASE ASC",
-        ("title", "desc") => "ORDER BY title COLLATE NOCASE DESC",
-        ("created_at", "asc") => "ORDER BY created_at ASC",
-        _ => "ORDER BY created_at DESC",
-    };
-    let sql = format!("SELECT * FROM videos WHERE series_id IS NULL {}", order_clause);
-    let rows = sqlx::query(&sql)
-        .fetch_all(pool)
-        .await?;
-    Ok(rows.iter().map(video_from_row).collect())
-}
-
-pub async fn get_standalone_videos_by_tag(pool: &SqlitePool, tag_id: i64) -> Result<Vec<Video>> {
-    let rows = sqlx::query(
-        "SELECT DISTINCT v.* FROM videos v JOIN video_tags vt ON vt.video_id = v.id WHERE v.series_id IS NULL AND vt.tag_id = ? ORDER BY v.created_at DESC",
-    )
-    .bind(tag_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.iter().map(video_from_row).collect())
-}
-
-pub async fn get_standalone_videos_by_tag_name(
-    pool: &SqlitePool,
-    tag_name: &str,
-) -> Result<Vec<Video>> {
-    let rows = sqlx::query(
-        "SELECT DISTINCT v.* FROM videos v JOIN video_tags vt ON vt.video_id = v.id JOIN tags t ON t.id = vt.tag_id WHERE v.series_id IS NULL AND t.name = ? ORDER BY v.created_at DESC",
-    )
-    .bind(tag_name)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.iter().map(video_from_row).collect())
-}
-
-pub async fn get_standalone_videos_by_actor(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
-    let rows = sqlx::query(
-        "SELECT DISTINCT v.* FROM videos v JOIN video_actors va ON va.video_id = v.id WHERE v.series_id IS NULL AND va.actor_id = ? ORDER BY v.created_at DESC",
-    )
-    .bind(actor_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.iter().map(video_from_row).collect())
-}
-
 fn series_from_row(row: &SqliteRow) -> VideoSeries {
     let poster: Option<String> = row.get("poster");
     let resolved_poster = poster.clone().map(|path| {

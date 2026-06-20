@@ -93,7 +93,6 @@ const Settings: React.FC = () => {
 
   const [deletingVideos, setDeletingVideos] = useState(false);
   const [deleteResult, setDeleteResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
-  const refreshVideos = useLibraryStore((s) => s.refreshVideos);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
   const handleDeleteAllVideos = async () => {
@@ -105,7 +104,7 @@ const Settings: React.FC = () => {
     try {
       const result = await deleteAllVideos();
       setDeleteResult(result);
-      await Promise.all([refreshVideos(), refreshSeries()]);
+      await refreshSeries();
     } catch (error) {
       console.error('删除所有视频失败:', error);
       alert('删除失败: ' + String(error));

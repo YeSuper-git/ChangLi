@@ -298,18 +298,7 @@ export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): P
   return invoke<VideoSeries[]>('get_video_series_list', { sortBy, sortOrder });
 }
 
-export async function getStandaloneVideos(sortBy?: string, sortOrder?: string): Promise<Video[]> {
-  return invoke<Video[]>('get_standalone_videos', { sortBy, sortOrder });
-}
 
-
-export async function getStandaloneVideosByTag(tagId: number): Promise<Video[]> {
-  return invoke<Video[]>('get_standalone_videos_by_tag', { tagId });
-}
-
-export async function getStandaloneVideosByTagName(tagName: string): Promise<Video[]> {
-  return invoke<Video[]>('get_standalone_videos_by_tag_name', { tagName });
-}
 
 export async function getVideoSeriesByTag(tagId: number): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_video_series_by_tag', { tagId });
@@ -317,10 +306,6 @@ export async function getVideoSeriesByTag(tagId: number): Promise<VideoSeries[]>
 
 export async function getVideoSeriesByTagName(tagName: string): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_video_series_by_tag_name', { tagName });
-}
-
-export async function getStandaloneVideosByActor(actorId: number): Promise<Video[]> {
-  return invoke<Video[]>('get_standalone_videos_by_actor', { actorId });
 }
 
 export async function getVideoSeriesByActor(actorId: number): Promise<VideoSeries[]> {
