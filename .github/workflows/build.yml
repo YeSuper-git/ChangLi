@@ -1,11 +1,10 @@
 name: Build
-run-name: "${{ github.event.head_commit.message }}"
+run-name: "${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
   push:
-    tags:
-      - "v*"
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,10 +14,7 @@ permissions:
 
 jobs:
   build:
-    runs-on:
-  push:
-    tags:
-      - "v*" windows-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -32,10 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version:
-  push:
-    tags:
-      - "v*" 'lts/*'
+          node-version: 'lts/*'
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
