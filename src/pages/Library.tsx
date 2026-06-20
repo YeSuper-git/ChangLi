@@ -475,8 +475,8 @@ const Library: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-2">
-                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>
-                    {series.title}
+                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
+                    {series.code ? `[${series.code}] ${series.title}` : series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
                     {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
@@ -534,8 +534,8 @@ const Library: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-2">
-                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>
-                    {series.title}
+                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
+                    {series.code ? `[${series.code}] ${series.title}` : series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
                     {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}部` : '尚未观看'}

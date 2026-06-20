@@ -390,7 +390,18 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                     db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
                     updated += 1;
                 } else {
-                    let series = db::add_video_series(&pool, &entry_name, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                    let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&entry_name) {
+                        let title = info.title.unwrap_or_else(|| entry_name.clone());
+                        (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
+                    } else {
+                        (entry_name.clone(), None, 0)
+                    };
+                    let series = db::add_video_series(&pool, &series_title, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                    // 设置 code 和 has_chinese_sub
+                    if let Some(c) = code {
+                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                    }
                     db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
                     if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None, None).await {
                         eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
@@ -413,7 +424,18 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                     db::add_videos_batch(&pool, vec![video], Some(existing.id)).await.map_err(|e| e.to_string())?;
                     updated += 1;
                 } else {
-                    let series = db::add_video_series(&pool, &file_stem, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
+                    let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&file_stem) {
+                        let title = info.title.unwrap_or_else(|| file_stem.clone());
+                        (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
+                    } else {
+                        (file_stem.clone(), None, 0)
+                    };
+                    let series = db::add_video_series(&pool, &series_title, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
+                    // 设置 code 和 has_chinese_sub
+                    if let Some(c) = code {
+                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                    }
                     db::add_videos_batch(&pool, vec![video], Some(series.id)).await.map_err(|e| e.to_string())?;
                     if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None, None).await {
                         eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
@@ -441,10 +463,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         if existing.code.is_none() || existing.code.as_deref() == Some("") {
             if let Some(info) = scanner::parse_adult_filename(&folder_name) {
                 let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-                let new_title = match &info.title {
-                    Some(t) => format!("[{}] {}", info.code, t),
-                    None => format!("[{}] {}", info.code, folder_name),
-                };
+                let new_title = info.title.unwrap_or_else(|| folder_name.clone());
                 let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')")
                     .bind(&info.code)
                     .bind(has_chinese_sub)
@@ -456,15 +475,18 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         db::add_videos_batch(&pool, result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 0, updated: 1 })
     } else {
-        let series_title = if let Some(info) = scanner::parse_adult_filename(&folder_name) {
-            match info.title {
-                Some(t) => format!("[{}] {}", info.code, t),
-                None => format!("[{}] {}", info.code, folder_name),
-            }
+        let (series_title, code, has_chinese_sub) = if let Some(info) = scanner::parse_adult_filename(&folder_name) {
+            let title = info.title.unwrap_or_else(|| folder_name.clone());
+            (title, Some(info.code), if info.has_chinese_sub { 1 } else { 0 })
         } else {
-            folder_name.clone()
+            (folder_name.clone(), None, 0)
         };
         let series = db::add_video_series(&pool, &series_title, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+        // 设置 code 和 has_chinese_sub
+        if let Some(c) = code {
+            let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+        }
         db::add_videos_batch(&pool, result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
         Ok(ScanResult { added: 1, updated: 0 })
     }

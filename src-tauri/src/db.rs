@@ -1935,10 +1935,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
         let code = info.code;
         let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-        let new_title = match info.title {
-            Some(t) => format!("[{}] {}", code, t),
-            None => format!("[{}] {}", code, folder_name),
-        };
+        let new_title = info.title.unwrap_or_else(|| folder_name.clone());
 
         // 重新生成海报
         let folder_path_std = std::path::Path::new(source);
@@ -1984,10 +1981,7 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
         if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
             let code = info.code;
             let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-            let new_title = match info.title {
-                Some(t) => format!("[{}] {}", code, t),
-                None => format!("[{}] {}", code, folder_name),
-            };
+            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
             sqlx::query(
                 "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')"
             )
