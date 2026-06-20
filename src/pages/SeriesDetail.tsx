@@ -76,6 +76,7 @@ const SeriesDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [userTouchedSub, setUserTouchedSub] = useState(false);
   const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed'; code: string; has_chinese_sub: boolean }>({ title: '', description: '', poster: '', status: 'ongoing', code: '', has_chinese_sub: false });
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [seriesTags, setSeriesTags] = useState<Tag[]>([]);
@@ -111,14 +112,15 @@ const SeriesDetail: React.FC = () => {
 
   // 编辑模式打开时自动识别车牌
   useEffect(() => {
+    if (userTouchedSub) return;
     if (editing && series && !editData.code) {
       const source = series.folder_path || series.title;
       const { code, hasChineseSub } = extractCode(source);
       if (code) {
-        setEditData((prev) => ({ ...prev, code, has_chinese_sub: prev.has_chinese_sub || hasChineseSub }));
+        setEditData((prev) => ({ ...prev, code, has_chinese_sub: hasChineseSub }));
       }
     }
-  }, [editing]);
+  }, [editing, series, editData.code, userTouchedSub]);
 
   // 点击空白关闭右键菜单
   useEffect(() => {
@@ -259,7 +261,7 @@ const SeriesDetail: React.FC = () => {
       const result = await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
       console.log('[Save] returned has_chinese_sub:', result.has_chinese_sub);
       await syncSeriesRelations();
-      clearEditQuery();
+      clearEditQuery(); setUserTouchedSub(false);
       setEditing(false);
       await loadSeries();
     } catch (error) {
@@ -447,7 +449,7 @@ const SeriesDetail: React.FC = () => {
                           <span className="text-sm font-medium text-gray-500">中文字幕</span>
                           <button
                             type="button"
-                            onClick={() => setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub })}
+                            onClick={() => { setUserTouchedSub(true); setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub }); }}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.has_chinese_sub ? 'bg-blue-500' : 'bg-gray-300'}`}
                           >
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.has_chinese_sub ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -536,7 +538,7 @@ const SeriesDetail: React.FC = () => {
                 )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
-                  <button onClick={() => { setEditing(false); clearEditQuery(); }} className="action-btn">取消</button>
+                  <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
                 </div>
               </div>
             ) : (

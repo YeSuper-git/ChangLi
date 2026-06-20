@@ -450,9 +450,9 @@ const Library: React.FC = () => {
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   {series.has_chinese_sub === 1 && (
-                    <div className="absolute bottom-2 left-2 text-white text-xs drop-shadow-lg">
-                      中文字幕
-                    </div>
+                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                      中字
+                    </span>
                   )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
@@ -509,9 +509,9 @@ const Library: React.FC = () => {
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   {series.has_chinese_sub === 1 && (
-                    <div className="absolute bottom-2 left-2 text-white text-xs drop-shadow-lg">
-                      中文字幕
-                    </div>
+                    <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                      中字
+                    </span>
                   )}
                   {typeFilter !== 'video' && (
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
