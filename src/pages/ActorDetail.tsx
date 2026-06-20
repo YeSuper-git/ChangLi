@@ -37,6 +37,7 @@ const ActorDetail: React.FC = () => {
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
@@ -46,6 +47,13 @@ const ActorDetail: React.FC = () => {
     }
   }, [id]);
 
+  // Toast 自动消失
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
   useEffect(() => {
     if (editFromUrl && actor) {
       setEditing(true);
@@ -175,7 +183,7 @@ const ActorDetail: React.FC = () => {
           
           // 扫描视频
           console.log('[ActorDetail] 开始扫描视频...');
-          await scanVideos(selected as string);
+          const result = await scanVideos(selected as string);
           
           // 扫描后重新获取视频列表，找出新增的
           const allVideos = await getVideos();
@@ -190,6 +198,18 @@ const ActorDetail: React.FC = () => {
           
           // 刷新资源列表
           loadActor(actor.id);
+
+          // 显示扫描结果
+          const { added, updated } = result;
+          if (added > 0 && updated > 0) {
+            setToast({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
+          } else if (added > 0) {
+            setToast({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
+          } else if (updated > 0) {
+            setToast({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
+          } else {
+            setToast({ message: '未发现新作品', type: 'info' });
+          }
         } catch (error) {
           console.error('[Actor] 添加作品失败:', error);
         } finally {
@@ -328,6 +348,7 @@ const ActorDetail: React.FC = () => {
   );
 
   return (
+    <>
     <div>
       {/* 返回按钮 */}
       <div className="mb-10">
@@ -671,6 +692,13 @@ const ActorDetail: React.FC = () => {
         </div>
       )}
     </div>
+    {/* Toast 提示 */}
+    {toast && (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
+        {toast.message}
+      </div>
+    )}
+    </>
   );
 };
 

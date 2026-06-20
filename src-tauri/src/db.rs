@@ -778,6 +778,23 @@ pub async fn get_series_videos(pool: &SqlitePool, series_id: i64) -> Result<Vec<
     Ok(rows.iter().map(video_from_row).collect())
 }
 
+pub async fn update_video_series_poster(
+    pool: &SqlitePool,
+    id: i64,
+    poster: Option<&str>,
+    poster_base64: Option<&str>,
+    poster_orientation: Option<&str>,
+) -> Result<()> {
+    sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = ?, poster_orientation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(poster)
+        .bind(poster_base64)
+        .bind(poster_orientation.unwrap_or("landscape"))
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn update_video_series(
     pool: &SqlitePool,
     id: i64,

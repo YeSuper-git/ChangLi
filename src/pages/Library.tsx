@@ -175,13 +175,13 @@ const Library: React.FC = () => {
             await filterByActor(activeActorId);
           }
           // 显示导入结果
-          const { added, skipped } = result;
-          if (added > 0 && skipped > 0) {
-            setToast({ message: `添加成功，本次添加了 ${added} 部作品，识别到 ${skipped} 部已添加已自动跳过`, type: 'success' });
+          const { added, updated } = result;
+          if (added > 0 && updated > 0) {
+            setToast({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
           } else if (added > 0) {
             setToast({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
-          } else if (skipped > 0) {
-            setToast({ message: `识别到 ${skipped} 部已添加，已自动跳过`, type: 'info' });
+          } else if (updated > 0) {
+            setToast({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
           } else {
             setToast({ message: '未发现新作品', type: 'info' });
           }

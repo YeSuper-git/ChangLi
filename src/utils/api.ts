@@ -222,7 +222,7 @@ export interface Video {
 
 export interface ScanResult {
   added: number;
-  skipped: number;
+  updated: number;
 }
 
 export async function scanVideos(path: string): Promise<ScanResult> {

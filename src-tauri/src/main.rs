@@ -261,8 +261,14 @@ async fn remove_download(state: State<'_, AppState>, id: i64) -> Result<(), Stri
 }
 
 // 视频相关命令
+#[derive(serde::Serialize)]
+struct ScanResult {
+    added: i64,
+    updated: i64,
+}
+
 #[tauri::command]
-async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db::Video>, String> {
+async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanResult, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -279,7 +285,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
         db::add_video(&pool, video)
             .await
             .map_err(|e| e.to_string())?;
-        return db::get_videos(&pool).await.map_err(|e| e.to_string());
+        return Ok(ScanResult { added: 1, updated: 0 });
     }
 
     let folder_name = import_path
@@ -291,7 +297,8 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
     // 如果文件夹名匹配已有标签，自动拆子文件夹为视频集并关联标签
     if let Ok(Some(tag)) = db::get_tag_by_name(&pool, folder_name.trim()).await {
         eprintln!("[ChangLi] 文件夹名 '{}' 匹配标签 '{}'，自动拆分子文件夹", folder_name, tag.name);
-        let mut all_videos: Vec<db::Video> = Vec::new();
+        let mut added: i64 = 0;
+        let mut updated: i64 = 0;
 
         let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
         for entry in entries {
@@ -310,25 +317,20 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 let sub_poster = sub_result.posters.values().next().cloned();
                 let sub_poster_base64 = sub_poster.as_deref()
                     .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-                let series = db::add_video_series(
-                    &pool,
-                    &entry_name,
-                    Some(&entry_path.to_string_lossy()),
-                    sub_poster.as_deref(),
-                    Some("landscape"),
-                    Some("completed"),
-                    sub_poster_base64.as_deref(),
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                let saved = db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
-                    .await
-                    .map_err(|e| e.to_string())?;
-                // 自动关联标签
-                if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
-                    eprintln!("[ChangLi] 关联标签失败: {}", e);
+                let folder_path_str = entry_path.to_string_lossy().to_string();
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str).await.map_err(|e| e.to_string())? {
+                    // 已存在：更新海报
+                    db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+                    updated += 1;
+                } else {
+                    let series = db::add_video_series(&pool, &entry_name, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+                    if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
+                        eprintln!("[ChangLi] 关联标签失败: {}", e);
+                    }
+                    added += 1;
                 }
-                all_videos.extend(saved);
             } else if entry_path.is_file() && scanner::is_video_file(&entry_path) {
                 // 根目录下的视频也创建视频集
                 let video = scanner::scan_video_file(&entry_path, None)
@@ -339,34 +341,30 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                     .unwrap_or_else(|| entry_name.clone());
                 let thumb = video.thumbnail.as_deref()
                     .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
-                let series = db::add_video_series(
-                    &pool,
-                    &file_stem,
-                    Some(&entry_path.to_string_lossy()),
-                    video.thumbnail.as_deref(),
-                    Some("landscape"),
-                    Some("completed"),
-                    thumb.as_deref(),
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                let saved = db::add_videos_batch(&pool, vec![video], Some(series.id))
-                    .await
-                    .map_err(|e| e.to_string())?;
-                if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
-                    eprintln!("[ChangLi] 关联标签失败: {}", e);
+                let file_path_str = entry_path.to_string_lossy().to_string();
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str).await.map_err(|e| e.to_string())? {
+                    db::update_video_series_poster(&pool, existing.id, video.thumbnail.as_deref(), thumb.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, vec![video], Some(existing.id)).await.map_err(|e| e.to_string())?;
+                    updated += 1;
+                } else {
+                    let series = db::add_video_series(&pool, &file_stem, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, vec![video], Some(series.id)).await.map_err(|e| e.to_string())?;
+                    if let Err(e) = db::add_series_tag(&pool, series.id, tag.id).await {
+                        eprintln!("[ChangLi] 关联标签失败: {}", e);
+                    }
+                    added += 1;
                 }
-                all_videos.extend(saved);
             }
         }
 
-        return Ok(all_videos);
+        return Ok(ScanResult { added, updated });
     }
 
     // 如果文件夹名匹配已有演员，自动拆子文件夹为视频集并关联演员
     if let Ok(Some(actor)) = db::get_actor_by_name(&pool, folder_name.trim()).await {
         eprintln!("[ChangLi] 文件夹名 '{}' 匹配演员 '{}'，自动拆分子文件夹并关联演员", folder_name, actor.name);
-        let mut all_videos: Vec<db::Video> = Vec::new();
+        let mut added: i64 = 0;
+        let mut updated: i64 = 0;
 
         let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
         for entry in entries {
@@ -386,25 +384,19 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                 let sub_poster_base64 = sub_poster.as_deref()
                     .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
 
-                // 统一走视频集创建逻辑
-                let series = db::add_video_series(
-                    &pool,
-                    &entry_name,
-                    Some(&entry_path.to_string_lossy()),
-                    sub_poster.as_deref(),
-                    Some("landscape"),
-                    Some("completed"),
-                    sub_poster_base64.as_deref(),
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                let saved = db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
-                    .await
-                    .map_err(|e| e.to_string())?;
-                if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
-                    eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
+                let folder_path_str = entry_path.to_string_lossy().to_string();
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str).await.map_err(|e| e.to_string())? {
+                    db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+                    updated += 1;
+                } else {
+                    let series = db::add_video_series(&pool, &entry_name, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
+                        eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
+                    }
+                    added += 1;
                 }
-                all_videos.extend(saved);
             } else if entry_path.is_file() && scanner::is_video_file(&entry_path) {
                 // 根目录下的视频也创建视频集并关联演员
                 let video = scanner::scan_video_file(&entry_path, None)
@@ -415,48 +407,43 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<Vec<db:
                     .unwrap_or_else(|| entry_name.clone());
                 let thumb = video.thumbnail.as_deref()
                     .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
-                let series = db::add_video_series(
-                    &pool,
-                    &file_stem,
-                    Some(&entry_path.to_string_lossy()),
-                    video.thumbnail.as_deref(),
-                    Some("landscape"),
-                    Some("completed"),
-                    thumb.as_deref(),
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                let saved = db::add_videos_batch(&pool, vec![video], Some(series.id))
-                    .await
-                    .map_err(|e| e.to_string())?;
-                if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
-                    eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
+                let file_path_str = entry_path.to_string_lossy().to_string();
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str).await.map_err(|e| e.to_string())? {
+                    db::update_video_series_poster(&pool, existing.id, video.thumbnail.as_deref(), thumb.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, vec![video], Some(existing.id)).await.map_err(|e| e.to_string())?;
+                    updated += 1;
+                } else {
+                    let series = db::add_video_series(&pool, &file_stem, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, vec![video], Some(series.id)).await.map_err(|e| e.to_string())?;
+                    if let Err(e) = db::add_series_actor(&pool, series.id, actor.id, None).await {
+                        eprintln!("[ChangLi] 关联演员到视频集失败: {}", e);
+                    }
+                    added += 1;
                 }
-                all_videos.extend(saved);
             }
         }
 
-        return Ok(all_videos);
+        return Ok(ScanResult { added, updated });
     }
 
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;
 
-    // 统一走视频集创建逻辑
     let series_poster = result.posters.values().next().cloned();
     let series_poster_base64 = series_poster.as_deref()
         .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-    let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref())
-        .await
-        .map_err(|e| e.to_string())?;
 
-    // P1: 事务批处理 - 所有视频在同一个事务中插入，1000条视频也只提交1次
-    let _saved_videos = db::add_videos_batch(&pool, result.videos, Some(series.id))
-        .await
-        .map_err(|e| e.to_string())?;
-
-    db::get_videos(&pool).await.map_err(|e| e.to_string())
+    if let Some(existing) = db::get_video_series_by_folder_path(&pool, &path).await.map_err(|e| e.to_string())? {
+        // 已存在：更新海报
+        db::update_video_series_poster(&pool, existing.id, series_poster.as_deref(), series_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+        db::add_videos_batch(&pool, result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+        Ok(ScanResult { added: 0, updated: 1 })
+    } else {
+        let series = db::add_video_series(&pool, &folder_name, Some(&path), series_poster.as_deref(), Some("landscape"), Some("completed"), series_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+        db::add_videos_batch(&pool, result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+        Ok(ScanResult { added: 1, updated: 0 })
+    }
 }
 
 #[tauri::command]
