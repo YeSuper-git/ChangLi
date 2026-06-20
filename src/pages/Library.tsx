@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
@@ -15,21 +15,64 @@ import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { tags, actors, series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activeTagId, setActiveTagId] = useState<number | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>('all');
+  const [activeTagId, setActiveTagId] = useState<number | null>(() => {
+    const t = searchParams.get('tag');
+    return t ? parseInt(t) : null;
+  });
+  const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>(() => {
+    return (searchParams.get('type') as 'all' | 'series' | 'video') || 'all';
+  });
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
-  const [watchedFilter, setWatchedFilter] = useState(false);
+  const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
   const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
-  const [activeActorId, setActiveActorId] = useState<number | null>(null);
+  const [activeActorId, setActiveActorId] = useState<number | null>(() => {
+    const a = searchParams.get('actor');
+    return a ? parseInt(a) : null;
+  });
   const [actorFilteredSeries, setActorFilteredSeries] = useState<VideoSeries[] | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  // Toast 自动消失
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // 同步筛选状态到 URL 参数
+  const syncParams = useCallback((updates: Record<string, string | null>) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null || value === '' || value === 'all') {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // 监听筛选状态变化，同步到 URL
+  useEffect(() => {
+    syncParams({
+      tag: activeTagId !== null ? String(activeTagId) : null,
+      actor: activeActorId !== null ? String(activeActorId) : null,
+      type: typeFilter !== 'all' ? typeFilter : null,
+      favorite: favoriteFilter ? '1' : null,
+      watched: watchedFilter ? '1' : null,
+    });
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -49,6 +92,20 @@ const Library: React.FC = () => {
       setActorFilteredSeries(null);
     }
   }, [storeSeries, activeTagId, activeActorId]);
+
+  // 恢复标签筛选
+  useEffect(() => {
+    if (activeTagId !== null && tagFilteredSeries === null) {
+      filterByTag(activeTagId);
+    }
+  }, [activeTagId]);
+
+  // 恢复演员筛选
+  useEffect(() => {
+    if (activeActorId !== null && actorFilteredSeries === null) {
+      filterByActor(activeActorId);
+    }
+  }, [activeActorId]);
 
   const filterByTag = async (tagId: number | null) => {
     if (tagId === null) {
@@ -86,6 +143,18 @@ const Library: React.FC = () => {
 
   const seriesList: VideoSeries[] = actorFilteredSeries ?? tagFilteredSeries ?? storeSeries;
 
+  // 构建当前筛选状态的 URL 参数字符串
+  const buildFilterSearch = () => {
+    const params = new URLSearchParams();
+    if (activeTagId !== null) params.set('tag', String(activeTagId));
+    if (activeActorId !== null) params.set('actor', String(activeActorId));
+    if (typeFilter !== 'all') params.set('type', typeFilter);
+    if (favoriteFilter) params.set('favorite', '1');
+    if (watchedFilter) params.set('watched', '1');
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  };
+
   const importPath = async () => {
     try {
       const selected = await open({
@@ -97,13 +166,24 @@ const Library: React.FC = () => {
       if (selected) {
         setScanning(true);
         try {
-          await scanVideos(selected as string);
+          const result = await scanVideos(selected as string);
           await refreshSeries();
           if (activeTagId !== null) {
             await filterByTag(activeTagId);
           }
           if (activeActorId !== null) {
             await filterByActor(activeActorId);
+          }
+          // 显示导入结果
+          const { added, skipped } = result;
+          if (added > 0 && skipped > 0) {
+            setToast({ message: `添加成功，本次添加了 ${added} 部作品，识别到 ${skipped} 部已添加已自动跳过`, type: 'success' });
+          } else if (added > 0) {
+            setToast({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
+          } else if (skipped > 0) {
+            setToast({ message: `识别到 ${skipped} 部已添加，已自动跳过`, type: 'info' });
+          } else {
+            setToast({ message: '未发现新作品', type: 'info' });
           }
         } catch (error) {
           console.error('[Library] 导入失败:', error);
@@ -143,10 +223,11 @@ const Library: React.FC = () => {
 
   const handleEditContextItem = () => {
     if (!contextMenu) return;
+    const filterSearch = buildFilterSearch();
     const target = `/series/${contextMenu.id}?edit=1`;
     setContextMenu(null);
     clearPending();
-    navigate(target, { state: { from: '/library', backLabel: '返回视频' } });
+    navigate(target, { state: { from: '/library', backLabel: '返回视频', filterSearch } });
   };
 
 
@@ -337,7 +418,10 @@ const Library: React.FC = () => {
             {animeSeries.map((series) => (
               <div
                 key={series.id}
-                onClick={() => { if (!selectMode) navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } }); }}
+                onClick={() => { if (!selectMode) {
+                  const filterSearch = buildFilterSearch();
+                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: '返回视频' } });
+                }}}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
@@ -364,6 +448,11 @@ const Library: React.FC = () => {
                   )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
+                  {series.has_chinese_sub === 1 && (
+                    <div className="absolute bottom-2 left-2 text-white text-xs drop-shadow-lg">
+                      中文字幕
+                    </div>
+                  )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
@@ -388,7 +477,10 @@ const Library: React.FC = () => {
             {adultSeries.map((series) => (
               <div
                 key={series.id}
-                onClick={() => { if (!selectMode) navigate(`/series/${series.id}`, { state: { from: '/library', backLabel: '返回视频' } }); }}
+                onClick={() => { if (!selectMode) {
+                  const filterSearch = buildFilterSearch();
+                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: '返回视频' } });
+                }}}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
@@ -415,6 +507,11 @@ const Library: React.FC = () => {
                   )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
+                  {series.has_chinese_sub === 1 && (
+                    <div className="absolute bottom-2 left-2 text-white text-xs drop-shadow-lg">
+                      中文字幕
+                    </div>
+                  )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
@@ -465,6 +562,13 @@ const Library: React.FC = () => {
         </div>
       )}
     </div>
+
+    {/* Toast 提示 */}
+    {toast && (
+      <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
+        {toast.message}
+      </div>
+    )}
 
     <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新视频" />
     </>

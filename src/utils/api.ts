@@ -217,13 +217,19 @@ export interface Video {
   subtitle?: string;
   created_at: string;
   is_favorite?: number;
+  series_has_chinese_sub?: number;
 }
 
-export async function scanVideos(path: string): Promise<Video[]> {
+export interface ScanResult {
+  added: number;
+  skipped: number;
+}
+
+export async function scanVideos(path: string): Promise<ScanResult> {
   console.log('[API] 调用 scanVideos, path:', path);
   try {
-    const result = await invoke<Video[]>('scan_videos', { path });
-    console.log('[API] scanVideos 返回:', result.length, '个视频');
+    const result = await invoke<ScanResult>('scan_videos', { path });
+    console.log('[API] scanVideos 返回:', result);
     return result;
   } catch (err) {
     console.error('[API] scanVideos 失败:', err);

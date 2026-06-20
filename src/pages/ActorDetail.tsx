@@ -175,10 +175,10 @@ const ActorDetail: React.FC = () => {
           
           // 扫描视频
           console.log('[ActorDetail] 开始扫描视频...');
-          const allVideos = await scanVideos(selected as string);
-          console.log('[ActorDetail] 扫描后视频总数:', allVideos.length);
+          await scanVideos(selected as string);
           
-          // 找出新增的视频
+          // 扫描后重新获取视频列表，找出新增的
+          const allVideos = await getVideos();
           const newVideos = allVideos.filter(v => !existingIds.has(v.id));
           console.log('[ActorDetail] 新增视频数量:', newVideos.length);
           
@@ -414,7 +414,7 @@ const ActorDetail: React.FC = () => {
                       inputMode="numeric"
                       min={1}
                       max={12}
-                      value={bParts[1] ? bParts[1].padStart(2, '0') : ''}
+                      value={bParts[1] || ''}
                       onChange={(e) => {
                         let v = e.target.value.replace(/[^0-9]/g, '');
                         if (v !== '' && parseInt(v, 10) > 12) v = '12';
@@ -431,7 +431,7 @@ const ActorDetail: React.FC = () => {
                       inputMode="numeric"
                       min={1}
                       max={maxDay || 31}
-                      value={bParts[2] ? bParts[2].padStart(2, '0') : ''}
+                      value={bParts[2] || ''}
                       onChange={(e) => {
                         let v = e.target.value.replace(/[^0-9]/g, '');
                         const md = maxDay || 31;
@@ -627,6 +627,9 @@ const ActorDetail: React.FC = () => {
                 </div>
                 <div className="p-5">
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
+                  {resource.series_has_chinese_sub === 1 && (
+                    <span className="text-xs text-orange-500">中文字幕</span>
+                  )}
                   <div className="text-sm text-gray-500">
                     
                   </div>

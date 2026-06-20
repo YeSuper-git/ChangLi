@@ -83,6 +83,7 @@ pub struct Video {
     pub poster_orientation: Option<String>,
     pub created_at: String,
     pub is_favorite: Option<i32>,
+    pub series_has_chinese_sub: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,6 +140,13 @@ pub struct Tag {
 pub struct ResourceTag {
     pub resource_id: i64,
     pub tag_id: i64,
+}
+
+// 扫描结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanResult {
+    pub added: i64,
+    pub skipped: i64,
 }
 
 // 资源演员关联
@@ -561,6 +569,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
         poster_orientation: row.try_get("poster_orientation").ok(),
         created_at: row.get("created_at"),
         is_favorite: row.try_get("is_favorite").ok(),
+        series_has_chinese_sub: row.try_get("series_has_chinese_sub").ok().flatten(),
     }
 }
 
@@ -1232,7 +1241,7 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
 
 pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
     let rows = sqlx::query(
-        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster
+        "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.has_chinese_sub AS series_has_chinese_sub
          FROM videos v
          LEFT JOIN video_series s ON s.id = v.series_id
          LEFT JOIN video_actors va ON va.video_id = v.id
