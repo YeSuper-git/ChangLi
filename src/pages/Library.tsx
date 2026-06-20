@@ -513,11 +513,9 @@ const Library: React.FC = () => {
                       中字
                     </span>
                   )}
-                  {typeFilter !== 'video' && (
-                    <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.status === 'completed' ? `全${series.video_count}部` : `更新至第${series.video_count}部`}
-                    </div>
-                  )}
+                  <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
+                    {series.status === 'completed' ? `全${series.video_count}部` : `更新至第${series.video_count}部`}
+                  </div>
                 </div>
                 <div className="mt-2">
                   <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.title}>

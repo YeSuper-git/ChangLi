@@ -1743,6 +1743,14 @@ pub async fn toggle_favorite_series(pool: &SqlitePool, id: i64) -> Result<()> {
     Ok(())
 }
 
+pub async fn toggle_chinese_sub_series(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("UPDATE video_series SET has_chinese_sub = CASE WHEN has_chinese_sub = 1 THEN 0 ELSE 1 END WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn toggle_watched_series(pool: &SqlitePool, id: i64) -> Result<()> {
     sqlx::query("UPDATE video_series SET is_watched = CASE WHEN is_watched = 1 THEN 0 ELSE 1 END WHERE id = ?")
         .bind(id)

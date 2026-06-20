@@ -362,6 +362,10 @@ export async function toggleWatched(id: number): Promise<void> {
   await invoke('toggle_watched', { id });
 }
 
+export async function toggleChineseSub(id: number): Promise<void> {
+  await invoke('toggle_chinese_sub', { id });
+}
+
 export async function getFavoriteVideos(): Promise<Video[]> {
   return invoke<Video[]>('get_favorite_videos_cmd');
 }

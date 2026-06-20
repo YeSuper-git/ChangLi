@@ -6,6 +6,7 @@ import loadingIcon from '../assets/icons/loading.svg';
 import favoriteIcon from '../assets/icons/favorite.svg';
 import notFavoriteIcon from '../assets/icons/not-favorite.svg';
 import watchedIcon from '../assets/icons/watched.svg';
+import translateIcon from '../assets/icons/translate.svg';
 import {
   addActor,
   addSeriesActor,
@@ -26,6 +27,7 @@ import {
   saveVideoThumbnail,
   updateVideoSeries,
   toggleWatched,
+  toggleChineseSub,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
@@ -368,6 +370,16 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const handleToggleChineseSub = async () => {
+    if (!series) return;
+    try {
+      await toggleChineseSub(series.id);
+      setSeries(prev => prev ? { ...prev, has_chinese_sub: prev.has_chinese_sub === 1 ? 0 : 1 } : prev);
+    } catch (error) {
+      console.error('切换中文字幕状态失败:', error);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -444,16 +456,6 @@ const SeriesDetail: React.FC = () => {
                             placeholder="如 JJK-098"
                             style={{ textTransform: 'uppercase' }}
                           />
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-gray-500">中文字幕</span>
-                          <button
-                            type="button"
-                            onClick={() => { setUserTouchedSub(true); setEditData({ ...editData, has_chinese_sub: !editData.has_chinese_sub }); }}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editData.has_chinese_sub ? 'bg-blue-500' : 'bg-gray-300'}`}
-                          >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editData.has_chinese_sub ? 'translate-x-6' : 'translate-x-1'}`} />
-                          </button>
                         </div>
                       </>
                     )}
@@ -547,9 +549,20 @@ const SeriesDetail: React.FC = () => {
                   <>
                     <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
                     <div className="flex items-center gap-2 mb-3">
-                      {series.has_chinese_sub === 1 && (
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
-                      )}
+                      <button
+                        onClick={handleToggleChineseSub}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={translateIcon}
+                          alt="中文字幕"
+                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-blue' : 'text-gray-400'}`}
+                          style={series.has_chinese_sub === 1 ? { filter: 'invert(27%) sepia(88%) saturate(2553%) hue-rotate(212deg) brightness(97%) contrast(97%)' } : {}}
+                        />
+                        <span className={series.has_chinese_sub === 1 ? 'text-blue-500' : 'text-gray-400'}>
+                          中字
+                        </span>
+                      </button>
                       <button
                         onClick={() => toggleFavorite(series.id, 'series')}
                         className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
@@ -582,9 +595,20 @@ const SeriesDetail: React.FC = () => {
                   <>
                     <div className="flex items-center gap-3 mb-3">
                       <h1 className="text-3xl font-bold">{series.title}</h1>
-                      {series.has_chinese_sub === 1 && (
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">中字</span>
-                      )}
+                      <button
+                        onClick={handleToggleChineseSub}
+                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                      >
+                        <img
+                          src={translateIcon}
+                          alt="中文字幕"
+                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-blue' : 'text-gray-400'}`}
+                          style={series.has_chinese_sub === 1 ? { filter: 'invert(27%) sepia(88%) saturate(2553%) hue-rotate(212deg) brightness(97%) contrast(97%)' } : {}}
+                        />
+                        <span className={series.has_chinese_sub === 1 ? 'text-blue-500' : 'text-gray-400'}>
+                          中字
+                        </span>
+                      </button>
                       <button
                         onClick={() => toggleFavorite(series.id, 'series')}
                         className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
@@ -903,6 +927,11 @@ const VideoGrid: React.FC<VideoGridProps> = ({
           } bg-gray-100 overflow-hidden relative`}
         >
           <SmartPoster src={poster} alt={video.file_name} posterOrientation={posterOrientation} />
+          {video.series_has_chinese_sub === 1 && (
+            <div className="absolute bottom-1 left-1 bg-orange-500 text-white text-[10px] px-1 py-0.5 rounded-sm">
+              中文字幕
+            </div>
+          )}
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">
