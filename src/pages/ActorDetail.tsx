@@ -393,10 +393,10 @@ const ActorDetail: React.FC = () => {
               {/* 出生日期 + 身高 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
                   <div className="flex gap-1 items-center">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       min={1900}
                       max={2100}
                       value={numOrEmpty(bParts[0])}
@@ -406,12 +406,13 @@ const ActorDetail: React.FC = () => {
                       }}
                       className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
-                    <span className="text-gray-400">-</span>
+                    <span className="text-gray-500 text-sm">年</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       min={1}
                       max={12}
-                      value={numOrEmpty(bParts[1])}
+                      value={bParts[1] ? bParts[1].padStart(2, '0') : ''}
                       onChange={(e) => {
                         let v = e.target.value.replace(/[^0-9]/g, '');
                         if (v !== '' && parseInt(v, 10) > 12) v = '12';
@@ -422,12 +423,13 @@ const ActorDetail: React.FC = () => {
                       }}
                       className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
-                    <span className="text-gray-400">-</span>
+                    <span className="text-gray-500 text-sm">月</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       min={1}
                       max={maxDay || 31}
-                      value={numOrEmpty(bParts[2])}
+                      value={bParts[2] ? bParts[2].padStart(2, '0') : ''}
                       onChange={(e) => {
                         let v = e.target.value.replace(/[^0-9]/g, '');
                         const md = maxDay || 31;
@@ -436,36 +438,43 @@ const ActorDetail: React.FC = () => {
                       }}
                       className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
                     />
+                    <span className="text-gray-500 text-sm">日</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">身高 (cm)</label>
-                  <input
-                    type="number"
-                    value={editForm.height}
-                    onChange={(e) => setEditForm({ ...editForm, height: e.target.value })}
-                    className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    min="0"
-                    max="300"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">身高</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={editForm.height}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                        setEditForm({ ...editForm, height: v });
+                      }}
+                      className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                    />
+                    <span className="text-gray-500 text-sm">cm</span>
+                  </div>
                 </div>
               </div>
 
               {/* 数值 + 车灯 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     {[0, 1, 2].map((idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => { measureRefs.current[idx] = el; }}
-                        type="text"
-                        inputMode="numeric"
-                        value={measureParts[idx]}
-                        onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                      />
+                      <React.Fragment key={idx}>
+                        <input
+                          ref={(el) => { measureRefs.current[idx] = el; }}
+                          type="text"
+                          inputMode="numeric"
+                          value={measureParts[idx]}
+                          onChange={(e) => handleMeasureChange(idx, e.target.value)}
+                          className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                        />
+                        <span className="text-gray-500 text-sm">{['B', 'W', 'H'][idx]}</span>
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>

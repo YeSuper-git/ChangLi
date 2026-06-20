@@ -244,6 +244,7 @@ const Library: React.FC = () => {
               >
                 <div className="card relative w-full aspect-[3/4] overflow-hidden">
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+                  <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
                     {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
                   </div>
@@ -253,7 +254,7 @@ const Library: React.FC = () => {
                     {series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
+                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
                   </div>
                 </div>
               </div>
