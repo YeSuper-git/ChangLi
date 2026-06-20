@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface FloatingActionsProps {
   onRefresh?: () => void;
@@ -6,16 +6,7 @@ interface FloatingActionsProps {
 }
 
 const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLabel = '刷新' }) => {
-  const [visible, setVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setVisible(window.scrollY > 300);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -32,7 +23,7 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
   };
 
   return (
-    <div className={`fixed right-6 bottom-6 z-50 flex flex-col gap-3 transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div className="fixed right-6 bottom-6 z-50 flex flex-col gap-3">
       {onRefresh && (
         <button
           onClick={handleRefresh}
