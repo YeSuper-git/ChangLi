@@ -54,7 +54,7 @@ const Library: React.FC = () => {
   useEffect(() => {
     const checkOverflow = () => {
       if (filterButtonsRef.current) {
-        setNeedsExpand(filterButtonsRef.current.scrollHeight > 44);
+        setNeedsExpand(filterButtonsRef.current.scrollHeight > filterButtonsRef.current.clientHeight + 2);
       }
     };
     checkOverflow();
@@ -411,23 +411,6 @@ const Library: React.FC = () => {
       </div>
 
       <div className="mb-6 flex gap-3 flex-wrap">
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
-          className="category-btn"
-        >
-          <option value="created_at">添加时间</option>
-          <option value="title">名称</option>
-        </select>
-        <button
-          onClick={() => toggleSortOrder()}
-          className="category-btn"
-        >
-          {sortOrder === 'desc' ? '降序 ↓' : '升序 ↑'}
-        </button>
-      </div>
-
-      <div className="mb-6 flex gap-3 flex-wrap">
         {mainCategory === 'anime' ? (
           <>
             <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
@@ -442,6 +425,23 @@ const Library: React.FC = () => {
             <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
           </>
         )}
+      </div>
+
+      <div className="mb-6 flex gap-3 flex-wrap">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
+          className="category-btn"
+        >
+          <option value="created_at">添加时间</option>
+          <option value="title">名称</option>
+        </select>
+        <button
+          onClick={() => toggleSortOrder()}
+          className="category-btn"
+        >
+          {sortOrder === 'desc' ? '降序 ↓' : '升序 ↑'}
+        </button>
       </div>
 
       <div className="mb-10">
