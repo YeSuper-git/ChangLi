@@ -52,7 +52,7 @@ const ActorDetail: React.FC = () => {
   // 时期删除确认
   const [deletingPeriodId, setDeletingPeriodId] = useState<number | null>(null);
   // 添加时期
-  const [addingPeriod, setAddingPeriod] = useState(false);
+  const [showAddPeriodModal, setShowAddPeriodModal] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   // 添加作品时选择时期弹窗
   const [periodSelectVisible, setPeriodSelectVisible] = useState(false);
@@ -145,50 +145,7 @@ const ActorDetail: React.FC = () => {
     }
   };
 
-  const handlePhotoClick = async () => {
-    try {
-      console.log('[ActorDetail] 打开文件选择器...');
-      const selected = await open({
-        multiple: false,
-        filters: [{
-          name: '图片',
-          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'heic', 'heif']
-        }],
-        title: '选择演员海报'
-      });
-      
-      if (selected && actor) {
-        console.log('[ActorDetail] 选择的文件:', selected);
-        setUploadingPhoto(true);
-        try {
-          // 复制文件到应用数据目录
-          const relativePath = await saveActorPhoto(selected as string);
-          console.log('[ActorDetail] 保存后的相对路径:', relativePath);
-          
-          // 更新演员信息
-          await updateActor(
-            actor.id,
-            actor.name,
-            relativePath,
-            actor.bio || undefined,
-            actor.birthday || undefined,
-            actor.height || undefined,
-            actor.measurements || undefined,
-            actor.japanese_name || undefined,
-            actor.cup_size || undefined,
-            actor.alias || undefined
-          );
-          loadActor(actor.id);
-        } catch (error) {
-          console.error('[Actor] 上传海报失败:', error);
-        } finally {
-          setUploadingPhoto(false);
-        }
-      }
-    } catch (error) {
-      console.error('[Actor] 打开文件选择器失败:', error);
-    }
-  };
+  // handlePhotoClick 已移除：编辑态点击海报改为调用 handleAddPhoto 添加新海报，不覆盖主海报
 
 
   // 添加作品：如果没有时期，直接打开文件夹；有时期，弹出选择弹窗
@@ -349,7 +306,7 @@ const ActorDetail: React.FC = () => {
       const period = await addActorPeriod(actor.id, newPeriodName.trim());
       setPeriods(prev => [...prev, period]);
       setNewPeriodName('');
-      setAddingPeriod(false);
+      setShowAddPeriodModal(false);
       setToast({ message: `时期"${period.name}"已创建`, type: 'success' });
     } catch (error) {
       console.error('[Actor] 添加时期失败:', error);
@@ -613,7 +570,14 @@ const ActorDetail: React.FC = () => {
         <div className="w-80 flex-shrink-0">
           <div 
             className={`aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden relative group ${editing ? 'cursor-pointer' : ''}`}
-            onClick={editing ? handlePhotoClick : undefined}
+            onClick={editing ? handleAddPhoto : undefined}
+            onContextMenu={(e) => {
+              if (photos.length === 0 || currentPhotoIndex >= photos.length) return;
+              if (photos[currentPhotoIndex]?.is_primary === 1) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setPhotoContextMenu({ photoId: photos[currentPhotoIndex].id, x: e.clientX, y: e.clientY });
+            }}
           >
             {isAddButton ? (
               /* "+" 按钮：添加新海报 */
@@ -682,13 +646,6 @@ const ActorDetail: React.FC = () => {
                     idx === currentPhotoIndex ? 'border-blue-500 ring-1 ring-blue-300' : 'border-transparent hover:border-gray-300'
                   }`}
                   onClick={() => setCurrentPhotoIndex(idx)}
-                  onContextMenu={(e) => {
-                    // 主海报不能右键
-                    if (photo.is_primary === 1) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setPhotoContextMenu({ photoId: photo.id, x: e.clientX, y: e.clientY });
-                  }}
                 >
                   {photo.photo_data_url ? (
                     <img src={photo.photo_data_url} alt="" className="w-full h-full object-cover" />
@@ -1001,7 +958,7 @@ const ActorDetail: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">参演作品</h2>
           <div className="flex gap-3">
             <button
-              onClick={() => { setAddingPeriod(true); setNewPeriodName(''); }}
+              onClick={() => { setShowAddPeriodModal(true); setNewPeriodName(''); }}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
             >
               + 添加时期
@@ -1016,22 +973,7 @@ const ActorDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* 添加时期输入框 */}
-        {addingPeriod && (
-          <div className="flex items-center gap-2 mb-4">
-            <input
-              type="text"
-              value={newPeriodName}
-              onChange={e => setNewPeriodName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddPeriod(); if (e.key === 'Escape') setAddingPeriod(false); }}
-              placeholder="时期名称"
-              autoFocus
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-            />
-            <button onClick={handleAddPeriod} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm">确定</button>
-            <button onClick={() => setAddingPeriod(false)} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">取消</button>
-          </div>
-        )}
+
 
         {/* 分组展示 */}
         {workItems.length > 0 ? (
@@ -1049,7 +991,6 @@ const ActorDetail: React.FC = () => {
             {/* 其他时期，按 sort_order 排序 */}
             {sortedPeriods.map(period => {
               const periodItems = workItems.filter(item => getWorkPeriodId(item) === period.id);
-              if (periodItems.length === 0) return null;
               return (
                 <div key={period.id} className="mb-8">
                   {editingPeriodId === period.id ? (
@@ -1066,7 +1007,7 @@ const ActorDetail: React.FC = () => {
                     </div>
                   ) : (
                     <h3
-                      className="text-lg font-bold text-gray-900 mb-4 cursor-default select-none"
+                      className="text-sm font-bold text-gray-900 mb-4 cursor-default select-none"
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -1076,9 +1017,13 @@ const ActorDetail: React.FC = () => {
                       {period.name}
                     </h3>
                   )}
-                  <div className="grid grid-cols-4 gap-6">
-                    {periodItems.map(resource => renderWorkCard(resource))}
-                  </div>
+                  {periodItems.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-6">
+                      {periodItems.map(resource => renderWorkCard(resource))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">该时期暂无作品</p>
+                  )}
                 </div>
               );
             })}
@@ -1266,6 +1211,38 @@ const ActorDetail: React.FC = () => {
           >
             取消
           </button>
+        </div>
+      </div>
+    )}
+
+    {/* 新增时期弹窗 */}
+    {showAddPeriodModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">新增时期</h3>
+          <input
+            type="text"
+            value={newPeriodName}
+            onChange={(e) => setNewPeriodName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddPeriod(); if (e.key === 'Escape') { setNewPeriodName(''); setShowAddPeriodModal(false); } }}
+            placeholder="输入时期名称"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 mb-4"
+            autoFocus
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={handleAddPeriod}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+            >
+              确认
+            </button>
+            <button
+              onClick={() => { setNewPeriodName(''); setShowAddPeriodModal(false); }}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            >
+              取消
+            </button>
+          </div>
         </div>
       </div>
     )}
