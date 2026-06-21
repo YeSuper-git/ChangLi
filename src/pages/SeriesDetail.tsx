@@ -693,6 +693,7 @@ const SeriesDetail: React.FC = () => {
           posterOrientation={series?.poster_orientation || 'unknown'}
           onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
           isAdult={!!isAdult}
+          fallbackPoster={series?.poster_data_url}
         />
       ) : (
         <div className="text-gray-500 py-10 text-center">暂无分集</div>
@@ -863,6 +864,7 @@ interface VideoGridProps {
   posterOrientation: string;
   onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
   isAdult?: boolean;
+  fallbackPoster?: string | null;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
@@ -870,6 +872,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   posterOrientation,
   onContextMenu,
   isAdult,
+  fallbackPoster,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -905,11 +908,12 @@ const VideoGrid: React.FC<VideoGridProps> = ({
     return entries;
   }, [videos, hasSeason]);
 
+  
   const gridClass = 'grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max';
 
   /** 渲染单个视频卡片 */
   const renderVideoCard = (video: Video) => {
-    const poster = videoPosterDataUrl(video);
+    const poster = videoPosterDataUrl(video) || fallbackPoster;
     return (
       <Link
         key={video.id}
