@@ -546,27 +546,42 @@ const SeriesDetail: React.FC = () => {
                 {isAdult ? (
                   <>
                     <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex items-center gap-3 mb-3">
                       {series.has_chinese_sub === 1 && (
-                        <button onClick={handleToggleChineseSub} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors">中文字幕</button>
+                        <button onClick={handleToggleChineseSub} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors" title="中文字幕">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/></svg>
+                          中字
+                        </button>
                       )}
                       {isFavorite && (
-                        <button onClick={() => toggleFavorite(series.id, 'series')} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors">已追番</button>
+                        <button onClick={() => toggleFavorite(series.id, 'series')} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors" title="已追番">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                          追番
+                        </button>
                       )}
                       {isWatched && (
-                        <button onClick={handleToggleWatched} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">已看完</button>
+                        <button onClick={handleToggleWatched} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors" title="已看完">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          已看完
+                        </button>
                       )}
                     </div>
                   </>
                 ) : (
                   <>
                     <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex items-center gap-3 mb-3">
                       {isFavorite && (
-                        <button onClick={() => toggleFavorite(series.id, 'series')} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors">已追番</button>
+                        <button onClick={() => toggleFavorite(series.id, 'series')} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors" title="已追番">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                          追番
+                        </button>
                       )}
                       {isWatched && (
-                        <button onClick={handleToggleWatched} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">已看完</button>
+                        <button onClick={handleToggleWatched} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors" title="已看完">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          已看完
+                        </button>
                       )}
                     </div>
                     <div className="mb-2">

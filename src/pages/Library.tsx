@@ -398,7 +398,6 @@ const Library: React.FC = () => {
               ))}
             </>
           )}
-          </div>
           {needsExpand && (
             <button
               onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
@@ -407,23 +406,25 @@ const Library: React.FC = () => {
               {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
             </button>
           )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-          >
-            <option value="created_at">添加时间</option>
-            <option value="title">名称</option>
-          </select>
-          <button
-            onClick={() => toggleSortOrder()}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none"
-          >
-            {sortOrder === 'desc' ? '↓' : '↑'}
-          </button>
-        </div>
+      </div>
+
+      <div className="mb-6 flex gap-3 flex-wrap">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
+          className="category-btn"
+        >
+          <option value="created_at">添加时间</option>
+          <option value="title">名称</option>
+        </select>
+        <button
+          onClick={() => toggleSortOrder()}
+          className="category-btn"
+        >
+          {sortOrder === 'desc' ? '降序 ↓' : '升序 ↑'}
+        </button>
       </div>
 
       <div className="mb-6 flex gap-3 flex-wrap">
@@ -437,6 +438,7 @@ const Library: React.FC = () => {
           <>
             <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
             <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+            <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
             <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
           </>
         )}
