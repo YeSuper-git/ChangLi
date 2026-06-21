@@ -2051,7 +2051,7 @@ pub async fn rescan_anime_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
                 .as_deref()
                 .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = ?, poster_base64 = ? WHERE id = ? AND (code IS NULL OR code = '')"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
             )
             .bind(&code)
             .bind(has_chinese_sub)
@@ -2098,7 +2098,7 @@ pub async fn rescan_adult_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
                 .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             // 影视模式：无条件覆盖（不加 code IS NULL 条件）
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = ?, poster_base64 = ? WHERE id = ?"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
             )
             .bind(&code)
             .bind(has_chinese_sub)

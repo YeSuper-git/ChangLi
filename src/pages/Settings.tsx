@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
+import { confirm } from '@tauri-apps/api/dialog';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -98,9 +99,9 @@ const Settings: React.FC = () => {
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
   const handleDeleteAllAnime = async () => {
-    if (!window.confirm('确定要删除所有动漫数据吗？\n\n此操作将删除所有动漫视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
-      return;
-    }
+    const confirmed = await confirm('确定要删除所有动漫数据吗？\n\n此操作将删除所有动漫视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。', { title: '确认删除', type: 'warning' });
+    if (!confirmed) return;
+    console.log('[DEBUG] handleDeleteAllAnime: 用户确认删除动漫数据');
     setDeletingAnime(true);
     setDeleteAnimeResult(null);
     try {
@@ -116,9 +117,9 @@ const Settings: React.FC = () => {
   };
 
   const handleDeleteAllAdult = async () => {
-    if (!window.confirm('确定要删除所有影视数据吗？\n\n此操作将删除所有影视视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
-      return;
-    }
+    const confirmed = await confirm('确定要删除所有影视数据吗？\n\n此操作将删除所有影视视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。', { title: '确认删除', type: 'warning' });
+    if (!confirmed) return;
+    console.log('[DEBUG] handleDeleteAllAdult: 用户确认删除影视数据');
     setDeletingAdult(true);
     setDeleteAdultResult(null);
     try {
