@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
@@ -47,6 +47,21 @@ const Library: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
+  const filterButtonsRef = useRef<HTMLDivElement>(null);
+  const [needsExpand, setNeedsExpand] = useState(false);
+
+  // 检测筛选按钮区域是否超过一行
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (filterButtonsRef.current) {
+        setNeedsExpand(filterButtonsRef.current.scrollHeight > 44);
+      }
+    };
+    checkOverflow();
+    // 窗口 resize 时重新检测
+    window.addEventListener('resize', checkOverflow);
+    return () => window.removeEventListener('resize', checkOverflow);
+  }, [tags, actors, mainCategory]);
 
   // Toast 自动消失
   useEffect(() => {
@@ -355,7 +370,7 @@ const Library: React.FC = () => {
 
       <div className="mb-6 flex justify-between items-center">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className={`flex gap-3 flex-wrap overflow-hidden ${mainCategory === 'anime' ? (!tagExpanded ? 'max-h-[40px]' : '') : (!actorExpanded ? 'max-h-[40px]' : '')}`}>
+          <div ref={filterButtonsRef} className={`flex gap-3 flex-wrap overflow-hidden ${mainCategory === 'anime' ? (!tagExpanded ? 'max-h-[40px]' : '') : (!actorExpanded ? 'max-h-[40px]' : '')}`}>
           {mainCategory === 'anime' ? (
             <>
               <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
@@ -384,12 +399,14 @@ const Library: React.FC = () => {
             </>
           )}
           </div>
-          <button
-            onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
-            className="flex-shrink-0 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
-          </button>
+          {needsExpand && (
+            <button
+              onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
+              className="category-btn active flex-shrink-0"
+            >
+              {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <select
