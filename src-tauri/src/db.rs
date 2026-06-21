@@ -1928,19 +1928,27 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
             let code = info.code;
             let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
             let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+            // 重新生成海报
+            let folder_path_std = std::path::Path::new(source);
+            let poster = crate::scanner::find_folder_poster(folder_path_std);
+            let poster_base64 = poster
+                .as_deref()
+                .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ? WHERE id = ? AND (code IS NULL OR code = '')"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = ?, poster_base64 = ? WHERE id = ? AND (code IS NULL OR code = '')"
             )
             .bind(&code)
             .bind(has_chinese_sub)
             .bind(&new_title)
+            .bind(&poster)
+            .bind(&poster_base64)
             .bind(id)
             .execute(pool)
             .await?;
             updated += 1;
-        } else {
+            } else {
             skipped += 1;
-        }
+            }
     }
 
     Ok((updated, skipped))

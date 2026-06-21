@@ -43,3 +43,4 @@ videos/
 
 # Thumbnails
 thumbnails/
+.worktrees/

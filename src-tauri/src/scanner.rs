@@ -214,7 +214,7 @@ async fn process_directory_videos(
             .to_string_lossy()
             .to_string();
 
-        let folder_poster_path = find_poster_for_folder(folder, &folder_name, &image_files);
+        let folder_poster_path = find_poster_for_folder(folder, &folder_name, &image_files, &videos_in_folder.iter().map(|p| p.clone()).collect::<Vec<_>>());
         let mut sorted_videos = videos_in_folder.clone();
         sort_episode_files(&mut sorted_videos);
 
@@ -326,6 +326,7 @@ fn find_poster_for_folder(
     folder: &Path,
     folder_name: &str,
     image_files: &[PathBuf],
+    video_files: &[PathBuf],
 ) -> Option<String> {
     // 策略1：查找与文件夹同名的图片
     for image_path in image_files {
@@ -344,7 +345,69 @@ fn find_poster_for_folder(
         }
     }
 
-    // 策略2：查找文件夹内的第一张图片
+    // 策略2：查找与视频文件同名的图片（如 abc.mp4 → abc.jpg）
+    for video_path in video_files {
+        if let Some(video_parent) = video_path.parent() {
+            if video_parent == folder {
+                let video_stem = video_path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase();
+                for image_path in image_files {
+                    if let Some(image_parent) = image_path.parent() {
+                        if image_parent == folder {
+                            let image_stem = image_path
+                                .file_stem()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_lowercase();
+                            if image_stem == video_stem {
+                                return Some(image_path.to_string_lossy().to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 策略3：查找图片名称中带 "pl" 的图片
+    for image_path in image_files {
+        if let Some(image_parent) = image_path.parent() {
+            if image_parent == folder {
+                let image_stem = image_path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase();
+                if image_stem.contains("pl") {
+                    return Some(image_path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
+    // 策略4：查找文件名包含车牌的图片（如 START-191-C.jpg 匹配车牌 START-191）
+    if let Some(info) = parse_adult_filename(folder_name) {
+        let code_lower = info.code.to_lowercase();
+        for image_path in image_files {
+            if let Some(image_parent) = image_path.parent() {
+                if image_parent == folder {
+                    let image_stem = image_path
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_lowercase();
+                    if image_stem.contains(&code_lower) {
+                        return Some(image_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // 策略5：查找文件夹内的第一张图片
     for image_path in image_files {
         if let Some(image_parent) = image_path.parent() {
             if image_parent == folder {
@@ -522,6 +585,7 @@ pub fn find_folder_poster(folder: &Path) -> Option<String> {
         .to_string_lossy()
         .to_string();
     let mut image_files: Vec<PathBuf> = Vec::new();
+    let mut video_files: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(folder) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
@@ -530,12 +594,14 @@ pub fn find_folder_poster(folder: &Path) -> Option<String> {
                     let ext = ext.to_string_lossy().to_lowercase();
                     if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
                         image_files.push(path);
+                    } else if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+                        video_files.push(path);
                     }
                 }
             }
         }
     }
-    find_poster_for_folder(folder, &folder_name, &image_files)
+    find_poster_for_folder(folder, &folder_name, &image_files, &video_files)
 }
 
 /// 成人视频文件名解析结果
