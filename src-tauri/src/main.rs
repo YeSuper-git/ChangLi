@@ -560,6 +560,94 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         return Ok(ScanResult { added, updated });
     }
 
+    // 路径6："动漫"文件夹模式 - 用子文件夹名匹配标签
+    if folder_name == "动漫" {
+        eprintln!("[ChangLi] 文件夹名 '动漫'，进入动漫文件夹模式");
+        let mut added: i64 = 0;
+        let mut updated: i64 = 0;
+
+        let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let entry_path = entry.path();
+            let sub_name = entry.file_name().to_string_lossy().to_string();
+
+            if !entry_path.is_dir() {
+                continue;
+            }
+
+            // 用子文件夹名匹配标签
+            if let Ok(Some(tag)) = db::get_tag_by_name(&pool, sub_name.trim()).await {
+                eprintln!("[ChangLi] 动漫模式：子文件夹 '{}' 匹配标签 '{}'，遍历子文件夹", sub_name, tag.name);
+                let sub_entries = std::fs::read_dir(&entry_path).map_err(|e| e.to_string())?;
+                for sub_entry in sub_entries {
+                    let sub_entry = sub_entry.map_err(|e| e.to_string())?;
+                    let sub_entry_path = sub_entry.path();
+                    let sub_entry_name = sub_entry.file_name().to_string_lossy().to_string();
+
+                    if sub_entry_path.is_dir() {
+                        let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        if sub_result.videos.is_empty() {
+                            continue;
+                        }
+                        let sub_poster = sub_result.posters.values().next().cloned();
+                        let sub_poster_base64 = sub_poster.as_deref()
+                            .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+                        let folder_path_str = sub_entry_path.to_string_lossy().to_string();
+                        if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str).await.map_err(|e| e.to_string())? {
+                            db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                            db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+                            let _ = db::add_series_tag(&pool, existing.id, tag.id).await;
+                            updated += 1;
+                        } else {
+                            let (series_title, code, has_chinese_sub) = extract_adult_metadata(&sub_entry_name);
+                            let series = db::add_video_series(&pool, &series_title, Some(&folder_path_str), sub_poster.as_deref(), Some("landscape"), Some("completed"), sub_poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                            if let Some(c) = code {
+                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                            }
+                            db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+                            let _ = db::add_series_tag(&pool, series.id, tag.id).await;
+                            added += 1;
+                        }
+                    } else if sub_entry_path.is_file() && scanner::is_video_file(&sub_entry_path) {
+                        // 根目录下的视频也创建视频集并关联标签
+                        let video = scanner::scan_video_file(&sub_entry_path, None)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        let file_stem = sub_entry_path.file_stem()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_else(|| sub_entry_name.clone());
+                        let thumb = video.thumbnail.as_deref()
+                            .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
+                        let file_path_str = sub_entry_path.to_string_lossy().to_string();
+                        if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str).await.map_err(|e| e.to_string())? {
+                            db::update_video_series_poster(&pool, existing.id, video.thumbnail.as_deref(), thumb.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                            db::add_videos_batch(&pool, vec![video], Some(existing.id)).await.map_err(|e| e.to_string())?;
+                            let _ = db::add_series_tag(&pool, existing.id, tag.id).await;
+                            updated += 1;
+                        } else {
+                            let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
+                            let series = db::add_video_series(&pool, &series_title, Some(&file_path_str), video.thumbnail.as_deref(), Some("landscape"), Some("completed"), thumb.as_deref()).await.map_err(|e| e.to_string())?;
+                            if let Some(c) = code {
+                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                            }
+                            db::add_videos_batch(&pool, vec![video], Some(series.id)).await.map_err(|e| e.to_string())?;
+                            let _ = db::add_series_tag(&pool, series.id, tag.id).await;
+                            added += 1;
+                        }
+                    }
+                }
+            }
+            // 没匹配到标签：跳过不加
+        }
+
+        return Ok(ScanResult { added, updated });
+    }
+
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;

@@ -1044,8 +1044,8 @@ const ActorDetail: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -1084,8 +1084,8 @@ const ActorDetail: React.FC = () => {
         const canMoveDown = idx >= 0 && idx < sortedP.length - 1;
         return (
           <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
-            style={{ left: periodContextMenu.x, top: periodContextMenu.y }}
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+            style={{ left: periodContextMenu.x + 160 > window.innerWidth ? periodContextMenu.x - 160 : periodContextMenu.x, top: periodContextMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -1141,8 +1141,8 @@ const ActorDetail: React.FC = () => {
         const canMoveDown = idx >= 0 && idx < nonPrimaryPhotos.length - 1;
         return (
           <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
-            style={{ left: photoContextMenu.x, top: photoContextMenu.y }}
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+            style={{ left: photoContextMenu.x + 160 > window.innerWidth ? photoContextMenu.x - 160 : photoContextMenu.x, top: photoContextMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button

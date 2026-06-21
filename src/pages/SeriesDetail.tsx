@@ -689,8 +689,15 @@ const SeriesDetail: React.FC = () => {
       {/* 右键菜单 */}
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
           style={{ left: contextMenu.x, top: contextMenu.y }}
+          ref={(node) => {
+            if (node) {
+              const rect = node.getBoundingClientRect();
+              if (rect.right > window.innerWidth) node.style.left = `${contextMenu.x - rect.width}px`;
+              if (rect.bottom > window.innerHeight) node.style.top = `${contextMenu.y - rect.height}px`;
+            }
+          }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
