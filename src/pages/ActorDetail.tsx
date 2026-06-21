@@ -278,7 +278,7 @@ const ActorDetail: React.FC = () => {
       setContextMenu(null);
       clearPending();
       if (actor) loadActor(actor.id);
-      setToast({ message: matched ? '元数据更新成功' : '未匹配到成人格式，未更新', type: matched ? 'success' : 'info' });
+      setToast({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Actor] 重新扫描元数据失败:', error);
       setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });

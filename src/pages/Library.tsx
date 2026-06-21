@@ -27,8 +27,11 @@ const Library: React.FC = () => {
     const t = searchParams.get('tag');
     return t ? parseInt(t) : null;
   });
-  const [typeFilter, setTypeFilter] = useState<'all' | 'series' | 'video'>(() => {
+  const [typeFilter] = useState<'all' | 'series' | 'video'>(() => {
     return (searchParams.get('type') as 'all' | 'series' | 'video') || 'all';
+  });
+  const [mainCategory, setMainCategory] = useState<'anime' | 'adult'>(() => {
+    return (searchParams.get('cat') as 'anime' | 'adult') || 'anime';
   });
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
@@ -74,8 +77,9 @@ const Library: React.FC = () => {
       type: typeFilter !== 'all' ? typeFilter : null,
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
+      cat: mainCategory !== 'anime' ? mainCategory : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -154,6 +158,7 @@ const Library: React.FC = () => {
     if (typeFilter !== 'all') params.set('type', typeFilter);
     if (favoriteFilter) params.set('favorite', '1');
     if (watchedFilter) params.set('watched', '1');
+    if (mainCategory !== 'anime') params.set('cat', mainCategory);
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   };
@@ -241,7 +246,7 @@ const Library: React.FC = () => {
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
-      setToast({ message: matched ? '元数据更新成功' : '未匹配到成人格式，未更新', type: matched ? 'success' : 'info' });
+      setToast({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Library] 重新扫描元数据失败:', error);
       setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });
@@ -277,11 +282,8 @@ const Library: React.FC = () => {
   const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (typeFilter === 'all' || (typeFilter === 'series' && !isAdult(series)) || (typeFilter === 'video' && isAdult(series)))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (mainCategory === 'anime' ? !isAdult(series) : isAdult(series))
   );
-
-  const animeSeries = filteredSeries.filter(s => !isAdult(s));
-  const adultSeries = filteredSeries.filter(s => isAdult(s));
 
   const toggleSelect = (key: string) => {
     setSelectedIds(prev => {
@@ -324,7 +326,20 @@ const Library: React.FC = () => {
     <>
     <div>
       <div className="flex items-center justify-between mb-10">
-        <h1 className="text-3xl font-bold">视频</h1>
+        <div className="flex items-center gap-4">
+          <h1
+            className={`font-bold cursor-pointer transition-all ${mainCategory === 'anime' ? 'text-4xl' : 'text-2xl text-gray-400'}`}
+            onClick={() => { setMainCategory('anime'); setActiveActorId(null); setActorFilteredSeries(null); }}
+          >
+            动漫
+          </h1>
+          <h1
+            className={`font-bold cursor-pointer transition-all ${mainCategory === 'adult' ? 'text-4xl' : 'text-2xl text-gray-400'}`}
+            onClick={() => { setMainCategory('adult'); setActiveTagId(null); setTagFilteredSeries(null); }}
+          >
+            影视
+          </h1>
+        </div>
         <div className="flex gap-3">
           <button
             onClick={importPath}
@@ -338,16 +353,33 @@ const Library: React.FC = () => {
 
       <div className="mb-6 flex justify-between items-center">
         <div className="flex gap-3 flex-wrap">
-          <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
-          {tags.map((tag) => (
-            <button
-              key={tag.id}
-              onClick={() => handleTagClick(tag.id)}
-              className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
-            >
-              {tag.name}
-            </button>
-          ))}
+          {mainCategory === 'anime' ? (
+            <>
+              <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
+              {tags.map((tag) => (
+                <button
+                  key={tag.id}
+                  onClick={() => handleTagClick(tag.id)}
+                  className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>全部</button>
+              {actors.map((actor) => (
+                <button
+                  key={actor.id}
+                  onClick={() => handleActorClick(actor.id)}
+                  className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
+                >
+                  {actor.name}
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -367,27 +399,18 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      {actors.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-3">
-          {actors.map((actor) => (
-            <button
-              key={actor.id}
-              onClick={() => handleActorClick(actor.id)}
-              className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
-            >
-              {actor.name}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="mb-6 flex gap-3 flex-wrap">
-        <button onClick={() => setTypeFilter('all')} className={`category-btn ${typeFilter === 'all' ? 'active' : ''}`}>全部</button>
-        <button onClick={() => { if (chineseSubFilter) return; setTypeFilter('series'); }} className={`category-btn ${typeFilter === 'series' ? 'active' : ''} ${chineseSubFilter ? 'opacity-50 cursor-not-allowed' : ''}`}>动漫</button>
-        <button onClick={() => setTypeFilter('video')} className={`category-btn ${typeFilter === 'video' ? 'active' : ''}`}>成人</button>
-        <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
-        <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
-        <button onClick={() => { if (typeFilter === 'series') return; setChineseSubFilter(!chineseSubFilter); }} className={`category-btn ${chineseSubFilter ? 'active' : ''} ${typeFilter === 'series' ? 'opacity-50 cursor-not-allowed' : ''}`}>中文字幕</button>
+        {mainCategory === 'anime' ? (
+          <>
+            <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+            <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+            <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+          </>
+        )}
       </div>
 
       <div className="mb-10">
@@ -444,20 +467,20 @@ const Library: React.FC = () => {
         </div>
       )}
 
-      {typeFilter !== 'video' && animeSeries.length > 0 && (
+      {filteredSeries.length > 0 && (
         <div className="mb-12">
-          <div className="grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max">
-            {animeSeries.map((series) => (
+          <div className={`grid gap-5 auto-rows-max ${mainCategory === 'anime' ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
+            {filteredSeries.map((series) => (
               <div
                 key={series.id}
                 onClick={() => { if (!selectMode) {
                   const filterSearch = buildFilterSearch();
-                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: '返回视频' } });
+                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: mainCategory === 'anime' ? '返回动漫' : '返回影视' } });
                 }}}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
-                <div className="card relative w-full aspect-[3/4] overflow-hidden">
+                <div className={`card relative w-full overflow-hidden ${mainCategory === 'anime' ? 'aspect-[3/4]' : 'aspect-video'}`}>
                   {selectMode && (
                     <div
                       className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
@@ -480,67 +503,13 @@ const Library: React.FC = () => {
                   )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                    {series.status === 'completed' ? `全${series.video_count}话` : `更新至第${series.video_count}话`}
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
-                    {series.code ? `[${series.code}] ${series.title}` : series.title}
-                  </h3>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}话` : '尚未观看'}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {typeFilter !== 'series' && adultSeries.length > 0 && (
-        <div className="mb-12">
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-5 auto-rows-max">
-            {adultSeries.map((series) => (
-              <div
-                key={series.id}
-                onClick={() => { if (!selectMode) {
-                  const filterSearch = buildFilterSearch();
-                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: '返回视频' } });
-                }}}
-                onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
-              >
-                <div className="card relative w-full aspect-video overflow-hidden">
-                  {selectMode && (
-                    <div
-                      className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
-                      style={{
-                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : 'white',
-                        borderColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : '#d1d5db',
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleSelect(`s-${series.id}`);
-                      }}
-                    >
-                      {selectedIds.has(`s-${series.id}`) && (
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  )}
-                  <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                  <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  {series.has_chinese_sub === 1 && (
+                  {mainCategory === 'adult' && series.has_chinese_sub === 1 && (
                     <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
                       中字
                     </span>
                   )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                    {series.status === 'completed' ? `全${series.video_count}部` : `更新至第${series.video_count}部`}
+                    {series.status === 'completed' ? `全${series.video_count}${mainCategory === 'anime' ? '话' : '部'}` : `更新至第${series.video_count}${mainCategory === 'anime' ? '话' : '部'}`}
                   </div>
                 </div>
                 <div className="mt-2">
@@ -548,7 +517,7 @@ const Library: React.FC = () => {
                     {series.code ? `[${series.code}] ${series.title}` : series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}部` : '尚未观看'}
+                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${mainCategory === 'anime' ? '话' : '部'}` : '尚未观看'}
                   </div>
                 </div>
               </div>
@@ -560,7 +529,7 @@ const Library: React.FC = () => {
 
       {filteredSeries.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : '暂无视频'}</p>
+          <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : `暂无${mainCategory === 'anime' ? '动漫' : '影视'}`}</p>
           {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
         </div>
       )}
@@ -612,7 +581,7 @@ const Library: React.FC = () => {
       </div>
     )}
 
-    <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新视频" />
+    <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新" />
     </>
   );
 };
