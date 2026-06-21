@@ -3,10 +3,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { open } from '@tauri-apps/api/dialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
-import favoriteIcon from '../assets/icons/favorite.svg';
-import notFavoriteIcon from '../assets/icons/not-favorite.svg';
-import watchedIcon from '../assets/icons/watched.svg';
-import translateIcon from '../assets/icons/translate.svg';
+
 import {
   addActor,
   addSeriesActor,
@@ -548,94 +545,29 @@ const SeriesDetail: React.FC = () => {
               <>
                 {isAdult ? (
                   <>
-                    <h1 className="text-3xl font-bold mb-3">{series.title}</h1>
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        onClick={handleToggleChineseSub}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={translateIcon}
-                          alt="中文字幕"
-                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-blue' : 'text-gray-400'}`}
-                          style={series.has_chinese_sub === 1 ? { filter: 'invert(27%) sepia(88%) saturate(2553%) hue-rotate(212deg) brightness(97%) contrast(97%)' } : {}}
-                        />
-                        <span className={series.has_chinese_sub === 1 ? 'text-blue-500' : 'text-gray-400'}>
-                          中字
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => toggleFavorite(series.id, 'series')}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
-                          alt="追番"
-                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
-                        />
-                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
-                          {isFavorite ? '已追番' : '追番'}
-                        </span>
-                      </button>
-                      <button
-                        onClick={handleToggleWatched}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={watchedIcon}
-                          alt="已看完"
-                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
-                        />
-                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
-                          {isWatched ? '已看完' : '看完'}
-                        </span>
-                      </button>
+                    <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
+                    <div className="flex gap-2 mb-3">
+                      {series.has_chinese_sub === 1 && (
+                        <button onClick={handleToggleChineseSub} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors">中文字幕</button>
+                      )}
+                      {isFavorite && (
+                        <button onClick={() => toggleFavorite(series.id, 'series')} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors">已追番</button>
+                      )}
+                      {isWatched && (
+                        <button onClick={handleToggleWatched} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">已看完</button>
+                      )}
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3 mb-3">
-                      <h1 className="text-3xl font-bold">{series.title}</h1>
-                      <button
-                        onClick={handleToggleChineseSub}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={translateIcon}
-                          alt="中文字幕"
-                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-blue' : 'text-gray-400'}`}
-                          style={series.has_chinese_sub === 1 ? { filter: 'invert(27%) sepia(88%) saturate(2553%) hue-rotate(212deg) brightness(97%) contrast(97%)' } : {}}
-                        />
-                        <span className={series.has_chinese_sub === 1 ? 'text-blue-500' : 'text-gray-400'}>
-                          中字
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => toggleFavorite(series.id, 'series')}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
-                          alt="追番"
-                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
-                        />
-                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
-                          {isFavorite ? '已追番' : '追番'}
-                        </span>
-                      </button>
-                      <button
-                        onClick={handleToggleWatched}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={watchedIcon}
-                          alt="已看完"
-                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
-                        />
-                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
-                          {isWatched ? '已看完' : '看完'}
-                        </span>
-                      </button>
+                    <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
+                    <div className="flex gap-2 mb-3">
+                      {isFavorite && (
+                        <button onClick={() => toggleFavorite(series.id, 'series')} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors">已追番</button>
+                      )}
+                      {isWatched && (
+                        <button onClick={handleToggleWatched} className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">已看完</button>
+                      )}
                     </div>
                     <div className="mb-2">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -932,11 +864,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
           } bg-gray-100 overflow-hidden relative`}
         >
           <SmartPoster src={poster} alt={video.file_name} posterOrientation={posterOrientation} />
-          {video.series_has_chinese_sub === 1 && (
-            <div className="absolute bottom-1 left-1 bg-orange-500 text-white text-[10px] px-1 py-0.5 rounded-sm">
-              中文字幕
-            </div>
-          )}
+
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">

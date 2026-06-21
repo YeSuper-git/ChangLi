@@ -45,6 +45,8 @@ const Library: React.FC = () => {
   const [actorFilteredSeries, setActorFilteredSeries] = useState<VideoSeries[] | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [tagExpanded, setTagExpanded] = useState(false);
+  const [actorExpanded, setActorExpanded] = useState(false);
 
   // Toast 自动消失
   useEffect(() => {
@@ -352,7 +354,8 @@ const Library: React.FC = () => {
       </div>
 
       <div className="mb-6 flex justify-between items-center">
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className={`flex gap-3 flex-wrap overflow-hidden ${mainCategory === 'anime' ? (!tagExpanded ? 'max-h-[40px]' : '') : (!actorExpanded ? 'max-h-[40px]' : '')}`}>
           {mainCategory === 'anime' ? (
             <>
               <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
@@ -380,8 +383,15 @@ const Library: React.FC = () => {
               ))}
             </>
           )}
+          </div>
+          <button
+            onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
+            className="flex-shrink-0 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
+          </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
