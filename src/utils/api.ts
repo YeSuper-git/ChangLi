@@ -836,3 +836,15 @@ export async function updateVideo(id: number, fileName?: string, description?: s
     throw err;
   }
 }
+
+export async function scanVideosForActor(path: string, actorId: number): Promise<ScanResult> {
+  console.log('[API] 调用 scanVideosForActor, path:', path, 'actorId:', actorId);
+  try {
+    const result = await invoke<ScanResult>('scan_videos_for_actor', { path, actorId });
+    console.log('[API] scanVideosForActor 返回:', result);
+    return result;
+  } catch (err) {
+    console.error('[API] scanVideosForActor 失败:', err);
+    throw err;
+  }
+}

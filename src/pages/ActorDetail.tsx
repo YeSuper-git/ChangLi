@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideos, getVideos, addResourceActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap, rescanSingleSeriesMetadata } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap, rescanSingleSeriesMetadata } from '../utils/api';
 import type { Actor, Video, ActorPeriod } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
@@ -192,26 +192,9 @@ const ActorDetail: React.FC = () => {
         console.log('[ActorDetail] 选择的文件夹:', selected);
         setAddingWork(true);
         try {
-          // 获取扫描前的视频ID列表
-          const existingVideos = await getVideos();
-          const existingIds = new Set(existingVideos.map(v => v.id));
-          console.log('[ActorDetail] 已有视频数量:', existingIds.size);
-          
-          // 扫描视频
+          // 扫描视频并自动关联到当前演员（校验文件夹名=演员名）
           console.log('[ActorDetail] 开始扫描视频...');
-          const result = await scanVideos(selected as string);
-          
-          // 扫描后重新获取视频列表，找出新增的
-          const allVideos = await getVideos();
-          const newVideos = allVideos.filter(v => !existingIds.has(v.id));
-          console.log('[ActorDetail] 新增视频数量:', newVideos.length);
-          
-          // 将新视频关联到当前演员（如果有活跃时期，自动关联 period_id）
-          for (const video of newVideos) {
-            console.log('[ActorDetail] 关联视频:', video.id, video.file_name);
-            const periodId = activePeriodId || undefined;
-            await addResourceActor(video.id, actor.id, undefined, periodId);
-          }
+          const result = await scanVideosForActor(selected as string, actor.id);
           
           // 刷新资源列表
           loadActor(actor.id);

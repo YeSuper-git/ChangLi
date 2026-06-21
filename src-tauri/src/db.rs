@@ -546,7 +546,15 @@ fn video_from_row(row: &SqliteRow) -> Video {
     });
     // 直接从数据库读取缓存的 Base64，不再实时生成
     let thumbnail_data_url: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
-    let series_poster_data_url: Option<String> = row.try_get("series_poster_base64").ok().flatten();
+    // 双读兜底：优先读 series_poster_base64，如果为 NULL，降级使用 series_poster 字段
+    let series_poster_data_url: Option<String> = row.try_get("series_poster_base64").ok().flatten()
+        .or_else(|| {
+            let poster: Option<String> = row.try_get("series_poster").ok().flatten();
+            poster.and_then(|p| {
+                let resolved = storage::resolve_data_path(&p);
+                image_data_url(Path::new(&resolved))
+            })
+        });
 
     Video {
         id: row.get("id"),
@@ -1146,6 +1154,29 @@ pub async fn get_actor_by_name(pool: &SqlitePool, name: &str) -> Result<Option<A
         Some(row) => Ok(Some(actor_from_row(&row))),
         None => Ok(None),
     }
+}
+
+/// 按名称或日文名匹配演员（忽略首尾空格和大小写）
+pub async fn get_actor_by_name_or_jp(pool: &SqlitePool, name: &str) -> Result<Option<Actor>> {
+    let row = sqlx::query("SELECT * FROM actors WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) OR (japanese_name IS NOT NULL AND LOWER(TRIM(japanese_name)) = LOWER(TRIM(?)))")
+        .bind(name)
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    match row {
+        Some(row) => Ok(Some(actor_from_row(&row))),
+        None => Ok(None),
+    }
+}
+
+/// 更新视频集的 display_type
+pub async fn update_video_series_display_type(pool: &SqlitePool, series_id: i64, display_type: &str) -> Result<()> {
+    sqlx::query("UPDATE video_series SET display_type = ? WHERE id = ?")
+        .bind(display_type)
+        .bind(series_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 /// 按名称精确匹配标签（忽略首尾空格和大小写）
@@ -1862,22 +1893,22 @@ pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
     sqlx::query("DELETE FROM video_series").execute(pool).await?;
     Ok((video_count.0, series_count.0))
 }
-/// 删除所有动漫（无演员且 display_type!='adult' 的视频集及其视频，但不删除占位视频）
+/// 删除所有动漫（display_type!='adult' 的视频集及其视频，但不删除占位视频）
 pub async fn delete_all_anime(pool: &SqlitePool) -> Result<(i64, i64)> {
-    let anime_cond = "NOT EXISTS (SELECT 1 FROM series_actors sa WHERE sa.series_id = video_series.id)";
+    let anime_cond = "(display_type IS NULL OR display_type != 'adult')";
     let video_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM videos v WHERE v.series_id IN (SELECT id FROM video_series WHERE {} AND (display_type IS NULL OR display_type != 'adult'))", anime_cond
+        "SELECT COUNT(*) FROM videos v WHERE v.series_id IN (SELECT id FROM video_series WHERE {})", anime_cond
     ))
     .fetch_one(pool)
     .await?;
 
     let series_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM video_series WHERE {} AND (display_type IS NULL OR display_type != 'adult')", anime_cond
+        "SELECT COUNT(*) FROM video_series WHERE {}", anime_cond
     ))
     .fetch_one(pool)
     .await?;
 
-    let anime_sub = &format!("SELECT id FROM video_series WHERE {} AND (display_type IS NULL OR display_type != 'adult')", anime_cond);
+    let anime_sub = &format!("SELECT id FROM video_series WHERE {}", anime_cond);
 
     sqlx::query(&format!("DELETE FROM play_history WHERE video_id IN (SELECT id FROM videos WHERE series_id IN ({}))", anime_sub))
         .execute(pool).await?;
@@ -1887,17 +1918,18 @@ pub async fn delete_all_anime(pool: &SqlitePool) -> Result<(i64, i64)> {
         .execute(pool).await?;
     sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", anime_sub))
         .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", anime_sub))
-        .execute(pool).await?;
+    // 先删 video_series（不依赖 series_actors），再删 series_actors
     sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", anime_sub))
         .execute(pool).await?;
 
     Ok((video_count.0, series_count.0))
 }
 
-/// 删除所有影视（有演员或 display_type='adult' 的视频集及其视频，但不删除占位视频）
+/// 删除所有影视（display_type='adult' 的视频集及其视频，但不删除占位视频）
 pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
-    let adult_sub = "SELECT id FROM video_series WHERE EXISTS (SELECT 1 FROM series_actors sa WHERE sa.series_id = video_series.id) OR display_type = 'adult'";
+    let adult_sub = "SELECT id FROM video_series WHERE display_type = 'adult'";
 
     let video_count: (i64,) = sqlx::query_as(&format!(
         "SELECT COUNT(*) FROM videos WHERE series_id IN ({})", adult_sub
@@ -1906,7 +1938,7 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
     .await?;
 
     let series_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM video_series WHERE EXISTS (SELECT 1 FROM series_actors sa WHERE sa.series_id = video_series.id) OR display_type = 'adult'"
+        "SELECT COUNT(*) FROM video_series WHERE display_type = 'adult'"
     ))
     .fetch_one(pool)
     .await?;
@@ -1919,9 +1951,10 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
         .execute(pool).await?;
     sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", adult_sub))
         .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", adult_sub))
-        .execute(pool).await?;
+    // 先删 video_series（不依赖 series_actors），再删 series_actors
     sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", adult_sub))
         .execute(pool).await?;
 
     Ok((video_count.0, series_count.0))
@@ -2024,10 +2057,10 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
 
     Ok((updated, skipped))
 }
-/// 重新扫描动漫元数据（无演员的视频集）
+/// 重新扫描动漫元数据（display_type!='adult' 的视频集）
 pub async fn rescan_anime_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series WHERE NOT EXISTS (SELECT 1 FROM series_actors sa WHERE sa.series_id = video_series.id) AND (display_type IS NULL OR display_type != 'adult')"
+        "SELECT id, title, folder_path FROM video_series WHERE display_type IS NULL OR display_type != 'adult'"
     )
     .fetch_all(pool)
     .await?;
@@ -2070,10 +2103,10 @@ pub async fn rescan_anime_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     Ok((updated, skipped))
 }
 
-/// 重新扫描影视元数据（有演员或 display_type='adult' 的视频集，无条件覆盖）
+/// 重新扫描影视元数据（display_type='adult' 的视频集，无条件覆盖）
 pub async fn rescan_adult_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series WHERE EXISTS (SELECT 1 FROM series_actors sa WHERE sa.series_id = video_series.id) OR display_type = 'adult'"
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = 'adult'"
     )
     .fetch_all(pool)
     .await?;
