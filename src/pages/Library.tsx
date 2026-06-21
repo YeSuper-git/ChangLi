@@ -568,7 +568,7 @@ const Library: React.FC = () => {
       {contextMenu && (
         <div
           className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
-          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y }}
+          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
           <button

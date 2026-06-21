@@ -6,6 +6,7 @@ import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
 import { useSecondConfirm } from '../utils/useSecondConfirm';
+import FloatingActions from '../components/FloatingActions';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 
@@ -472,7 +473,7 @@ const ActorDetail: React.FC = () => {
     return actor ? actorPhotoDataUrl(actor) : null;
   };
 
-  const isAddButton = photos.length > 0 && currentPhotoIndex === photos.length;
+  const isAddButton = currentPhotoIndex === photos.length;
 
   // 作品的 period_id
   const getWorkPeriodId = (resource: Video): number | null => {
@@ -579,8 +580,8 @@ const ActorDetail: React.FC = () => {
               setPhotoContextMenu({ photoId: photos[currentPhotoIndex].id, x: e.clientX, y: e.clientY });
             }}
           >
-            {isAddButton ? (
-              /* "+" 按钮：添加新海报 */
+            {photos.length > 0 && isAddButton ? (
+              /* "+" 按钮：添加新海报（已有照片时的最后一位） */
               <div
                 className="w-full h-full flex items-center justify-center cursor-pointer hover:bg-pink-300 transition-colors"
                 onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}
@@ -588,11 +589,20 @@ const ActorDetail: React.FC = () => {
                 <div className="text-5xl text-white/80">+</div>
               </div>
             ) : getCurrentPhotoUrl() ? (
-              <img
-                src={getCurrentPhotoUrl()!}
-                alt={actor.name}
-                className="w-full h-full object-cover"
-              />
+              <>
+                <img
+                  src={getCurrentPhotoUrl()!}
+                  alt={actor.name}
+                  className="w-full h-full object-cover"
+                />
+                {/* 旧数据（photos为空但有fallback海报）右下角"+"按钮 */}
+                {photos.length === 0 && editing && (
+                  <button
+                    className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center"
+                    onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}
+                  >+</button>
+                )}
+              </>
             ) : (
               <StaticImagePlaceholder kind="actor" />
             )}
@@ -1045,7 +1055,7 @@ const ActorDetail: React.FC = () => {
       {contextMenu && (
         <div
           className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
-          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y }}
+          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -1085,7 +1095,7 @@ const ActorDetail: React.FC = () => {
         return (
           <div
             className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
-            style={{ left: periodContextMenu.x + 160 > window.innerWidth ? periodContextMenu.x - 160 : periodContextMenu.x, top: periodContextMenu.y }}
+            style={{ left: periodContextMenu.x + 160 > window.innerWidth ? periodContextMenu.x - 160 : periodContextMenu.x, top: periodContextMenu.y + 200 > window.innerHeight ? periodContextMenu.y - 200 : periodContextMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -1116,7 +1126,7 @@ const ActorDetail: React.FC = () => {
             <div className="border-t border-gray-100 my-1" />
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-              onClick={() => {
+              onClick={(e) => { e.stopPropagation();
                 if (deletingPeriodId === periodContextMenu.periodId) {
                   // 已经确认过了，直接删除
                   handleDeletePeriod(periodContextMenu.periodId);
@@ -1255,6 +1265,8 @@ const ActorDetail: React.FC = () => {
         </div>
       </div>
     )}
+
+    <FloatingActions onRefresh={actor ? async () => { await loadActor(actor.id); } : undefined} refreshLabel="刷新" />
     </>
   );
 };
