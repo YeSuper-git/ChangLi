@@ -1891,7 +1891,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
             .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
 
         sqlx::query(
-            "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
+            "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = ? WHERE id = ?"
         )
         .bind(&code)
         .bind(has_chinese_sub)

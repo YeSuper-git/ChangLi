@@ -559,17 +559,15 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
     let code_raw = code_match.as_str();
     let after_code = &filename[code_match.end()..];
 
-    // 检查车牌后是否有中文字幕标记（c/ch/CH 等），前面可能有 -
-    let (sub_suffix_len, has_chinese_sub) = if let Some(m) = regex::Regex::new(r"(?i)^-?[cC][hH]")
-        .ok()
-        .and_then(|re| re.find(after_code))
-    {
-        (m.len(), true)
-    } else if let Some(m) = regex::Regex::new(r"(?i)^-?[cC](?![hH])")
-        .ok()
-        .and_then(|re| re.find(after_code))
-    {
-        (m.len(), true)
+    // 检查车牌后是否有中文字幕标记：-CH, -C, CH, C
+    let (sub_suffix_len, has_chinese_sub) = if after_code.starts_with("-CH") || after_code.starts_with("-ch") {
+        (3, true)
+    } else if after_code.starts_with("-C") || after_code.starts_with("-c") {
+        (2, true)
+    } else if after_code.get(..2).map_or(false, |s| s.eq_ignore_ascii_case("ch")) {
+        (2, true)
+    } else if after_code.get(..1).map_or(false, |s| s.eq_ignore_ascii_case("c")) {
+        (1, true)
     } else {
         (0, false)
     };
@@ -648,3 +646,31 @@ mod tests {
         Ok(())
     }
 }
+    #[test]
+    fn test_parse_adult_filename_chinese_sub() {
+        // 无横杠 C
+        let r = parse_adult_filename("STARS-667C[标题]").unwrap();
+        assert!(r.has_chinese_sub, "STARS-667C should be chinese sub");
+        assert_eq!(r.code, "STARS-667");
+
+        // 有横杠 -C
+        let r = parse_adult_filename("JUR-472-C[标题]").unwrap();
+        assert!(r.has_chinese_sub, "JUR-472-C should be chinese sub");
+        assert_eq!(r.code, "JUR-472");
+
+        // 无横杠 ch
+        let r = parse_adult_filename("SONE-672ch[标题]").unwrap();
+        assert!(r.has_chinese_sub, "SONE-672ch should be chinese sub");
+        assert_eq!(r.code, "SONE-672");
+
+        // 有横杠 -CH
+        let r = parse_adult_filename("SONE-519-CH[标题]").unwrap();
+        assert!(r.has_chinese_sub, "SONE-519-CH should be chinese sub");
+        assert_eq!(r.code, "SONE-519");
+
+        // 无 C
+        let r = parse_adult_filename("STARS-667[标题]").unwrap();
+        assert!(!r.has_chinese_sub, "STARS-667 should NOT be chinese sub");
+
+        println!("All chinese sub tests passed!");
+    }
