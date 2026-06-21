@@ -1,90 +1,16 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "ChangLi",
+  "version": "0.8.5",
+  "identifier": "com.changli.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "ChangLi",
-    "version": "0.8.5"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "globalShortcut": {
-        "all": true
-      },
-      "shell": {
-        "all": false,
-        "execute": true,
-        "sidecar": true,
-        "open": true
-      },
-      "fs": {
-        "all": true,
-        "readFile": true,
-        "writeFile": true,
-        "readDir": true,
-        "createDir": true,
-        "removeDir": true,
-        "removeFile": true,
-        "renameFile": true,
-        "copyFile": true
-      },
-      "path": {
-        "all": true
-      },
-      "http": {
-        "all": true,
-        "request": true,
-        "scope": [
-          "http://**",
-          "https://**"
-        ]
-      },
-      "dialog": {
-        "all": true,
-        "open": true,
-        "save": true,
-        "message": true,
-        "ask": true,
-        "confirm": true
-      }
-    },
+  "app": {
     "macOSPrivateApi": true,
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.changli.app",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "resources": [
-        "resources/mpv/**/*"
-      ],
-      "windows": {
-        "allowDowngrades": false,
-        "nsis": {
-          "template": "nsis/installer.nsi",
-          "headerImage": "nsis/installer-header.bmp",
-          "sidebarImage": "nsis/installer-sidebar.bmp",
-          "installerIcon": "icons/icon.ico",
-          "languages": [
-            "SimpChinese"
-          ],
-          "displayLanguageSelector": false,
-          "installMode": "both"
-        }
-      }
-    },
-    "security": {
-      "csp": "default-src 'self'; img-src 'self' data:; media-src 'self'"
-    },
     "windows": [
       {
         "fullscreen": false,
@@ -95,6 +21,60 @@
         "minWidth": 800,
         "minHeight": 600
       }
-    ]
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; media-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/mpv/**/*"
+    ],
+    "windows": {
+      "allowDowngrades": false,
+      "nsis": {
+        "template": "nsis/installer.nsi",
+        "headerImage": "nsis/installer-header.bmp",
+        "sidebarImage": "nsis/installer-sidebar.bmp",
+        "installerIcon": "icons/icon.ico",
+        "languages": [
+          "SimpChinese"
+        ],
+        "displayLanguageSelector": false,
+        "installMode": "both"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true,
+      "scope": [
+        {
+          "name": "mpv",
+          "cmd": "mpv",
+          "args": true
+        }
+      ]
+    },
+    "fs": {
+      "scope": {
+        "allow": ["**"]
+      }
+    },
+    "http": {
+      "scope": [
+        "http://**",
+        "https://**"
+      ]
+    }
   }
 }

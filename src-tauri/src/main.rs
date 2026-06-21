@@ -1702,9 +1702,9 @@ fn main() {
             }
             Ok(())
         })
-        .on_window_event(|event| {
-            if event.window().label() == "main" {
-                player::handle_main_window_event(&event.window().app_handle(), event.event());
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                player::handle_main_window_event(&window.app_handle(), event);
             }
         })
         .invoke_handler(tauri::generate_handler![
