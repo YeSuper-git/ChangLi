@@ -737,6 +737,7 @@ async fn add_actor(
     measurements: Option<String>,
     japanese_name: Option<String>,
     cup_size: Option<String>,
+    alias: Option<String>,
 ) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -756,6 +757,7 @@ async fn add_actor(
         japanese_name.as_deref(),
         cup_size.as_deref(),
         avatar_base64.as_deref(),
+        alias.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -773,6 +775,7 @@ async fn update_actor(
     measurements: Option<String>,
     japanese_name: Option<String>,
     cup_size: Option<String>,
+    alias: Option<String>,
 ) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -793,6 +796,7 @@ async fn update_actor(
         japanese_name.as_deref(),
         cup_size.as_deref(),
         avatar_base64.as_deref(),
+        alias.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -1322,6 +1326,24 @@ async fn rescan_all_series_metadata(state: State<'_, AppState>) -> Result<(i64, 
     };
     db::rescan_all_series_metadata(&pool).await.map_err(|e| e.to_string())
 }
+#[tauri::command]
+async fn rescan_anime_metadata(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::rescan_anime_metadata(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn rescan_adult_metadata(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::rescan_adult_metadata(&pool).await.map_err(|e| e.to_string())
+}
+
 
 #[tauri::command]
 async fn rescan_single_series_metadata(state: State<'_, AppState>, series_id: i64) -> Result<bool, String> {
@@ -1421,6 +1443,10 @@ fn main() {
             rescan_all_series_metadata,
             rescan_single_series_metadata,
             delete_all_videos,
+            delete_all_anime,
+            delete_all_adult,
+            rescan_anime_metadata,
+            rescan_adult_metadata,
             get_series_seasons,
             delete_season,
             create_season,
@@ -1548,3 +1574,21 @@ async fn delete_all_videos(state: State<'_, AppState>) -> Result<(i64, i64), Str
     };
     db::delete_all_videos(&pool).await.map_err(|e| e.to_string())
 }
+#[tauri::command]
+async fn delete_all_anime(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_all_anime(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_all_adult(state: State<'_, AppState>) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_all_adult(&pool).await.map_err(|e| e.to_string())
+}
+

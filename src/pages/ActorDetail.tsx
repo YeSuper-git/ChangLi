@@ -34,6 +34,7 @@ const ActorDetail: React.FC = () => {
     measurements: '',
     japanese_name: '',
     cup_size: '',
+    alias: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [addingWork, setAddingWork] = useState(false);
@@ -98,6 +99,7 @@ const ActorDetail: React.FC = () => {
           measurements: actorData.measurements || '',
           japanese_name: actorData.japanese_name || '',
           cup_size: actorData.cup_size || '',
+          alias: actorData.alias || '',
         });
       }
     } catch (error) {
@@ -120,7 +122,8 @@ const ActorDetail: React.FC = () => {
         editForm.height || undefined,
         editForm.measurements || undefined,
         editForm.japanese_name || undefined,
-        editForm.cup_size || undefined
+        editForm.cup_size || undefined,
+        editForm.alias || undefined
       );
       clearEditQuery();
       setEditing(false);
@@ -160,7 +163,8 @@ const ActorDetail: React.FC = () => {
             actor.height || undefined,
             actor.measurements || undefined,
             actor.japanese_name || undefined,
-            actor.cup_size || undefined
+            actor.cup_size || undefined,
+            actor.alias || undefined
           );
           loadActor(actor.id);
         } catch (error) {
@@ -321,10 +325,6 @@ const ActorDetail: React.FC = () => {
     const clamped = digits.slice(0, maxLen);
     parts[index] = clamped;
     setEditForm({ ...editForm, measurements: parts.join('-') });
-    if (clamped.length === maxLen && index < 2) {
-      measureRefs.current[index + 1]?.focus();
-      measureRefs.current[index + 1]?.select();
-    }
   };
 
   const normalizeBirthday = (bd: string): string => {
@@ -475,8 +475,8 @@ const ActorDetail: React.FC = () => {
         <div className="flex-1">
           {editing ? (
             <div className="space-y-4">
-              {/* 姓名 + 日本名 */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* 姓名 + 日本名 + 曾用名 */}
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
                   <input
@@ -495,6 +495,15 @@ const ActorDetail: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">曾用名</label>
+                  <input
+                    type="text"
+                    value={editForm.alias}
+                    onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
               {/* 出生日期 + 身高 */}
@@ -502,66 +511,90 @@ const ActorDetail: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
                   <div className="flex gap-1 items-center">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      min={1900}
-                      max={2100}
-                      value={numOrEmpty(bParts[0])}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
-                        updateBirthday(0, v);
-                      }}
-                      className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        min={1900}
+                        max={2100}
+                        value={numOrEmpty(bParts[0])}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                          updateBirthday(0, v);
+                        }}
+                        className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                      />
+                      <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[0], 10) || 0; const v = Math.min(cur + 1, 2100); updateBirthday(0, String(v)); }}>▲</button>
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[0], 10) || 0; const v = Math.max(cur - 1, 1900); updateBirthday(0, String(v)); }}>▼</button>
+                      </div>
+                    </div>
                     <span className="text-gray-500 text-sm">年</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      min={1}
-                      max={12}
-                      value={bParts[1] || ''}
-                      onChange={(e) => {
-                        let v = e.target.value.replace(/[^0-9]/g, '');
-                        if (v !== '' && parseInt(v, 10) > 12) v = '12';
-                        updateBirthday(1, v);
-                        const newMaxDay = getMaxDay(parseInt(v, 10) || 0);
-                        const currentDay = parseInt(bParts[2], 10);
-                        if (currentDay > newMaxDay) updateBirthday(2, String(newMaxDay));
-                      }}
-                      className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        min={1}
+                        max={12}
+                        value={bParts[1] || ''}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/[^0-9]/g, '');
+                          if (v !== '' && parseInt(v, 10) > 12) v = '12';
+                          updateBirthday(1, v);
+                          const newMaxDay = getMaxDay(parseInt(v, 10) || 0);
+                          const currentDay = parseInt(bParts[2], 10);
+                          if (currentDay > newMaxDay) updateBirthday(2, String(newMaxDay));
+                        }}
+                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                      />
+                      <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[1], 10) || 0; const v = cur >= 12 ? 1 : cur + 1; updateBirthday(1, String(v)); }}>▲</button>
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[1], 10) || 0; const v = cur <= 1 ? 12 : cur - 1; updateBirthday(1, String(v)); }}>▼</button>
+                      </div>
+                    </div>
                     <span className="text-gray-500 text-sm">月</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      min={1}
-                      max={maxDay || 31}
-                      value={bParts[2] || ''}
-                      onChange={(e) => {
-                        let v = e.target.value.replace(/[^0-9]/g, '');
-                        const md = maxDay || 31;
-                        if (v !== '' && parseInt(v, 10) > md) v = String(md);
-                        updateBirthday(2, v);
-                      }}
-                      className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        min={1}
+                        max={maxDay || 31}
+                        value={bParts[2] || ''}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/[^0-9]/g, '');
+                          const md = maxDay || 31;
+                          if (v !== '' && parseInt(v, 10) > md) v = String(md);
+                          updateBirthday(2, v);
+                        }}
+                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                      />
+                      <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const md = maxDay || 31; const cur = parseInt(bParts[2], 10) || 0; const v = cur >= md ? 1 : cur + 1; updateBirthday(2, String(v)); }}>▲</button>
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const md = maxDay || 31; const cur = parseInt(bParts[2], 10) || 0; const v = cur <= 1 ? md : cur - 1; updateBirthday(2, String(v)); }}>▼</button>
+                      </div>
+                    </div>
                     <span className="text-gray-500 text-sm">日</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">身高</label>
                   <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={editForm.height}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
-                        setEditForm({ ...editForm, height: v });
-                      }}
-                      className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={editForm.height}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                          setEditForm({ ...editForm, height: v });
+                        }}
+                        className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                      />
+                      <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(editForm.height, 10) || 0; const v = Math.min(cur + 1, 200); setEditForm({ ...editForm, height: String(v) }); }}>▲</button>
+                        <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(editForm.height, 10) || 0; const v = Math.max(cur - 1, 100); setEditForm({ ...editForm, height: String(v) }); }}>▼</button>
+                      </div>
+                    </div>
                     <span className="text-gray-500 text-sm">cm</span>
                   </div>
                 </div>
@@ -575,14 +608,20 @@ const ActorDetail: React.FC = () => {
                     {[0, 1, 2].map((idx) => (
                       <React.Fragment key={idx}>
                         <span className="text-gray-500 text-sm">{['B', 'W', 'H'][idx]}</span>
-                        <input
-                          ref={(el) => { measureRefs.current[idx] = el; }}
-                          type="text"
-                          inputMode="numeric"
-                          value={measureParts[idx]}
-                          onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                          className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                        />
+                        <div className="relative">
+                          <input
+                            ref={(el) => { measureRefs.current[idx] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            value={measureParts[idx]}
+                            onChange={(e) => handleMeasureChange(idx, e.target.value)}
+                            className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                          />
+                          <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                            <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(measureParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
+                            <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(measureParts[idx], 10) || 0; const v = Math.max(cur - 1, 0); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▼</button>
+                          </div>
+                        </div>
                       </React.Fragment>
                     ))}
                   </div>
@@ -632,6 +671,7 @@ const ActorDetail: React.FC = () => {
                         measurements: actor.measurements || '',
                         japanese_name: actor.japanese_name || '',
                         cup_size: actor.cup_size || '',
+                        alias: actor.alias || '',
                       });
                     }
                     setEditing(false);
@@ -648,6 +688,9 @@ const ActorDetail: React.FC = () => {
               <h1 className="text-4xl font-bold text-gray-900 mb-4">{actor.name}</h1>
               {actor.japanese_name && (
                 <p className="text-lg text-gray-500 mb-4">{actor.japanese_name}</p>
+              )}
+              {actor.alias && (
+                <p className="text-sm text-gray-400 mb-4">曾用名: {actor.alias}</p>
               )}
               
               <div className="grid grid-cols-2 gap-6 mb-8 text-sm">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllVideos, rescanAllSeriesMetadata } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -91,42 +91,78 @@ const Settings: React.FC = () => {
     }
   };
 
-  const [deletingVideos, setDeletingVideos] = useState(false);
-  const [deleteResult, setDeleteResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
+  const [deletingAnime, setDeletingAnime] = useState(false);
+  const [deletingAdult, setDeletingAdult] = useState(false);
+  const [deleteAnimeResult, setDeleteAnimeResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
+  const [deleteAdultResult, setDeleteAdultResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
-  const handleDeleteAllVideos = async () => {
-    if (!window.confirm('确定要删除所有视频数据吗？\n\n此操作将删除所有视频、视频集、播放记录和关联关系，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
+  const handleDeleteAllAnime = async () => {
+    if (!window.confirm('确定要删除所有动漫数据吗？\n\n此操作将删除所有动漫视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
       return;
     }
-    setDeletingVideos(true);
-    setDeleteResult(null);
+    setDeletingAnime(true);
+    setDeleteAnimeResult(null);
     try {
-      const result = await deleteAllVideos();
-      setDeleteResult(result);
+      const result = await deleteAllAnime();
+      setDeleteAnimeResult(result);
       await refreshSeries();
     } catch (error) {
-      console.error('删除所有视频失败:', error);
+      console.error('删除所有动漫失败:', error);
       alert('删除失败: ' + String(error));
     } finally {
-      setDeletingVideos(false);
+      setDeletingAnime(false);
     }
   };
 
-  const [rescanning, setRescanning] = useState(false);
-  const [rescanResult, setRescanResult] = useState<[number, number] | null>(null);
-
-  const handleRescanMetadata = async () => {
-    setRescanning(true);
-    setRescanResult(null);
+  const handleDeleteAllAdult = async () => {
+    if (!window.confirm('确定要删除所有影视数据吗？\n\n此操作将删除所有影视视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。')) {
+      return;
+    }
+    setDeletingAdult(true);
+    setDeleteAdultResult(null);
     try {
-      const result = await rescanAllSeriesMetadata();
-      setRescanResult(result);
+      const result = await deleteAllAdult();
+      setDeleteAdultResult(result);
+      await refreshSeries();
     } catch (error) {
-      console.error('重新扫描元数据失败:', error);
+      console.error('删除所有影视失败:', error);
+      alert('删除失败: ' + String(error));
+    } finally {
+      setDeletingAdult(false);
+    }
+  };
+
+  const [rescanningAnime, setRescanningAnime] = useState(false);
+  const [rescanningAdult, setRescanningAdult] = useState(false);
+  const [rescanAnimeResult, setRescanAnimeResult] = useState<[number, number] | null>(null);
+  const [rescanAdultResult, setRescanAdultResult] = useState<[number, number] | null>(null);
+
+  const handleRescanAnimeMetadata = async () => {
+    setRescanningAnime(true);
+    setRescanAnimeResult(null);
+    try {
+      const result = await rescanAnimeMetadata();
+      setRescanAnimeResult(result);
+    } catch (error) {
+      console.error('重新扫描动漫元数据失败:', error);
       alert('扫描失败: ' + String(error));
     } finally {
-      setRescanning(false);
+      setRescanningAnime(false);
+    }
+  };
+
+  const handleRescanAdultMetadata = async () => {
+    setRescanningAdult(true);
+    setRescanAdultResult(null);
+    try {
+      const result = await rescanAdultMetadata();
+      setRescanAdultResult(result);
+    } catch (error) {
+      console.error('重新扫描影视元数据失败:', error);
+      alert('扫描失败: ' + String(error));
+    } finally {
+      setRescanningAdult(false);
     }
   };
 
@@ -188,45 +224,83 @@ const Settings: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">视频管理</h2>
-            <p className="text-sm text-gray-500 mt-1">一键删除所有添加的视频数据（不删除本地源文件）</p>
+            <p className="text-sm text-gray-500 mt-1">分别删除动漫或影视数据（不删除本地源文件）</p>
           </div>
         </div>
         <div className="card p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">删除数据库中所有视频和视频集记录，保留演员和标签数据。</p>
-              {deleteResult && (
+              <p className="text-sm text-gray-600">删除所有动漫视频集及其视频，保留演员和标签数据。</p>
+              {deleteAnimeResult && (
                 <p className="text-sm text-green-600 mt-2">
-                  ✓ 已删除 {deleteResult.videoCount} 个视频，{deleteResult.seriesCount} 个视频集
+                  ✓ 已删除 {deleteAnimeResult.videoCount} 个视频，{deleteAnimeResult.seriesCount} 个视频集
                 </p>
               )}
             </div>
             <button
-              onClick={handleDeleteAllVideos}
-              disabled={deletingVideos}
+              onClick={handleDeleteAllAnime}
+              disabled={deletingAnime}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
             >
-              {deletingVideos ? '删除中...' : '删除所有视频'}
+              {deletingAnime ? '删除中...' : '删除所有动漫'}
+            </button>
+          </div>
+        </div>
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">删除所有影视视频集及其视频，保留演员和标签数据。</p>
+              {deleteAdultResult && (
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ 已删除 {deleteAdultResult.videoCount} 个视频，{deleteAdultResult.seriesCount} 个视频集
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleDeleteAllAdult}
+              disabled={deletingAdult}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+            >
+              {deletingAdult ? '删除中...' : '删除所有影视'}
             </button>
           </div>
         </div>
 
-        <div className="card p-6">
+        <div className="card p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">重新解析所有视频集的文件名，补充缺失的番号（code）和中文字幕标记。</p>
-              {rescanResult && (
+              <p className="text-sm text-gray-600">重新解析所有动漫视频集的文件名，补充缺失的番号（code）和中文字幕标记。</p>
+              {rescanAnimeResult && (
                 <p className="text-sm text-green-600 mt-2">
-                  ✓ 已更新 {rescanResult[0]} 部，跳过 {rescanResult[1]} 部
+                  ✓ 已更新 {rescanAnimeResult[0]} 部，跳过 {rescanAnimeResult[1]} 部
                 </p>
               )}
             </div>
             <button
-              onClick={handleRescanMetadata}
-              disabled={rescanning}
+              onClick={handleRescanAnimeMetadata}
+              disabled={rescanningAnime}
               className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
             >
-              {rescanning ? '扫描中...' : '重新扫描元数据'}
+              {rescanningAnime ? '扫描中...' : '重新扫描动漫元数据'}
+            </button>
+          </div>
+        </div>
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">重新解析所有影视视频集的文件名，无条件覆盖已有数据。</p>
+              {rescanAdultResult && (
+                <p className="text-sm text-green-600 mt-2">
+                  ✓ 已更新 {rescanAdultResult[0]} 部，跳过 {rescanAdultResult[1]} 部
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleRescanAdultMetadata}
+              disabled={rescanningAdult}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              {rescanningAdult ? '扫描中...' : '重新扫描影视元数据'}
             </button>
           </div>
         </div>

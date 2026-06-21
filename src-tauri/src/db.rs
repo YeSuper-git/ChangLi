@@ -124,6 +124,7 @@ pub struct Actor {
     pub measurements: Option<String>,
     pub japanese_name: Option<String>,
     pub cup_size: Option<String>,
+    pub alias: Option<String>,
     pub work_count: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -941,9 +942,10 @@ pub async fn add_actor(
     japanese_name: Option<&str>,
     cup_size: Option<&str>,
     avatar_base64: Option<&str>,
+    alias: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name, cup_size, avatar_base64) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actors (name, photo, bio, birthday, height, measurements, japanese_name, cup_size, avatar_base64, alias) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -954,6 +956,7 @@ pub async fn add_actor(
     .bind(japanese_name)
     .bind(cup_size)
     .bind(avatar_base64)
+    .bind(alias)
     .fetch_one(pool)
     .await?;
 
@@ -972,9 +975,10 @@ pub async fn update_actor(
     japanese_name: Option<&str>,
     cup_size: Option<&str>,
     avatar_base64: Option<&str>,
+    alias: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, avatar_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, avatar_base64 = ?, alias = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -985,6 +989,7 @@ pub async fn update_actor(
     .bind(japanese_name)
     .bind(cup_size)
     .bind(avatar_base64)
+    .bind(alias)
     .bind(id)
     .fetch_one(pool)
     .await?;
@@ -1050,6 +1055,7 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
         measurements: row.get("measurements"),
         japanese_name: row.get("japanese_name"),
         cup_size: row.get("cup_size"),
+        alias: row.try_get("alias").ok().flatten(),
         work_count: row.try_get("work_count").unwrap_or(0),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
@@ -1856,6 +1862,70 @@ pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
     sqlx::query("DELETE FROM video_series").execute(pool).await?;
     Ok((video_count.0, series_count.0))
 }
+/// 删除所有动漫（has_actor=0 且 display_type!='adult' 的视频集及其视频，但不删除占位视频）
+pub async fn delete_all_anime(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let video_count: (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM videos v WHERE v.series_id IN (SELECT id FROM video_series WHERE (has_actor = 0 OR has_actor IS NULL) AND (display_type IS NULL OR display_type != 'adult'))"
+    ))
+    .fetch_one(pool)
+    .await?;
+
+    let series_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM video_series WHERE (has_actor = 0 OR has_actor IS NULL) AND (display_type IS NULL OR display_type != 'adult')"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let anime_sub = "SELECT id FROM video_series WHERE (has_actor = 0 OR has_actor IS NULL) AND (display_type IS NULL OR display_type != 'adult')";
+
+    sqlx::query(&format!("DELETE FROM play_history WHERE video_id IN (SELECT id FROM videos WHERE series_id IN ({}))", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM watch_progress WHERE resource_id IN (SELECT id FROM videos WHERE series_id IN ({}))", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM videos WHERE series_id IN ({})", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", anime_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", anime_sub))
+        .execute(pool).await?;
+
+    Ok((video_count.0, series_count.0))
+}
+
+/// 删除所有影视（has_actor=1 或 display_type='adult' 的视频集及其视频，但不删除占位视频）
+pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let adult_sub = "SELECT id FROM video_series WHERE has_actor = 1 OR display_type = 'adult'";
+
+    let video_count: (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM videos WHERE series_id IN ({})", adult_sub
+    ))
+    .fetch_one(pool)
+    .await?;
+
+    let series_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM video_series WHERE has_actor = 1 OR display_type = 'adult'"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    sqlx::query(&format!("DELETE FROM play_history WHERE video_id IN (SELECT id FROM videos WHERE series_id IN ({}))", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM watch_progress WHERE resource_id IN (SELECT id FROM videos WHERE series_id IN ({}))", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM videos WHERE series_id IN ({})", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", adult_sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", adult_sub))
+        .execute(pool).await?;
+
+    Ok((video_count.0, series_count.0))
+}
+
 
 /// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
 /// 重新扫描单个视频集的元数据（车牌、中字、标题、海报）
@@ -1953,6 +2023,99 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
 
     Ok((updated, skipped))
 }
+/// 重新扫描动漫元数据（has_actor=0 的视频集）
+pub async fn rescan_anime_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, folder_path FROM video_series WHERE (has_actor = 0 OR has_actor IS NULL) AND (display_type IS NULL OR display_type != 'adult')"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut updated: i64 = 0;
+    let mut skipped: i64 = 0;
+
+    for (id, title, folder_path) in series_list {
+        let source = folder_path.as_deref().unwrap_or(&title);
+        let folder_name = std::path::Path::new(source)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| title.clone());
+        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+            let code = info.code;
+            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+            let folder_path_std = std::path::Path::new(source);
+            let poster = crate::scanner::find_folder_poster(folder_path_std);
+            let poster_base64 = poster
+                .as_deref()
+                .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+            sqlx::query(
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = ?, poster_base64 = ? WHERE id = ? AND (code IS NULL OR code = '')"
+            )
+            .bind(&code)
+            .bind(has_chinese_sub)
+            .bind(&new_title)
+            .bind(&poster)
+            .bind(&poster_base64)
+            .bind(id)
+            .execute(pool)
+            .await?;
+            updated += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    Ok((updated, skipped))
+}
+
+/// 重新扫描影视元数据（has_actor=1 的视频集，无条件覆盖）
+pub async fn rescan_adult_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, folder_path FROM video_series WHERE has_actor = 1 OR display_type = 'adult'"
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut updated: i64 = 0;
+    let mut skipped: i64 = 0;
+
+    for (id, title, folder_path) in series_list {
+        let source = folder_path.as_deref().unwrap_or(&title);
+        let folder_name = std::path::Path::new(source)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| title.clone());
+        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+            let code = info.code;
+            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+            let folder_path_std = std::path::Path::new(source);
+            let poster = crate::scanner::find_folder_poster(folder_path_std);
+            let poster_base64 = poster
+                .as_deref()
+                .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+            // 影视模式：无条件覆盖（不加 code IS NULL 条件）
+            sqlx::query(
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = ?, poster_base64 = ? WHERE id = ?"
+            )
+            .bind(&code)
+            .bind(has_chinese_sub)
+            .bind(&new_title)
+            .bind(&poster)
+            .bind(&poster_base64)
+            .bind(id)
+            .execute(pool)
+            .await?;
+            updated += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    Ok((updated, skipped))
+}
+
 
 // 季管理
 #[derive(Debug, Clone, Serialize, Deserialize)]

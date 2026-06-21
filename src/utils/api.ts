@@ -384,8 +384,26 @@ export async function deleteAllVideos(): Promise<{ videoCount: number; seriesCou
   return { videoCount, seriesCount };
 }
 
+export async function deleteAllAnime(): Promise<{ videoCount: number; seriesCount: number }> {
+  const [videoCount, seriesCount] = await invoke<[number, number]>('delete_all_anime');
+  return { videoCount, seriesCount };
+}
+
+export async function deleteAllAdult(): Promise<{ videoCount: number; seriesCount: number }> {
+  const [videoCount, seriesCount] = await invoke<[number, number]>('delete_all_adult');
+  return { videoCount, seriesCount };
+}
+
 export async function rescanAllSeriesMetadata(): Promise<[number, number]> {
   return invoke<[number, number]>('rescan_all_series_metadata');
+}
+
+export async function rescanAnimeMetadata(): Promise<[number, number]> {
+  return invoke<[number, number]>('rescan_anime_metadata');
+}
+
+export async function rescanAdultMetadata(): Promise<[number, number]> {
+  return invoke<[number, number]>('rescan_adult_metadata');
 }
 
 export async function rescanSingleSeriesMetadata(seriesId: number): Promise<boolean> {
@@ -404,6 +422,7 @@ export interface Actor {
   measurements?: string;
   japanese_name?: string;
   cup_size?: string;
+  alias?: string;
   work_count: number;
   created_at: string;
   updated_at: string;
@@ -441,10 +460,10 @@ export async function getActor(id: number): Promise<Actor | null> {
   }
 }
 
-export async function addActor(name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string): Promise<Actor> {
-  console.log('[API] 调用 addActor, name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize);
+export async function addActor(name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string, alias?: string): Promise<Actor> {
+  console.log('[API] 调用 addActor, name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize, 'alias:', alias);
   try {
-    const result = await invoke<Actor>('add_actor', { name, photo, bio, birthday, height, measurements, japaneseName, cupSize });
+    const result = await invoke<Actor>('add_actor', { name, photo, bio, birthday, height, measurements, japaneseName, cupSize, alias });
     console.log('[API] addActor 成功, 返回:', result);
     return result;
   } catch (err) {
@@ -453,10 +472,10 @@ export async function addActor(name: string, photo?: string, bio?: string, birth
   }
 }
 
-export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string): Promise<Actor> {
-  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize);
+export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string, alias?: string): Promise<Actor> {
+  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize, 'alias:', alias);
   try {
-    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName, cupSize });
+    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName, cupSize, alias });
     console.log('[API] updateActor 成功, 返回:', result);
     return result;
   } catch (err) {

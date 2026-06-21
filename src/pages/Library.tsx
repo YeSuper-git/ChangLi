@@ -402,11 +402,13 @@ const Library: React.FC = () => {
       <div className="mb-6 flex gap-3 flex-wrap">
         {mainCategory === 'anime' ? (
           <>
+            <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
             <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
             <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
           </>
         ) : (
           <>
+            <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
             <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
             <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
           </>
