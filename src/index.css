@@ -303,3 +303,8 @@ body.player-window-document,
 .filter-gold {
   filter: invert(70%) sepia(50%) saturate(500%) hue-rotate(5deg) brightness(95%) contrast(90%);
 }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

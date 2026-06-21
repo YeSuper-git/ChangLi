@@ -59,7 +59,7 @@ const ActorDetail: React.FC = () => {
   // Toast 自动消失
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
+      const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -212,6 +212,7 @@ const ActorDetail: React.FC = () => {
           }
         } catch (error) {
           console.error('[Actor] 添加作品失败:', error);
+          setToast({ message: '请添加该演员对应的视频哦', type: 'info' });
         } finally {
           setAddingWork(false);
         }
@@ -883,8 +884,10 @@ const ActorDetail: React.FC = () => {
     </div>
     {/* Toast 提示 */}
     {toast && (
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
-        {toast.message}
+      <div className="fixed top-4 right-4 z-50" style={{ animation: 'slideInRight 0.3s ease-out' }}>
+        <div className="px-4 py-3 rounded-lg shadow-lg text-sm text-white bg-gray-800">
+          {toast.message}
+        </div>
       </div>
     )}
     </>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata } from '../utils/api';
 import type { Site, Tag, StorageInfo } from '../utils/api';
-import { confirm } from '@tauri-apps/api/dialog';
+// confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -94,13 +94,16 @@ const Settings: React.FC = () => {
 
   const [deletingAnime, setDeletingAnime] = useState(false);
   const [deletingAdult, setDeletingAdult] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'anime' | 'adult' } | null>(null);
   const [deleteAnimeResult, setDeleteAnimeResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
   const [deleteAdultResult, setDeleteAdultResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
-  const handleDeleteAllAnime = async () => {
-    const confirmed = await confirm('确定要删除所有动漫数据吗？\n\n此操作将删除所有动漫视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。', { title: '确认删除', type: 'warning' });
-    if (!confirmed) return;
+  const handleDeleteAllAnime = () => {
+    setDeleteConfirm({ type: 'anime' });
+  };
+
+  const doDeleteAllAnime = async () => {
     console.log('[DEBUG] handleDeleteAllAnime: 用户确认删除动漫数据');
     setDeletingAnime(true);
     setDeleteAnimeResult(null);
@@ -116,9 +119,11 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleDeleteAllAdult = async () => {
-    const confirmed = await confirm('确定要删除所有影视数据吗？\n\n此操作将删除所有影视视频集及其视频，但不会删除本地源文件。\n\n演员和标签数据将保留。', { title: '确认删除', type: 'warning' });
-    if (!confirmed) return;
+  const handleDeleteAllAdult = () => {
+    setDeleteConfirm({ type: 'adult' });
+  };
+
+  const doDeleteAllAdult = async () => {
     console.log('[DEBUG] handleDeleteAllAdult: 用户确认删除影视数据');
     setDeletingAdult(true);
     setDeleteAdultResult(null);
@@ -397,6 +402,35 @@ const Settings: React.FC = () => {
           </div>
         )}
       </section>
+
+      {/* 删除二次确认弹窗 */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <p className="text-gray-900 text-base mb-6">
+              该操作会删除所有{deleteConfirm.type === 'anime' ? '动漫' : '影视'}，请谨慎操作
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  if (deleteConfirm.type === 'anime') doDeleteAllAnime();
+                  else doDeleteAllAdult();
+                  setDeleteConfirm(null);
+                }}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+              >
+                狠心删除
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 添加网站弹窗 */}
       {showAddModal && (
