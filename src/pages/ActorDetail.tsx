@@ -473,7 +473,7 @@ const ActorDetail: React.FC = () => {
     return actor ? actorPhotoDataUrl(actor) : null;
   };
 
-  const isAddButton = currentPhotoIndex === photos.length;
+  const isAddButton = photos.length > 0 && currentPhotoIndex === photos.length;
 
   // 作品的 period_id
   const getWorkPeriodId = (resource: Video): number | null => {
@@ -580,29 +580,13 @@ const ActorDetail: React.FC = () => {
               setPhotoContextMenu({ photoId: photos[currentPhotoIndex].id, x: e.clientX, y: e.clientY });
             }}
           >
-            {photos.length > 0 && isAddButton ? (
-              /* "+" 按钮：添加新海报（已有照片时的最后一位） */
-              <div
-                className="w-full h-full flex items-center justify-center cursor-pointer hover:bg-pink-300 transition-colors"
-                onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}
-              >
+            {isAddButton ? (
+              <div className="w-full h-full flex items-center justify-center cursor-pointer hover:bg-pink-300 transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}>
                 <div className="text-5xl text-white/80">+</div>
               </div>
             ) : getCurrentPhotoUrl() ? (
-              <>
-                <img
-                  src={getCurrentPhotoUrl()!}
-                  alt={actor.name}
-                  className="w-full h-full object-cover"
-                />
-                {/* 旧数据（photos为空但有fallback海报）右下角"+"按钮 */}
-                {photos.length === 0 && editing && (
-                  <button
-                    className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center"
-                    onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}
-                  >+</button>
-                )}
-              </>
+              <img src={getCurrentPhotoUrl()!} alt={actor.name} className="w-full h-full object-cover" />
             ) : (
               <StaticImagePlaceholder kind="actor" />
             )}
@@ -674,20 +658,7 @@ const ActorDetail: React.FC = () => {
             </div>
           )}
 
-          {/* 兼容旧数据提示 */}
-          {photos.length === 0 && actorPhotoDataUrl(actor) && !editing && (
-            <div className="text-xs text-gray-400 text-center mt-1">
-              点击"+"添加更多海报
-              <div className="flex justify-center mt-1">
-                <button
-                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500"
-                  onClick={handleAddPhoto}
-                >
-                  + 添加海报
-                </button>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* 详细信息 */}
