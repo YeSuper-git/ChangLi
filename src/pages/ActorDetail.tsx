@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, getActorWorkPeriodMap, rescanSingleSeriesMetadata } from '../utils/api';
-import type { Actor, Video, ActorPeriod } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos } from '../utils/api';
+import type { Actor, Video, ActorPeriod, ActorPhoto } from '../utils/api';
 import { open } from '@tauri-apps/api/dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
@@ -37,16 +37,25 @@ const ActorDetail: React.FC = () => {
     alias: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photos, setPhotos] = useState<ActorPhoto[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [photoContextMenu, setPhotoContextMenu] = useState<{ photoId: number; x: number; y: number } | null>(null);
   const [addingWork, setAddingWork] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [periods, setPeriods] = useState<ActorPeriod[]>([]);
   const [workPeriodMap, setWorkPeriodMap] = useState<Record<string, number>>({});
-  const [activePeriodId, setActivePeriodId] = useState<number | null>(null); // null = 未分类/全部
+  // 时期右键菜单
+  const [periodContextMenu, setPeriodContextMenu] = useState<{ periodId: number; x: number; y: number } | null>(null);
+  // 时期编辑
   const [editingPeriodId, setEditingPeriodId] = useState<number | null>(null);
   const [editingPeriodName, setEditingPeriodName] = useState('');
+  // 时期删除确认
+  const [deletingPeriodId, setDeletingPeriodId] = useState<number | null>(null);
+  // 添加时期
   const [addingPeriod, setAddingPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
-  const [deletingPeriodId, setDeletingPeriodId] = useState<number | null>(null);
+  // 添加作品时选择时期弹窗
+  const [periodSelectVisible, setPeriodSelectVisible] = useState(false);
 
   const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
@@ -69,7 +78,7 @@ const ActorDetail: React.FC = () => {
     }
   }, [editFromUrl, actor]);
   useEffect(() => {
-    const closeMenu = () => { setContextMenu(null); clearPending(); };
+    const closeMenu = () => { setContextMenu(null); setPhotoContextMenu(null); setPeriodContextMenu(null); clearPending(); setDeletingPeriodId(null); };
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
@@ -78,11 +87,12 @@ const ActorDetail: React.FC = () => {
   const loadActor = async (actorId: number) => {
     try {
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
-      const [actorData, resourcesData, periodsData, periodMap] = await Promise.all([
+      const [actorData, resourcesData, periodsData, periodMap, photosData] = await Promise.all([
         getActor(actorId),
         getActorResources(actorId),
         getActorPeriods(actorId),
         getActorWorkPeriodMap(actorId),
+        getActorPhotos(actorId),
       ]);
       console.log('[Actor] getActor 返回:', actorData ? `name: ${actorData.name}, photo: ${actorData.photo || '无'}` : 'null');
       console.log('[Actor] getActorResources 返回:', resourcesData.length, '条');
@@ -90,6 +100,8 @@ const ActorDetail: React.FC = () => {
       setResources(resourcesData);
       setPeriods(periodsData);
       setWorkPeriodMap(periodMap);
+      setPhotos(photosData);
+      setCurrentPhotoIndex(0);
       if (actorData) {
         setEditForm({
           name: actorData.name,
@@ -179,7 +191,18 @@ const ActorDetail: React.FC = () => {
   };
 
 
+  // 添加作品：如果没有时期，直接打开文件夹；有时期，弹出选择弹窗
   const handleAddWork = async () => {
+    if (periods.length > 0) {
+      // 有新增时期，弹出选择弹窗
+      setPeriodSelectVisible(true);
+    } else {
+      // 没有新增时期，直接打开文件夹
+      await doAddWork(undefined);
+    }
+  };
+
+  const doAddWork = async (selectedPeriodId: number | undefined) => {
     try {
       console.log('[ActorDetail] 打开文件夹选择器...');
       const selected = await open({
@@ -192,9 +215,8 @@ const ActorDetail: React.FC = () => {
         console.log('[ActorDetail] 选择的文件夹:', selected);
         setAddingWork(true);
         try {
-          // 扫描视频并自动关联到当前演员（校验文件夹名=演员名）
           console.log('[ActorDetail] 开始扫描视频...');
-          const result = await scanVideosForActor(selected as string, actor.id);
+          const result = await scanVideosForActor(selected as string, actor.id, selectedPeriodId);
           
           // 刷新资源列表
           loadActor(actor.id);
@@ -328,7 +350,6 @@ const ActorDetail: React.FC = () => {
       setPeriods(prev => [...prev, period]);
       setNewPeriodName('');
       setAddingPeriod(false);
-      setActivePeriodId(period.id);
       setToast({ message: `时期"${period.name}"已创建`, type: 'success' });
     } catch (error) {
       console.error('[Actor] 添加时期失败:', error);
@@ -355,26 +376,154 @@ const ActorDetail: React.FC = () => {
     try {
       await deleteActorPeriod(periodId);
       setPeriods(prev => prev.filter(p => p.id !== periodId));
-      if (activePeriodId === periodId) setActivePeriodId(null);
       setDeletingPeriodId(null);
       // 重新加载以刷新 workPeriodMap
       if (actor) {
         const periodMap = await getActorWorkPeriodMap(actor.id);
         setWorkPeriodMap(periodMap);
       }
-      setToast({ message: '时期已删除，作品变为未分类', type: 'info' });
+      setToast({ message: '时期已删除，作品归入演员名时期', type: 'info' });
     } catch (error) {
       console.error('[Actor] 删除时期失败:', error);
     }
   };
 
-  // 获取作品的 period_id
+  // 时期移位
+  const handleMovePeriod = async (periodId: number, direction: 'up' | 'down') => {
+    const sortedPeriods = [...periods].sort((a, b) => a.sort_order - b.sort_order);
+    const idx = sortedPeriods.findIndex(p => p.id === periodId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === sortedPeriods.length - 1) return;
+
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const newPeriods = [...sortedPeriods];
+    [newPeriods[idx], newPeriods[swapIdx]] = [newPeriods[swapIdx], newPeriods[idx]];
+
+    try {
+      await reorderActorPeriods(newPeriods.map(p => p.id));
+      // 更新本地 sort_order
+      const updated = newPeriods.map((p, i) => ({ ...p, sort_order: i }));
+      setPeriods(updated);
+      setPeriodContextMenu(null);
+    } catch (error) {
+      console.error('[Actor] 移位时期失败:', error);
+    }
+  };
+
+  // 照片管理函数
+  const handleAddPhoto = async () => {
+    if (!actor) return;
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: '图片',
+          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'tif', 'tiff', 'heic', 'heif']
+        }],
+        title: '选择演员海报'
+      });
+      if (selected) {
+        setUploadingPhoto(true);
+        try {
+          const relativePath = await saveActorPhoto(selected as string);
+          await addActorPhoto(actor.id, relativePath);
+          const photosData = await getActorPhotos(actor.id);
+          setPhotos(photosData);
+          // 切换到新添加的照片
+          setCurrentPhotoIndex(photosData.length - 1);
+          setToast({ message: '海报添加成功', type: 'success' });
+        } catch (error) {
+          console.error('[Actor] 添加海报失败:', error);
+          setToast({ message: '添加海报失败', type: 'info' });
+        } finally {
+          setUploadingPhoto(false);
+        }
+      }
+    } catch (error) {
+      console.error('[Actor] 打开文件选择器失败:', error);
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    if (!actor) return;
+    try {
+      await deleteActorPhoto(photoId);
+      const photosData = await getActorPhotos(actor.id);
+      setPhotos(photosData);
+      // 如果删的是当前显示的，切换到前一张
+      if (currentPhotoIndex >= photosData.length) {
+        setCurrentPhotoIndex(Math.max(0, photosData.length - 1));
+      }
+      setPhotoContextMenu(null);
+      setToast({ message: '海报已删除', type: 'info' });
+    } catch (error) {
+      console.error('[Actor] 删除海报失败:', error);
+    }
+  };
+
+  const handleSetPrimary = async (photoId: number) => {
+    if (!actor) return;
+    try {
+      await setPrimaryPhoto(actor.id, photoId);
+      // 重新排序（主海报在第一位）
+      const photosData = await getActorPhotos(actor.id);
+      setPhotos(photosData);
+      setCurrentPhotoIndex(0);
+      setPhotoContextMenu(null);
+      setToast({ message: '主海报已更新', type: 'success' });
+    } catch (error) {
+      console.error('[Actor] 设置主海报失败:', error);
+    }
+  };
+
+  const handleReorderPhoto = async (photoId: number, direction: 'up' | 'down') => {
+    if (!actor) return;
+    const nonPrimaryPhotos = photos.filter(p => p.is_primary !== 1);
+    const idx = nonPrimaryPhotos.findIndex(p => p.id === photoId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === nonPrimaryPhotos.length - 1) return;
+
+    const newPhotos = [...nonPrimaryPhotos];
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    [newPhotos[idx], newPhotos[swapIdx]] = [newPhotos[swapIdx], newPhotos[idx]];
+
+    const primaryPhoto = photos.find(p => p.is_primary === 1);
+    const allIds = primaryPhoto ? [primaryPhoto.id, ...newPhotos.map(p => p.id)] : newPhotos.map(p => p.id);
+
+    try {
+      await reorderActorPhotos(actor.id, allIds);
+      const photosData = await getActorPhotos(actor.id);
+      setPhotos(photosData);
+      // 更新当前显示索引
+      const currentPhotoId = photos[currentPhotoIndex]?.id;
+      const newIndex = photosData.findIndex(p => p.id === currentPhotoId);
+      if (newIndex >= 0) setCurrentPhotoIndex(newIndex);
+      setPhotoContextMenu(null);
+    } catch (error) {
+      console.error('[Actor] 重排序海报失败:', error);
+    }
+  };
+
+  // 获取当前显示的照片数据 URL
+  const getCurrentPhotoUrl = (): string | null => {
+    if (photos.length > 0 && currentPhotoIndex < photos.length) {
+      return photos[currentPhotoIndex].photo_data_url || null;
+    }
+    // 兼容旧数据
+    return actor ? actorPhotoDataUrl(actor) : null;
+  };
+
+  const isAddButton = photos.length > 0 && currentPhotoIndex === photos.length;
+
+  // 作品的 period_id
   const getWorkPeriodId = (resource: Video): number | null => {
     const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
     return workPeriodMap[key] || null;
   };
 
-  // 按时期分组作品
+  // 按时期分组作品（去重：同一 series 只显示一次）
   const workItems = Array.from(
     resources.reduce((map, resource) => {
       const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
@@ -385,10 +534,9 @@ const ActorDetail: React.FC = () => {
     }, new Map<string, Video>()).values()
   );
 
-  // 根据 activePeriodId 过滤作品
-  const filteredWorkItems = activePeriodId === null
-    ? workItems
-    : workItems.filter(item => getWorkPeriodId(item) === activePeriodId);
+  // 分组：演员名时期（period_id = null）在最上，其他时期按 sort_order 排序
+  const actorNamePeriodItems = workItems.filter(item => getWorkPeriodId(item) === null);
+  const sortedPeriods = [...periods].sort((a, b) => a.sort_order - b.sort_order);
 
   if (loading) {
     return (
@@ -416,6 +564,38 @@ const ActorDetail: React.FC = () => {
     }
   };
 
+  // 渲染作品卡片
+  const renderWorkCard = (resource: Video) => {
+    const isSeries = Boolean(resource.series_id);
+    const code = resource.series_code || '';
+    const rawTitle = isSeries ? (resource.series_title || '视频集') : resource.file_name;
+    const title = code ? `[${code}] ${rawTitle}` : rawTitle;
+    const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
+    const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/series/${resource.series_id || resource.id}?fromActor=${actor.id}`;
+    return (
+      <Link
+        key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`}
+        to={target}
+        state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
+        onContextMenu={(event) => openContextMenu(event, isSeries ? 'series' : 'video', isSeries ? resource.series_id! : resource.id, title)}
+        className="card block"
+      >
+        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+          <SmartPoster src={poster} alt={title} />
+        </div>
+        <div className="p-5">
+          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
+          {resource.series_has_chinese_sub === 1 && (
+            <span className="text-xs text-orange-500">中文字幕</span>
+          )}
+          <div className="text-sm text-gray-500">
+            
+          </div>
+        </div>
+      </Link>
+    );
+  };
+
   return (
     <>
     <div>
@@ -435,15 +615,46 @@ const ActorDetail: React.FC = () => {
             className={`aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden relative group ${editing ? 'cursor-pointer' : ''}`}
             onClick={editing ? handlePhotoClick : undefined}
           >
-            {actorPhotoDataUrl(actor) ? (
+            {isAddButton ? (
+              /* "+" 按钮：添加新海报 */
+              <div
+                className="w-full h-full flex items-center justify-center cursor-pointer hover:bg-pink-300 transition-colors"
+                onClick={(e) => { e.stopPropagation(); handleAddPhoto(); }}
+              >
+                <div className="text-5xl text-white/80">+</div>
+              </div>
+            ) : getCurrentPhotoUrl() ? (
               <img
-                src={actorPhotoDataUrl(actor)!}
+                src={getCurrentPhotoUrl()!}
                 alt={actor.name}
                 className="w-full h-full object-cover"
               />
             ) : (
               <StaticImagePlaceholder kind="actor" />
             )}
+
+            {/* 左右箭头 - 仅有多张海报时显示 */}
+            {photos.length > 0 && !editing && (
+              <>
+                {currentPhotoIndex > 0 && (
+                  <button
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.max(0, prev - 1)); }}
+                  >
+                    ‹
+                  </button>
+                )}
+                {(currentPhotoIndex < photos.length - 1 || (photos.length > 0 && currentPhotoIndex < photos.length)) && (
+                  <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.min(photos.length, prev + 1)); }}
+                  >
+                    ›
+                  </button>
+                )}
+              </>
+            )}
+
             {/* 悬浮提示 - 仅编辑状态显示 */}
             {editing && (
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -452,7 +663,64 @@ const ActorDetail: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* 主海报标记 */}
+            {photos.length > 0 && currentPhotoIndex < photos.length && photos[currentPhotoIndex]?.is_primary === 1 && (
+              <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500/80 text-white text-xs rounded-full">
+                主海报
+              </div>
+            )}
           </div>
+
+          {/* 缩略图列表 */}
+          {photos.length > 0 && !editing && (
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+              {photos.map((photo, idx) => (
+                <div
+                  key={photo.id}
+                  className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                    idx === currentPhotoIndex ? 'border-blue-500 ring-1 ring-blue-300' : 'border-transparent hover:border-gray-300'
+                  }`}
+                  onClick={() => setCurrentPhotoIndex(idx)}
+                  onContextMenu={(e) => {
+                    // 主海报不能右键
+                    if (photo.is_primary === 1) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPhotoContextMenu({ photoId: photo.id, x: e.clientX, y: e.clientY });
+                  }}
+                >
+                  {photo.photo_data_url ? (
+                    <img src={photo.photo_data_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-pink-200 flex items-center justify-center text-xs">👤</div>
+                  )}
+                </div>
+              ))}
+              {/* "+" 缩略图按钮 */}
+              <div
+                className="flex-shrink-0 w-14 h-14 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 flex items-center justify-center cursor-pointer text-gray-400 hover:text-blue-500 transition-colors"
+                onClick={handleAddPhoto}
+              >
+                +
+              </div>
+            </div>
+          )}
+
+          {/* 兼容旧数据提示 */}
+          {photos.length === 0 && actorPhotoDataUrl(actor) && !editing && (
+            <div className="text-xs text-gray-400 text-center mt-1">
+              点击"+"添加更多海报
+              <div className="flex justify-center mt-1">
+                <button
+                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500"
+                  onClick={handleAddPhoto}
+                >
+                  + 添加海报
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 详细信息 */}
@@ -765,89 +1033,70 @@ const ActorDetail: React.FC = () => {
           </div>
         )}
 
-        {/* 时期标签栏 */}
-        {periods.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setActivePeriodId(null)}
-              className={`px-4 py-1.5 rounded-full text-sm transition-all ${activePeriodId === null ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              全部 ({workItems.length})
-            </button>
-            {periods.map(period => (
-              <div key={period.id} className="flex items-center gap-1 group">
-                {editingPeriodId === period.id ? (
-                  <input
-                    type="text"
-                    value={editingPeriodName}
-                    onChange={e => setEditingPeriodName(e.target.value)}
-                    onBlur={() => handleUpdatePeriod(period.id)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleUpdatePeriod(period.id); if (e.key === 'Escape') setEditingPeriodId(null); }}
-                    autoFocus
-                    className="px-3 py-1.5 border border-blue-300 rounded-full text-sm focus:outline-none"
-                    style={{ width: `${Math.max(editingPeriodName.length * 14 + 24, 60)}px` }}
-                  />
-                ) : (
-                  <button
-                    onClick={() => setActivePeriodId(activePeriodId === period.id ? null : period.id)}
-                    onDoubleClick={() => { setEditingPeriodId(period.id); setEditingPeriodName(period.name); }}
-                    className={`px-4 py-1.5 rounded-full text-sm transition-all ${activePeriodId === period.id ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    {period.name}
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDeletePeriod(period.id)}
-                  className={`text-xs px-1.5 py-0.5 rounded transition-all ${deletingPeriodId === period.id ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100'}`}
-                  title={deletingPeriodId === period.id ? '再次点击确认删除' : '删除时期'}
-                >
-                  {deletingPeriodId === period.id ? '确认?' : '×'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {filteredWorkItems.length > 0 ? (
-          <div className="grid grid-cols-4 gap-6">
-            {filteredWorkItems.map((resource) => {
-              const isSeries = Boolean(resource.series_id);
-              const code = resource.series_code || '';
-              const rawTitle = isSeries ? (resource.series_title || '视频集') : resource.file_name;
-              const title = code ? `[${code}] ${rawTitle}` : rawTitle;
-              const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
-              const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/series/${resource.series_id || resource.id}?fromActor=${actor.id}`;
-              return (
-              <Link
-                key={isSeries ? `series-${resource.series_id}` : `video-${resource.id}`}
-                to={target}
-                state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
-                onContextMenu={(event) => openContextMenu(event, isSeries ? 'series' : 'video', isSeries ? resource.series_id! : resource.id, title)}
-                className="card block"
-              >
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
-                  <SmartPoster src={poster} alt={title} />
+        {/* 分组展示 */}
+        {workItems.length > 0 ? (
+          <div>
+            {/* 演员名时期（虚拟，固定最上） */}
+            {actorNamePeriodItems.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">{actor.name}</h3>
+                <div className="grid grid-cols-4 gap-6">
+                  {actorNamePeriodItems.map(resource => renderWorkCard(resource))}
                 </div>
-                <div className="p-5">
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
-                  {resource.series_has_chinese_sub === 1 && (
-                    <span className="text-xs text-orange-500">中文字幕</span>
+              </div>
+            )}
+
+            {/* 其他时期，按 sort_order 排序 */}
+            {sortedPeriods.map(period => {
+              const periodItems = workItems.filter(item => getWorkPeriodId(item) === period.id);
+              if (periodItems.length === 0) return null;
+              return (
+                <div key={period.id} className="mb-8">
+                  {editingPeriodId === period.id ? (
+                    <div className="flex items-center gap-2 mb-4">
+                      <input
+                        type="text"
+                        value={editingPeriodName}
+                        onChange={e => setEditingPeriodName(e.target.value)}
+                        onBlur={() => handleUpdatePeriod(period.id)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdatePeriod(period.id); if (e.key === 'Escape') setEditingPeriodId(null); }}
+                        autoFocus
+                        className="px-2 py-1 border border-blue-300 rounded text-lg font-bold focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <h3
+                      className="text-lg font-bold text-gray-900 mb-4 cursor-default select-none"
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPeriodContextMenu({ periodId: period.id, x: e.clientX, y: e.clientY });
+                      }}
+                    >
+                      {period.name}
+                    </h3>
                   )}
-                  <div className="text-sm text-gray-500">
-                    
+                  <div className="grid grid-cols-4 gap-6">
+                    {periodItems.map(resource => renderWorkCard(resource))}
                   </div>
                 </div>
-              </Link>
               );
             })}
+
+            {/* 没有时期但有未分类作品时，如果没有时期则不显示演员名标题（因为全部都在演员名时期） */}
+            {periods.length === 0 && actorNamePeriodItems.length > 0 && (
+              // 已经在上面显示了，不需要额外处理
+              null
+            )}
           </div>
         ) : (
           <div className="text-center py-16">
-            <p className="text-gray-500">{activePeriodId !== null ? '该时期暂无作品' : '暂无参演作品'}</p>
+            <p className="text-gray-500">暂无参演作品</p>
             <p className="text-gray-400 text-sm mt-2">点击"添加作品"按钮添加</p>
           </div>
         )}
       </section>
+
       {contextMenu && (
         <div
           className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
@@ -881,11 +1130,150 @@ const ActorDetail: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* 时期右键菜单 */}
+      {periodContextMenu && (() => {
+        const sortedP = [...periods].sort((a, b) => a.sort_order - b.sort_order);
+        const idx = sortedP.findIndex(p => p.id === periodContextMenu.periodId);
+        const canMoveUp = idx > 0;
+        const canMoveDown = idx >= 0 && idx < sortedP.length - 1;
+        return (
+          <div
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+            style={{ left: periodContextMenu.x, top: periodContextMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                const p = periods.find(pp => pp.id === periodContextMenu.periodId);
+                if (p) {
+                  setEditingPeriodId(p.id);
+                  setEditingPeriodName(p.name);
+                }
+                setPeriodContextMenu(null);
+              }}
+            >
+              编辑
+            </button>
+            <button
+              className={`w-full text-left px-4 py-2 text-sm ${canMoveUp ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              onClick={() => canMoveUp && handleMovePeriod(periodContextMenu.periodId, 'up')}
+            >
+              ↑ 移位上
+            </button>
+            <button
+              className={`w-full text-left px-4 py-2 text-sm ${canMoveDown ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              onClick={() => canMoveDown && handleMovePeriod(periodContextMenu.periodId, 'down')}
+            >
+              ↓ 移位下
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              onClick={() => {
+                if (deletingPeriodId === periodContextMenu.periodId) {
+                  // 已经确认过了，直接删除
+                  handleDeletePeriod(periodContextMenu.periodId);
+                } else {
+                  setDeletingPeriodId(periodContextMenu.periodId);
+                  // 3秒后重置
+                  setTimeout(() => setDeletingPeriodId(null), 3000);
+                }
+              }}
+            >
+              {deletingPeriodId === periodContextMenu.periodId ? '再次点击确认删除' : '删除'}
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* 照片右键菜单 */}
+      {photoContextMenu && (() => {
+        const nonPrimaryPhotos = photos.filter(p => p.is_primary !== 1);
+        const idx = nonPrimaryPhotos.findIndex(p => p.id === photoContextMenu.photoId);
+        const canMoveUp = idx > 0;
+        const canMoveDown = idx >= 0 && idx < nonPrimaryPhotos.length - 1;
+        return (
+          <div
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 min-w-40"
+            style={{ left: photoContextMenu.x, top: photoContextMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className={`w-full text-left px-4 py-2 text-sm ${canMoveUp ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              onClick={() => canMoveUp && handleReorderPhoto(photoContextMenu.photoId, 'up')}
+            >
+              ↑ 移位上
+            </button>
+            <button
+              className={`w-full text-left px-4 py-2 text-sm ${canMoveDown ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              onClick={() => canMoveDown && handleReorderPhoto(photoContextMenu.photoId, 'down')}
+            >
+              ↓ 移位下
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                const key = `set-primary-${photoContextMenu.photoId}`;
+                requestSecondConfirm(key, () => handleSetPrimary(photoContextMenu.photoId));
+              }}
+            >
+              {pendingKey === `set-primary-${photoContextMenu.photoId}` ? '再次点击确认设为主海报' : '⭐ 设为主海报'}
+            </button>
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              onClick={() => {
+                const key = `delete-photo-${photoContextMenu.photoId}`;
+                requestSecondConfirm(key, () => handleDeletePhoto(photoContextMenu.photoId));
+              }}
+            >
+              {pendingKey === `delete-photo-${photoContextMenu.photoId}` ? '再次点击确认删除' : '🗑 删除'}
+            </button>
+          </div>
+        );
+      })()}
     </div>
+
+    {/* 选择时期弹窗 */}
+    {periodSelectVisible && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPeriodSelectVisible(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 min-w-80" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">选择时期</h3>
+          <div className="space-y-2 mb-6">
+            {/* 演员名时期（period_id = null） */}
+            <button
+              className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+              onClick={() => { setPeriodSelectVisible(false); doAddWork(undefined); }}
+            >
+              {actor?.name}（演员名时期）
+            </button>
+            {/* 其他时期 */}
+            {[...periods].sort((a, b) => a.sort_order - b.sort_order).map(period => (
+              <button
+                key={period.id}
+                className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                onClick={() => { setPeriodSelectVisible(false); doAddWork(period.id); }}
+              >
+                {period.name}
+              </button>
+            ))}
+          </div>
+          <button
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            onClick={() => setPeriodSelectVisible(false)}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    )}
+
     {/* Toast 提示 */}
     {toast && (
-      <div className="fixed top-4 right-4 z-50" style={{ animation: 'slideInRight 0.3s ease-out' }}>
-        <div className="px-4 py-3 rounded-lg shadow-lg text-sm text-white bg-gray-800">
+      <div className="fixed top-20 right-6 z-50" style={{ animation: 'slideInRight 0.3s ease-out' }}>
+        <div className="px-5 py-4 rounded-xl shadow-xl text-base text-gray-900 bg-white border border-gray-300">
           {toast.message}
         </div>
       </div>
@@ -895,4 +1283,3 @@ const ActorDetail: React.FC = () => {
 };
 
 export default ActorDetail;
-

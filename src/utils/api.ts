@@ -433,6 +433,7 @@ export interface ActorPeriod {
   id: number;
   actor_id: number;
   name: string;
+  sort_order: number;
   created_at: string;
 }
 
@@ -668,6 +669,37 @@ export async function removeSeriesActor(seriesId: number, actorId: number): Prom
 }
 
 // 演员时期相关
+export interface ActorPhoto {
+  id: number;
+  actor_id: number;
+  photo?: string;
+  photo_data_url?: string;
+  is_primary: number;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function getActorPhotos(actorId: number): Promise<ActorPhoto[]> {
+  return invoke<ActorPhoto[]>('get_actor_photos', { actorId });
+}
+
+export async function addActorPhoto(actorId: number, photo?: string, photoBase64?: string, isPrimary?: number): Promise<ActorPhoto> {
+  return invoke<ActorPhoto>('add_actor_photo_cmd', { actorId, photo, photoBase64, isPrimary });
+}
+
+export async function deleteActorPhoto(photoId: number): Promise<void> {
+  return invoke('delete_actor_photo_cmd', { photoId });
+}
+
+export async function setPrimaryPhoto(actorId: number, photoId: number): Promise<void> {
+  return invoke('set_primary_photo_cmd', { actorId, photoId });
+}
+
+export async function reorderActorPhotos(actorId: number, photoIds: number[]): Promise<void> {
+  return invoke('reorder_actor_photos_cmd', { actorId, photoIds });
+}
+
+// 演员时期相关
 export async function getActorPeriods(actorId: number): Promise<ActorPeriod[]> {
   return invoke<ActorPeriod[]>('get_actor_periods', { actorId });
 }
@@ -682,6 +714,10 @@ export async function updateActorPeriod(id: number, name: string): Promise<void>
 
 export async function deleteActorPeriod(id: number): Promise<void> {
   return invoke('delete_actor_period', { id });
+}
+
+export async function reorderActorPeriods(periodIds: number[]): Promise<void> {
+  return invoke('reorder_actor_periods_cmd', { periodIds });
 }
 
 export async function getActorWorkPeriodMap(actorId: number): Promise<Record<string, number>> {
@@ -837,10 +873,10 @@ export async function updateVideo(id: number, fileName?: string, description?: s
   }
 }
 
-export async function scanVideosForActor(path: string, actorId: number): Promise<ScanResult> {
-  console.log('[API] 调用 scanVideosForActor, path:', path, 'actorId:', actorId);
+export async function scanVideosForActor(path: string, actorId: number, periodId?: number): Promise<ScanResult> {
+  console.log('[API] 调用 scanVideosForActor, path:', path, 'actorId:', actorId, 'periodId:', periodId);
   try {
-    const result = await invoke<ScanResult>('scan_videos_for_actor', { path, actorId });
+    const result = await invoke<ScanResult>('scan_videos_for_actor', { path, actorId, periodId: periodId ?? null });
     console.log('[API] scanVideosForActor 返回:', result);
     return result;
   } catch (err) {

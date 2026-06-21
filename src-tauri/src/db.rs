@@ -166,6 +166,7 @@ pub struct ActorPeriod {
     pub id: i64,
     pub actor_id: i64,
     pub name: String,
+    pub sort_order: i64,
     pub created_at: String,
 }
 
@@ -1080,7 +1081,7 @@ pub async fn delete_actor(pool: &SqlitePool, id: i64) -> Result<()> {
 
 // 演员时期操作
 pub async fn get_actor_periods(pool: &SqlitePool, actor_id: i64) -> Result<Vec<ActorPeriod>> {
-    let rows = sqlx::query("SELECT * FROM actor_periods WHERE actor_id = ? ORDER BY created_at ASC")
+    let rows = sqlx::query("SELECT * FROM actor_periods WHERE actor_id = ? ORDER BY sort_order ASC, created_at ASC")
         .bind(actor_id)
         .fetch_all(pool)
         .await?;
@@ -1088,23 +1089,31 @@ pub async fn get_actor_periods(pool: &SqlitePool, actor_id: i64) -> Result<Vec<A
         id: row.get("id"),
         actor_id: row.get("actor_id"),
         name: row.get("name"),
+        sort_order: row.get("sort_order"),
         created_at: row.get("created_at"),
     }).collect();
     Ok(periods)
 }
 
 pub async fn add_actor_period(pool: &SqlitePool, actor_id: i64, name: &str) -> Result<ActorPeriod> {
+    // Get max sort_order for this actor
+    let max_order: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_periods WHERE actor_id = ?")
+        .bind(actor_id)
+        .fetch_one(pool)
+        .await?;
     let row = sqlx::query(
-        "INSERT INTO actor_periods (actor_id, name) VALUES (?, ?) RETURNING *",
+        "INSERT INTO actor_periods (actor_id, name, sort_order) VALUES (?, ?, ?) RETURNING *",
     )
     .bind(actor_id)
     .bind(name)
+    .bind(max_order + 1)
     .fetch_one(pool)
     .await?;
     Ok(ActorPeriod {
         id: row.get("id"),
         actor_id: row.get("actor_id"),
         name: row.get("name"),
+        sort_order: row.get("sort_order"),
         created_at: row.get("created_at"),
     })
 }
@@ -1119,10 +1128,34 @@ pub async fn update_actor_period(pool: &SqlitePool, id: i64, name: &str) -> Resu
 }
 
 pub async fn delete_actor_period(pool: &SqlitePool, id: i64) -> Result<()> {
+    // Set period_id to NULL for all associated works (归入演员名时期)
+    sqlx::query("UPDATE video_actors SET period_id = NULL WHERE period_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE series_actors SET period_id = NULL WHERE period_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE resource_actors SET period_id = NULL WHERE period_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM actor_periods WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub async fn reorder_actor_periods(pool: &SqlitePool, period_ids: Vec<i64>) -> Result<()> {
+    for (i, pid) in period_ids.iter().enumerate() {
+        sqlx::query("UPDATE actor_periods SET sort_order = ? WHERE id = ?")
+            .bind(i as i64)
+            .bind(pid)
+            .execute(pool)
+            .await?;
+    }
     Ok(())
 }
 
@@ -1453,6 +1486,123 @@ pub async fn get_series_actors(pool: &SqlitePool, series_id: i64) -> Result<Vec<
     .fetch_all(pool)
     .await?;
     Ok(rows.iter().map(actor_from_row).collect())
+}
+
+// 演员多海报
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorPhoto {
+    pub id: i64,
+    pub actor_id: i64,
+    pub photo: Option<String>,
+    pub photo_data_url: Option<String>,
+    pub is_primary: i32,
+    pub sort_order: i32,
+    pub created_at: String,
+}
+
+fn actor_photo_from_row(row: &SqliteRow) -> ActorPhoto {
+    let photo: Option<String> = row.get("photo");
+    let resolved_photo = photo.clone().map(|path| {
+        storage::resolve_data_path(&path)
+            .to_string_lossy()
+            .to_string()
+    });
+    let photo_data_url: Option<String> = row.try_get("photo_base64").ok().flatten()
+        .or_else(|| {
+            let p = photo?;
+            let resolved = storage::resolve_data_path(&p);
+            image_data_url(Path::new(&resolved))
+        });
+    ActorPhoto {
+        id: row.get("id"),
+        actor_id: row.get("actor_id"),
+        photo: resolved_photo,
+        photo_data_url,
+        is_primary: row.try_get("is_primary").unwrap_or(0),
+        sort_order: row.try_get("sort_order").unwrap_or(0),
+        created_at: row.get("created_at"),
+    }
+}
+
+pub async fn get_actor_photos(pool: &SqlitePool, actor_id: i64) -> Result<Vec<ActorPhoto>> {
+    let rows = sqlx::query(
+        "SELECT * FROM actor_photos WHERE actor_id = ? ORDER BY is_primary DESC, sort_order ASC, created_at ASC"
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(actor_photo_from_row).collect())
+}
+
+pub async fn add_actor_photo(
+    pool: &SqlitePool,
+    actor_id: i64,
+    photo: Option<&str>,
+    photo_base64: Option<&str>,
+    is_primary: i32,
+) -> Result<ActorPhoto> {
+    // 如果是第一张照片，自动设为 is_primary=1
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_photos WHERE actor_id = ?")
+        .bind(actor_id)
+        .fetch_one(pool)
+        .await?;
+    let actual_is_primary = if count == 0 { 1 } else { is_primary };
+
+    // 获取当前最大 sort_order
+    let max_order: i32 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(sort_order), -1) FROM actor_photos WHERE actor_id = ?"
+    )
+    .bind(actor_id)
+    .fetch_one(pool)
+    .await?;
+
+    let row = sqlx::query(
+        "INSERT INTO actor_photos (actor_id, photo, photo_base64, is_primary, sort_order) VALUES (?, ?, ?, ?, ?) RETURNING *"
+    )
+    .bind(actor_id)
+    .bind(photo)
+    .bind(photo_base64)
+    .bind(actual_is_primary)
+    .bind(max_order + 1)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(actor_photo_from_row(&row))
+}
+
+pub async fn delete_actor_photo(pool: &SqlitePool, photo_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM actor_photos WHERE id = ?")
+        .bind(photo_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn set_primary_photo(pool: &SqlitePool, actor_id: i64, photo_id: i64) -> Result<()> {
+    // 先把所有 is_primary 设为 0
+    sqlx::query("UPDATE actor_photos SET is_primary = 0 WHERE actor_id = ?")
+        .bind(actor_id)
+        .execute(pool)
+        .await?;
+    // 再把指定的设为 1
+    sqlx::query("UPDATE actor_photos SET is_primary = 1 WHERE id = ? AND actor_id = ?")
+        .bind(photo_id)
+        .bind(actor_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn reorder_actor_photos(pool: &SqlitePool, actor_id: i64, photo_ids: Vec<i64>) -> Result<()> {
+    for (index, photo_id) in photo_ids.iter().enumerate() {
+        sqlx::query("UPDATE actor_photos SET sort_order = ? WHERE id = ? AND actor_id = ?")
+            .bind(index as i32)
+            .bind(photo_id)
+            .bind(actor_id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
 }
 
 // 播放记录操作

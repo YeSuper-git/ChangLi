@@ -610,7 +610,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
 }
 
 #[tauri::command]
-async fn scan_videos_for_actor(state: State<'_, AppState>, path: String, actor_id: i64) -> Result<ScanResult, String> {
+async fn scan_videos_for_actor(state: State<'_, AppState>, path: String, actor_id: i64, period_id: Option<i64>) -> Result<ScanResult, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -658,7 +658,7 @@ async fn scan_videos_for_actor(state: State<'_, AppState>, path: String, actor_i
         if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str).await.map_err(|e| e.to_string())? {
             db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
             db::add_videos_batch(&pool, sub_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
-            let _ = db::add_series_actor(&pool, existing.id, actor_id, None, None).await;
+            let _ = db::add_series_actor(&pool, existing.id, actor_id, None, period_id).await;
             let _ = db::update_video_series_display_type(&pool, existing.id, "adult").await;
             updated += 1;
         } else {
@@ -669,7 +669,7 @@ async fn scan_videos_for_actor(state: State<'_, AppState>, path: String, actor_i
                     .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
             }
             db::add_videos_batch(&pool, sub_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
-            let _ = db::add_series_actor(&pool, series.id, actor_id, None, None).await;
+            let _ = db::add_series_actor(&pool, series.id, actor_id, None, period_id).await;
             let _ = db::update_video_series_display_type(&pool, series.id, "adult").await;
             added += 1;
         }
@@ -1139,6 +1139,20 @@ async fn delete_actor_period(state: State<'_, AppState>, id: i64) -> Result<(), 
 }
 
 #[tauri::command]
+async fn reorder_actor_periods_cmd(
+    state: State<'_, AppState>,
+    period_ids: Vec<i64>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::reorder_actor_periods(&pool, period_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_actor_work_period_map(
     state: State<'_, AppState>,
     actor_id: i64,
@@ -1534,6 +1548,61 @@ async fn rescan_single_series_metadata(state: State<'_, AppState>, series_id: i6
     db::rescan_single_series_metadata(&pool, series_id).await.map_err(|e| e.to_string())
 }
 
+// 演员多海报命令
+#[tauri::command]
+async fn get_actor_photos(state: State<'_, AppState>, actor_id: i64) -> Result<Vec<db::ActorPhoto>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_actor_photos(&pool, actor_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_actor_photo_cmd(
+    state: State<'_, AppState>,
+    actor_id: i64,
+    photo: Option<String>,
+    photo_base64: Option<String>,
+    is_primary: Option<i32>,
+) -> Result<db::ActorPhoto, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    db::add_actor_photo(&pool, actor_id, stored_photo.as_deref(), photo_base64.as_deref(), is_primary.unwrap_or(0))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_actor_photo_cmd(state: State<'_, AppState>, photo_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_actor_photo(&pool, photo_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_primary_photo_cmd(state: State<'_, AppState>, actor_id: i64, photo_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::set_primary_photo(&pool, actor_id, photo_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reorder_actor_photos_cmd(state: State<'_, AppState>, actor_id: i64, photo_ids: Vec<i64>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::reorder_actor_photos(&pool, actor_id, photo_ids).await.map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(AppState {
@@ -1636,7 +1705,13 @@ fn main() {
             add_actor_period,
             update_actor_period,
             delete_actor_period,
+            reorder_actor_periods_cmd,
             get_actor_work_period_map,
+            get_actor_photos,
+            add_actor_photo_cmd,
+            delete_actor_photo_cmd,
+            set_primary_photo_cmd,
+            reorder_actor_photos_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

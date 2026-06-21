@@ -7,12 +7,14 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     // actor_periods table and period_id columns must exist before cascade rebuild,
     // because rebuild copies data using SELECT period_id FROM old tables.
     create_actor_periods_table(pool).await?;
+    add_column_if_not_exists(pool, "actor_periods", "sort_order", "INTEGER NOT NULL DEFAULT 0").await?;
     migrate_period_id_columns(pool).await?;
     migrate_cascade_foreign_keys(pool).await?;
     create_video_and_series_relation_tables(pool).await?;
     migrate_legacy_video_relations(pool).await?;
     backfill_required_values(pool).await?;
     seed_default_actors_if_empty(pool).await?;
+    create_actor_photos_table(pool).await?;
     create_indexes(pool).await?;
     Ok(())
 }
@@ -749,6 +751,7 @@ async fn create_actor_periods_table(pool: &SqlitePool) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             actor_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (actor_id) REFERENCES actors(id) ON DELETE CASCADE
         )
@@ -764,6 +767,26 @@ async fn migrate_period_id_columns(pool: &SqlitePool) -> Result<()> {
     add_column_if_not_exists(pool, "video_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
     add_column_if_not_exists(pool, "series_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
     add_column_if_not_exists(pool, "resource_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
+    Ok(())
+}
+
+async fn create_actor_photos_table(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS actor_photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
+            photo TEXT,
+            photo_base64 TEXT,
+            is_primary INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create actor_photos table",
+    )
+    .await?;
     Ok(())
 }
 
