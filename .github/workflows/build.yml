@@ -103,15 +103,30 @@ jobs:
           }
           Get-ChildItem $mpvTarget | Select-Object Name, Length
 
-          # Copy libmpv-2.dll to src-tauri/lib/ for libmpv plugin
-          $libmpv2 = Get-ChildItem $extractDir -Filter 'libmpv-2.dll' -Recurse | Select-Object -First 1
+          # Download mpv-dev package for libmpv-2.dll (not in the static mpv build)
+          $devAsset = $release.assets |
+            Where-Object { $_.name -match '^mpv-dev-x86_64-.*\\.7z$' -and $_.name -notmatch 'v3|debug|symbols' } |
+            Select-Object -First 1
+          if (-not $devAsset) {
+            throw "No x86_64 mpv-dev archive found in latest shinchiro/mpv-winbuild-cmake release"
+          }
+          $devArchive = Join-Path $downloadDir $devAsset.name
+          Invoke-WithRetry -Description "Download $($devAsset.name)" -ScriptBlock {
+            Invoke-WebRequest -Headers @{ "User-Agent" = "ChangLi-CI"; "Authorization" = "Bearer $env:GITHUB_TOKEN" } -Uri $devAsset.browser_download_url -OutFile $devArchive
+          } | Out-Null
+          $devExtractDir = Join-Path $env:RUNNER_TEMP "mpv-dev-extract"
+          New-Item -ItemType Directory -Force -Path $devExtractDir | Out-Null
+          7z x $devArchive "-o$devExtractDir" -y | Out-Host
+
+          $libDir = 'src-tauri\lib'
+          New-Item -ItemType Directory -Force -Path $libDir | Out-Null
+
+          $libmpv2 = Get-ChildItem $devExtractDir -Filter 'libmpv-2.dll' -Recurse | Select-Object -First 1
           if ($libmpv2) {
-            $libDir = 'src-tauri\lib'
-            New-Item -ItemType Directory -Force -Path $libDir | Out-Null
             Copy-Item -Path $libmpv2.FullName -Destination $libDir -Force
             Write-Host "Copied libmpv-2.dll to $libDir"
           } else {
-            Write-Warning "libmpv-2.dll not found in mpv archive"
+            throw "libmpv-2.dll not found in mpv-dev archive"
           }
 
       - name: Download libmpv-wrapper
