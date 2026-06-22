@@ -139,7 +139,7 @@ jobs:
           7z x $archive "-o$downloadDir" -y | Out-Host
           $libDir = 'src-tauri\lib'
           New-Item -ItemType Directory -Force -Path $libDir | Out-Null
-          Copy-Item -Path "$downloadDir\libmpv-wrapper.dll" -Destination $libDir -Force
+          Copy-Item -Path "$downloadDir\bin\libmpv-wrapper.dll" -Destination $libDir -Force
           Write-Host "Copied libmpv-wrapper.dll to $libDir"
           Get-ChildItem $libDir | Select-Object Name, Length
 
