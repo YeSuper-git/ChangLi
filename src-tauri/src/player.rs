@@ -474,7 +474,7 @@ fn unique_ipc_path() -> String {
 
 #[cfg(target_os = "windows")]
 fn native_window_id(window: &WebviewWindow) -> Result<Option<String>> {
-    let mut last_hwnd = windows::Win32::Foundation::HWND(0);
+    let mut last_hwnd = windows::Win32::Foundation::HWND(std::ptr::null_mut());
     let mut stable_count = 0_u8;
 
     for _ in 0..20 {
@@ -482,7 +482,7 @@ fn native_window_id(window: &WebviewWindow) -> Result<Option<String>> {
             .hwnd()
             .map_err(|e| anyhow!("获取 HWND 失败: {}", e))?;
 
-        if hwnd.0 > 0 {
+        if !hwnd.0.is_null() {
             if hwnd == last_hwnd {
                 stable_count += 1;
             } else {
@@ -491,7 +491,7 @@ fn native_window_id(window: &WebviewWindow) -> Result<Option<String>> {
             }
 
             if stable_count >= 2 {
-                return Ok(Some(hwnd.0.to_string()));
+                return Ok(Some((hwnd.0 as isize).to_string()));
             }
         }
 
