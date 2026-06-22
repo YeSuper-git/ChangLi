@@ -103,6 +103,46 @@ jobs:
           }
           Get-ChildItem $mpvTarget | Select-Object Name, Length
 
+          # Copy libmpv-2.dll to src-tauri/lib/ for libmpv plugin
+          $libmpv2 = Get-ChildItem $extractDir -Filter 'libmpv-2.dll' -Recurse | Select-Object -First 1
+          if ($libmpv2) {
+            $libDir = 'src-tauri\lib'
+            New-Item -ItemType Directory -Force -Path $libDir | Out-Null
+            Copy-Item -Path $libmpv2.FullName -Destination $libDir -Force
+            Write-Host "Copied libmpv-2.dll to $libDir"
+          } else {
+            Write-Warning "libmpv-2.dll not found in mpv archive"
+          }
+
+      - name: Download libmpv-wrapper
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $headers = @{
+            "User-Agent" = "ChangLi-CI"
+            "Accept" = "application/vnd.github+json"
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          }
+          $release = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/nini22P/libmpv-wrapper/releases/latest"
+          $asset = $release.assets |
+            Where-Object { $_.name -match 'libmpv-wrapper-windows-x86_64\.zip' } |
+            Select-Object -First 1
+          if (-not $asset) {
+            throw "libmpv-wrapper-windows-x86_64.zip not found"
+          }
+          $downloadDir = Join-Path $env:RUNNER_TEMP "libmpv-wrapper"
+          New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
+          $archive = Join-Path $downloadDir $asset.name
+          Invoke-WebRequest -Headers @{ "User-Agent" = "ChangLi-CI"; "Authorization" = "Bearer $env:GITHUB_TOKEN" } -Uri $asset.browser_download_url -OutFile $archive
+          7z x $archive "-o$downloadDir" -y | Out-Host
+          $libDir = 'src-tauri\lib'
+          New-Item -ItemType Directory -Force -Path $libDir | Out-Null
+          Copy-Item -Path "$downloadDir\libmpv-wrapper.dll" -Destination $libDir -Force
+          Write-Host "Copied libmpv-wrapper.dll to $libDir"
+          Get-ChildItem $libDir | Select-Object Name, Length
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
