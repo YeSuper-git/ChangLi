@@ -38,8 +38,7 @@
     ],
     "resources": [
       "resources/mpv/**/*",
-      "lib/libmpv-wrapper.dll",
-      "lib/libmpv-2.dll"
+      "lib/*"
     ],
     "windows": {
       "allowDowngrades": false,
@@ -53,29 +52,6 @@
         "displayLanguageSelector": false,
         "installMode": "both"
       }
-    }
-  },
-  "plugins": {
-    "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "mpv",
-          "cmd": "mpv",
-          "args": true
-        }
-      ]
-    },
-    "fs": {
-      "scope": {
-        "allow": ["**"]
-      }
-    },
-    "http": {
-      "scope": [
-        "http://**",
-        "https://**"
-      ]
     }
   }
 }
