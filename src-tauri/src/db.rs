@@ -249,7 +249,10 @@ pub async fn migrate_actor_photos(pool: &SqlitePool) -> Result<()> {
         return Ok(());
     }
 
-    eprintln!("[ChangLi] 迁移旧数据海报: 发现 {} 个演员需要迁移", actors.len());
+    eprintln!(
+        "[ChangLi] 迁移旧数据海报: 发现 {} 个演员需要迁移",
+        actors.len()
+    );
 
     for row in actors {
         let actor_id: i64 = row.get("id");
@@ -488,7 +491,11 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
 }
 
 /// 批量插入视频（事务批处理，1000条视频也只提交1次事务）
-pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: Option<i64>) -> Result<Vec<Video>> {
+pub async fn add_videos_batch(
+    pool: &SqlitePool,
+    videos: Vec<Video>,
+    series_id: Option<i64>,
+) -> Result<Vec<Video>> {
     let mut tx = pool.begin().await?;
     let mut saved_videos = Vec::new();
 
@@ -558,14 +565,16 @@ pub async fn add_videos_batch(pool: &SqlitePool, videos: Vec<Video>, series_id: 
 }
 
 /// 事务内查询视频（用于批量插入）
-async fn get_video_by_path_tx(tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, file_path: &str) -> Result<Option<Video>> {
+async fn get_video_by_path_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    file_path: &str,
+) -> Result<Option<Video>> {
     let row = sqlx::query("SELECT * FROM videos WHERE file_path = ?")
         .bind(file_path)
         .fetch_optional(&mut **tx)
         .await?;
     Ok(row.map(|row| video_from_row(&row)))
 }
-
 
 async fn get_video_by_path(pool: &SqlitePool, file_path: &str) -> Result<Option<Video>> {
     let row = sqlx::query("SELECT * FROM videos WHERE file_path = ?")
@@ -586,7 +595,10 @@ fn video_from_row(row: &SqliteRow) -> Video {
     // 直接从数据库读取缓存的 Base64，不再实时生成
     let thumbnail_data_url: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
     // 双读兜底：优先读 series_poster_base64，如果为 NULL，降级使用 series_poster 字段
-    let series_poster_data_url: Option<String> = row.try_get("series_poster_base64").ok().flatten()
+    let series_poster_data_url: Option<String> = row
+        .try_get("series_poster_base64")
+        .ok()
+        .flatten()
         .or_else(|| {
             let poster: Option<String> = row.try_get("series_poster").ok().flatten();
             poster.and_then(|p| {
@@ -653,8 +665,8 @@ fn series_from_row(row: &SqliteRow) -> VideoSeries {
             .to_string()
     });
     // 双读兜底：优先读 poster_base64，如果为 NULL，降级使用 image_data_url
-    let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten()
-        .or_else(|| {
+    let poster_data_url: Option<String> =
+        row.try_get("poster_base64").ok().flatten().or_else(|| {
             let p = poster?;
             let resolved = storage::resolve_data_path(&p);
             image_data_url(Path::new(&resolved))
@@ -722,7 +734,11 @@ pub async fn get_video_series_by_folder_path(
     Ok(row.map(|row| series_from_row(&row)))
 }
 
-pub async fn get_video_series_list(pool: &SqlitePool, sort_by: &str, sort_order: &str) -> Result<Vec<VideoSeries>> {
+pub async fn get_video_series_list(
+    pool: &SqlitePool,
+    sort_by: &str,
+    sort_order: &str,
+) -> Result<Vec<VideoSeries>> {
     let order_clause = match (sort_by, sort_order) {
         ("title", "asc") => "ORDER BY s.title COLLATE NOCASE ASC",
         ("title", "desc") => "ORDER BY s.title COLLATE NOCASE DESC",
@@ -730,9 +746,7 @@ pub async fn get_video_series_list(pool: &SqlitePool, sort_by: &str, sort_order:
         _ => "ORDER BY s.created_at DESC",
     };
     let sql = format!("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
-    let rows = sqlx::query(&sql)
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows.iter().map(series_from_row).collect())
 }
 
@@ -759,7 +773,10 @@ pub async fn get_video_series_by_tag_name(
     Ok(rows.iter().map(series_from_row).collect())
 }
 
-pub async fn get_video_series_by_actor(pool: &SqlitePool, actor_id: i64) -> Result<Vec<VideoSeries>> {
+pub async fn get_video_series_by_actor(
+    pool: &SqlitePool,
+    actor_id: i64,
+) -> Result<Vec<VideoSeries>> {
     let rows = sqlx::query(
         "SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id JOIN series_actors sa ON sa.series_id = s.id WHERE sa.actor_id = ? GROUP BY s.id ORDER BY s.updated_at DESC, s.created_at DESC",
     )
@@ -1083,8 +1100,8 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
             .to_string()
     });
     // 双读兜底：优先读 avatar_base64，如果为 NULL，降级使用 image_data_url
-    let photo_data_url: Option<String> = row.try_get("avatar_base64").ok().flatten()
-        .or_else(|| {
+    let photo_data_url: Option<String> =
+        row.try_get("avatar_base64").ok().flatten().or_else(|| {
             let p = photo?;
             let resolved = storage::resolve_data_path(&p);
             image_data_url(Path::new(&resolved))
@@ -1119,26 +1136,33 @@ pub async fn delete_actor(pool: &SqlitePool, id: i64) -> Result<()> {
 
 // 演员时期操作
 pub async fn get_actor_periods(pool: &SqlitePool, actor_id: i64) -> Result<Vec<ActorPeriod>> {
-    let rows = sqlx::query("SELECT * FROM actor_periods WHERE actor_id = ? ORDER BY sort_order ASC, created_at ASC")
-        .bind(actor_id)
-        .fetch_all(pool)
-        .await?;
-    let periods = rows.iter().map(|row| ActorPeriod {
-        id: row.get("id"),
-        actor_id: row.get("actor_id"),
-        name: row.get("name"),
-        sort_order: row.get("sort_order"),
-        created_at: row.get("created_at"),
-    }).collect();
+    let rows = sqlx::query(
+        "SELECT * FROM actor_periods WHERE actor_id = ? ORDER BY sort_order ASC, created_at ASC",
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+    let periods = rows
+        .iter()
+        .map(|row| ActorPeriod {
+            id: row.get("id"),
+            actor_id: row.get("actor_id"),
+            name: row.get("name"),
+            sort_order: row.get("sort_order"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
     Ok(periods)
 }
 
 pub async fn add_actor_period(pool: &SqlitePool, actor_id: i64, name: &str) -> Result<ActorPeriod> {
     // Get max sort_order for this actor
-    let max_order: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_periods WHERE actor_id = ?")
-        .bind(actor_id)
-        .fetch_one(pool)
-        .await?;
+    let max_order: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(sort_order), 0) FROM actor_periods WHERE actor_id = ?",
+    )
+    .bind(actor_id)
+    .fetch_one(pool)
+    .await?;
     let row = sqlx::query(
         "INSERT INTO actor_periods (actor_id, name, sort_order) VALUES (?, ?, ?) RETURNING *",
     )
@@ -1241,7 +1265,11 @@ pub async fn get_actor_by_name_or_jp(pool: &SqlitePool, name: &str) -> Result<Op
 }
 
 /// 更新视频集的 display_type
-pub async fn update_video_series_display_type(pool: &SqlitePool, series_id: i64, display_type: &str) -> Result<()> {
+pub async fn update_video_series_display_type(
+    pool: &SqlitePool,
+    series_id: i64,
+    display_type: &str,
+) -> Result<()> {
     sqlx::query("UPDATE video_series SET display_type = ? WHERE id = ?")
         .bind(display_type)
         .bind(series_id)
@@ -1400,14 +1428,17 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
 
 /// 返回演员参演作品的时期映射：work_key -> period_id
 /// work_key 格式: "series-{id}" 或 "video-{id}"
-pub async fn get_actor_work_period_map(pool: &SqlitePool, actor_id: i64) -> Result<std::collections::HashMap<String, i64>> {
+pub async fn get_actor_work_period_map(
+    pool: &SqlitePool,
+    actor_id: i64,
+) -> Result<std::collections::HashMap<String, i64>> {
     let mut map = std::collections::HashMap::new();
 
     // 从 video_actors 获取独立视频的 period_id
     let rows = sqlx::query(
         "SELECT va.video_id, va.period_id FROM video_actors va
          JOIN videos v ON v.id = va.video_id
-         WHERE va.actor_id = ? AND va.period_id IS NOT NULL AND v.series_id IS NULL"
+         WHERE va.actor_id = ? AND va.period_id IS NOT NULL AND v.series_id IS NULL",
     )
     .bind(actor_id)
     .fetch_all(pool)
@@ -1424,7 +1455,7 @@ pub async fn get_actor_work_period_map(pool: &SqlitePool, actor_id: i64) -> Resu
         "SELECT v.series_id, va.period_id FROM video_actors va
          JOIN videos v ON v.id = va.video_id
          WHERE va.actor_id = ? AND va.period_id IS NOT NULL AND v.series_id IS NOT NULL
-         GROUP BY v.series_id"
+         GROUP BY v.series_id",
     )
     .bind(actor_id)
     .fetch_all(pool)
@@ -1432,7 +1463,8 @@ pub async fn get_actor_work_period_map(pool: &SqlitePool, actor_id: i64) -> Resu
     for row in rows {
         if let Ok(Some(period_id)) = row.try_get::<Option<i64>, _>("period_id") {
             if let Ok(Some(series_id)) = row.try_get::<Option<i64>, _>("series_id") {
-                map.entry(format!("series-{}", series_id)).or_insert(period_id);
+                map.entry(format!("series-{}", series_id))
+                    .or_insert(period_id);
             }
         }
     }
@@ -1440,7 +1472,7 @@ pub async fn get_actor_work_period_map(pool: &SqlitePool, actor_id: i64) -> Resu
     // 从 series_actors 获取系列的 period_id（优先级更高，覆盖 video_actors 的值）
     let rows = sqlx::query(
         "SELECT sa.series_id, sa.period_id FROM series_actors sa
-         WHERE sa.actor_id = ? AND sa.period_id IS NOT NULL"
+         WHERE sa.actor_id = ? AND sa.period_id IS NOT NULL",
     )
     .bind(actor_id)
     .fetch_all(pool)
@@ -1545,12 +1577,11 @@ fn actor_photo_from_row(row: &SqliteRow) -> ActorPhoto {
             .to_string_lossy()
             .to_string()
     });
-    let photo_data_url: Option<String> = row.try_get("photo_base64").ok().flatten()
-        .or_else(|| {
-            let p = photo?;
-            let resolved = storage::resolve_data_path(&p);
-            image_data_url(Path::new(&resolved))
-        });
+    let photo_data_url: Option<String> = row.try_get("photo_base64").ok().flatten().or_else(|| {
+        let p = photo?;
+        let resolved = storage::resolve_data_path(&p);
+        image_data_url(Path::new(&resolved))
+    });
     ActorPhoto {
         id: row.get("id"),
         actor_id: row.get("actor_id"),
@@ -1588,7 +1619,7 @@ pub async fn add_actor_photo(
 
     // 获取当前最大 sort_order
     let max_order: i32 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(sort_order), -1) FROM actor_photos WHERE actor_id = ?"
+        "SELECT COALESCE(MAX(sort_order), -1) FROM actor_photos WHERE actor_id = ?",
     )
     .bind(actor_id)
     .fetch_one(pool)
@@ -1629,19 +1660,30 @@ pub async fn set_primary_photo(pool: &SqlitePool, actor_id: i64, photo_id: i64) 
         .execute(pool)
         .await?;
     // 同步新主海报到 actors 表
-    if let Some(row) = sqlx::query("SELECT photo, photo_base64 FROM actor_photos WHERE id = ? AND actor_id = ?")
-        .bind(photo_id).bind(actor_id)
-        .fetch_optional(pool).await? {
+    if let Some(row) =
+        sqlx::query("SELECT photo, photo_base64 FROM actor_photos WHERE id = ? AND actor_id = ?")
+            .bind(photo_id)
+            .bind(actor_id)
+            .fetch_optional(pool)
+            .await?
+    {
         let photo: Option<String> = row.try_get("photo").ok().flatten();
         let photo_base64: Option<String> = row.try_get("photo_base64").ok().flatten();
         sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ? WHERE id = ?")
-            .bind(&photo).bind(&photo_base64).bind(actor_id)
-            .execute(pool).await?;
+            .bind(&photo)
+            .bind(&photo_base64)
+            .bind(actor_id)
+            .execute(pool)
+            .await?;
     }
     Ok(())
 }
 
-pub async fn reorder_actor_photos(pool: &SqlitePool, actor_id: i64, photo_ids: Vec<i64>) -> Result<()> {
+pub async fn reorder_actor_photos(
+    pool: &SqlitePool,
+    actor_id: i64,
+    photo_ids: Vec<i64>,
+) -> Result<()> {
     for (index, photo_id) in photo_ids.iter().enumerate() {
         sqlx::query("UPDATE actor_photos SET sort_order = ? WHERE id = ? AND actor_id = ?")
             .bind(index as i32)
@@ -1919,12 +1961,15 @@ pub async fn get_recent_resources(pool: &SqlitePool, limit: i64) -> Result<Vec<R
 pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
     // 回填 video_series 的 poster_base64
     let series_rows = sqlx::query(
-        "SELECT id, poster FROM video_series WHERE poster_base64 IS NULL AND poster IS NOT NULL"
+        "SELECT id, poster FROM video_series WHERE poster_base64 IS NULL AND poster IS NOT NULL",
     )
     .fetch_all(pool)
     .await?;
 
-    eprintln!("[ChangLi] 回填海报缓存: 发现 {} 条 video_series 记录需要处理", series_rows.len());
+    eprintln!(
+        "[ChangLi] 回填海报缓存: 发现 {} 条 video_series 记录需要处理",
+        series_rows.len()
+    );
     let mut series_filled = 0;
     for row in &series_rows {
         let id: i64 = row.get("id");
@@ -1940,17 +1985,23 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
         }
     }
     if series_filled > 0 {
-        eprintln!("[ChangLi] 回填海报缓存: 成功回填 {} 条 video_series", series_filled);
+        eprintln!(
+            "[ChangLi] 回填海报缓存: 成功回填 {} 条 video_series",
+            series_filled
+        );
     }
 
     // 回填 actors 的 avatar_base64
     let actor_rows = sqlx::query(
-        "SELECT id, photo FROM actors WHERE avatar_base64 IS NULL AND photo IS NOT NULL"
+        "SELECT id, photo FROM actors WHERE avatar_base64 IS NULL AND photo IS NOT NULL",
     )
     .fetch_all(pool)
     .await?;
 
-    eprintln!("[ChangLi] 回填头像缓存: 发现 {} 条 actors 记录需要处理", actor_rows.len());
+    eprintln!(
+        "[ChangLi] 回填头像缓存: 发现 {} 条 actors 记录需要处理",
+        actor_rows.len()
+    );
     let mut actors_filled = 0;
     for row in &actor_rows {
         let id: i64 = row.get("id");
@@ -1966,7 +2017,10 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
         }
     }
     if actors_filled > 0 {
-        eprintln!("[ChangLi] 回填头像缓存: 成功回填 {} 条 actors", actors_filled);
+        eprintln!(
+            "[ChangLi] 回填头像缓存: 成功回填 {} 条 actors",
+            actors_filled
+        );
     }
 
     // 回填 video_series 的 poster_orientation
@@ -1977,7 +2031,10 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
     .await?;
 
     if !series_orientation_rows.is_empty() {
-        eprintln!("[ChangLi] 回填海报方向: 发现 {} 条 video_series 记录需要处理", series_orientation_rows.len());
+        eprintln!(
+            "[ChangLi] 回填海报方向: 发现 {} 条 video_series 记录需要处理",
+            series_orientation_rows.len()
+        );
         let mut orientation_filled = 0;
         for row in &series_orientation_rows {
             let id: i64 = row.get("id");
@@ -1993,7 +2050,10 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
             }
         }
         if orientation_filled > 0 {
-            eprintln!("[ChangLi] 回填海报方向: 成功回填 {} 条 video_series", orientation_filled);
+            eprintln!(
+                "[ChangLi] 回填海报方向: 成功回填 {} 条 video_series",
+                orientation_filled
+            );
         }
     }
 
@@ -2005,7 +2065,10 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
     .await?;
 
     if !video_orientation_rows.is_empty() {
-        eprintln!("[ChangLi] 回填海报方向: 发现 {} 条 videos 记录需要处理", video_orientation_rows.len());
+        eprintln!(
+            "[ChangLi] 回填海报方向: 发现 {} 条 videos 记录需要处理",
+            video_orientation_rows.len()
+        );
         let mut orientation_filled = 0;
         for row in &video_orientation_rows {
             let id: i64 = row.get("id");
@@ -2021,7 +2084,10 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
             }
         }
         if orientation_filled > 0 {
-            eprintln!("[ChangLi] 回填海报方向: 成功回填 {} 条 videos", orientation_filled);
+            eprintln!(
+                "[ChangLi] 回填海报方向: 成功回填 {} 条 videos",
+                orientation_filled
+            );
         }
     }
 
@@ -2029,10 +2095,12 @@ pub async fn backfill_base64_cache(pool: &SqlitePool) -> Result<()> {
 }
 
 pub async fn toggle_favorite_video(pool: &SqlitePool, id: i64) -> Result<()> {
-    sqlx::query("UPDATE videos SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE videos SET is_favorite = CASE WHEN is_favorite = 1 THEN 0 ELSE 1 END WHERE id = ?",
+    )
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -2083,25 +2151,35 @@ pub async fn delete_all_videos(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM video_series")
         .fetch_one(pool)
         .await?;
-    sqlx::query("DELETE FROM play_history").execute(pool).await?;
-    sqlx::query("DELETE FROM watch_progress").execute(pool).await?;
+    sqlx::query("DELETE FROM play_history")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM watch_progress")
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM videos").execute(pool).await?;
     sqlx::query("DELETE FROM series_tags").execute(pool).await?;
-    sqlx::query("DELETE FROM series_actors").execute(pool).await?;
-    sqlx::query("DELETE FROM video_series").execute(pool).await?;
+    sqlx::query("DELETE FROM series_actors")
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM video_series")
+        .execute(pool)
+        .await?;
     Ok((video_count.0, series_count.0))
 }
 /// 删除所有动漫（display_type!='adult' 的视频集及其视频，但不删除占位视频）
 pub async fn delete_all_anime(pool: &SqlitePool) -> Result<(i64, i64)> {
     let anime_cond = "(display_type IS NULL OR display_type != 'adult')";
     let video_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM videos v WHERE v.series_id IN (SELECT id FROM video_series WHERE {})", anime_cond
+        "SELECT COUNT(*) FROM videos v WHERE v.series_id IN (SELECT id FROM video_series WHERE {})",
+        anime_cond
     ))
     .fetch_one(pool)
     .await?;
 
     let series_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM video_series WHERE {}", anime_cond
+        "SELECT COUNT(*) FROM video_series WHERE {}",
+        anime_cond
     ))
     .fetch_one(pool)
     .await?;
@@ -2112,15 +2190,31 @@ pub async fn delete_all_anime(pool: &SqlitePool) -> Result<(i64, i64)> {
         .execute(pool).await?;
     sqlx::query(&format!("DELETE FROM watch_progress WHERE resource_id IN (SELECT id FROM videos WHERE series_id IN ({}))", anime_sub))
         .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM videos WHERE series_id IN ({})", anime_sub))
-        .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", anime_sub))
-        .execute(pool).await?;
+    sqlx::query(&format!(
+        "DELETE FROM videos WHERE series_id IN ({})",
+        anime_sub
+    ))
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "DELETE FROM series_tags WHERE series_id IN ({})",
+        anime_sub
+    ))
+    .execute(pool)
+    .await?;
     // 先删 video_series（不依赖 series_actors），再删 series_actors
-    sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", anime_sub))
-        .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", anime_sub))
-        .execute(pool).await?;
+    sqlx::query(&format!(
+        "DELETE FROM video_series WHERE id IN ({})",
+        anime_sub
+    ))
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "DELETE FROM series_actors WHERE series_id IN ({})",
+        anime_sub
+    ))
+    .execute(pool)
+    .await?;
 
     Ok((video_count.0, series_count.0))
 }
@@ -2130,7 +2224,8 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
     let adult_sub = "SELECT id FROM video_series WHERE display_type = 'adult'";
 
     let video_count: (i64,) = sqlx::query_as(&format!(
-        "SELECT COUNT(*) FROM videos WHERE series_id IN ({})", adult_sub
+        "SELECT COUNT(*) FROM videos WHERE series_id IN ({})",
+        adult_sub
     ))
     .fetch_one(pool)
     .await?;
@@ -2145,25 +2240,40 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
         .execute(pool).await?;
     sqlx::query(&format!("DELETE FROM watch_progress WHERE resource_id IN (SELECT id FROM videos WHERE series_id IN ({}))", adult_sub))
         .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM videos WHERE series_id IN ({})", adult_sub))
-        .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", adult_sub))
-        .execute(pool).await?;
+    sqlx::query(&format!(
+        "DELETE FROM videos WHERE series_id IN ({})",
+        adult_sub
+    ))
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "DELETE FROM series_tags WHERE series_id IN ({})",
+        adult_sub
+    ))
+    .execute(pool)
+    .await?;
     // 先删 video_series（不依赖 series_actors），再删 series_actors
-    sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", adult_sub))
-        .execute(pool).await?;
-    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", adult_sub))
-        .execute(pool).await?;
+    sqlx::query(&format!(
+        "DELETE FROM video_series WHERE id IN ({})",
+        adult_sub
+    ))
+    .execute(pool)
+    .await?;
+    sqlx::query(&format!(
+        "DELETE FROM series_actors WHERE series_id IN ({})",
+        adult_sub
+    ))
+    .execute(pool)
+    .await?;
 
     Ok((video_count.0, series_count.0))
 }
-
 
 /// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
 /// 重新扫描单个视频集的元数据（车牌、中字、标题、海报）
 pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) -> Result<bool> {
     let row = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series WHERE id = ?"
+        "SELECT id, title, folder_path FROM video_series WHERE id = ?",
     )
     .bind(series_id)
     .fetch_optional(pool)
@@ -2212,7 +2322,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
 
 pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series"
+        "SELECT id, title, folder_path FROM video_series",
     )
     .fetch_all(pool)
     .await?;
@@ -2248,9 +2358,9 @@ pub async fn rescan_all_series_metadata(pool: &SqlitePool) -> Result<(i64, i64)>
             .execute(pool)
             .await?;
             updated += 1;
-            } else {
+        } else {
             skipped += 1;
-            }
+        }
     }
 
     Ok((updated, skipped))
@@ -2304,7 +2414,7 @@ pub async fn rescan_anime_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
 /// 重新扫描影视元数据（display_type='adult' 的视频集，无条件覆盖）
 pub async fn rescan_adult_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series WHERE display_type = 'adult'"
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = 'adult'",
     )
     .fetch_all(pool)
     .await?;
@@ -2348,7 +2458,6 @@ pub async fn rescan_adult_metadata(pool: &SqlitePool) -> Result<(i64, i64)> {
     Ok((updated, skipped))
 }
 
-
 // 季管理
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SeasonInfo {
@@ -2365,11 +2474,14 @@ pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.iter().map(|row| SeasonInfo {
-        season: row.get("season"),
-        subtitle: row.try_get("subtitle").ok(),
-        video_count: row.get("video_count"),
-    }).collect())
+    Ok(rows
+        .iter()
+        .map(|row| SeasonInfo {
+            season: row.get("season"),
+            subtitle: row.try_get("subtitle").ok(),
+            video_count: row.get("video_count"),
+        })
+        .collect())
 }
 
 pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32) -> Result<()> {
@@ -2381,13 +2493,18 @@ pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32) -> Re
     Ok(())
 }
 
-pub async fn create_season(pool: &SqlitePool, series_id: i64, season: i32, subtitle: Option<&str>) -> Result<()> {
+pub async fn create_season(
+    pool: &SqlitePool,
+    series_id: i64,
+    season: i32,
+    subtitle: Option<&str>,
+) -> Result<()> {
     // 获取当前最大 season 编号（排除 999）
     // 如果 season 参数传 0，自动分配下一个季号
     // 如果 season 参数传 999，创建剧场版
     let target_season = if season == 0 {
         let max_season: i32 = sqlx::query_scalar(
-            "SELECT COALESCE(MAX(season), 0) FROM videos WHERE series_id = ? AND season < 999"
+            "SELECT COALESCE(MAX(season), 0) FROM videos WHERE series_id = ? AND season < 999",
         )
         .bind(series_id)
         .fetch_one(pool)
@@ -2412,7 +2529,11 @@ pub async fn create_season(pool: &SqlitePool, series_id: i64, season: i32, subti
     Ok(())
 }
 
-pub async fn update_video_subtitle(pool: &SqlitePool, video_id: i64, subtitle: Option<String>) -> Result<()> {
+pub async fn update_video_subtitle(
+    pool: &SqlitePool,
+    video_id: i64,
+    subtitle: Option<String>,
+) -> Result<()> {
     sqlx::query("UPDATE videos SET subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(subtitle)
         .bind(video_id)

@@ -7,7 +7,13 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     // actor_periods table and period_id columns must exist before cascade rebuild,
     // because rebuild copies data using SELECT period_id FROM old tables.
     create_actor_periods_table(pool).await?;
-    add_column_if_not_exists(pool, "actor_periods", "sort_order", "INTEGER NOT NULL DEFAULT 0").await?;
+    add_column_if_not_exists(
+        pool,
+        "actor_periods",
+        "sort_order",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
+    .await?;
     migrate_period_id_columns(pool).await?;
     migrate_cascade_foreign_keys(pool).await?;
     create_video_and_series_relation_tables(pool).await?;
@@ -264,7 +270,11 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("video_series", "description", "TEXT"),
         Column::new("video_series", "poster", "TEXT"),
         Column::new("video_series", "folder_path", "TEXT"),
-        Column::new("video_series", "poster_orientation", "TEXT DEFAULT 'landscape'"),
+        Column::new(
+            "video_series",
+            "poster_orientation",
+            "TEXT DEFAULT 'landscape'",
+        ),
         Column::new("video_series", "status", "TEXT DEFAULT 'ongoing'"),
         Column::new("video_series", "created_at", "TEXT"),
         Column::new("video_series", "updated_at", "TEXT"),
@@ -764,9 +774,27 @@ async fn create_actor_periods_table(pool: &SqlitePool) -> Result<()> {
 
 async fn migrate_period_id_columns(pool: &SqlitePool) -> Result<()> {
     // Add period_id to video_actors (legacy name: resource_actors)
-    add_column_if_not_exists(pool, "video_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
-    add_column_if_not_exists(pool, "series_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
-    add_column_if_not_exists(pool, "resource_actors", "period_id", "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL").await?;
+    add_column_if_not_exists(
+        pool,
+        "video_actors",
+        "period_id",
+        "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL",
+    )
+    .await?;
+    add_column_if_not_exists(
+        pool,
+        "series_actors",
+        "period_id",
+        "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL",
+    )
+    .await?;
+    add_column_if_not_exists(
+        pool,
+        "resource_actors",
+        "period_id",
+        "INTEGER REFERENCES actor_periods(id) ON DELETE SET NULL",
+    )
+    .await?;
     Ok(())
 }
 

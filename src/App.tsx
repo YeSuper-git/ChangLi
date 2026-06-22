@@ -43,7 +43,7 @@ function App() {
   }, [isPlayerWindow, loadAll]);
 
   if (isPlayerWindow) {
-    return <Player embeddedWindow />;
+    return <Player />;
   }
 
   if (error) {

@@ -20,7 +20,11 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     let img = match reader.decode() {
         Ok(i) => i,
         Err(e) => {
-            eprintln!("[Decoder] Failed to decode image: {} ({:?})", poster_path.display(), e);
+            eprintln!(
+                "[Decoder] Failed to decode image: {} ({:?})",
+                poster_path.display(),
+                e
+            );
             return None;
         }
     };
@@ -28,7 +32,11 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     // 缩放到最大 300px 宽
     let max_width = 300;
     let resized = if img.width() > max_width {
-        img.resize(max_width, max_width * img.height() / img.width(), image::imageops::FilterType::Lanczos3)
+        img.resize(
+            max_width,
+            max_width * img.height() / img.width(),
+            image::imageops::FilterType::Lanczos3,
+        )
     } else {
         img
     };
@@ -57,7 +65,11 @@ pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[Scanner] open failed for dimensions: {} ({})", poster_path.display(), e);
+            eprintln!(
+                "[Scanner] open failed for dimensions: {} ({})",
+                poster_path.display(),
+                e
+            );
             return None;
         }
     };
@@ -65,7 +77,11 @@ pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
     let (w, h) = match reader.into_dimensions() {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("[Decoder] Failed to read dimensions: {} ({:?})", poster_path.display(), e);
+            eprintln!(
+                "[Decoder] Failed to read dimensions: {} ({:?})",
+                poster_path.display(),
+                e
+            );
             return None;
         }
     };
@@ -153,13 +169,24 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
 
             // ≤3 部作品 → 剧场版（season = 999），多部 → 正常季
             let (season, subtitle) = if count <= 3 {
-                let movie_title = subdir.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let movie_title = subdir
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
                 (999, Some(movie_title))
             } else {
                 season_counter += 1;
                 (season_counter, None)
             };
-            process_directory_videos(subdir, Some(season), subtitle.as_deref(), &mut videos, &mut posters).await?;
+            process_directory_videos(
+                subdir,
+                Some(season),
+                subtitle.as_deref(),
+                &mut videos,
+                &mut posters,
+            )
+            .await?;
         }
     }
 
@@ -214,7 +241,15 @@ async fn process_directory_videos(
             .to_string_lossy()
             .to_string();
 
-        let folder_poster_path = find_poster_for_folder(folder, &folder_name, &image_files, &videos_in_folder.iter().map(|p| p.clone()).collect::<Vec<_>>());
+        let folder_poster_path = find_poster_for_folder(
+            folder,
+            &folder_name,
+            &image_files,
+            &videos_in_folder
+                .iter()
+                .map(|p| p.clone())
+                .collect::<Vec<_>>(),
+        );
         let mut sorted_videos = videos_in_folder.clone();
         sort_episode_files(&mut sorted_videos);
 
@@ -626,17 +661,24 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
     let after_code = &filename[code_match.end()..];
 
     // 检查车牌后是否有中文字幕标记：-CH, -C, CH, C
-    let (sub_suffix_len, has_chinese_sub) = if after_code.starts_with("-CH") || after_code.starts_with("-ch") {
-        (3, true)
-    } else if after_code.starts_with("-C") || after_code.starts_with("-c") {
-        (2, true)
-    } else if after_code.get(..2).map_or(false, |s| s.eq_ignore_ascii_case("ch")) {
-        (2, true)
-    } else if after_code.get(..1).map_or(false, |s| s.eq_ignore_ascii_case("c")) {
-        (1, true)
-    } else {
-        (0, false)
-    };
+    let (sub_suffix_len, has_chinese_sub) =
+        if after_code.starts_with("-CH") || after_code.starts_with("-ch") {
+            (3, true)
+        } else if after_code.starts_with("-C") || after_code.starts_with("-c") {
+            (2, true)
+        } else if after_code
+            .get(..2)
+            .map_or(false, |s| s.eq_ignore_ascii_case("ch"))
+        {
+            (2, true)
+        } else if after_code
+            .get(..1)
+            .map_or(false, |s| s.eq_ignore_ascii_case("c"))
+        {
+            (1, true)
+        } else {
+            (0, false)
+        };
 
     // 提取 [] 中的标题
     let rest = &after_code[sub_suffix_len..];
@@ -706,37 +748,40 @@ mod tests {
         fs::write(&folder_poster, b"folder")?;
 
         let video = scan_video_file(&video_path, None).await?;
-        assert_eq!(video.thumbnail.as_deref(), Some(same_stem.to_str().unwrap()));
+        assert_eq!(
+            video.thumbnail.as_deref(),
+            Some(same_stem.to_str().unwrap())
+        );
 
         fs::remove_dir_all(dir).ok();
         Ok(())
     }
 }
-    #[test]
-    fn test_parse_adult_filename_chinese_sub() {
-        // 无横杠 C
-        let r = parse_adult_filename("STARS-667C[标题]").unwrap();
-        assert!(r.has_chinese_sub, "STARS-667C should be chinese sub");
-        assert_eq!(r.code, "STARS-667");
+#[test]
+fn test_parse_adult_filename_chinese_sub() {
+    // 无横杠 C
+    let r = parse_adult_filename("STARS-667C[标题]").unwrap();
+    assert!(r.has_chinese_sub, "STARS-667C should be chinese sub");
+    assert_eq!(r.code, "STARS-667");
 
-        // 有横杠 -C
-        let r = parse_adult_filename("JUR-472-C[标题]").unwrap();
-        assert!(r.has_chinese_sub, "JUR-472-C should be chinese sub");
-        assert_eq!(r.code, "JUR-472");
+    // 有横杠 -C
+    let r = parse_adult_filename("JUR-472-C[标题]").unwrap();
+    assert!(r.has_chinese_sub, "JUR-472-C should be chinese sub");
+    assert_eq!(r.code, "JUR-472");
 
-        // 无横杠 ch
-        let r = parse_adult_filename("SONE-672ch[标题]").unwrap();
-        assert!(r.has_chinese_sub, "SONE-672ch should be chinese sub");
-        assert_eq!(r.code, "SONE-672");
+    // 无横杠 ch
+    let r = parse_adult_filename("SONE-672ch[标题]").unwrap();
+    assert!(r.has_chinese_sub, "SONE-672ch should be chinese sub");
+    assert_eq!(r.code, "SONE-672");
 
-        // 有横杠 -CH
-        let r = parse_adult_filename("SONE-519-CH[标题]").unwrap();
-        assert!(r.has_chinese_sub, "SONE-519-CH should be chinese sub");
-        assert_eq!(r.code, "SONE-519");
+    // 有横杠 -CH
+    let r = parse_adult_filename("SONE-519-CH[标题]").unwrap();
+    assert!(r.has_chinese_sub, "SONE-519-CH should be chinese sub");
+    assert_eq!(r.code, "SONE-519");
 
-        // 无 C
-        let r = parse_adult_filename("STARS-667[标题]").unwrap();
-        assert!(!r.has_chinese_sub, "STARS-667 should NOT be chinese sub");
+    // 无 C
+    let r = parse_adult_filename("STARS-667[标题]").unwrap();
+    assert!(!r.has_chinese_sub, "STARS-667 should NOT be chinese sub");
 
-        println!("All chinese sub tests passed!");
-    }
+    println!("All chinese sub tests passed!");
+}

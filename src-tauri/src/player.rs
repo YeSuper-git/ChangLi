@@ -9,8 +9,8 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewWindow, WebviewWindowBuilder,
-    WebviewUrl, WindowEvent,
+    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 
 const PLAYER_WINDOW_LABEL: &str = "player";
@@ -145,7 +145,7 @@ pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
 
 pub fn register_shortcuts(app: &AppHandle) -> Result<()> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
-    
+
     let app_for_shortcut = app.clone();
     app.global_shortcut()
         .on_shortcut("Ctrl+Shift+T", move |_app, _shortcut, _event| {
@@ -309,9 +309,7 @@ fn spawn_mpv_process(
                 .arg("--background=none")
                 .arg("--no-border");
         } else {
-            command
-                .arg("--border=yes")
-                .arg("--ontop");
+            command.arg("--border=yes").arg("--ontop");
             if let Some(geometry) = _geometry {
                 command.arg(format!("--geometry={geometry}"));
             }

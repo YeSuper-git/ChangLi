@@ -54,7 +54,11 @@ pub fn get_site_templates() -> Vec<SiteTemplate> {
                 },
                 headers: {
                     let mut map = HashMap::new();
-                    map.insert("User-Agent".to_string(), "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36".to_string());
+                    map.insert(
+                        "User-Agent".to_string(),
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                            .to_string(),
+                    );
                     map
                 },
                 cookies: None,
@@ -84,7 +88,11 @@ pub fn get_site_templates() -> Vec<SiteTemplate> {
                 },
                 headers: {
                     let mut map = HashMap::new();
-                    map.insert("User-Agent".to_string(), "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36".to_string());
+                    map.insert(
+                        "User-Agent".to_string(),
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                            .to_string(),
+                    );
                     map
                 },
                 cookies: None,
@@ -113,7 +121,11 @@ pub fn get_site_templates() -> Vec<SiteTemplate> {
                 },
                 headers: {
                     let mut map = HashMap::new();
-                    map.insert("User-Agent".to_string(), "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36".to_string());
+                    map.insert(
+                        "User-Agent".to_string(),
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                            .to_string(),
+                    );
                     map
                 },
                 cookies: None,
@@ -129,27 +141,27 @@ pub fn validate_site_config(config: &SiteConfig) -> Result<()> {
     if config.name.is_empty() {
         return Err(anyhow::anyhow!("网站名称不能为空"));
     }
-    
+
     if config.base_url.is_empty() {
         return Err(anyhow::anyhow!("网站 URL 不能为空"));
     }
-    
+
     if config.search_url.is_empty() {
         return Err(anyhow::anyhow!("搜索 URL 不能为空"));
     }
-    
+
     if config.list_selector.is_empty() {
         return Err(anyhow::anyhow!("列表选择器不能为空"));
     }
-    
+
     if config.title_selector.is_empty() {
         return Err(anyhow::anyhow!("标题选择器不能为空"));
     }
-    
+
     if config.url_selector.is_empty() {
         return Err(anyhow::anyhow!("链接选择器不能为空"));
     }
-    
+
     Ok(())
 }
 
@@ -158,25 +170,26 @@ pub async fn test_site_config(config: &SiteConfig) -> Result<bool> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()?;
-    
+
     // 测试基础 URL 是否可访问
     let response = client.get(&config.base_url).send().await?;
-    
+
     if !response.status().is_success() {
         return Ok(false);
     }
-    
+
     // 测试搜索 URL 是否有效
     let test_keyword = "test";
-    let search_url = config.search_url
+    let search_url = config
+        .search_url
         .replace("{base_url}", &config.base_url)
         .replace("{keyword}", test_keyword);
-    
+
     let mut request = client.get(&search_url);
     for (key, value) in &config.headers {
         request = request.header(key.as_str(), value.as_str());
     }
-    
+
     let response = request.send().await?;
     Ok(response.status().is_success())
 }
