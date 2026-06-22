@@ -232,48 +232,12 @@ pub async fn init_database() -> Result<SqlitePool> {
     backfill_base64_cache(&pool).await?;
 
     // 启动时迁移旧数据海报到 actor_photos 表（一次性迁移）
-    migrate_actor_photos(&pool).await?;
+
 
     Ok(pool)
 }
 
 /// 一次性迁移：将 actors 表中有 photo 但 actor_photos 表无记录的演员海报写入 actor_photos
-pub async fn migrate_actor_photos(pool: &SqlitePool) -> Result<()> {
-    let actors = sqlx::query(
-        "SELECT id, photo, avatar_base64 FROM actors WHERE photo IS NOT NULL AND photo != '' AND id NOT IN (SELECT DISTINCT actor_id FROM actor_photos)"
-    )
-    .fetch_all(pool)
-    .await?;
-
-    if actors.is_empty() {
-        return Ok(());
-    }
-
-    eprintln!(
-        "[ChangLi] 迁移旧数据海报: 发现 {} 个演员需要迁移",
-        actors.len()
-    );
-
-    for row in actors {
-        let actor_id: i64 = row.get("id");
-        let photo: Option<String> = row.get("photo");
-        let avatar_base64: Option<String> = row.get("avatar_base64");
-
-        if let Some(photo_path) = photo {
-            let _ = sqlx::query(
-                "INSERT INTO actor_photos (actor_id, photo, photo_base64, is_primary, sort_order) VALUES (?, ?, ?, 1, 0)"
-            )
-            .bind(actor_id)
-            .bind(&photo_path)
-            .bind(&avatar_base64)
-            .execute(pool)
-            .await;
-        }
-    }
-
-    eprintln!("[ChangLi] 迁移旧数据海报完成");
-    Ok(())
-}
 
 // 网站操作
 pub async fn get_sites(pool: &SqlitePool) -> Result<Vec<Site>> {
