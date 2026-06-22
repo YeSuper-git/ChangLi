@@ -105,7 +105,7 @@ jobs:
 
           # Download mpv-dev package for libmpv-2.dll (not in the static mpv build)
           $devAsset = $release.assets |
-            Where-Object { $_.name -match '^mpv-dev-x86_64-.*\\.7z$' -and $_.name -notmatch 'v3|debug|symbols' } |
+            Where-Object { $_.name -match '^mpv-dev-x86_64-.*\.7z$' -and $_.name -notmatch 'v3|debug|symbols' } |
             Select-Object -First 1
           if (-not $devAsset) {
             throw "No x86_64 mpv-dev archive found in latest shinchiro/mpv-winbuild-cmake release"
