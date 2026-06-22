@@ -21,7 +21,7 @@ import {
   getVideoSeriesDetail,
 } from '../utils/api';
 import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
-import { open } from '@tauri-apps/api/dialog';
+import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 

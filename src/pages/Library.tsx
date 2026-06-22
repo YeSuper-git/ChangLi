@@ -9,7 +9,7 @@ import {
   switchSeriesType,
 } from '../utils/api';
 import type { VideoSeries } from '../utils/api';
-import { open } from '@tauri-apps/api/dialog';
+import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';

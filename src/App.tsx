@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api';
-import { appWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Search from './pages/Search';
@@ -17,7 +17,7 @@ import Settings from './pages/Settings';
 import { useLibraryStore } from './store/libraryStore';
 
 function App() {
-  const isPlayerWindow = appWindow.label === 'player';
+  const isPlayerWindow = getCurrentWindow().label === 'player';
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadAll = useLibraryStore((s) => s.loadAll);

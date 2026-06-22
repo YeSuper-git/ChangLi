@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { appWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getVideo, playVideo } from '../utils/api';
 import type { Video } from '../utils/api';
 
@@ -10,7 +10,7 @@ interface PlayerProps {
 
 const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
   const { id } = useParams<{ id: string }>();
-  const isPlayerWindow = embeddedWindow || appWindow.label === 'player';
+  const isPlayerWindow = embeddedWindow || getCurrentWindow().label === 'player';
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [launching, setLaunching] = useState(false);
@@ -34,7 +34,7 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
 
     const handleKeyDown = async (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        await appWindow.setFullscreen(false);
+        await getCurrentWindow().setFullscreen(false);
         setFullscreen(false);
       }
     };
@@ -83,7 +83,7 @@ const Player: React.FC<PlayerProps> = ({ embeddedWindow = false }) => {
   const toggleFullscreen = async () => {
     if (!isPlayerWindow) return;
     const next = !fullscreen;
-    await appWindow.setFullscreen(next);
+    await getCurrentWindow().setFullscreen(next);
     setFullscreen(next);
   };
 
