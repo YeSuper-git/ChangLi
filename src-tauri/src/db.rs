@@ -1628,6 +1628,16 @@ pub async fn set_primary_photo(pool: &SqlitePool, actor_id: i64, photo_id: i64) 
         .bind(actor_id)
         .execute(pool)
         .await?;
+    // 同步新主海报到 actors 表
+    if let Some(row) = sqlx::query("SELECT photo, photo_base64 FROM actor_photos WHERE id = ? AND actor_id = ?")
+        .bind(photo_id).bind(actor_id)
+        .fetch_optional(pool).await? {
+        let photo: Option<String> = row.try_get("photo").ok().flatten();
+        let photo_base64: Option<String> = row.try_get("photo_base64").ok().flatten();
+        sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ? WHERE id = ?")
+            .bind(&photo).bind(&photo_base64).bind(actor_id)
+            .execute(pool).await?;
+    }
     Ok(())
 }
 
