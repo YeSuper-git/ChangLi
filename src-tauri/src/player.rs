@@ -9,8 +9,8 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
-    AppHandle, GlobalShortcutManager, LogicalPosition, LogicalSize, Manager, Window, WindowBuilder,
-    WindowEvent, WindowUrl,
+    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewWindow, WebviewWindowBuilder,
+    WebviewUrl, WindowEvent,
 };
 
 #[cfg(target_os = "windows")]
@@ -38,17 +38,7 @@ fn candidate_mpv_paths(app: &AppHandle) -> Vec<PathBuf> {
         }
     }
 
-    if let Some(path) = app.path_resolver().resolve_resource("mpv/mpv.exe") {
-        candidates.push(path);
-    }
-    if let Some(path) = app
-        .path_resolver()
-        .resolve_resource("resources/mpv/mpv.exe")
-    {
-        candidates.push(path);
-    }
-
-    if let Some(resource_dir) = app.path_resolver().resource_dir() {
+    if let Ok(resource_dir) = app.path().resource_dir() {
         candidates.push(resource_dir.join("mpv").join("mpv.exe"));
         candidates.push(resource_dir.join("resources").join("mpv").join("mpv.exe"));
     }
@@ -76,7 +66,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // 因此 Windows 仍使用 mpv 原生窗口兜底：不传 --wid，保留 mpv 自身可关闭窗口。
     // 用户要求视觉上在原程序窗口内播放：把 mpv 几何位置覆盖到主窗口内容区，
     // 同时给原生窗口加 --ontop，避免它被 ChangLi 主窗口遮挡。
-    if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
 
@@ -118,7 +108,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-    if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
     kill_mpv();
@@ -127,12 +117,12 @@ pub fn close_player_window(app: &AppHandle) {
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_) => {
-            if let Some(player) = app.get_window(PLAYER_WINDOW_LABEL) {
+            if let Some(player) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
                 let _ = position_player_window_next_to_main(app, &player);
             }
         }
         WindowEvent::Resized(_) => {
-            if let Some(player) = app.get_window(PLAYER_WINDOW_LABEL) {
+            if let Some(player) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
                 let _ = sync_player_minimize_state(app, &player);
                 let _ = position_player_window_next_to_main(app, &player);
             }
@@ -157,25 +147,27 @@ pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
 }
 
 pub fn register_shortcuts(app: &AppHandle) -> Result<()> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    
     let app_for_shortcut = app.clone();
-    app.global_shortcut_manager()
-        .register("Ctrl+Shift+T", move || {
+    app.global_shortcut()
+        .on_shortcut("Ctrl+Shift+T", move |_app, _shortcut, _event| {
             let _ = toggle_always_on_top(&app_for_shortcut);
         })
         .context("register Ctrl+Shift+T shortcut for player always-on-top")?;
     Ok(())
 }
 
-fn get_or_create_player_window(app: &AppHandle) -> Result<Window> {
-    if let Some(window) = app.get_window(PLAYER_WINDOW_LABEL) {
+fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         apply_player_window_style(&window)?;
         return Ok(window);
     }
 
-    let mut builder = WindowBuilder::new(
+    let mut builder = WebviewWindowBuilder::new(
         app,
         PLAYER_WINDOW_LABEL,
-        WindowUrl::App("index.html?window=player".into()),
+        WebviewUrl::App("index.html?window=player".into()),
     )
     .title("ChangLi Player")
     .inner_size(PLAYER_WIDTH, PLAYER_HEIGHT)
@@ -209,7 +201,7 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<Window> {
     Ok(window)
 }
 
-fn apply_player_window_style(window: &Window) -> Result<()> {
+fn apply_player_window_style(window: &WebviewWindow) -> Result<()> {
     let always_on_top = *ALWAYS_ON_TOP
         .lock()
         .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
@@ -220,8 +212,8 @@ fn apply_player_window_style(window: &Window) -> Result<()> {
     Ok(())
 }
 
-fn position_player_window_next_to_main(app: &AppHandle, player: &Window) -> Result<()> {
-    let Some(main) = app.get_window("main") else {
+fn position_player_window_next_to_main(app: &AppHandle, player: &WebviewWindow) -> Result<()> {
+    let Some(main) = app.get_webview_window("main") else {
         return Ok(());
     };
 
@@ -240,8 +232,8 @@ fn position_player_window_next_to_main(app: &AppHandle, player: &Window) -> Resu
     Ok(())
 }
 
-fn sync_player_minimize_state(app: &AppHandle, player: &Window) -> Result<()> {
-    let Some(main) = app.get_window("main") else {
+fn sync_player_minimize_state(app: &AppHandle, player: &WebviewWindow) -> Result<()> {
+    let Some(main) = app.get_webview_window("main") else {
         return Ok(());
     };
 
@@ -254,7 +246,7 @@ fn sync_player_minimize_state(app: &AppHandle, player: &Window) -> Result<()> {
     Ok(())
 }
 
-fn spawn_mpv(app: &AppHandle, window: &Window, video_path: &PathBuf) -> Result<MpvSession> {
+fn spawn_mpv(app: &AppHandle, window: &WebviewWindow, video_path: &PathBuf) -> Result<MpvSession> {
     let ipc_path = unique_ipc_path();
     let wid = native_window_id(window).context("获取独立播放窗口原生句柄失败")?;
     spawn_mpv_with_options(app, wid.as_deref(), None, &ipc_path, video_path)
@@ -363,7 +355,7 @@ fn spawn_mpv_process(
 
 #[cfg(target_os = "windows")]
 fn windows_mpv_geometry(app: &AppHandle) -> Option<String> {
-    let main = app.get_window("main")?;
+    let main = app.get_webview_window("main")?;
     let pos = main.outer_position().ok()?;
     let size = main.outer_size().ok()?;
     let margin_x = 32_i32;
@@ -528,13 +520,13 @@ fn native_window_id(window: &Window) -> Result<Option<String>> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn native_window_id(_window: &Window) -> Result<Option<String>> {
+fn native_window_id(_window: &WebviewWindow) -> Result<Option<String>> {
     // macOS 保持现有独立控制窗口逻辑，不传平台私有句柄。
     Ok(None)
 }
 
 #[cfg(target_os = "windows")]
-fn set_windows_11_rounded_corners(window: &Window) {
+fn set_windows_11_rounded_corners(window: &WebviewWindow) {
     use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE};
 
     const DWMWCP_ROUND: u32 = 2;
@@ -552,4 +544,4 @@ fn set_windows_11_rounded_corners(window: &Window) {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn set_windows_11_rounded_corners(_window: &Window) {}
+fn set_windows_11_rounded_corners(_window: &WebviewWindow) {}
