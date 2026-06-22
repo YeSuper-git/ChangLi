@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
@@ -7,8 +7,10 @@ import {
   deleteVideoSeries,
   rescanSingleSeriesMetadata,
   switchSeriesType,
+  getAllCategories,
+  parseCategoryFeatures,
 } from '../utils/api';
-import type { VideoSeries } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -30,9 +32,17 @@ const Library: React.FC = () => {
   const [typeFilter] = useState<'all' | 'series' | 'video'>(() => {
     return (searchParams.get('type') as 'all' | 'series' | 'video') || 'all';
   });
-  const [mainCategory, setMainCategory] = useState<'anime' | 'adult'>(() => {
-    return (searchParams.get('cat') as 'anime' | 'adult') || 'anime';
+  const [mainCategory, setMainCategory] = useState<string>(() => {
+    return searchParams.get('cat') || 'anime';
   });
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // 加载大类配置
+  useEffect(() => {
+    getAllCategories()
+      .then(setCategories)
+      .catch((err) => console.error('[Library] 加载大类配置失败:', err));
+  }, []);
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
   const [chineseSubFilter, setChineseSubFilter] = useState(false);
@@ -297,6 +307,21 @@ const Library: React.FC = () => {
 
   const normalizedSearch = searchTerm.toLowerCase();
   const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
+  const currentCategory = useMemo(() => categories.find(c => c.key === mainCategory), [categories, mainCategory]);
+  const currentFeatures = useMemo(() => currentCategory ? parseCategoryFeatures(currentCategory.features) : null, [currentCategory]);
+
+  // fallback: 当 categories 未加载时使用默认值
+  const features = currentFeatures || {
+    tags: mainCategory === 'anime',
+    actors: mainCategory === 'adult',
+    tracking: mainCategory === 'anime',
+    chinese_sub: mainCategory === 'adult',
+    episode: mainCategory === 'anime',
+  } as CategoryFeatures;
+  const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
+  const categoryDisplayName = currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
+  const epWord = features.episode ? '话' : '部';
+
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
     (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (mainCategory === 'anime' ? !isAdult(series) : isAdult(series))
@@ -344,18 +369,21 @@ const Library: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-4">
-          <h1
-            className={`font-bold cursor-pointer transition-all ${mainCategory === 'anime' ? 'text-4xl' : 'text-2xl text-gray-400'}`}
-            onClick={() => { setMainCategory('anime'); setActiveActorId(null); setActorFilteredSeries(null); }}
-          >
-            动漫
-          </h1>
-          <h1
-            className={`font-bold cursor-pointer transition-all ${mainCategory === 'adult' ? 'text-4xl' : 'text-2xl text-gray-400'}`}
-            onClick={() => { setMainCategory('adult'); setActiveTagId(null); setTagFilteredSeries(null); }}
-          >
-            影视
-          </h1>
+          {categories.map((cat) => (
+            <h1
+              key={cat.key}
+              className={`font-bold cursor-pointer transition-all ${mainCategory === cat.key ? 'text-4xl' : 'text-2xl text-gray-400'}`}
+              onClick={() => { setMainCategory(cat.key); setActiveActorId(null); setActorFilteredSeries(null); setActiveTagId(null); setTagFilteredSeries(null); }}
+            >
+              {cat.name}
+            </h1>
+          ))}
+          {categories.length === 0 && (
+            <>
+              <h1 className="font-bold cursor-pointer transition-all text-4xl">动漫</h1>
+              <h1 className="font-bold cursor-pointer transition-all text-2xl text-gray-400">影视</h1>
+            </>
+          )}
         </div>
         <div className="flex gap-3">
           <button
@@ -370,8 +398,8 @@ const Library: React.FC = () => {
 
       <div className="mb-6 flex justify-between items-center">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div ref={filterButtonsRef} className={`flex gap-3 flex-wrap overflow-hidden ${mainCategory === 'anime' ? (!tagExpanded ? 'max-h-[40px]' : '') : (!actorExpanded ? 'max-h-[40px]' : '')}`}>
-          {mainCategory === 'anime' ? (
+          <div ref={filterButtonsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded && !actorExpanded ? 'max-h-[40px]' : ''}`}>
+          {features.tags ? (
             <>
               <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
               {tags.map((tag) => (
@@ -384,7 +412,7 @@ const Library: React.FC = () => {
                 </button>
               ))}
             </>
-          ) : (
+          ) : features.actors ? (
             <>
               <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>全部</button>
               {actors.map((actor) => (
@@ -397,32 +425,35 @@ const Library: React.FC = () => {
                 </button>
               ))}
             </>
-          )}
+          ) : null}
           </div>
           {needsExpand && (
             <button
-              onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
+              onClick={() => features.tags ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
               className="category-btn active flex-shrink-0"
             >
-              {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
+              {features.tags ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
             </button>
           )}
         </div>
       </div>
 
       <div className="mb-6 flex gap-3 flex-wrap">
-        {mainCategory === 'anime' ? (
+        {features.tracking ? (
           <>
             <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
             <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
             <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
+            {features.chinese_sub && (
+              <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+            )}
           </>
         ) : (
           <>
             <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
-            <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
-            <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
-            <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+            {features.chinese_sub && (
+              <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+            )}
           </>
         )}
       </div>
@@ -500,18 +531,18 @@ const Library: React.FC = () => {
 
       {filteredSeries.length > 0 && (
         <div className="mb-12">
-          <div className={`grid gap-5 auto-rows-max ${mainCategory === 'anime' ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
+          <div className={`grid gap-5 auto-rows-max ${isPortrait ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
             {filteredSeries.map((series) => (
               <div
                 key={series.id}
                 onClick={() => { if (!selectMode) {
                   const filterSearch = buildFilterSearch();
-                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: mainCategory === 'anime' ? '返回动漫' : '返回影视' } });
+                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}` } });
                 }}}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
-                <div className={`card relative w-full overflow-hidden ${mainCategory === 'anime' ? 'aspect-[3/4]' : 'aspect-video'}`}>
+                <div className={`card relative w-full overflow-hidden ${isPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
                   {selectMode && (
                     <div
                       className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
@@ -534,13 +565,13 @@ const Library: React.FC = () => {
                   )}
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  {mainCategory === 'adult' && series.has_chinese_sub === 1 && (
+                  {features.chinese_sub && series.has_chinese_sub === 1 && (
                     <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
                       中字
                     </span>
                   )}
                   <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                    {series.status === 'completed' ? `全${series.video_count}${mainCategory === 'anime' ? '话' : '部'}` : `更新至第${series.video_count}${mainCategory === 'anime' ? '话' : '部'}`}
+                    {series.status === 'completed' ? `全${series.video_count}${epWord}` : `更新至第${series.video_count}${epWord}`}
                   </div>
                 </div>
                 <div className="mt-2">
@@ -548,7 +579,7 @@ const Library: React.FC = () => {
                     {series.code ? `[${series.code}] ${series.title}` : series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${mainCategory === 'anime' ? '话' : '部'}` : '尚未观看'}
+                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${epWord}` : '尚未观看'}
                   </div>
                 </div>
               </div>
@@ -560,7 +591,7 @@ const Library: React.FC = () => {
 
       {filteredSeries.length === 0 && (
         <div className="text-center py-16">
-          <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : `暂无${mainCategory === 'anime' ? '动漫' : '影视'}`}</p>
+          <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : `暂无${categoryDisplayName}`}</p>
           {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
         </div>
       )}

@@ -2251,6 +2251,15 @@ fn main() {
             delete_actor_photo_cmd,
             set_primary_photo_cmd,
             reorder_actor_photos_cmd,
+            get_all_categories,
+            create_category_cmd,
+            update_category_cmd,
+            delete_category_cmd,
+            get_all_actor_fields,
+            update_actor_field_cmd,
+            create_actor_field_cmd,
+            delete_actor_field_cmd,
+            reorder_actor_fields_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2405,4 +2414,137 @@ async fn delete_all_adult(state: State<'_, AppState>) -> Result<(i64, i64), Stri
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::delete_all_adult(&pool).await.map_err(|e| e.to_string())
+}
+
+// ==================== 大类配置 Commands ====================
+
+#[tauri::command]
+async fn get_all_categories(state: State<'_, AppState>) -> Result<Vec<db::Category>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_all_categories(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_category_cmd(
+    state: State<'_, AppState>,
+    key: String,
+    name: String,
+    card_layout: String,
+    features: String,
+) -> Result<db::Category, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::create_category(&pool, &key, &name, &card_layout, &features)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_category_cmd(
+    state: State<'_, AppState>,
+    key: String,
+    name: String,
+    card_layout: String,
+    features: String,
+) -> Result<db::Category, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_category(&pool, &key, &name, &card_layout, &features)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_category_cmd(state: State<'_, AppState>, key: String) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_category(&pool, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ==================== 演员字段配置 Commands ====================
+
+#[tauri::command]
+async fn get_all_actor_fields(
+    state: State<'_, AppState>,
+) -> Result<Vec<db::ActorField>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_all_actor_fields(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_actor_field_cmd(
+    state: State<'_, AppState>,
+    field_key: String,
+    field_label: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_actor_field(&pool, &field_key, &field_label, enabled)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_actor_field_cmd(
+    state: State<'_, AppState>,
+    field_key: String,
+    field_label: String,
+    field_type: String,
+) -> Result<db::ActorField, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::create_actor_field(&pool, &field_key, &field_label, &field_type)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_actor_field_cmd(
+    state: State<'_, AppState>,
+    field_key: String,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_actor_field(&pool, &field_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reorder_actor_fields_cmd(
+    state: State<'_, AppState>,
+    field_keys: Vec<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::reorder_actor_fields(&pool, &field_keys)
+        .await
+        .map_err(|e| e.to_string())
 }

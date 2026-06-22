@@ -2505,3 +2505,212 @@ pub async fn update_video_subtitle(
         .await?;
     Ok(())
 }
+
+// ==================== 大类配置 CRUD ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Category {
+    pub id: i64,
+    pub key: String,
+    pub name: String,
+    pub card_layout: String,
+    pub features: String, // JSON string
+    pub sort_order: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub async fn get_all_categories(pool: &SqlitePool) -> Result<Vec<Category>> {
+    let rows = sqlx::query("SELECT * FROM categories ORDER BY sort_order")
+        .fetch_all(pool)
+        .await?;
+
+    let categories = rows
+        .iter()
+        .map(|row| Category {
+            id: row.get("id"),
+            key: row.get("key"),
+            name: row.get("name"),
+            card_layout: row.get("card_layout"),
+            features: row.get("features"),
+            sort_order: row.get("sort_order"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(categories)
+}
+
+pub async fn create_category(
+    pool: &SqlitePool,
+    key: &str,
+    name: &str,
+    card_layout: &str,
+    features: &str,
+) -> Result<Category> {
+    let row = sqlx::query(
+        "INSERT INTO categories (key, name, card_layout, features) VALUES (?, ?, ?, ?) RETURNING *",
+    )
+    .bind(key)
+    .bind(name)
+    .bind(card_layout)
+    .bind(features)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(Category {
+        id: row.get("id"),
+        key: row.get("key"),
+        name: row.get("name"),
+        card_layout: row.get("card_layout"),
+        features: row.get("features"),
+        sort_order: row.get("sort_order"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}
+
+pub async fn update_category(
+    pool: &SqlitePool,
+    key: &str,
+    name: &str,
+    card_layout: &str,
+    features: &str,
+) -> Result<Category> {
+    let row = sqlx::query(
+        "UPDATE categories SET name = ?, card_layout = ?, features = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? RETURNING *",
+    )
+    .bind(name)
+    .bind(card_layout)
+    .bind(features)
+    .bind(key)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(Category {
+        id: row.get("id"),
+        key: row.get("key"),
+        name: row.get("name"),
+        card_layout: row.get("card_layout"),
+        features: row.get("features"),
+        sort_order: row.get("sort_order"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}
+
+pub async fn delete_category(pool: &SqlitePool, key: &str) -> Result<()> {
+    sqlx::query("DELETE FROM categories WHERE key = ?")
+        .bind(key)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+// ==================== 演员字段配置 CRUD ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorField {
+    pub id: i64,
+    pub field_key: String,
+    pub field_label: String,
+    pub field_type: String,
+    pub sort_order: i32,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub async fn get_all_actor_fields(pool: &SqlitePool) -> Result<Vec<ActorField>> {
+    let rows = sqlx::query("SELECT * FROM actor_fields ORDER BY sort_order")
+        .fetch_all(pool)
+        .await?;
+
+    let fields = rows
+        .iter()
+        .map(|row| ActorField {
+            id: row.get("id"),
+            field_key: row.get("field_key"),
+            field_label: row.get("field_label"),
+            field_type: row.get("field_type"),
+            sort_order: row.get("sort_order"),
+            enabled: row.get::<i32, _>("enabled") != 0,
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
+        .collect();
+
+    Ok(fields)
+}
+
+pub async fn update_actor_field(
+    pool: &SqlitePool,
+    field_key: &str,
+    field_label: &str,
+    enabled: bool,
+) -> Result<()> {
+    sqlx::query(
+        "UPDATE actor_fields SET field_label = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
+    )
+    .bind(field_label)
+    .bind(if enabled { 1 } else { 0 })
+    .bind(field_key)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn create_actor_field(
+    pool: &SqlitePool,
+    field_key: &str,
+    field_label: &str,
+    field_type: &str,
+) -> Result<ActorField> {
+    let max_order: i32 =
+        sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
+            .fetch_one(pool)
+            .await?;
+
+    let row = sqlx::query(
+        "INSERT INTO actor_fields (field_key, field_label, field_type, sort_order) VALUES (?, ?, ?, ?) RETURNING *",
+    )
+    .bind(field_key)
+    .bind(field_label)
+    .bind(field_type)
+    .bind(max_order + 1)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(ActorField {
+        id: row.get("id"),
+        field_key: row.get("field_key"),
+        field_label: row.get("field_label"),
+        field_type: row.get("field_type"),
+        sort_order: row.get("sort_order"),
+        enabled: row.get::<i32, _>("enabled") != 0,
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}
+
+pub async fn delete_actor_field(pool: &SqlitePool, field_key: &str) -> Result<()> {
+    sqlx::query("DELETE FROM actor_fields WHERE field_key = ?")
+        .bind(field_key)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn reorder_actor_fields(pool: &SqlitePool, field_keys: &[String]) -> Result<()> {
+    for (i, key) in field_keys.iter().enumerate() {
+        sqlx::query(
+            "UPDATE actor_fields SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
+        )
+        .bind((i + 1) as i32)
+        .bind(key)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
