@@ -79,7 +79,7 @@ const ActorDetail: React.FC = () => {
     }
   }, [editFromUrl, actor]);
   useEffect(() => {
-    const closeMenu = () => { setContextMenu(null); setPhotoContextMenu(null); setPeriodContextMenu(null); clearPending(); setDeletingPeriodId(null); };
+    const closeMenu = () => { setContextMenu(null); setPhotoContextMenu(null); setPeriodContextMenu(null); clearPending(); };
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);

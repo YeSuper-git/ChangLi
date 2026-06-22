@@ -398,6 +398,7 @@ const Library: React.FC = () => {
               ))}
             </>
           )}
+          </div>
           {needsExpand && (
             <button
               onClick={() => mainCategory === 'anime' ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
@@ -406,7 +407,6 @@ const Library: React.FC = () => {
               {mainCategory === 'anime' ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
             </button>
           )}
-          </div>
         </div>
       </div>
 
