@@ -35,10 +35,9 @@ open = "5.0"
 regex = "1.12.4"
 image = { version = "0.25", default-features = false, features = ["png", "bmp", "tiff", "jpeg", "webp"] }
 base64 = "0.22"
-raw-window-handle = "0.6"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.52", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

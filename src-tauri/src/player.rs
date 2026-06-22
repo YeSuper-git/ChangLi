@@ -13,9 +13,6 @@ use tauri::{
     WebviewUrl, WindowEvent,
 };
 
-#[cfg(target_os = "windows")]
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-
 const PLAYER_WINDOW_LABEL: &str = "player";
 const PLAYER_OFFSET_X: f64 = 40.0;
 const PLAYER_WIDTH: f64 = 720.0;
@@ -476,26 +473,14 @@ fn unique_ipc_path() -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn native_window_id(window: &Window) -> Result<Option<String>> {
-    let mut last_hwnd = 0_i64;
+fn native_window_id(window: &WebviewWindow) -> Result<Option<String>> {
+    let mut last_hwnd = 0_isize;
     let mut stable_count = 0_u8;
 
     for _ in 0..20 {
-        let hwnd = match window.raw_window_handle() {
-            RawWindowHandle::Win32(handle) => {
-                // Tauri 1.x uses raw-window-handle 0.5 here.
-                // If upgrading to Tauri 2/raw-window-handle 0.6, switch to
-                // HasWindowHandle + window_handle()?.as_raw() + hwnd.get().
-                handle.hwnd as isize as i64
-            }
-            other => {
-                return Err(anyhow!(
-                    "独立播放窗口不是 Win32 RawWindowHandle，实际为 {:?}；window label={}",
-                    other,
-                    window.label()
-                ));
-            }
-        };
+        let hwnd = window
+            .hwnd()
+            .map_err(|e| anyhow!("获取 HWND 失败: {}", e))?;
 
         if hwnd > 0 {
             if hwnd == last_hwnd {
