@@ -29,8 +29,10 @@ import {
   updateVideoSeries,
   toggleWatched,
   toggleChineseSub,
+  getAllCategories,
+  parseCategoryFeatures,
 } from '../utils/api';
-import type { Actor, SeasonInfo, Tag, Video, VideoSeries } from '../utils/api';
+import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -361,6 +363,34 @@ const SeriesDetail: React.FC = () => {
   const isWatched = series?.is_watched === 1;
   const isAdult = series ? (series.has_actor || series.display_type === 'adult') : false;
 
+  // 大类配置
+  const [categories, setCategories] = useState<Category[]>([]);
+  useEffect(() => {
+    getAllCategories()
+      .then(setCategories)
+      .catch((err) => console.error('[SeriesDetail] 加载大类配置失败:', err));
+  }, []);
+
+  const currentCategory = useMemo(() => {
+    if (!series) return null;
+    return categories.find(c => c.key === series.display_type) || null;
+  }, [categories, series]);
+
+  const features: CategoryFeatures = useMemo(() => {
+    if (currentCategory) return parseCategoryFeatures(currentCategory.features);
+    // fallback: 和原 isAdult 行为一致
+    return {
+      tags: !isAdult,
+      actors: isAdult,
+      tracking: !isAdult,
+      chinese_sub: isAdult,
+      episode: !isAdult,
+    };
+  }, [currentCategory, isAdult]);
+
+  const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
+
+
   const handleToggleWatched = async () => {
     if (!series) return;
     try {
@@ -392,7 +422,7 @@ const SeriesDetail: React.FC = () => {
 
       <div className="card p-6 mb-8">
         <div className="flex gap-6">
-          <div className={`w-80 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 ${editing && isAdult ? 'h-80' : 'aspect-video'}`}>
+          <div className={`w-80 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
             <div
               className={`relative w-full h-full group ${editing ? 'cursor-pointer' : ''}`}
               onClick={editing ? handleSelectPoster : undefined}
@@ -401,7 +431,7 @@ const SeriesDetail: React.FC = () => {
                 src={series.poster_data_url}
                 alt={series.title}
                 posterOrientation={series.poster_orientation}
-                imageClassName={editing && isAdult ? '!object-contain' : ''}
+                imageClassName={editing && !isPortrait ? '!object-contain' : ''}
               />
               {editing && (
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -419,7 +449,7 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
-                {isAdult ? (
+                {features.actors ? (
                   <>
                     {series?.has_actor && (
                       <>
@@ -478,7 +508,7 @@ const SeriesDetail: React.FC = () => {
                     <option value="completed">已完结</option>
                   </select>
                 )}
-                {!isAdult && (
+                {features.tags && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
                     <div className="flex flex-wrap gap-2 mb-3">
@@ -532,7 +562,7 @@ const SeriesDetail: React.FC = () => {
                     )}
                   </div>
                 )}
-                {!isAdult && (
+                {features.tags && (
                   <textarea
                     value={editData.description}
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
@@ -547,7 +577,7 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                {isAdult ? (
+                {features.chinese_sub ? (
                   <>
                     <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
                     <div className="flex items-center gap-2 mb-3">
@@ -634,7 +664,7 @@ const SeriesDetail: React.FC = () => {
                 <p className="text-gray-500 mb-4">{series.video_count} 集</p>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
-                  {!isAdult && (
+                  {features.tags && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
                       {seriesTags.length > 0 ? seriesTags.map((tag) => (
@@ -655,7 +685,7 @@ const SeriesDetail: React.FC = () => {
                       </Link>
                     )) : <span className="text-sm text-gray-400">暂无</span>}
                   </div>
-                  {isAdult && series.code && (
+                  {features.actors && series.code && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">车牌：</span>
                       <span className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 font-mono">{series.code}</span>
@@ -665,7 +695,7 @@ const SeriesDetail: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
-                  <button onClick={handleAddEpisode} className="action-btn">{isAdult ? '添加分部' : '添加分集'}</button>
+                  <button onClick={handleAddEpisode} className="action-btn">{features.episode ? '添加分集' : '添加分部'}</button>
                 </div>
               </>
             )}
@@ -673,13 +703,13 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">{isAdult ? '分部' : '分集'}</h2>
+      <h2 className="text-xl font-semibold mb-4">{features.episode ? '分集' : '分部'}</h2>
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
           posterOrientation={series?.poster_orientation || 'unknown'}
           onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
-          isAdult={!!isAdult}
+          useEpisodeWord={features.episode}
           fallbackPoster={series?.poster_data_url}
         />
       ) : (
@@ -857,7 +887,7 @@ interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
   onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
-  isAdult?: boolean;
+  useEpisodeWord?: boolean;
   fallbackPoster?: string | null;
 }
 
@@ -865,7 +895,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
   onContextMenu,
-  isAdult,
+  useEpisodeWord,
   fallbackPoster,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
@@ -930,7 +960,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">
-            {video.episode_number ? `第${video.episode_number}${isAdult ? '部' : '集'}` : video.file_name}
+            {video.episode_number ? `第${video.episode_number}${useEpisodeWord ? '话' : '部'}` : video.file_name}
           </h3>
           {video.episode_number && (
             <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>

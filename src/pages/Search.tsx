@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { Actor, VideoSeries } from '../utils/api';
+import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
+import { getAllCategories, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 
@@ -28,11 +29,35 @@ const Search: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { series: storeSeries, actors: storeActors, loadAll, loaded } = useLibraryStore();
+  const [categories, setCategories] = useState<Category[]>([]);
   const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
   const [keyword, setKeyword] = useState(queryKeyword);
   const [results, setResults] = useState<SearchItem[]>([]);
   
   const [searched, setSearched] = useState(false);
+
+  // 加载大类配置
+  useEffect(() => {
+    getAllCategories().then(setCategories).catch(() => {});
+  }, []);
+
+  // 根据 display_type 获取大类配置
+  const getCategoryFeatures = (series: VideoSeries): CategoryFeatures => {
+    const key = series.display_type || '';
+    const cat = categories.find(c => c.key === key);
+    return cat ? parseCategoryFeatures(cat.features) : { tags: false, actors: !!series.has_actor, tracking: false, chinese_sub: false, episode: false };
+  };
+
+  const getCategoryName = (series: VideoSeries): string => {
+    const key = series.display_type || '';
+    const cat = categories.find(c => c.key === key);
+    return cat?.name || (series.has_actor ? '影视' : '动漫');
+  };
+
+  const getEpisodeWord = (series: VideoSeries): string => {
+    const features = getCategoryFeatures(series);
+    return features.episode ? '话' : '部';
+  };
 
   // 首次进入时确保 store 已加载
   useEffect(() => {
@@ -56,7 +81,7 @@ const Search: React.FC = () => {
         type: 'series',
         id: series.id,
         title: series.title,
-        subtitle: `${(series.has_actor || series.display_type === 'adult') ? '影视' : '动漫'} · ${series.status === 'completed' ? `全${series.video_count}${(series.has_actor || series.display_type === 'adult') ? '部' : '话'}` : `更新至第${series.video_count}${(series.has_actor || series.display_type === 'adult') ? '部' : '话'}`}`,
+        subtitle: `${getCategoryName(series)} · ${series.status === 'completed' ? `全${series.video_count}${getEpisodeWord(series)}` : `更新至第${series.video_count}${getEpisodeWord(series)}`}`,
         series,
       }));
 

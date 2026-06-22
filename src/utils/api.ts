@@ -884,3 +884,88 @@ export async function scanVideosForActor(path: string, actorId: number, periodId
     throw err;
   }
 }
+
+// ==================== 大类配置 ====================
+
+export interface Category {
+  id: number;
+  key: string;
+  name: string;
+  card_layout: 'portrait' | 'landscape' | 'auto';
+  features: string; // JSON string
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CategoryFeatures {
+  tags: boolean;
+  actors: boolean;
+  tracking: boolean;
+  chinese_sub: boolean;
+  episode: boolean;
+}
+
+export function parseCategoryFeatures(features: string): CategoryFeatures {
+  try {
+    return JSON.parse(features);
+  } catch {
+    return { tags: false, actors: false, tracking: false, chinese_sub: false, episode: false };
+  }
+}
+
+export async function getAllCategories(): Promise<Category[]> {
+  return invoke<Category[]>('get_all_categories');
+}
+
+export async function createCategory(key: string, name: string, cardLayout: string, features: string): Promise<Category> {
+  return invoke<Category>('create_category_cmd', { key, name, cardLayout, features });
+}
+
+export async function updateCategory(key: string, name: string, cardLayout: string, features: string): Promise<Category> {
+  return invoke<Category>('update_category_cmd', { key, name, cardLayout, features });
+}
+
+export async function deleteCategory(key: string): Promise<void> {
+  return invoke('delete_category_cmd', { key });
+}
+
+export async function getCategoryConfig(categoryKey: string): Promise<{ category: Category; features: CategoryFeatures } | null> {
+  const categories = await getAllCategories();
+  const cat = categories.find(c => c.key === categoryKey);
+  if (!cat) return null;
+  return { category: cat, features: parseCategoryFeatures(cat.features) };
+}
+
+// ==================== 演员字段配置 ====================
+
+export interface ActorField {
+  id: number;
+  field_key: string;
+  field_label: string;
+  field_type: string;
+  sort_order: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getAllActorFields(): Promise<ActorField[]> {
+  return invoke<ActorField[]>('get_all_actor_fields');
+}
+
+export async function updateActorField(fieldKey: string, fieldLabel: string, enabled: boolean): Promise<void> {
+  return invoke('update_actor_field_cmd', { fieldKey, fieldLabel, enabled });
+}
+
+export async function createActorField(fieldKey: string, fieldLabel: string, fieldType: string): Promise<ActorField> {
+  return invoke<ActorField>('create_actor_field_cmd', { fieldKey, fieldLabel, fieldType });
+}
+
+export async function deleteActorField(fieldKey: string): Promise<void> {
+  return invoke('delete_actor_field_cmd', { fieldKey });
+}
+
+export async function reorderActorFields(fieldKeys: string[]): Promise<void> {
+  return invoke('reorder_actor_fields_cmd', { fieldKeys });
+}

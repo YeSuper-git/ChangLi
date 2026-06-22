@@ -22,6 +22,8 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actors_if_empty(pool).await?;
     create_actor_photos_table(pool).await?;
     create_indexes(pool).await?;
+    seed_default_categories(pool).await?;
+    seed_default_actor_fields(pool).await?;
     Ok(())
 }
 
@@ -217,6 +219,44 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
         )
         "#,
         "create watch_progress table",
+    )
+    .await?;
+
+    // 大类配置表
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            card_layout TEXT NOT NULL DEFAULT 'auto',
+            features TEXT NOT NULL DEFAULT '{}',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create categories table",
+    )
+    .await?;
+
+    // 演员字段配置表（全局独立，不关联大类）
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS actor_fields (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            field_key TEXT NOT NULL UNIQUE,
+            field_label TEXT NOT NULL,
+            field_type TEXT NOT NULL DEFAULT 'text',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create actor_fields table",
     )
     .await?;
 
@@ -832,6 +872,77 @@ async fn create_indexes(pool: &SqlitePool) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_series_actors_actor_id ON series_actors(actor_id)",
     ] {
         execute(pool, sql, "create index").await?;
+    }
+
+    Ok(())
+}
+
+async fn seed_default_categories(pool: &SqlitePool) -> Result<()> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM categories")
+        .fetch_one(pool)
+        .await?;
+    if count > 0 {
+        return Ok(());
+    }
+
+    // 动漫：竖版卡片，支持标签/追番/中字/集数，不支持演员
+    sqlx::query(
+        "INSERT INTO categories (key, name, card_layout, features, sort_order) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind("anime")
+    .bind("动漫")
+    .bind("portrait")
+    .bind(r#"{"tags":true,"actors":false,"tracking":true,"chinese_sub":true,"episode":true}"#)
+    .bind(1)
+    .execute(pool)
+    .await?;
+
+    // 影视：横版卡片，支持演员/中字，不支持标签/追番/集数
+    sqlx::query(
+        "INSERT INTO categories (key, name, card_layout, features, sort_order) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind("adult")
+    .bind("影视")
+    .bind("landscape")
+    .bind(r#"{"tags":false,"actors":true,"tracking":false,"chinese_sub":true,"episode":false}"#)
+    .bind(2)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_fields")
+        .fetch_one(pool)
+        .await?;
+    if count > 0 {
+        return Ok(());
+    }
+
+    let default_fields = [
+        ("name", "名称", "text", 1, 1),
+        ("japanese_name", "日本名", "text", 2, 1),
+        ("alias", "别名", "text", 3, 1),
+        ("photo", "照片", "text", 4, 1),
+        ("birthday", "生日", "date", 5, 1),
+        ("height", "身高", "text", 6, 1),
+        ("measurements", "三围", "text", 7, 1),
+        ("cup_size", "罩杯", "text", 8, 1),
+        ("bio", "简介", "text", 9, 1),
+    ];
+
+    for (key, label, ftype, order, enabled) in &default_fields {
+        sqlx::query(
+            "INSERT INTO actor_fields (field_key, field_label, field_type, sort_order, enabled) VALUES (?, ?, ?, ?, ?)"
+        )
+        .bind(key)
+        .bind(label)
+        .bind(ftype)
+        .bind(order)
+        .bind(enabled)
+        .execute(pool)
+        .await?;
     }
 
     Ok(())
