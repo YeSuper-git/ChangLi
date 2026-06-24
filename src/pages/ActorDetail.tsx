@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos } from '../utils/api';
-import type { Actor, Video, ActorPeriod, ActorPhoto } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields } from '../utils/api';
+import type { Actor, Video, ActorPeriod, ActorPhoto, ActorField } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 
@@ -57,6 +57,8 @@ const ActorDetail: React.FC = () => {
   const [newPeriodName, setNewPeriodName] = useState('');
   // 添加作品时选择时期弹窗
   const [periodSelectVisible, setPeriodSelectVisible] = useState(false);
+  // 演员字段配置
+  const [actorFields, setActorFields] = useState<ActorField[]>([]);
 
   const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
@@ -88,12 +90,13 @@ const ActorDetail: React.FC = () => {
   const loadActor = async (actorId: number) => {
     try {
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
-      const [actorData, resourcesData, periodsData, periodMap, photosData] = await Promise.all([
+      const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),
         getActorResources(actorId),
         getActorPeriods(actorId),
         getActorWorkPeriodMap(actorId),
         getActorPhotos(actorId),
+        getAllActorFields(),
       ]);
       console.log('[Actor] getActor 返回:', actorData ? `name: ${actorData.name}, photo: ${actorData.photo || '无'}` : 'null');
       console.log('[Actor] getActorResources 返回:', resourcesData.length, '条');
@@ -102,6 +105,7 @@ const ActorDetail: React.FC = () => {
       setPeriods(periodsData);
       setWorkPeriodMap(periodMap);
       setPhotos(photosData);
+      setActorFields(actorFieldsData);
       setCurrentPhotoIndex(0);
       if (actorData) {
         setEditForm({
@@ -119,6 +123,42 @@ const ActorDetail: React.FC = () => {
       console.error('[Actor] 加载演员详情失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 根据 actorFields 配置动态渲染字段输入框
+  const renderDynamicField = (field: ActorField) => {
+    const value = (editForm as Record<string, string>)[field.field_key] || '';
+    const onChange = (val: string) => setEditForm({ ...editForm, [field.field_key]: val });
+    switch (field.field_type) {
+      case 'number':
+        return (
+          <input
+            type="text"
+            inputMode="numeric"
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+        );
+      case 'date':
+        return (
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+        );
+      default: // text
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+          />
+        );
     }
   };
 
@@ -665,36 +705,49 @@ const ActorDetail: React.FC = () => {
         <div className="flex-1">
           {editing ? (
             <div className="space-y-4">
-              {/* 姓名 + 日本名 + 曾用名 */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">日本名</label>
-                  <input
-                    type="text"
-                    value={editForm.japanese_name}
-                    onChange={(e) => setEditForm({ ...editForm, japanese_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">曾用名</label>
-                  <input
-                    type="text"
-                    value={editForm.alias}
-                    onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+              {/* 姓名 - always shown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                />
               </div>
+
+              {/* Dynamic fields based on actorFields config, or fallback to hardcoded */}
+              {actorFields.length > 0 ? (
+                <div className="grid grid-cols-3 gap-4">
+                  {actorFields.filter(f => f.enabled).map(field => (
+                    <div key={field.field_key}>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{field.field_label}</label>
+                      {renderDynamicField(field)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">日本名</label>
+                      <input
+                        type="text"
+                        value={editForm.japanese_name}
+                        onChange={(e) => setEditForm({ ...editForm, japanese_name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">曾用名</label>
+                      <input
+                        type="text"
+                        value={editForm.alias}
+                        onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
 
               {/* 出生日期 + 身高 */}
               <div className="grid grid-cols-2 gap-4">
@@ -830,6 +883,8 @@ const ActorDetail: React.FC = () => {
                   />
                 </div>
               </div>
+                </>
+              )}
 
               {/* 简介 */}
               <div>
