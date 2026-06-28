@@ -306,7 +306,6 @@ const Library: React.FC = () => {
   }, [favorites]);
 
   const normalizedSearch = searchTerm.toLowerCase();
-  const isAdult = (series: VideoSeries) => series.has_actor || series.display_type === 'adult';
   const currentCategory = useMemo(() => categories.find(c => c.key === mainCategory), [categories, mainCategory]);
   const currentFeatures = useMemo(() => currentCategory ? parseCategoryFeatures(currentCategory.features) : null, [currentCategory]);
 
@@ -324,7 +323,7 @@ const Library: React.FC = () => {
 
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (mainCategory === 'anime' ? !isAdult(series) : isAdult(series))
+    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (series.display_type === mainCategory || (!series.display_type && mainCategory === 'anime'))
   );
 
   const toggleSelect = (key: string) => {
@@ -399,9 +398,9 @@ const Library: React.FC = () => {
       <div className="mb-6 flex justify-between items-center">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div ref={filterButtonsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded && !actorExpanded ? 'max-h-[40px]' : ''}`}>
-          {features.tags ? (
+          {features.tags && (
             <>
-              <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>全部</button>
+              <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
               {tags.map((tag) => (
                 <button
                   key={tag.id}
@@ -412,9 +411,10 @@ const Library: React.FC = () => {
                 </button>
               ))}
             </>
-          ) : features.actors ? (
+          )}
+          {features.actors && (
             <>
-              <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>全部</button>
+              <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
               {actors.map((actor) => (
                 <button
                   key={actor.id}
@@ -425,14 +425,18 @@ const Library: React.FC = () => {
                 </button>
               ))}
             </>
-          ) : null}
+          )}
           </div>
           {needsExpand && (
             <button
-              onClick={() => features.tags ? setTagExpanded(!tagExpanded) : setActorExpanded(!actorExpanded)}
+              onClick={() => {
+                const nextExpanded = !tagExpanded && !actorExpanded;
+                setTagExpanded(nextExpanded);
+                setActorExpanded(nextExpanded);
+              }}
               className="category-btn active flex-shrink-0"
             >
-              {features.tags ? (tagExpanded ? '收起 ↑' : '展开 ↓') : (actorExpanded ? '收起 ↑' : '展开 ↓')}
+              {tagExpanded || actorExpanded ? '收起 ↑' : '展开 ↓'}
             </button>
           )}
         </div>
