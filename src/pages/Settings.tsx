@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField } from '../utils/api';
-import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate } from '../utils/api';
+import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -29,6 +29,16 @@ const Settings: React.FC = () => {
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
+      // 加载扩展预设模板
+      try {
+        const templates = await getExtensionPresetTemplates();
+        setPresetTemplates(templates);
+        const map: Record<string, boolean> = {};
+        for (const t of templates) {
+          map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key);
+        }
+        setPresetEnabledMap(map);
+      } catch {}
     } catch (error) {
       console.error('加载设置失败:', error);
     } finally {
@@ -227,6 +237,10 @@ const Settings: React.FC = () => {
   const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[], format: '' });
   const [fieldContextMenu, setFieldContextMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const [newOptionValue, setNewOptionValue] = useState('');
+  const [presetTemplates, setPresetTemplates] = useState<PresetTemplate[]>([]);
+  const [presetEnabledMap, setPresetEnabledMap] = useState<Record<string, boolean>>({});
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -234,6 +248,20 @@ const Settings: React.FC = () => {
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, [fieldContextMenu]);
+
+  const loadPresetTemplates = async () => {
+    try {
+      const templates = await getExtensionPresetTemplates();
+      setPresetTemplates(templates);
+      const map: Record<string, boolean> = {};
+      for (const t of templates) {
+        map[t.key] = actorFields.some(f => f.field_key === t.key);
+      }
+      setPresetEnabledMap(map);
+    } catch (error) {
+      console.error('加载预设模板失败:', error);
+    }
+  };
 
   const loadActorFields = async () => {
     try {
@@ -518,17 +546,25 @@ const Settings: React.FC = () => {
             <h2 className="text-xl font-semibold">演员管理</h2>
             <p className="text-sm text-gray-500 mt-1">配置演员详情页显示的字段</p>
           </div>
-          <button
-            onClick={openAddField}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            新增字段
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { loadPresetTemplates(); setShowPresetModal(true); }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            >
+              扩展系统预设
+            </button>
+            <button
+              onClick={openAddField}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              新增字段
+            </button>
+          </div>
         </div>
 
         {(
           <div className="grid grid-cols-4 gap-4">
-            {actorFields.map((field) => (
+            {actorFields.filter(f => f.field_key !== 'name').map((field) => (
               <div key={field.field_key} className="card p-4 cursor-pointer flex flex-col items-center justify-center" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
                 <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
                 <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : '选择'}</p>
@@ -864,7 +900,7 @@ const Settings: React.FC = () => {
       {fieldContextMenu && (
         <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
           <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button>
-          <button onClick={() => { if (confirm('确定删除该字段？')) { handleDeleteField(fieldContextMenu.key); } setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
+          <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
         </div>
       )}
 
@@ -887,6 +923,89 @@ const Settings: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
               >
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 演员字段删除确认弹窗 */}
+      {deleteFieldConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <p className="text-gray-900 text-base mb-6">
+              确定删除该字段？
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { handleDeleteField(deleteFieldConfirm); setDeleteFieldConfirm(null); }}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+              >
+                确认删除
+              </button>
+              <button
+                onClick={() => setDeleteFieldConfirm(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 扩展系统预设弹窗 */}
+      {showPresetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h2 className="text-xl font-bold mb-4">扩展系统预设</h2>
+            <p className="text-sm text-gray-500 mb-4">启用后将在演员管理中显示对应字段</p>
+            <div className="space-y-3">
+              {presetTemplates.map((template) => {
+                const enabled = presetEnabledMap[template.key] || false;
+                return (
+                  <div key={template.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{template.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">({template.field_type})</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (enabled) {
+                            await disablePresetTemplate(template.key);
+                          } else {
+                            await enablePresetTemplate(template.key);
+                          }
+                          // 刷新
+                          const fieldsList = await getAllActorFields();
+                          setActorFields(fieldsList);
+                          const map: Record<string, boolean> = {};
+                          for (const t of presetTemplates) {
+                            map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key);
+                          }
+                          setPresetEnabledMap(map);
+                        } catch (error) {
+                          console.error('切换预设模板失败:', error);
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-blue-500' : 'bg-gray-200'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                );
+              })}
+              {presetTemplates.length === 0 && (
+                <p className="text-center text-gray-400 text-sm py-4">暂无扩展预设</p>
+              )}
+            </div>
+            <div className="mt-6">
+              <button
+                onClick={() => setShowPresetModal(false)}
+                className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                关闭
               </button>
             </div>
           </div>

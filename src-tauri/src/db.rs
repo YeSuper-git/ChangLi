@@ -2901,3 +2901,106 @@ pub async fn reorder_actor_fields(pool: &SqlitePool, field_keys: &[String]) -> R
     }
     Ok(())
 }
+
+// ==================== 预设模板 CRUD ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PresetTemplate {
+    pub id: i64,
+    pub key: String,
+    pub name: String,
+    pub field_type: String,
+    pub sub_fields: String,
+    pub rules: String,
+    pub is_extension: bool,
+    pub sort_order: i32,
+    pub created_at: String,
+}
+
+pub async fn get_preset_templates(pool: &SqlitePool) -> Result<Vec<PresetTemplate>> {
+    let rows = sqlx::query("SELECT * FROM preset_templates ORDER BY sort_order")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(|row| preset_from_row(row)).collect())
+}
+
+pub async fn get_extension_preset_templates(pool: &SqlitePool) -> Result<Vec<PresetTemplate>> {
+    let rows = sqlx::query("SELECT * FROM preset_templates WHERE is_extension = 1 ORDER BY sort_order")
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(|row| preset_from_row(row)).collect())
+}
+
+fn preset_from_row(row: &SqliteRow) -> PresetTemplate {
+    PresetTemplate {
+        id: row.get("id"),
+        key: row.get("key"),
+        name: row.get("name"),
+        field_type: row.get("field_type"),
+        sub_fields: row.get("sub_fields"),
+        rules: row.get("rules"),
+        is_extension: row.get::<i32, _>("is_extension") != 0,
+        sort_order: row.get("sort_order"),
+        created_at: row.get("created_at"),
+    }
+}
+
+pub async fn is_preset_template_enabled(pool: &SqlitePool, key: &str) -> Result<bool> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_fields WHERE field_key = ?")
+        .bind(key)
+        .fetch_one(pool)
+        .await?;
+    Ok(count > 0)
+}
+
+pub async fn enable_preset_template(pool: &SqlitePool, key: &str) -> Result<()> {
+    if is_preset_template_enabled(pool, key).await? {
+        return Ok(());
+    }
+
+    let row = sqlx::query("SELECT * FROM preset_templates WHERE key = ?")
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+
+    let row = row.ok_or_else(|| anyhow::anyhow!("预设模板不存在: {}", key))?;
+
+    let name: String = row.get("name");
+    let field_type: String = row.get("field_type");
+    let sub_fields: String = row.get("sub_fields");
+    let rules: String = row.get("rules");
+
+    let options_json = serde_json::json!({
+        "sub_fields": serde_json::from_str::<serde_json::Value>(&sub_fields).unwrap_or_default(),
+        "rules": serde_json::from_str::<serde_json::Value>(&rules).unwrap_or_default(),
+    });
+    let options_str = serde_json::to_string(&options_json).ok();
+
+    let max_order: i32 =
+        sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
+            .fetch_one(pool)
+            .await?;
+
+    let actual_field_type = if field_type == "compound" { "compound" } else { &field_type };
+
+    sqlx::query(
+        "INSERT INTO actor_fields (field_key, field_label, field_type, options, sort_order, enabled) VALUES (?, ?, ?, ?, ?, 1)",
+    )
+    .bind(key)
+    .bind(&name)
+    .bind(actual_field_type)
+    .bind(options_str.as_deref())
+    .bind(max_order + 1)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn disable_preset_template(pool: &SqlitePool, key: &str) -> Result<()> {
+    sqlx::query("DELETE FROM actor_fields WHERE field_key = ?")
+        .bind(key)
+        .execute(pool)
+        .await?;
+    Ok(())
+}

@@ -30,6 +30,8 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         .await?;
     add_column_if_not_exists(pool, "actor_fields", "format", "TEXT")
         .await?;
+    create_preset_templates_table(pool).await?;
+    seed_preset_templates(pool).await?;
     Ok(())
 }
 
@@ -933,8 +935,6 @@ async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
         ("photo", "照片", "text", 4, 1),
         ("birthday", "生日", "date", 5, 1),
         ("height", "身高", "text", 6, 1),
-        ("measurements", "三围", "text", 7, 1),
-        ("cup_size", "罩杯", "text", 8, 1),
         ("bio", "简介", "text", 9, 1),
     ];
 
@@ -947,6 +947,70 @@ async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
         .bind(ftype)
         .bind(order)
         .bind(enabled)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn create_preset_templates_table(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS preset_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            field_type TEXT NOT NULL DEFAULT 'text',
+            sub_fields TEXT NOT NULL DEFAULT '[]',
+            rules TEXT NOT NULL DEFAULT '{}',
+            is_extension INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create preset_templates table",
+    )
+    .await?;
+    Ok(())
+}
+
+async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM preset_templates")
+        .fetch_one(pool)
+        .await?;
+    if count > 0 {
+        return Ok(());
+    }
+
+    let presets: Vec<(&str, &str, &str, &str, &str, i32, i32)> = vec![
+        ("height", "身高", "number", "[]", r#"{"unit":"cm"}"#, 0, 1),
+        ("weight", "体重", "number", "[]", r#"{"unit":"kg"}"#, 0, 2),
+        ("birthday", "生日", "date", "[]", "{}", 0, 3),
+        (
+            "measurements",
+            "三围",
+            "compound",
+            r#"[{"label":"B","maxLen":2},{"label":"W","maxLen":2},{"label":"H","maxLen":2}]"#,
+            "{}",
+            1,
+            4,
+        ),
+        ("cup_size", "罩杯", "text", "[]", r#"{"maxLength":1,"uppercase":true}"#, 1, 5),
+    ];
+
+    for (key, name, field_type, sub_fields, rules, is_ext, order) in &presets {
+        sqlx::query(
+            "INSERT INTO preset_templates (key, name, field_type, sub_fields, rules, is_extension, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(key)
+        .bind(name)
+        .bind(field_type)
+        .bind(sub_fields)
+        .bind(rules)
+        .bind(is_ext)
+        .bind(order)
         .execute(pool)
         .await?;
     }

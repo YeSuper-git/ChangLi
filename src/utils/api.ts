@@ -996,3 +996,37 @@ export async function deleteActorField(fieldKey: string): Promise<void> {
 export async function reorderActorFields(fieldKeys: string[]): Promise<void> {
   return invoke('reorder_actor_fields_cmd', { fieldKeys });
 }
+
+// ==================== 预设模板 ====================
+
+export interface PresetTemplate {
+  id: number;
+  key: string;
+  name: string;
+  field_type: string;
+  sub_fields: string;
+  rules: string;
+  is_extension: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function getPresetTemplates(): Promise<PresetTemplate[]> {
+  return invoke<PresetTemplate[]>('get_preset_templates_cmd');
+}
+
+export async function getExtensionPresetTemplates(): Promise<PresetTemplate[]> {
+  return invoke<PresetTemplate[]>('get_extension_preset_templates_cmd');
+}
+
+export async function isPresetTemplateEnabled(key: string): Promise<boolean> {
+  return invoke<boolean>('is_preset_template_enabled_cmd', { key });
+}
+
+export async function enablePresetTemplate(key: string): Promise<void> {
+  return invoke('enable_preset_template_cmd', { key });
+}
+
+export async function disablePresetTemplate(key: string): Promise<void> {
+  return invoke('disable_preset_template_cmd', { key });
+}

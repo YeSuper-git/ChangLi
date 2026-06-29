@@ -1973,6 +1973,11 @@ fn main() {
             create_actor_field_cmd,
             delete_actor_field_cmd,
             reorder_actor_fields_cmd,
+            get_preset_templates_cmd,
+            get_extension_preset_templates_cmd,
+            is_preset_template_enabled_cmd,
+            enable_preset_template_cmd,
+            disable_preset_template_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2499,6 +2504,76 @@ async fn reorder_actor_fields_cmd(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::reorder_actor_fields(&pool, &field_keys)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ==================== 预设模板 Commands ====================
+
+#[tauri::command]
+async fn get_preset_templates_cmd(
+    state: State<'_, AppState>,
+) -> Result<Vec<db::PresetTemplate>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_preset_templates(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_extension_preset_templates_cmd(
+    state: State<'_, AppState>,
+) -> Result<Vec<db::PresetTemplate>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_extension_preset_templates(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn is_preset_template_enabled_cmd(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<bool, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::is_preset_template_enabled(&pool, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn enable_preset_template_cmd(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::enable_preset_template(&pool, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn disable_preset_template_cmd(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::disable_preset_template(&pool, &key)
         .await
         .map_err(|e| e.to_string())
 }
