@@ -745,6 +745,10 @@ export async function getActorWorkPeriodMap(actorId: number): Promise<Record<str
   return invoke<Record<string, number>>('get_actor_work_period_map', { actorId });
 }
 
+export async function updateActorWorkPeriod(actorId: number, workType: 'video' | 'series', workId: number, periodId?: number | null): Promise<void> {
+  return invoke('update_actor_work_period', { actorId, workType, workId, periodId: periodId ?? null });
+}
+
 // 播放器相关
 export async function playVideo(id: number): Promise<void> {
   console.log('[API] 调用 playVideo, id:', id);

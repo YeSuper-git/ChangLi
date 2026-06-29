@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, updateActorWorkPeriod, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields } from '../utils/api';
 import type { Actor, Video, ActorPeriod, ActorPhoto, ActorField } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
-
-import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -13,7 +11,6 @@ import loadingIcon from '../assets/icons/loading.svg';
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   const [contextMenu, setContextMenu] = useState<{ type: 'video' | 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -51,8 +48,14 @@ const ActorDetail: React.FC = () => {
   // 时期编辑
   const [editingPeriodId, setEditingPeriodId] = useState<number | null>(null);
   const [editingPeriodName, setEditingPeriodName] = useState('');
-  // 时期删除确认
-  const [deletingPeriodId, setDeletingPeriodId] = useState<number | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+    danger?: boolean;
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+  const [periodAssignModal, setPeriodAssignModal] = useState<{ type: 'video' | 'series'; id: number; name: string; currentPeriodId: number | null } | null>(null);
   // 添加时期
   const [showAddPeriodModal, setShowAddPeriodModal] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
@@ -65,7 +68,7 @@ const ActorDetail: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      loadActor(parseInt(id));
+      loadActor(parseInt(id), { scrollToTop: true, resetPhoto: true });
     }
   }, [id]);
 
@@ -82,15 +85,15 @@ const ActorDetail: React.FC = () => {
     }
   }, [editFromUrl, actor]);
   useEffect(() => {
-    const closeMenu = () => { setContextMenu(null); setPhotoContextMenu(null); setPeriodContextMenu(null); clearPending(); };
+    const closeMenu = () => { setContextMenu(null); setPhotoContextMenu(null); setPeriodContextMenu(null); };
     window.addEventListener('click', closeMenu);
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
 
-  const loadActor = async (actorId: number) => {
+  const loadActor = async (actorId: number, options: { scrollToTop?: boolean; resetPhoto?: boolean } = {}) => {
     try {
-      window.scrollTo(0, 0);
+      if (options.scrollToTop) window.scrollTo(0, 0);
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
       const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),
@@ -108,7 +111,7 @@ const ActorDetail: React.FC = () => {
       setWorkPeriodMap(periodMap);
       setPhotos(photosData);
       setActorFields(actorFieldsData);
-      setCurrentPhotoIndex(0);
+      if (options.resetPhoto) setCurrentPhotoIndex(0);
       if (actorData) {
         setEditForm({
           name: actorData.name,
@@ -418,13 +421,94 @@ const ActorDetail: React.FC = () => {
     setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
   };
 
+  const openConfirmDialog = (dialog: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    danger?: boolean;
+    onConfirm: () => Promise<void> | void;
+  }) => {
+    setConfirmDialog(dialog);
+  };
+
+  const runConfirmDialog = async () => {
+    if (!confirmDialog) return;
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
+  };
+
+  const openAssignPeriodModal = () => {
+    if (!contextMenu) return;
+    const currentPeriodId = workPeriodMap[`${contextMenu.type}-${contextMenu.id}`] || null;
+    setPeriodAssignModal({ ...contextMenu, currentPeriodId });
+    setContextMenu(null);
+  };
+
+  const handleAssignWorkPeriod = async (periodId: number | undefined) => {
+    if (!actor || !periodAssignModal) return;
+    try {
+      await updateActorWorkPeriod(actor.id, periodAssignModal.type, periodAssignModal.id, periodId);
+      setWorkPeriodMap(prev => {
+        const next = { ...prev };
+        const key = `${periodAssignModal.type}-${periodAssignModal.id}`;
+        if (periodId === undefined) {
+          delete next[key];
+        } else {
+          next[key] = periodId;
+        }
+        return next;
+      });
+      setPeriodAssignModal(null);
+      setToast({ message: periodId === undefined ? '已归入演员名时期' : '已分配到指定时期', type: 'success' });
+    } catch (error) {
+      console.error('[Actor] 分配时期失败:', error);
+      setToast({ message: '分配时期失败: ' + String(error), type: 'info' });
+    }
+  };
+
+  const requestDeleteVideo = () => {
+    if (!contextMenu) return;
+    const { type, id, name } = contextMenu;
+    setContextMenu(null);
+    openConfirmDialog({
+      title: type === 'video' ? '删除视频' : '删除视频集',
+      message: `确定要删除「${name}」吗？此操作不可恢复。`,
+      confirmText: '确认删除',
+      danger: true,
+      onConfirm: () => type === 'video' ? handleDeleteVideo(id) : handleDeleteSeries(id),
+    });
+  };
+
+  const requestDeletePeriod = (periodId: number) => {
+    const period = periods.find(p => p.id === periodId);
+    setPeriodContextMenu(null);
+    openConfirmDialog({
+      title: '删除时期',
+      message: `确定要删除时期「${period?.name || '未命名时期'}」吗？该时期下的作品会归入演员名时期。`,
+      confirmText: '确认删除',
+      danger: true,
+      onConfirm: () => handleDeletePeriod(periodId),
+    });
+  };
+
+  const requestPhotoAction = (photoId: number, action: 'primary' | 'delete') => {
+    setPhotoContextMenu(null);
+    openConfirmDialog({
+      title: action === 'primary' ? '设为主海报' : '删除海报',
+      message: action === 'primary' ? '确定将这张海报设为主海报吗？' : '确定删除这张海报吗？此操作不可恢复。',
+      confirmText: action === 'primary' ? '确认设置' : '确认删除',
+      danger: action === 'delete',
+      onConfirm: () => action === 'primary' ? handleSetPrimary(photoId) : handleDeletePhoto(photoId),
+    });
+  };
+
   const handleEditContextItem = () => {
     if (!contextMenu) return;
     const target = contextMenu.type === 'video'
       ? `/video/${contextMenu.id}?edit=1`
       : `/series/${contextMenu.id}?edit=1`;
     setContextMenu(null);
-    clearPending();
     navigate(target, { state: { from: `/actors/${actor?.id}`, backLabel: '返回演员详情' } });
   };
 
@@ -454,7 +538,6 @@ const ActorDetail: React.FC = () => {
     try {
       const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
-      clearPending();
       if (actor) loadActor(actor.id);
       setToast({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
@@ -537,22 +620,18 @@ const ActorDetail: React.FC = () => {
   };
 
   const handleDeletePeriod = async (periodId: number) => {
-    if (deletingPeriodId !== periodId) {
-      setDeletingPeriodId(periodId);
-      return;
-    }
     try {
       await deleteActorPeriod(periodId);
       setPeriods(prev => prev.filter(p => p.id !== periodId));
-      setDeletingPeriodId(null);
       // 重新加载以刷新 workPeriodMap
       if (actor) {
         const periodMap = await getActorWorkPeriodMap(actor.id);
         setWorkPeriodMap(periodMap);
       }
-      setToast({ message: '时期已删除，作品归入演员名时期', type: 'info' });
+      setToast({ message: '时期已删除，作品已归入演员名时期', type: 'info' });
     } catch (error) {
       console.error('[Actor] 删除时期失败:', error);
+      setToast({ message: '删除时期失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -1276,15 +1355,16 @@ const ActorDetail: React.FC = () => {
             </button>
           )}
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            onClick={() => {
-              const key = `${contextMenu.type}-${contextMenu.id}`;
-              requestSecondConfirm(key, () => contextMenu.type === 'video'
-                ? handleDeleteVideo(contextMenu.id)
-                : handleDeleteSeries(contextMenu.id));
-            }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            onClick={openAssignPeriodModal}
           >
-            {pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
+            分配到时期
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            onClick={requestDeleteVideo}
+          >
+            删除
           </button>
         </div>
       )}
@@ -1329,18 +1409,9 @@ const ActorDetail: React.FC = () => {
             <div className="border-t border-gray-100 my-1" />
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-              onClick={(e) => { e.stopPropagation();
-                if (deletingPeriodId === periodContextMenu.periodId) {
-                  // 已经确认过了，直接删除
-                  handleDeletePeriod(periodContextMenu.periodId);
-                } else {
-                  setDeletingPeriodId(periodContextMenu.periodId);
-                  // 3秒后重置
-                  setTimeout(() => setDeletingPeriodId(null), 3000);
-                }
-              }}
+              onClick={() => requestDeletePeriod(periodContextMenu.periodId)}
             >
-              {deletingPeriodId === periodContextMenu.periodId ? '再次点击确认删除' : '删除'}
+              删除
             </button>
           </div>
         );
@@ -1373,21 +1444,15 @@ const ActorDetail: React.FC = () => {
             <div className="border-t border-gray-100 my-1" />
             <button
               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              onClick={() => {
-                const key = `set-primary-${photoContextMenu.photoId}`;
-                requestSecondConfirm(key, () => handleSetPrimary(photoContextMenu.photoId));
-              }}
+              onClick={() => requestPhotoAction(photoContextMenu.photoId, 'primary')}
             >
-              {pendingKey === `set-primary-${photoContextMenu.photoId}` ? '再次点击确认设为主海报' : '⭐ 设为主海报'}
+              ⭐ 设为主海报
             </button>
             <button
               className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-              onClick={() => {
-                const key = `delete-photo-${photoContextMenu.photoId}`;
-                requestSecondConfirm(key, () => handleDeletePhoto(photoContextMenu.photoId));
-              }}
+              onClick={() => requestPhotoAction(photoContextMenu.photoId, 'delete')}
             >
-              {pendingKey === `delete-photo-${photoContextMenu.photoId}` ? '再次点击确认删除' : '🗑 删除'}
+              🗑 删除
             </button>
           </div>
         );
@@ -1428,6 +1493,7 @@ const ActorDetail: React.FC = () => {
       </div>
     )}
 
+
     {/* 新增时期弹窗 */}
     {showAddPeriodModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -1452,6 +1518,63 @@ const ActorDetail: React.FC = () => {
             <button
               onClick={() => { setNewPeriodName(''); setShowAddPeriodModal(false); }}
               className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 重新分配时期弹窗 */}
+    {periodAssignModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPeriodAssignModal(null)}>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 min-w-80 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">分配到时期</h3>
+          <p className="text-sm text-gray-500 mb-4 truncate">{periodAssignModal.name}</p>
+          <div className="space-y-2 mb-6 max-h-80 overflow-auto">
+            <button
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors text-sm ${periodAssignModal.currentPeriodId === null ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+              onClick={() => handleAssignWorkPeriod(undefined)}
+            >
+              {actor?.name}（演员名时期）
+            </button>
+            {[...periods].sort((a, b) => a.sort_order - b.sort_order).map(period => (
+              <button
+                key={period.id}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-colors text-sm ${periodAssignModal.currentPeriodId === period.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                onClick={() => handleAssignWorkPeriod(period.id)}
+              >
+                {period.name}
+              </button>
+            ))}
+          </div>
+          <button
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            onClick={() => setPeriodAssignModal(null)}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* 统一确认弹窗 */}
+    {confirmDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmDialog(null)}>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{confirmDialog.title}</h3>
+          <p className="text-sm text-gray-600 leading-6 mb-6">{confirmDialog.message}</p>
+          <div className="flex gap-3">
+            <button
+              className={`flex-1 px-4 py-2 text-white rounded-lg text-sm font-medium ${confirmDialog.danger ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+              onClick={runConfirmDialog}
+            >
+              {confirmDialog.confirmText || '确认'}
+            </button>
+            <button
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              onClick={() => setConfirmDialog(null)}
             >
               取消
             </button>

@@ -1402,7 +1402,12 @@ pub async fn add_resource_actor(
     role: Option<&str>,
     period_id: Option<i64>,
 ) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO video_actors (video_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)")
+    sqlx::query(
+        "INSERT INTO video_actors (video_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)
+         ON CONFLICT(video_id, actor_id) DO UPDATE SET
+           role = COALESCE(excluded.role, video_actors.role),
+           period_id = excluded.period_id",
+    )
         .bind(resource_id)
         .bind(actor_id)
         .bind(role)
@@ -1559,13 +1564,54 @@ pub async fn add_series_actor(
     role: Option<&str>,
     period_id: Option<i64>,
 ) -> Result<()> {
-    sqlx::query("INSERT OR IGNORE INTO series_actors (series_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)")
+    sqlx::query(
+        "INSERT INTO series_actors (series_id, actor_id, role, period_id) VALUES (?, ?, ?, ?)
+         ON CONFLICT(series_id, actor_id) DO UPDATE SET
+           role = COALESCE(excluded.role, series_actors.role),
+           period_id = excluded.period_id",
+    )
         .bind(series_id)
         .bind(actor_id)
         .bind(role)
         .bind(period_id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub async fn update_actor_work_period(
+    pool: &SqlitePool,
+    actor_id: i64,
+    work_type: &str,
+    work_id: i64,
+    period_id: Option<i64>,
+) -> Result<()> {
+    match work_type {
+        "series" => {
+            sqlx::query(
+                "INSERT INTO series_actors (series_id, actor_id, period_id) VALUES (?, ?, ?)
+                 ON CONFLICT(series_id, actor_id) DO UPDATE SET period_id = excluded.period_id",
+            )
+            .bind(work_id)
+            .bind(actor_id)
+            .bind(period_id)
+            .execute(pool)
+            .await?;
+        }
+        "video" => {
+            sqlx::query(
+                "INSERT INTO video_actors (video_id, actor_id, period_id) VALUES (?, ?, ?)
+                 ON CONFLICT(video_id, actor_id) DO UPDATE SET period_id = excluded.period_id",
+            )
+            .bind(work_id)
+            .bind(actor_id)
+            .bind(period_id)
+            .execute(pool)
+            .await?;
+        }
+        _ => anyhow::bail!("不支持的作品类型: {}", work_type),
+    }
+
     Ok(())
 }
 

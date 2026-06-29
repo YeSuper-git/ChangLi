@@ -76,6 +76,7 @@ const Library: React.FC = () => {
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
   const actorsRef = useRef<HTMLDivElement>(null);
@@ -101,7 +102,7 @@ const Library: React.FC = () => {
   // Toast 自动消失
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
+      const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -408,8 +409,8 @@ const Library: React.FC = () => {
 
   const deselectAll = () => setSelectedIds(new Set());
 
-  const handleBatchDelete = async () => {
-    if (!confirm(`确定删除选中的 ${selectedIds.size} 个项目？`)) return;
+  const doBatchDelete = async () => {
+    setBatchDeleteConfirm(false);
     for (const key of selectedIds) {
       const [type, idStr] = key.split('-');
       const id = parseInt(idStr);
@@ -426,6 +427,10 @@ const Library: React.FC = () => {
     if (activeActorId !== null) {
       await filterByActor(activeActorId);
     }
+  };
+
+  const handleBatchDelete = async () => {
+    setBatchDeleteConfirm(true);
   };
 
   return (
@@ -724,6 +729,30 @@ const Library: React.FC = () => {
     {toast && (
       <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
         {toast.message}
+      </div>
+    )}
+
+    {/* 批量删除确认弹窗 */}
+    {batchDeleteConfirm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setBatchDeleteConfirm(false)}>
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">批量删除</h3>
+          <p className="text-sm text-gray-600 leading-6 mb-6">确定删除选中的 {selectedIds.size} 个项目？此操作不可恢复。</p>
+          <div className="flex gap-3">
+            <button
+              onClick={doBatchDelete}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+            >
+              确认删除
+            </button>
+            <button
+              onClick={() => setBatchDeleteConfirm(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            >
+              取消
+            </button>
+          </div>
+        </div>
       </div>
     )}
 
