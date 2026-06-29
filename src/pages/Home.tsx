@@ -13,6 +13,7 @@ const Home: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     getAllCategories()
       .then(setCategories)
       .catch((err) => console.error('[Home] 加载大类配置失败:', err));

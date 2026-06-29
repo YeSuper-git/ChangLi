@@ -104,6 +104,7 @@ const SeriesDetail: React.FC = () => {
   const [loadingSeasons, setLoadingSeasons] = useState(false);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     if (seriesId) {
       loadSeries();
     }

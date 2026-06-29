@@ -14,6 +14,7 @@ const Downloads: React.FC = () => {
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     loadDownloads();
   }, []);
 

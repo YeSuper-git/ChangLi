@@ -956,6 +956,10 @@ export async function deleteCategory(key: string): Promise<void> {
   return invoke('delete_category_cmd', { key });
 }
 
+export async function reorderCategories(categoryKeys: string[]): Promise<void> {
+  return invoke('reorder_categories_cmd', { categoryKeys });
+}
+
 export async function scanCategory(categoryKey: string): Promise<{ added: number; updated: number }> {
   return invoke('scan_category', { categoryKey });
 }

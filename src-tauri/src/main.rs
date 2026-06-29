@@ -1982,6 +1982,7 @@ fn main() {
             create_category_cmd,
             update_category_cmd,
             delete_category_cmd,
+            reorder_categories_cmd,
             scan_category,
             get_all_actor_fields,
             update_actor_field_cmd,
@@ -2222,6 +2223,17 @@ async fn delete_category_cmd(state: State<'_, AppState>, key: String) -> Result<
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::delete_category(&pool, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn reorder_categories_cmd(state: State<'_, AppState>, category_keys: Vec<String>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::reorder_categories(&pool, &category_keys)
         .await
         .map_err(|e| e.to_string())
 }

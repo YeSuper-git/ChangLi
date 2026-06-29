@@ -64,6 +64,7 @@ const VideoDetail: React.FC = () => {
   const [actorNotice, setActorNotice] = useState('');
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     if (id) {
       loadVideo(parseInt(id));
       loadTags();

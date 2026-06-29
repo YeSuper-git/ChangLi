@@ -2681,6 +2681,17 @@ pub async fn delete_category(pool: &SqlitePool, key: &str) -> Result<()> {
         .await?;
     Ok(())
 }
+
+pub async fn reorder_categories(pool: &SqlitePool, category_keys: &[String]) -> Result<()> {
+    for (i, key) in category_keys.iter().enumerate() {
+        sqlx::query("UPDATE categories SET sort_order = ? WHERE key = ?")
+            .bind(i as i64)
+            .bind(key)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
 /// 删除某个大类下所有视频数据（不删除本地源文件）
 pub async fn delete_videos_by_category(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64)> {
     let video_count: (i64,) = sqlx::query_as(&format!(

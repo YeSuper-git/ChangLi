@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -282,6 +282,7 @@ const Settings: React.FC = () => {
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     loadSettingsData();
   }, []);
 
@@ -493,6 +494,22 @@ const Settings: React.FC = () => {
       loadCategories();
     } catch (error) {
       console.error('删除大类失败:', error);
+    }
+  };
+
+  const handleMoveCategory = async (key: string, direction: 'up' | 'down') => {
+    const idx = categories.findIndex(c => c.key === key);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === categories.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const newCategories = [...categories];
+    [newCategories[idx], newCategories[swapIdx]] = [newCategories[swapIdx], newCategories[idx]];
+    try {
+      await reorderCategories(newCategories.map(c => c.key));
+      setCategories(newCategories);
+    } catch (error) {
+      console.error('大类排序失败:', error);
     }
   };
 
@@ -793,6 +810,18 @@ const Settings: React.FC = () => {
                     </div>
                     <div className="flex gap-2 ml-4">
                       <button
+                        onClick={() => handleMoveCategory(cat.key, 'up')}
+                        disabled={categories.indexOf(cat) === 0}
+                        className="px-2 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="上移"
+                      >↑</button>
+                      <button
+                        onClick={() => handleMoveCategory(cat.key, 'down')}
+                        disabled={categories.indexOf(cat) === categories.length - 1}
+                        className="px-2 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="下移"
+                      >↓</button>
+                      <button
                         onClick={() => openEditCategory(cat)}
                         className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
                       >
@@ -909,7 +938,7 @@ const Settings: React.FC = () => {
             <h2 className="text-2xl font-bold mb-6">添加网站</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">网站名称 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">网站名称</label>
                 <input
                   type="text"
                   value={newSite.name}
@@ -919,7 +948,7 @@ const Settings: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">网站地址 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">网站地址</label>
                 <input
                   type="text"
                   value={newSite.url}
@@ -1016,45 +1045,45 @@ const Settings: React.FC = () => {
                     { key: 'chinese_sub' as const, label: '中文字幕', tip: '控制是否支持中文字幕标记' },
                   ]).map(({ key, label, tip }) => (
                     <div key={key} className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700 flex items-center gap-1">
-                        {label}
-                        <span className="group relative">
-                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
-                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">{tip}</span>
-                        </span>
-                      </span>
-                      <button
+                      <span className="text-sm text-gray-700">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <button
                         type="button"
                         onClick={() => setCategoryForm({
                           ...categoryForm,
                           features: { ...categoryForm.features, [key]: !categoryForm.features[key] }
                         })}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${categoryForm.features[key] ? 'bg-blue-500' : 'bg-gray-200'}`}
-                      >
+                        >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${categoryForm.features[key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
+                        </button>
+                        <span className="group relative">
+                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
+                          <span className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">{tip}</span>
+                        </span>
+                      </div>
                     </div>
                   ))}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700 flex items-center gap-1">
-                      剧集单位
-                      <span className="group relative">
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>
-                      </span>
-                    </span>
-                    <select
+                    <span className="text-sm text-gray-700">剧集单位</span>
+                    <div className="flex items-center gap-2">
+                      <select
                       value={categoryForm.features.episode || '部'}
                       onChange={(e) => setCategoryForm({
                         ...categoryForm,
                         features: { ...categoryForm.features, episode: e.target.value }
                       })}
                       className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                    >
+                      >
                       <option value="话">话</option>
                       <option value="部">部</option>
                       <option value="集">集</option>
-                    </select>
+                      </select>
+                      <span className="group relative">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
+                        <span className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

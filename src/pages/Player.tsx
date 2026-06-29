@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { LogicalSize } from '@tauri-apps/api/dpi';
 import { getVideo } from '../utils/api';
 import { init, destroy, setProperty, command, observeProperties } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -42,6 +43,7 @@ const Player: React.FC = () => {
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
+  const isPlayingRef = useRef(false);
 
   // 初始化 mpv
   useEffect(() => {
@@ -62,11 +64,12 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu-next',
+            'vo': 'gpu',
             'hwdec': 'auto-safe',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
+            'gpu-api': 'auto',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -77,7 +80,11 @@ const Player: React.FC = () => {
         await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
           switch (name) {
             case 'pause':
-              setIsPlaying(!data);
+              {
+                const playing = !data;
+                isPlayingRef.current = playing;
+                setIsPlaying(playing);
+              }
               break;
             case 'time-pos':
               setCurrentTime(data ?? 0);
@@ -118,11 +125,11 @@ const Player: React.FC = () => {
   // 播放/暂停
   const togglePlay = useCallback(async () => {
     try {
-      await setProperty('pause', !isPlaying);
+      await setProperty('pause', !isPlayingRef.current);
     } catch (err) {
       console.error('[Player] 切换播放状态失败:', err);
     }
-  }, [isPlaying]);
+  }, []);
 
   // 跳转
   const seek = useCallback(async (time: number) => {
@@ -175,8 +182,25 @@ const Player: React.FC = () => {
 
   // 切换画中画
   const togglePiP = useCallback(async () => {
-    // TODO: 实现画中画功能
-    setIsPiP(!isPiP);
+    try {
+      const win = getCurrentWindow();
+      const newPiP = !isPiP;
+      if (newPiP) {
+        // 进入画中画：缩小窗口并置顶
+        await win.setAlwaysOnTop(true);
+        await win.setSize(new LogicalSize(480, 270));
+        setIsPiP(true);
+        setIsPinned(true);
+      } else {
+        // 退出画中画：恢复窗口
+        await win.setAlwaysOnTop(false);
+        await win.setSize(new LogicalSize(1280, 720));
+        setIsPiP(false);
+        setIsPinned(false);
+      }
+    } catch (err) {
+      console.error('[Player] 切换画中画失败:', err);
+    }
   }, [isPiP]);
 
   // 进度条鼠标悬浮
@@ -190,7 +214,11 @@ const Player: React.FC = () => {
     
     setHoverTime(time);
     setHoverX(x);
-    // TODO: 生成缩略图预览
+    // 使用 mpv screenshot 生成预览缩略图
+    try {
+      const screenshotPath = `/tmp/changli_preview_${Math.round(time)}.jpg`;
+      command('screenshot-to-file', [screenshotPath, 'single']).catch(() => {});
+    } catch {}
   }, [duration]);
 
   // 进度条鼠标离开
