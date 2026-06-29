@@ -1059,6 +1059,28 @@ async fn restore_preset_templates(pool: &SqlitePool) -> Result<()> {
             .execute(pool)
             .await?;
         }
+
+        // 同时恢复 actor_fields 表中缺少的非扩展预设记录
+        if *is_ext == 0 {
+            let af_exists: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM actor_fields WHERE field_key = ?",
+            )
+            .bind(key)
+            .fetch_one(pool)
+            .await?;
+            if af_exists == 0 {
+                eprintln!("[migrations] restoring missing actor_field for preset: key={}", key);
+                sqlx::query(
+                    "INSERT INTO actor_fields (field_key, field_label, field_type, sort_order, enabled) VALUES (?, ?, ?, ?, 1)",
+                )
+                .bind(key)
+                .bind(name)
+                .bind(field_type)
+                .bind(order)
+                .execute(pool)
+                .await?;
+            }
+        }
     }
 
     Ok(())
