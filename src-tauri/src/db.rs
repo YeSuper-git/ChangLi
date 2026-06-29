@@ -2516,6 +2516,7 @@ pub struct Category {
     pub card_layout: String,
     pub features: String, // JSON string
     pub sort_order: i32,
+    pub scan_path: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -2534,6 +2535,7 @@ pub async fn get_all_categories(pool: &SqlitePool) -> Result<Vec<Category>> {
             card_layout: row.get("card_layout"),
             features: row.get("features"),
             sort_order: row.get("sort_order"),
+            scan_path: row.try_get("scan_path").ok().flatten(),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
@@ -2548,14 +2550,16 @@ pub async fn create_category(
     name: &str,
     card_layout: &str,
     features: &str,
+    scan_path: Option<&str>,
 ) -> Result<Category> {
     let row = sqlx::query(
-        "INSERT INTO categories (key, name, card_layout, features) VALUES (?, ?, ?, ?) RETURNING *",
+        "INSERT INTO categories (key, name, card_layout, features, scan_path) VALUES (?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(key)
     .bind(name)
     .bind(card_layout)
     .bind(features)
+    .bind(scan_path)
     .fetch_one(pool)
     .await?;
 
@@ -2566,6 +2570,7 @@ pub async fn create_category(
         card_layout: row.get("card_layout"),
         features: row.get("features"),
         sort_order: row.get("sort_order"),
+        scan_path: row.try_get("scan_path").ok().flatten(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
@@ -2577,13 +2582,15 @@ pub async fn update_category(
     name: &str,
     card_layout: &str,
     features: &str,
+    scan_path: Option<&str>,
 ) -> Result<Category> {
     let row = sqlx::query(
-        "UPDATE categories SET name = ?, card_layout = ?, features = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? RETURNING *",
+        "UPDATE categories SET name = ?, card_layout = ?, features = ?, scan_path = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ? RETURNING *",
     )
     .bind(name)
     .bind(card_layout)
     .bind(features)
+    .bind(scan_path)
     .bind(key)
     .fetch_one(pool)
     .await?;
@@ -2595,6 +2602,7 @@ pub async fn update_category(
         card_layout: row.get("card_layout"),
         features: row.get("features"),
         sort_order: row.get("sort_order"),
+        scan_path: row.try_get("scan_path").ok().flatten(),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
@@ -2606,6 +2614,24 @@ pub async fn delete_category(pool: &SqlitePool, key: &str) -> Result<()> {
         .execute(pool)
         .await?;
     Ok(())
+}
+
+pub async fn get_category_by_key(pool: &SqlitePool, key: &str) -> Result<Option<Category>> {
+    let row = sqlx::query("SELECT * FROM categories WHERE key = ?")
+        .bind(key)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|row| Category {
+        id: row.get("id"),
+        key: row.get("key"),
+        name: row.get("name"),
+        card_layout: row.get("card_layout"),
+        features: row.get("features"),
+        sort_order: row.get("sort_order"),
+        scan_path: row.try_get("scan_path").ok().flatten(),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }))
 }
 
 // ==================== 演员字段配置 CRUD ====================

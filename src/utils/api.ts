@@ -894,6 +894,7 @@ export interface Category {
   card_layout: 'portrait' | 'landscape' | 'auto';
   features: string; // JSON string
   sort_order: number;
+  scan_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -918,16 +919,20 @@ export async function getAllCategories(): Promise<Category[]> {
   return invoke<Category[]>('get_all_categories');
 }
 
-export async function createCategory(key: string, name: string, cardLayout: string, features: string): Promise<Category> {
-  return invoke<Category>('create_category_cmd', { key, name, cardLayout, features });
+export async function createCategory(key: string, name: string, cardLayout: string, features: string, scanPath?: string | null): Promise<Category> {
+  return invoke<Category>('create_category_cmd', { key, name, cardLayout, features, scanPath: scanPath || null });
 }
 
-export async function updateCategory(key: string, name: string, cardLayout: string, features: string): Promise<Category> {
-  return invoke<Category>('update_category_cmd', { key, name, cardLayout, features });
+export async function updateCategory(key: string, name: string, cardLayout: string, features: string, scanPath?: string | null): Promise<Category> {
+  return invoke<Category>('update_category_cmd', { key, name, cardLayout, features, scanPath: scanPath || null });
 }
 
 export async function deleteCategory(key: string): Promise<void> {
   return invoke('delete_category_cmd', { key });
+}
+
+export async function scanCategory(categoryKey: string): Promise<{ added: number; updated: number }> {
+  return invoke('scan_category', { categoryKey });
 }
 
 export async function getCategoryConfig(categoryKey: string): Promise<{ category: Category; features: CategoryFeatures } | null> {

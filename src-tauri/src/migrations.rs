@@ -22,6 +22,8 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actors_if_empty(pool).await?;
     create_actor_photos_table(pool).await?;
     create_indexes(pool).await?;
+    add_column_if_not_exists(pool, "categories", "scan_path", "TEXT")
+        .await?;
     seed_default_categories(pool).await?;
     seed_default_actor_fields(pool).await?;
     Ok(())

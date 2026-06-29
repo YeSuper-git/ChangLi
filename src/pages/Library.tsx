@@ -9,6 +9,7 @@ import {
   switchSeriesType,
   getAllCategories,
   parseCategoryFeatures,
+  scanCategory,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -22,6 +23,8 @@ const Library: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { tags, actors, series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
+  const [categoryScanning, setCategoryScanning] = useState(false);
+  const [scanConfirm, setScanConfirm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -293,6 +296,32 @@ const Library: React.FC = () => {
     }
   };
 
+  const handleCategoryScan = async () => {
+    setScanConfirm(false);
+    setCategoryScanning(true);
+    try {
+      const result = await scanCategory(mainCategory);
+      await refreshSeries();
+      if (activeTagId !== null) await filterByTag(activeTagId);
+      if (activeActorId !== null) await filterByActor(activeActorId);
+      const { added, updated } = result;
+      if (added > 0 && updated > 0) {
+        setToast({ message: `扫描完成，添加了 ${added} 部，更新了 ${updated} 部`, type: 'success' });
+      } else if (added > 0) {
+        setToast({ message: `扫描完成，添加了 ${added} 部`, type: 'success' });
+      } else if (updated > 0) {
+        setToast({ message: `扫描完成，更新了 ${updated} 部`, type: 'info' });
+      } else {
+        setToast({ message: '扫描完成，未发现新作品', type: 'info' });
+      }
+    } catch (error) {
+      console.error('[Library] 一键扫描失败:', error);
+      setToast({ message: '扫描失败: ' + String(error), type: 'info' });
+    } finally {
+      setCategoryScanning(false);
+    }
+  };
+
   const handleTagClick = (tagId: number | null) => {
     filterByTag(tagId);
   };
@@ -385,6 +414,15 @@ const Library: React.FC = () => {
           )}
         </div>
         <div className="flex gap-3">
+          {currentCategory?.scan_path && (
+            <button
+              onClick={() => setScanConfirm(true)}
+              disabled={categoryScanning}
+              className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
+            >
+              {categoryScanning ? '扫描中...' : '一键扫描'}
+            </button>
+          )}
           <button
             onClick={importPath}
             disabled={scanning}
@@ -644,6 +682,32 @@ const Library: React.FC = () => {
     {toast && (
       <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
         {toast.message}
+      </div>
+    )}
+
+    {/* 一键扫描确认弹窗 */}
+    {scanConfirm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+          <p className="text-gray-900 text-base mb-6">
+            确定对「{categoryDisplayName}」执行一键扫描？<br />
+            <span className="text-sm text-gray-500">扫描路径：{currentCategory?.scan_path}</span>
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={handleCategoryScan}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+            >
+              确认扫描
+            </button>
+            <button
+              onClick={() => setScanConfirm(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            >
+              取消
+            </button>
+          </div>
+        </div>
       </div>
     )}
 

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, getAllActorFields, updateActorField, createActorField, deleteActorField } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -183,8 +184,10 @@ const Settings: React.FC = () => {
     name: '',
     card_layout: 'auto' as 'portrait' | 'landscape' | 'auto',
     features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: true } as CategoryFeatures,
+    scan_path: '' as string,
   });
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
+  const [scanAfterCreate, setScanAfterCreate] = useState(false);
 
   const loadCategories = async () => {
     try {
@@ -197,13 +200,13 @@ const Settings: React.FC = () => {
 
   const openAddCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ key: '', name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: true } });
+    setCategoryForm({ key: '', name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: true }, scan_path: '' });
     setShowCategoryModal(true);
   };
 
   const openEditCategory = (cat: Category) => {
     setEditingCategory(cat);
-    setCategoryForm({ key: cat.key, name: cat.name, card_layout: cat.card_layout, features: parseCategoryFeatures(cat.features) });
+    setCategoryForm({ key: cat.key, name: cat.name, card_layout: cat.card_layout, features: parseCategoryFeatures(cat.features), scan_path: cat.scan_path || '' });
     setShowCategoryModal(true);
   };
 
@@ -211,15 +214,41 @@ const Settings: React.FC = () => {
     if (!categoryForm.key.trim() || !categoryForm.name.trim()) return;
     try {
       const featuresStr = JSON.stringify(categoryForm.features);
+      const scanPath = categoryForm.scan_path.trim() || null;
       if (editingCategory) {
-        await updateCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr);
+        await updateCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
       } else {
-        await createCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr);
+        await createCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
+        if (scanPath) {
+          setScanAfterCreate(true);
+        }
       }
       setShowCategoryModal(false);
       loadCategories();
     } catch (error) {
       console.error('保存大类失败:', error);
+    }
+  };
+
+  const handleScanAfterCreate = async () => {
+    setScanAfterCreate(false);
+    try {
+      const result = await scanCategory(categoryForm.key);
+      alert(`扫描完成：添加了 ${result.added} 部，更新了 ${result.updated} 部`);
+    } catch (error) {
+      console.error('扫描失败:', error);
+      alert('扫描失败: ' + String(error));
+    }
+  };
+
+  const selectScanPath = async () => {
+    try {
+      const selected = await open({ directory: true, title: '选择扫描目录' });
+      if (selected) {
+        setCategoryForm({ ...categoryForm, scan_path: selected as string });
+      }
+    } catch (error) {
+      console.error('选择文件夹失败:', error);
     }
   };
 
@@ -544,6 +573,9 @@ const Settings: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900">{cat.name}</h3>
                       <p className="text-sm text-gray-500 mt-1">Key: {cat.key} · 卡片方向: {layoutLabel}</p>
+                      {cat.scan_path && (
+                        <p className="text-xs text-gray-400 mt-1 truncate">扫描路径: {cat.scan_path}</p>
+                      )}
                       {activeFeatures.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {activeFeatures.map((f) => (
@@ -759,6 +791,25 @@ const Settings: React.FC = () => {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">默认扫描路径</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={categoryForm.scan_path}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, scan_path: e.target.value })}
+                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    placeholder="留空则不启用一键扫描"
+                  />
+                  <button
+                    type="button"
+                    onClick={selectScanPath}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                  >
+                    选择文件夹
+                  </button>
+                </div>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">功能开关</label>
                 <div className="space-y-3">
                   {([
@@ -923,6 +974,31 @@ const Settings: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
               >
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 新增大类后立即扫描确认弹窗 */}
+      {scanAfterCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <p className="text-gray-900 text-base mb-6">
+              大类已创建，是否立即扫描并添加？
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleScanAfterCreate}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              >
+                立即扫描
+              </button>
+              <button
+                onClick={() => setScanAfterCreate(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                稍后再说
               </button>
             </div>
           </div>

@@ -622,316 +622,6 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         return Ok(ScanResult { added, updated });
     }
 
-    // 路径5："影视"文件夹模式 - 用子文件夹名匹配演员
-    if folder_name == "影视" {
-        eprintln!("[ChangLi] 文件夹名 '影视'，进入影视文件夹模式");
-        let mut added: i64 = 0;
-        let mut updated: i64 = 0;
-
-        let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
-        for entry in entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let entry_path = entry.path();
-            let sub_name = entry.file_name().to_string_lossy().to_string();
-
-            if !entry_path.is_dir() {
-                continue;
-            }
-
-            // 用子文件夹名匹配演员 name 或 japanese_name
-            if let Ok(Some(actor)) = db::get_actor_by_name_or_jp(&pool, sub_name.trim()).await {
-                eprintln!(
-                    "[ChangLi] 影视模式：子文件夹 '{}' 匹配演员 '{}'，遍历子文件夹",
-                    sub_name, actor.name
-                );
-                let sub_entries = std::fs::read_dir(&entry_path).map_err(|e| e.to_string())?;
-                for sub_entry in sub_entries {
-                    let sub_entry = sub_entry.map_err(|e| e.to_string())?;
-                    let sub_entry_path = sub_entry.path();
-                    let sub_entry_name = sub_entry.file_name().to_string_lossy().to_string();
-
-                    if sub_entry_path.is_dir() {
-                        let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        if sub_result.videos.is_empty() {
-                            continue;
-                        }
-                        let sub_poster = sub_result.posters.values().next().cloned();
-                        let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
-                            scanner::generate_thumbnail_base64(std::path::Path::new(p))
-                        });
-                        let folder_path_str = sub_entry_path.to_string_lossy().to_string();
-                        if let Some(existing) =
-                            db::get_video_series_by_folder_path(&pool, &folder_path_str)
-                                .await
-                                .map_err(|e| e.to_string())?
-                        {
-                            db::update_video_series_poster(
-                                &pool,
-                                existing.id,
-                                sub_poster.as_deref(),
-                                sub_poster_base64.as_deref(),
-                                Some("landscape"),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            db::add_videos_batch(&pool, sub_result.videos, Some(existing.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            // 确保关联演员和 display_type
-                            let _ = db::add_series_actor(&pool, existing.id, actor.id, None, None)
-                                .await;
-                            let _ =
-                                db::update_video_series_display_type(&pool, existing.id, "adult")
-                                    .await;
-                            updated += 1;
-                        } else {
-                            let (series_title, code, has_chinese_sub) =
-                                extract_adult_metadata(&sub_entry_name);
-                            let series = db::add_video_series(
-                                &pool,
-                                &series_title,
-                                Some(&folder_path_str),
-                                sub_poster.as_deref(),
-                                Some("landscape"),
-                                Some("completed"),
-                                sub_poster_base64.as_deref(),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            if let Some(c) = code {
-                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
-                            }
-                            db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ =
-                                db::add_series_actor(&pool, series.id, actor.id, None, None).await;
-                            let _ = db::update_video_series_display_type(&pool, series.id, "adult")
-                                .await;
-                            added += 1;
-                        }
-                    } else if sub_entry_path.is_file() && scanner::is_video_file(&sub_entry_path) {
-                        let video = scanner::scan_video_file(&sub_entry_path, None)
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        let file_stem = sub_entry_path
-                            .file_stem()
-                            .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_else(|| sub_entry_name.clone());
-                        let thumb = video.thumbnail.as_deref().and_then(|t| {
-                            scanner::generate_thumbnail_base64(std::path::Path::new(t))
-                        });
-                        let file_path_str = sub_entry_path.to_string_lossy().to_string();
-                        if let Some(existing) =
-                            db::get_video_series_by_folder_path(&pool, &file_path_str)
-                                .await
-                                .map_err(|e| e.to_string())?
-                        {
-                            db::update_video_series_poster(
-                                &pool,
-                                existing.id,
-                                video.thumbnail.as_deref(),
-                                thumb.as_deref(),
-                                Some("landscape"),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            db::add_videos_batch(&pool, vec![video], Some(existing.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ = db::add_series_actor(&pool, existing.id, actor.id, None, None)
-                                .await;
-                            let _ =
-                                db::update_video_series_display_type(&pool, existing.id, "adult")
-                                    .await;
-                            updated += 1;
-                        } else {
-                            let (series_title, code, has_chinese_sub) =
-                                extract_adult_metadata(&file_stem);
-                            let series = db::add_video_series(
-                                &pool,
-                                &series_title,
-                                Some(&file_path_str),
-                                video.thumbnail.as_deref(),
-                                Some("landscape"),
-                                Some("completed"),
-                                thumb.as_deref(),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            if let Some(c) = code {
-                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
-                            }
-                            db::add_videos_batch(&pool, vec![video], Some(series.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ =
-                                db::add_series_actor(&pool, series.id, actor.id, None, None).await;
-                            let _ = db::update_video_series_display_type(&pool, series.id, "adult")
-                                .await;
-                            added += 1;
-                        }
-                    }
-                }
-            }
-            // 没匹配到演员的子文件夹：跳过不加
-        }
-
-        return Ok(ScanResult { added, updated });
-    }
-
-    // 路径6："动漫"文件夹模式 - 用子文件夹名匹配标签
-    if folder_name == "动漫" {
-        eprintln!("[ChangLi] 文件夹名 '动漫'，进入动漫文件夹模式");
-        let mut added: i64 = 0;
-        let mut updated: i64 = 0;
-
-        let entries = std::fs::read_dir(&path).map_err(|e| e.to_string())?;
-        for entry in entries {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let entry_path = entry.path();
-            let sub_name = entry.file_name().to_string_lossy().to_string();
-
-            if !entry_path.is_dir() {
-                continue;
-            }
-
-            // 用子文件夹名匹配标签
-            if let Ok(Some(tag)) = db::get_tag_by_name(&pool, sub_name.trim()).await {
-                eprintln!(
-                    "[ChangLi] 动漫模式：子文件夹 '{}' 匹配标签 '{}'，遍历子文件夹",
-                    sub_name, tag.name
-                );
-                let sub_entries = std::fs::read_dir(&entry_path).map_err(|e| e.to_string())?;
-                for sub_entry in sub_entries {
-                    let sub_entry = sub_entry.map_err(|e| e.to_string())?;
-                    let sub_entry_path = sub_entry.path();
-                    let sub_entry_name = sub_entry.file_name().to_string_lossy().to_string();
-
-                    if sub_entry_path.is_dir() {
-                        let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        if sub_result.videos.is_empty() {
-                            continue;
-                        }
-                        let sub_poster = sub_result.posters.values().next().cloned();
-                        let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
-                            scanner::generate_thumbnail_base64(std::path::Path::new(p))
-                        });
-                        let folder_path_str = sub_entry_path.to_string_lossy().to_string();
-                        if let Some(existing) =
-                            db::get_video_series_by_folder_path(&pool, &folder_path_str)
-                                .await
-                                .map_err(|e| e.to_string())?
-                        {
-                            db::update_video_series_poster(
-                                &pool,
-                                existing.id,
-                                sub_poster.as_deref(),
-                                sub_poster_base64.as_deref(),
-                                Some("landscape"),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            db::add_videos_batch(&pool, sub_result.videos, Some(existing.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ = db::add_series_tag(&pool, existing.id, tag.id).await;
-                            updated += 1;
-                        } else {
-                            let (series_title, code, has_chinese_sub) =
-                                extract_adult_metadata(&sub_entry_name);
-                            let series = db::add_video_series(
-                                &pool,
-                                &series_title,
-                                Some(&folder_path_str),
-                                sub_poster.as_deref(),
-                                Some("landscape"),
-                                Some("completed"),
-                                sub_poster_base64.as_deref(),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            if let Some(c) = code {
-                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
-                            }
-                            db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ = db::add_series_tag(&pool, series.id, tag.id).await;
-                            added += 1;
-                        }
-                    } else if sub_entry_path.is_file() && scanner::is_video_file(&sub_entry_path) {
-                        // 根目录下的视频也创建视频集并关联标签
-                        let video = scanner::scan_video_file(&sub_entry_path, None)
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        let file_stem = sub_entry_path
-                            .file_stem()
-                            .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_else(|| sub_entry_name.clone());
-                        let thumb = video.thumbnail.as_deref().and_then(|t| {
-                            scanner::generate_thumbnail_base64(std::path::Path::new(t))
-                        });
-                        let file_path_str = sub_entry_path.to_string_lossy().to_string();
-                        if let Some(existing) =
-                            db::get_video_series_by_folder_path(&pool, &file_path_str)
-                                .await
-                                .map_err(|e| e.to_string())?
-                        {
-                            db::update_video_series_poster(
-                                &pool,
-                                existing.id,
-                                video.thumbnail.as_deref(),
-                                thumb.as_deref(),
-                                Some("landscape"),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            db::add_videos_batch(&pool, vec![video], Some(existing.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ = db::add_series_tag(&pool, existing.id, tag.id).await;
-                            updated += 1;
-                        } else {
-                            let (series_title, code, has_chinese_sub) =
-                                extract_adult_metadata(&file_stem);
-                            let series = db::add_video_series(
-                                &pool,
-                                &series_title,
-                                Some(&file_path_str),
-                                video.thumbnail.as_deref(),
-                                Some("landscape"),
-                                Some("completed"),
-                                thumb.as_deref(),
-                            )
-                            .await
-                            .map_err(|e| e.to_string())?;
-                            if let Some(c) = code {
-                                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                                    .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
-                            }
-                            db::add_videos_batch(&pool, vec![video], Some(series.id))
-                                .await
-                                .map_err(|e| e.to_string())?;
-                            let _ = db::add_series_tag(&pool, series.id, tag.id).await;
-                            added += 1;
-                        }
-                    }
-                }
-            }
-            // 没匹配到标签：跳过不加
-        }
-
-        return Ok(ScanResult { added, updated });
-    }
-
     let result = scanner::scan_directory(&path)
         .await
         .map_err(|e| e.to_string())?;
@@ -2255,6 +1945,7 @@ fn main() {
             create_category_cmd,
             update_category_cmd,
             delete_category_cmd,
+            scan_category,
             get_all_actor_fields,
             update_actor_field_cmd,
             create_actor_field_cmd,
@@ -2436,12 +2127,13 @@ async fn create_category_cmd(
     name: String,
     card_layout: String,
     features: String,
+    scan_path: Option<String>,
 ) -> Result<db::Category, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::create_category(&pool, &key, &name, &card_layout, &features)
+    db::create_category(&pool, &key, &name, &card_layout, &features, scan_path.as_deref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -2453,12 +2145,13 @@ async fn update_category_cmd(
     name: String,
     card_layout: String,
     features: String,
+    scan_path: Option<String>,
 ) -> Result<db::Category, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_category(&pool, &key, &name, &card_layout, &features)
+    db::update_category(&pool, &key, &name, &card_layout, &features, scan_path.as_deref())
         .await
         .map_err(|e| e.to_string())
 }
@@ -2472,6 +2165,187 @@ async fn delete_category_cmd(state: State<'_, AppState>, key: String) -> Result<
     db::delete_category(&pool, &key)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn scan_category(state: State<'_, AppState>, category_key: String) -> Result<ScanResult, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    // 1. 读取大类配置
+    let category = db::get_category_by_key(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("大类 '{}' 不存在", category_key))?;
+
+    let scan_path = category.scan_path.ok_or_else(|| {
+        format!("大类 '{}' 未设置扫描路径", category.name)
+    })?;
+
+    let path = Path::new(&scan_path);
+    if !path.exists() {
+        return Err(format!("扫描路径不存在: {}", scan_path));
+    }
+
+    // 解析 features
+    let features: serde_json::Value = serde_json::from_str(&category.features).unwrap_or_default();
+    let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
+    let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
+
+    let mut added: i64 = 0;
+    let mut updated: i64 = 0;
+
+    // 2. 遍历子文件夹
+    let entries = std::fs::read_dir(&scan_path).map_err(|e| e.to_string())?;
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let entry_path = entry.path();
+        let entry_name = entry.file_name().to_string_lossy().to_string();
+
+        if !entry_path.is_dir() {
+            continue;
+        }
+
+        // 3. 根据 features 决定匹配方式
+        let matched_actor: Option<i64> = if actors_enabled {
+            match db::get_actor_by_name_or_jp(&pool, entry_name.trim()).await {
+                Ok(Some(actor)) => Some(actor.id),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        let matched_tag: Option<i64> = if tags_enabled && matched_actor.is_none() {
+            match db::get_tag_by_name(&pool, entry_name.trim()).await {
+                Ok(Some(tag)) => Some(tag.id),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        // 都没匹配到但启用了标签/演员：跳过
+        if (actors_enabled || tags_enabled) && matched_actor.is_none() && matched_tag.is_none() {
+            eprintln!("[ChangLi] scan_category: 子文件夹 '{}' 未匹配到演员或标签，跳过", entry_name);
+            continue;
+        }
+
+        // 4. 处理子文件夹下的子文件夹/视频
+        let sub_entries = std::fs::read_dir(&entry_path).map_err(|e| e.to_string())?;
+        for sub_entry in sub_entries {
+            let sub_entry = sub_entry.map_err(|e| e.to_string())?;
+            let sub_entry_path = sub_entry.path();
+            let sub_entry_name = sub_entry.file_name().to_string_lossy().to_string();
+
+            if sub_entry_path.is_dir() {
+                let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                if sub_result.videos.is_empty() {
+                    continue;
+                }
+                let sub_poster = sub_result.posters.values().next().cloned();
+                let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
+                    scanner::generate_thumbnail_base64(std::path::Path::new(p))
+                });
+                let folder_path_str = sub_entry_path.to_string_lossy().to_string();
+
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str)
+                    .await
+                    .map_err(|e| e.to_string())?
+                {
+                    db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape"))
+                        .await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, sub_result.videos, Some(existing.id))
+                        .await.map_err(|e| e.to_string())?;
+                    if let Some(aid) = matched_actor {
+                        let _ = db::add_series_actor(&pool, existing.id, aid, None, None).await;
+                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                    }
+                    if let Some(tid) = matched_tag {
+                        let _ = db::add_series_tag(&pool, existing.id, tid).await;
+                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                    }
+                    updated += 1;
+                } else {
+                    let (series_title, code, has_chinese_sub) = extract_adult_metadata(&sub_entry_name);
+                    let series = db::add_video_series(
+                        &pool, &series_title, Some(&folder_path_str),
+                        sub_poster.as_deref(), Some("landscape"), Some("completed"),
+                        sub_poster_base64.as_deref(),
+                    ).await.map_err(|e| e.to_string())?;
+                    if let Some(c) = code {
+                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                    }
+                    db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
+                        .await.map_err(|e| e.to_string())?;
+                    if let Some(aid) = matched_actor {
+                        let _ = db::add_series_actor(&pool, series.id, aid, None, None).await;
+                    }
+                    if let Some(tid) = matched_tag {
+                        let _ = db::add_series_tag(&pool, series.id, tid).await;
+                    }
+                    let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                    added += 1;
+                }
+            } else if sub_entry_path.is_file() && scanner::is_video_file(&sub_entry_path) {
+                let video = scanner::scan_video_file(&sub_entry_path, None)
+                    .await.map_err(|e| e.to_string())?;
+                let file_stem = sub_entry_path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| sub_entry_name.clone());
+                let thumb = video.thumbnail.as_deref().and_then(|t| {
+                    scanner::generate_thumbnail_base64(std::path::Path::new(t))
+                });
+                let file_path_str = sub_entry_path.to_string_lossy().to_string();
+
+                if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str)
+                    .await.map_err(|e| e.to_string())?
+                {
+                    db::update_video_series_poster(&pool, existing.id, video.thumbnail.as_deref(), thumb.as_deref(), Some("landscape"))
+                        .await.map_err(|e| e.to_string())?;
+                    db::add_videos_batch(&pool, vec![video], Some(existing.id))
+                        .await.map_err(|e| e.to_string())?;
+                    if let Some(aid) = matched_actor {
+                        let _ = db::add_series_actor(&pool, existing.id, aid, None, None).await;
+                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                    }
+                    if let Some(tid) = matched_tag {
+                        let _ = db::add_series_tag(&pool, existing.id, tid).await;
+                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                    }
+                    updated += 1;
+                } else {
+                    let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
+                    let series = db::add_video_series(
+                        &pool, &series_title, Some(&file_path_str),
+                        video.thumbnail.as_deref(), Some("landscape"), Some("completed"),
+                        thumb.as_deref(),
+                    ).await.map_err(|e| e.to_string())?;
+                    if let Some(c) = code {
+                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                    }
+                    db::add_videos_batch(&pool, vec![video], Some(series.id))
+                        .await.map_err(|e| e.to_string())?;
+                    if let Some(aid) = matched_actor {
+                        let _ = db::add_series_actor(&pool, series.id, aid, None, None).await;
+                    }
+                    if let Some(tid) = matched_tag {
+                        let _ = db::add_series_tag(&pool, series.id, tid).await;
+                    }
+                    let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                    added += 1;
+                }
+            }
+        }
+    }
+
+    Ok(ScanResult { added, updated })
 }
 
 // ==================== 演员字段配置 Commands ====================
