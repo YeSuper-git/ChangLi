@@ -2946,7 +2946,7 @@ fn preset_from_row(row: &SqliteRow) -> PresetTemplate {
 }
 
 pub async fn is_preset_template_enabled(pool: &SqlitePool, key: &str) -> Result<bool> {
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_fields WHERE field_key = ?")
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_fields WHERE field_key = ? AND enabled = 1")
         .bind(key)
         .fetch_one(pool)
         .await?;
@@ -2954,51 +2954,62 @@ pub async fn is_preset_template_enabled(pool: &SqlitePool, key: &str) -> Result<
 }
 
 pub async fn enable_preset_template(pool: &SqlitePool, key: &str) -> Result<()> {
-    if is_preset_template_enabled(pool, key).await? {
-        return Ok(());
-    }
-
-    let row = sqlx::query("SELECT * FROM preset_templates WHERE key = ?")
+    // Check if record already exists in actor_fields (possibly disabled)
+    let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actor_fields WHERE field_key = ?")
         .bind(key)
-        .fetch_optional(pool)
+        .fetch_one(pool)
         .await?;
 
-    let row = row.ok_or_else(|| anyhow::anyhow!("预设模板不存在: {}", key))?;
-
-    let name: String = row.get("name");
-    let field_type: String = row.get("field_type");
-    let sub_fields: String = row.get("sub_fields");
-    let rules: String = row.get("rules");
-
-    let options_json = serde_json::json!({
-        "sub_fields": serde_json::from_str::<serde_json::Value>(&sub_fields).unwrap_or_default(),
-        "rules": serde_json::from_str::<serde_json::Value>(&rules).unwrap_or_default(),
-    });
-    let options_str = serde_json::to_string(&options_json).ok();
-
-    let max_order: i32 =
-        sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
-            .fetch_one(pool)
+    if exists > 0 {
+        // Record exists (possibly disabled), just enable it — preserving user-modified name
+        sqlx::query("UPDATE actor_fields SET enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?")
+            .bind(key)
+            .execute(pool)
+            .await?;
+    } else {
+        // Insert new record from preset template
+        let row = sqlx::query("SELECT * FROM preset_templates WHERE key = ?")
+            .bind(key)
+            .fetch_optional(pool)
             .await?;
 
-    let actual_field_type = if field_type == "compound" { "compound" } else { &field_type };
+        let row = row.ok_or_else(|| anyhow::anyhow!("预设模板不存在: {}", key))?;
 
-    sqlx::query(
-        "INSERT INTO actor_fields (field_key, field_label, field_type, options, sort_order, enabled) VALUES (?, ?, ?, ?, ?, 1)",
-    )
-    .bind(key)
-    .bind(&name)
-    .bind(actual_field_type)
-    .bind(options_str.as_deref())
-    .bind(max_order + 1)
-    .execute(pool)
-    .await?;
+        let name: String = row.get("name");
+        let field_type: String = row.get("field_type");
+        let sub_fields: String = row.get("sub_fields");
+        let rules: String = row.get("rules");
+
+        let options_json = serde_json::json!({
+            "sub_fields": serde_json::from_str::<serde_json::Value>(&sub_fields).unwrap_or_default(),
+            "rules": serde_json::from_str::<serde_json::Value>(&rules).unwrap_or_default(),
+        });
+        let options_str = serde_json::to_string(&options_json).ok();
+
+        let max_order: i32 =
+            sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
+                .fetch_one(pool)
+                .await?;
+
+        let actual_field_type = if field_type == "compound" { "compound" } else { &field_type };
+
+        sqlx::query(
+            "INSERT INTO actor_fields (field_key, field_label, field_type, options, sort_order, enabled) VALUES (?, ?, ?, ?, ?, 1)",
+        )
+        .bind(key)
+        .bind(&name)
+        .bind(actual_field_type)
+        .bind(options_str.as_deref())
+        .bind(max_order + 1)
+        .execute(pool)
+        .await?;
+    }
 
     Ok(())
 }
 
 pub async fn disable_preset_template(pool: &SqlitePool, key: &str) -> Result<()> {
-    sqlx::query("DELETE FROM actor_fields WHERE field_key = ?")
+    sqlx::query("UPDATE actor_fields SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?")
         .bind(key)
         .execute(pool)
         .await?;

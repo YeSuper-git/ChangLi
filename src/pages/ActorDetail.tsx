@@ -126,10 +126,136 @@ const ActorDetail: React.FC = () => {
     }
   };
 
+  // 预设模板 key 集合
+  const PRESET_KEYS = new Set(['height', 'weight', 'birthday', 'measurements', 'cup_size']);
+
   // 根据 actorFields 配置动态渲染字段输入框
   const renderDynamicField = (field: ActorField) => {
     const value = (editForm as Record<string, string>)[field.field_key] || '';
     const onChange = (val: string) => setEditForm({ ...editForm, [field.field_key]: val });
+
+    // 预设模板定制渲染
+    if (PRESET_KEYS.has(field.field_key)) {
+      switch (field.field_key) {
+        case 'measurements': {
+          const mParts = (editForm.measurements || '').split('-');
+          while (mParts.length < 3) mParts.push('');
+          return (
+            <div className="flex gap-1 items-center">
+              {[0, 1, 2].map((idx) => (
+                <React.Fragment key={idx}>
+                  <span className="text-gray-500 text-xs">{['B', 'W', 'H'][idx]}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={mParts[idx]}
+                    onChange={(e) => handleMeasureChange(idx, e.target.value)}
+                    className="w-12 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm"
+                  />
+                </React.Fragment>
+              ))}
+            </div>
+          );
+        }
+        case 'cup_size':
+          return (
+            <input
+              type="text"
+              value={editForm.cup_size}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                setEditForm({ ...editForm, cup_size: val });
+              }}
+              className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+              maxLength={1}
+            />
+          );
+        case 'height':
+          return (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={editForm.height}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                  setEditForm({ ...editForm, height: v });
+                }}
+                className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+              />
+              <span className="text-gray-500 text-sm">cm</span>
+            </div>
+          );
+        case 'weight': {
+          const weightVal = (editForm as Record<string, string>)['weight'] || '';
+          return (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={weightVal}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                  setEditForm({ ...editForm, weight: v } as any);
+                }}
+                className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+              />
+              <span className="text-gray-500 text-sm">kg</span>
+            </div>
+          );
+        }
+        case 'birthday': {
+          const bdParts = (editForm.birthday || '').split('-');
+          while (bdParts.length < 3) bdParts.push('');
+          const getMaxDayLocal = (month: number): number => {
+            if ([1, 3, 5, 7, 8, 10, 12].includes(month)) return 31;
+            if ([4, 6, 9, 11].includes(month)) return 30;
+            if (month === 2) return 29;
+            return 31;
+          };
+          const updateBd = (idx: number, val: string) => {
+            const parts = (editForm.birthday || '').split('-');
+            while (parts.length < 3) parts.push('');
+            parts[idx] = val;
+            setEditForm({ ...editForm, birthday: parts.join('-') });
+          };
+          const md = getMaxDayLocal(parseInt(bdParts[1], 10) || 0);
+          return (
+            <div className="flex gap-1 items-center">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={bdParts[0] || ''}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4); updateBd(0, v); }}
+                className="w-16 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm"
+                placeholder="年"
+              />
+              <span className="text-gray-500 text-xs">年</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={bdParts[1] || ''}
+                onChange={(e) => { let v = e.target.value.replace(/[^0-9]/g, ''); if (v !== '' && parseInt(v, 10) > 12) v = '12'; updateBd(1, v); }}
+                className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm"
+                placeholder="月"
+              />
+              <span className="text-gray-500 text-xs">月</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={bdParts[2] || ''}
+                onChange={(e) => { let v = e.target.value.replace(/[^0-9]/g, ''); if (v !== '' && parseInt(v, 10) > (md || 31)) v = String(md || 31); updateBd(2, v); }}
+                className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm"
+                placeholder="日"
+              />
+              <span className="text-gray-500 text-xs">日</span>
+            </div>
+          );
+        }
+      }
+    }
+
+    // 通用字段渲染
     switch (field.field_type) {
       case 'number':
         return (

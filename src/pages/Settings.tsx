@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -33,9 +33,11 @@ const Settings: React.FC = () => {
       try {
         const templates = await getExtensionPresetTemplates();
         setPresetTemplates(templates);
+        const allTemplates = await getPresetTemplates();
+        setAllPresetTemplates(allTemplates);
         const map: Record<string, boolean> = {};
         for (const t of templates) {
-          map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key);
+          map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key && f.enabled);
         }
         setPresetEnabledMap(map);
       } catch {}
@@ -238,6 +240,7 @@ const Settings: React.FC = () => {
   const [fieldContextMenu, setFieldContextMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const [newOptionValue, setNewOptionValue] = useState('');
   const [presetTemplates, setPresetTemplates] = useState<PresetTemplate[]>([]);
+  const [allPresetTemplates, setAllPresetTemplates] = useState<PresetTemplate[]>([]);
   const [presetEnabledMap, setPresetEnabledMap] = useState<Record<string, boolean>>({});
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
@@ -253,9 +256,11 @@ const Settings: React.FC = () => {
     try {
       const templates = await getExtensionPresetTemplates();
       setPresetTemplates(templates);
+      const allTemplates = await getPresetTemplates();
+      setAllPresetTemplates(allTemplates);
       const map: Record<string, boolean> = {};
       for (const t of templates) {
-        map[t.key] = actorFields.some(f => f.field_key === t.key);
+        map[t.key] = actorFields.some(f => f.field_key === t.key && f.enabled);
       }
       setPresetEnabledMap(map);
     } catch (error) {
@@ -280,11 +285,8 @@ const Settings: React.FC = () => {
     setShowFieldModal(true);
   };
 
-  const openAddField = () => {
-    setEditingField(null);
-    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [], format: '' });
-    setShowFieldModal(true);
-  };
+  // 判断是否是预设模板字段
+  const isPresetField = (fieldKey: string) => allPresetTemplates.some(t => t.key === fieldKey);
 
   const handleSaveField = async () => {
     try {
@@ -553,30 +555,31 @@ const Settings: React.FC = () => {
             >
               扩展系统预设
             </button>
-            <button
-              onClick={openAddField}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              新增字段
-            </button>
           </div>
         </div>
 
-        {(
-          <div className="grid grid-cols-4 gap-4">
-            {actorFields.filter(f => f.field_key !== 'name').map((field) => (
-              <div key={field.field_key} className="card p-4 cursor-pointer flex flex-col items-center justify-center" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
-                <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
-                <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : '选择'}</p>
-                <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
-              </div>
-            ))}
-            <div className="border-dashed border-2 border-gray-300 rounded-xl p-4 cursor-pointer flex flex-col items-center justify-center hover:bg-gray-50" onClick={openAddField}>
-              <span className="text-gray-400 text-2xl">+</span>
-              <span className="text-xs text-gray-400 mt-1">新增字段</span>
+        {(() => {
+          const presetKeySet = new Set(allPresetTemplates.map(t => t.key));
+          const sorted = [...actorFields.filter(f => f.field_key !== 'name')].sort((a, b) => {
+            const aPreset = presetKeySet.has(a.field_key) ? 0 : 1;
+            const bPreset = presetKeySet.has(b.field_key) ? 0 : 1;
+            return aPreset - bPreset;
+          });
+          return (
+            <div className="grid grid-cols-4 gap-4">
+              {sorted.map((field) => (
+                <div key={field.field_key} className="card p-4 cursor-pointer flex flex-col items-center justify-center" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
+                  <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
+                  {presetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-600 mt-1">预设</span>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : field.field_type === 'compound' ? '复合' : '选择'}</p>
+                  <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </section>
 
       {/* 大类视频删除确认弹窗 */}
@@ -821,6 +824,8 @@ const Settings: React.FC = () => {
                   placeholder="如：身高"
                 />
               </div>
+              {!(editingField && isPresetField(editingField.field_key)) && (
+                <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">字段类型</label>
                 <select
@@ -876,6 +881,20 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
               )}
+                </>
+              )}
+              {editingField && isPresetField(editingField.field_key) && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">启用</span>
+                  <button
+                    type="button"
+                    onClick={() => setFieldForm({ ...fieldForm, enabled: !fieldForm.enabled })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fieldForm.enabled ? 'bg-blue-500' : 'bg-gray-200'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fieldForm.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex gap-4 mt-8">
               <button
@@ -900,7 +919,9 @@ const Settings: React.FC = () => {
       {fieldContextMenu && (
         <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
           <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button>
-          <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
+          {!isPresetField(fieldContextMenu.key) && (
+            <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
+          )}
         </div>
       )}
 
@@ -982,7 +1003,7 @@ const Settings: React.FC = () => {
                           setActorFields(fieldsList);
                           const map: Record<string, boolean> = {};
                           for (const t of presetTemplates) {
-                            map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key);
+                            map[t.key] = fieldsList.some((f: ActorField) => f.field_key === t.key && f.enabled);
                           }
                           setPresetEnabledMap(map);
                         } catch (error) {
