@@ -169,10 +169,33 @@ jobs:
           name: changli-v${{ steps.version.outputs.version }}-windows
           path: src-tauri/target/release/bundle/nsis/*.exe
 
+      - name: Generate latest.json
+        shell: bash
+        run: |
+          EXE_PATH=$(ls src-tauri/target/release/bundle/nsis/*.exe | head -1)
+          EXE_NAME=$(basename "$EXE_PATH")
+          EXE_SIZE=$(stat -c%s "$EXE_PATH" 2>/dev/null || stat -f%z "$EXE_PATH")
+          VERSION="${{ steps.version.outputs.version }}"
+          cat > src-tauri/target/release/bundle/nsis/latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "ChangLi v$VERSION",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "",
+                "url": "https://github.com/YeSuper-git/ChangLi/releases/download/v${VERSION}/${EXE_NAME}"
+              }
+            }
+          }
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/release/bundle/nsis/*.exe
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/latest.json
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
