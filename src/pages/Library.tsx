@@ -6,7 +6,7 @@ import {
   scanVideos,
   deleteVideoSeries,
   rescanSingleSeriesMetadata,
-  switchSeriesType,
+  switchSeriesTypeTo,
   getAllCategories,
   parseCategoryFeatures,
   scanCategory,
@@ -74,6 +74,8 @@ const Library: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
+  const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
+  const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
   const actorsRef = useRef<HTMLDivElement>(null);
   const [tagsNeedsExpand, setTagsNeedsExpand] = useState(false);
@@ -303,15 +305,29 @@ const Library: React.FC = () => {
   };
 
   const handleSwitchType = async (seriesId: number) => {
+    setTypeSwitchSeriesId(seriesId);
+  };
+
+  const handleSwitchTypeTo = async (seriesId: number, categoryKey: string, categoryName: string) => {
+    setTypeSwitchConfirm({ seriesId, categoryName, categoryKey });
+    setTypeSwitchSeriesId(null);
+    setContextMenu(null);
+    clearPending();
+  };
+
+  const doSwitchType = async () => {
+    if (!typeSwitchConfirm) return;
     try {
-      await switchSeriesType(seriesId);
-      setContextMenu(null);
-      clearPending();
+      await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
+      setTypeSwitchConfirm(null);
       await refreshSeries();
-      setToast({ message: '类型已切换', type: 'success' });
+      if (activeTagId !== null) await filterByTag(activeTagId);
+      if (activeActorId !== null) await filterByActor(activeActorId);
+      setToast({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
     } catch (error) {
       console.error('[Library] 切换类型失败:', error);
       setToast({ message: '切换类型失败: ' + String(error), type: 'info' });
+      setTypeSwitchConfirm(null);
     }
   };
 
@@ -416,7 +432,7 @@ const Library: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-4">
-          {categories.map((cat) => (
+          {[...categories].sort((a, b) => a.sort_order - b.sort_order).map((cat) => (
             <h1
               key={cat.key}
               className={`font-bold cursor-pointer transition-all ${mainCategory === cat.key ? 'text-4xl' : 'text-2xl text-gray-400'}`}
@@ -684,11 +700,11 @@ const Library: React.FC = () => {
           <button
             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             onClick={() => {
-              const key = `switch-${contextMenu.id}`;
-              requestSecondConfirm(key, () => handleSwitchType(contextMenu.id));
+              
+              handleSwitchType(contextMenu.id);
             }}
           >
-            {pendingKey === `switch-${contextMenu.id}` ? '确认切换' : '切换类型'}
+            切换类型
           </button>
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -727,6 +743,57 @@ const Library: React.FC = () => {
             </button>
             <button
               onClick={() => setScanConfirm(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 切换类型 - 大类选择弹窗 */}
+    {typeSwitchSeriesId !== null && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setTypeSwitchSeriesId(null)}>
+        <div className="bg-white rounded-2xl p-6 min-w-64 shadow-xl" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">切换到</h3>
+          <div className="space-y-2 mb-4">
+            {categories.filter(c => c.key !== mainCategory).map(cat => (
+              <button
+                key={cat.key}
+                className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                onClick={() => handleSwitchTypeTo(typeSwitchSeriesId, cat.key, cat.name)}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <button
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            onClick={() => setTypeSwitchSeriesId(null)}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* 切换类型确认弹窗 */}
+    {typeSwitchConfirm && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+          <p className="text-gray-900 text-base mb-6">
+            确定切换到「{typeSwitchConfirm.categoryName}」？
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={doSwitchType}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+            >
+              确认
+            </button>
+            <button
+              onClick={() => setTypeSwitchConfirm(null)}
               className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
             >
               取消

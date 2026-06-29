@@ -26,13 +26,14 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         .await?;
     seed_default_categories(pool).await?;
     seed_default_actor_fields(pool).await?;
+    // Remove stale 'name' field from actor_fields (task #1)
+    execute(pool, "DELETE FROM actor_fields WHERE field_key = 'name'", "delete name from actor_fields").await?;
     add_column_if_not_exists(pool, "actor_fields", "options", "TEXT")
         .await?;
     add_column_if_not_exists(pool, "actor_fields", "format", "TEXT")
         .await?;
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
-    restore_preset_templates(pool).await?;
     Ok(())
 }
 
@@ -345,6 +346,7 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("actors", "japanese_name", "TEXT"),
         Column::new("actors", "cup_size", "TEXT"),
         Column::new("actors", "alias", "TEXT"),
+        Column::new("actors", "weight", "TEXT"),
         Column::new("actors", "created_at", "TEXT"),
         Column::new("actors", "updated_at", "TEXT"),
         Column::new("tags", "name", "TEXT NOT NULL DEFAULT ''"),
@@ -930,7 +932,6 @@ async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
     }
 
     let default_fields = [
-        ("name", "名称", "text", 1, 1),
         ("japanese_name", "日本名", "text", 2, 1),
         ("alias", "别名", "text", 3, 1),
         ("photo", "照片", "text", 4, 1),
@@ -1019,72 +1020,6 @@ async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
-async fn restore_preset_templates(pool: &SqlitePool) -> Result<()> {
-    let presets: Vec<(&str, &str, &str, &str, &str, i32, i32)> = vec![
-        ("height", "身高", "number", "[]", r#"{"unit":"cm"}"#, 0, 1),
-        ("weight", "体重", "number", "[]", r#"{"unit":"kg"}"#, 0, 2),
-        ("birthday", "生日", "date", "[]", "{}", 0, 3),
-        (
-            "measurements",
-            "三围",
-            "compound",
-            r#"[{"label":"B","maxLen":2},{"label":"W","maxLen":2},{"label":"H","maxLen":2}]"#,
-            "{}",
-            1,
-            4,
-        ),
-        ("cup_size", "罩杯", "text", "[]", r#"{"maxLength":1,"uppercase":true}"#, 1, 5),
-    ];
-
-    for (key, name, field_type, sub_fields, rules, is_ext, order) in &presets {
-        let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM preset_templates WHERE key = ?",
-        )
-        .bind(key)
-        .fetch_one(pool)
-        .await?;
-
-        if exists == 0 {
-            eprintln!("[migrations] restoring missing preset template: key={}", key);
-            sqlx::query(
-                "INSERT INTO preset_templates (key, name, field_type, sub_fields, rules, is_extension, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(key)
-            .bind(name)
-            .bind(field_type)
-            .bind(sub_fields)
-            .bind(rules)
-            .bind(is_ext)
-            .bind(order)
-            .execute(pool)
-            .await?;
-        }
-
-        // 同时恢复 actor_fields 表中缺少的非扩展预设记录
-        if *is_ext == 0 {
-            let af_exists: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM actor_fields WHERE field_key = ?",
-            )
-            .bind(key)
-            .fetch_one(pool)
-            .await?;
-            if af_exists == 0 {
-                eprintln!("[migrations] restoring missing actor_field for preset: key={}", key);
-                sqlx::query(
-                    "INSERT INTO actor_fields (field_key, field_label, field_type, sort_order, enabled) VALUES (?, ?, ?, ?, 1)",
-                )
-                .bind(key)
-                .bind(name)
-                .bind(field_type)
-                .bind(order)
-                .execute(pool)
-                .await?;
-            }
-        }
-    }
-
-    Ok(())
-}
 
 async fn execute(pool: &SqlitePool, sql: &str, action: &str) -> Result<()> {
     sqlx::query(sql)

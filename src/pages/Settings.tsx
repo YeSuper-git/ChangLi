@@ -11,6 +11,14 @@ import { relaunch } from '@tauri-apps/plugin-process';
 
 const changelogData = [
   {
+    version: '1.6.6', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['切换类型支持多大类选择', '首页加刷新+返回顶部', '刷新按钮反馈toast', '大类排序支持', '生日/身高/体重/三围上下箭头', '罩杯A-Z上下箭头'] },
+      { category: '修复', items: ['体重编辑不生效', '动漫标签筛选显示0个', '演员详情页滚动到顶部', '关闭扩展预设后详情态不展示', '删掉actor_fields的name字段'] },
+      { category: '优化', items: ['扩展预设弹窗隐藏类型标签', '问号tooltip边缘自适应', '去掉必填星号', '刷新按钮位置固定', '删掉restore_preset_templates迁移'] },
+    ],
+  },
+  {
     version: '1.6.2', date: '2026-06-29',
     changes: [
       { category: '新功能', items: ['检查更新功能：设置页一键检查并自动更新', '版本更新记录：设置页可查看完整版本历史'] },
@@ -503,7 +511,7 @@ const Settings: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
-  const currentVersion = '1.6.2';
+  const currentVersion = '1.6.6';
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -1032,7 +1040,7 @@ const Settings: React.FC = () => {
                       剧集单位
                       <span className="group relative">
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的计数单位（话/部/集）</span>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>
                       </span>
                     </span>
                     <select
@@ -1262,8 +1270,7 @@ const Settings: React.FC = () => {
                 return (
                   <div key={template.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
-                      <span className="text-sm font-medium text-gray-900">{template.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">({template.field_type})</span>
+                      <span className="text-sm font-medium text-gray-900">{actorFields.find(f => f.field_key === template.key)?.field_label || template.name}</span>
                     </div>
                     <button
                       onClick={async () => {

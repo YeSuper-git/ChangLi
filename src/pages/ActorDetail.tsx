@@ -36,6 +36,7 @@ const ActorDetail: React.FC = () => {
     japanese_name: '',
     cup_size: '',
     alias: '',
+    weight: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photos, setPhotos] = useState<ActorPhoto[]>([]);
@@ -89,6 +90,7 @@ const ActorDetail: React.FC = () => {
 
   const loadActor = async (actorId: number) => {
     try {
+      window.scrollTo(0, 0);
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
       const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),
@@ -117,6 +119,7 @@ const ActorDetail: React.FC = () => {
           japanese_name: actorData.japanese_name || '',
           cup_size: actorData.cup_size || '',
           alias: actorData.alias || '',
+          weight: actorData.weight || '',
         });
       }
     } catch (error) {
@@ -128,6 +131,11 @@ const ActorDetail: React.FC = () => {
 
   // 预设模板 key 集合
   const PRESET_KEYS = new Set(['height', 'weight', 'birthday', 'measurements', 'cup_size']);
+  // 检查字段是否启用
+  const isFieldEnabled = (key: string) => {
+    const field = actorFields.find(f => f.field_key === key);
+    return field ? field.enabled : true;
+  };
 
   // 根据 actorFields 配置动态渲染字段输入框
   const renderDynamicField = (field: ActorField) => {
@@ -302,7 +310,8 @@ const ActorDetail: React.FC = () => {
         editForm.measurements || undefined,
         editForm.japanese_name || undefined,
         editForm.cup_size || undefined,
-        editForm.alias || undefined
+        editForm.alias || undefined,
+        (editForm as any).weight || undefined
       );
       clearEditQuery();
       setEditing(false);
@@ -845,7 +854,7 @@ const ActorDetail: React.FC = () => {
               {/* Dynamic fields based on actorFields config, or fallback to hardcoded */}
               {actorFields.length > 0 ? (
                 <div className="grid grid-cols-3 gap-4">
-                  {actorFields.filter(f => f.enabled).map(field => (
+                  {actorFields.filter(f => f.enabled && f.field_key !== 'name').map(field => (
                     <div key={field.field_key}>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{field.field_label}</label>
                       {renderDynamicField(field)}
@@ -1043,6 +1052,7 @@ const ActorDetail: React.FC = () => {
                         japanese_name: actor.japanese_name || '',
                         cup_size: actor.cup_size || '',
                         alias: actor.alias || '',
+                        weight: actor.weight || '',
                       });
                     }
                     setEditing(false);
@@ -1065,19 +1075,19 @@ const ActorDetail: React.FC = () => {
               )}
               
               <div className="grid grid-cols-2 gap-6 mb-8 text-sm">
-                {actor.birthday && (
+                {actor.birthday && isFieldEnabled('birthday') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">出生日期</span>
                     <span className="font-medium">{actor.birthday}</span>
                   </div>
                 )}
-                {actor.height && (
+                {actor.height && isFieldEnabled('height') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">身高</span>
                     <span className="font-medium">{actor.height}cm</span>
                   </div>
                 )}
-                {actor.measurements && (
+                {actor.measurements && isFieldEnabled('measurements') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">数值</span>
                     <span className="font-medium">
@@ -1085,10 +1095,16 @@ const ActorDetail: React.FC = () => {
                     </span>
                   </div>
                 )}
-                {actor.cup_size && (
+                {actor.cup_size && isFieldEnabled('cup_size') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">车灯</span>
                     <span className="font-medium">{actor.cup_size}</span>
+                  </div>
+                )}
+                {actor.weight && isFieldEnabled('weight') && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-500 w-20">体重</span>
+                    <span className="font-medium">{actor.weight}kg</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">

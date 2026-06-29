@@ -1016,6 +1016,17 @@ async fn switch_series_type(state: State<'_, AppState>, series_id: i64) -> Resul
         .await
         .map_err(|e| e.to_string())
 }
+#[tauri::command]
+async fn switch_series_type_to(state: State<'_, AppState>, series_id: i64, category_key: String) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_video_series_display_type(&pool, series_id, &category_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 
 #[tauri::command]
 async fn add_video_to_series(
@@ -1136,6 +1147,7 @@ async fn update_actor(
     japanese_name: Option<String>,
     cup_size: Option<String>,
     alias: Option<String>,
+    weight: Option<String>,
 ) -> Result<db::Actor, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -1158,6 +1170,7 @@ async fn update_actor(
         cup_size.as_deref(),
         avatar_base64.as_deref(),
         alias.as_deref(),
+        weight.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -1899,6 +1912,7 @@ fn main() {
             update_video_series,
             delete_video_series,
             switch_series_type,
+            switch_series_type_to,
             add_video_to_series,
             remove_video_from_series,
             get_actors,

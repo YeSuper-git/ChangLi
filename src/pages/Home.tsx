@@ -6,9 +6,10 @@ import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
 import { HorizontalScroll } from '../components/HorizontalScroll';
+import FloatingActions from '../components/FloatingActions';
 
 const Home: React.FC = () => {
-  const { actors, series: storeSeries, favorites } = useLibraryStore();
+  const { actors, series: storeSeries, favorites, refreshSeries } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -185,6 +186,8 @@ const Home: React.FC = () => {
           )}
         </div>
       </section>
+
+    <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新" />
     </div>
   );
 };

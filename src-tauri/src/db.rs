@@ -125,6 +125,7 @@ pub struct Actor {
     pub japanese_name: Option<String>,
     pub cup_size: Option<String>,
     pub alias: Option<String>,
+    pub weight: Option<String>,
     pub work_count: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -1041,9 +1042,10 @@ pub async fn update_actor(
     cup_size: Option<&str>,
     avatar_base64: Option<&str>,
     alias: Option<&str>,
+    weight: Option<&str>,
 ) -> Result<Actor> {
     let row = sqlx::query(
-        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, avatar_base64 = ?, alias = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
+        "UPDATE actors SET name = ?, photo = ?, bio = ?, birthday = ?, height = ?, measurements = ?, japanese_name = ?, cup_size = ?, avatar_base64 = ?, alias = ?, weight = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING *",
     )
     .bind(name)
     .bind(photo)
@@ -1055,6 +1057,7 @@ pub async fn update_actor(
     .bind(cup_size)
     .bind(avatar_base64)
     .bind(alias)
+    .bind(weight)
     .bind(id)
     .fetch_one(pool)
     .await?;
@@ -1121,6 +1124,7 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
         japanese_name: row.get("japanese_name"),
         cup_size: row.get("cup_size"),
         alias: row.try_get("alias").ok().flatten(),
+        weight: row.try_get("weight").ok().flatten(),
         work_count: row.try_get("work_count").unwrap_or(0),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
@@ -1245,7 +1249,7 @@ pub async fn get_tags_by_category(pool: &SqlitePool, category_key: &str) -> Resu
         "SELECT DISTINCT t.* FROM tags t
          JOIN series_tags st ON st.tag_id = t.id
          JOIN video_series vs ON vs.id = st.series_id
-         WHERE (vs.display_type = ? OR (vs.display_type IS NULL AND ? = 'anime'))
+         WHERE (vs.display_type = ? OR ((vs.display_type IS NULL OR vs.display_type = '') AND ? = 'anime'))
          ORDER BY t.name",
     )
     .bind(category_key)

@@ -332,6 +332,10 @@ export async function switchSeriesType(seriesId: number): Promise<void> {
   return invoke('switch_series_type', { seriesId });
 }
 
+export async function switchSeriesTypeTo(seriesId: number, categoryKey: string): Promise<void> {
+  return invoke('switch_series_type_to', { seriesId, categoryKey });
+}
+
 export async function addVideoToSeries(seriesId: number, path: string): Promise<Video> {
   return invoke<Video>('add_video_to_series', { seriesId, path });
 }
@@ -431,6 +435,7 @@ export interface Actor {
   japanese_name?: string;
   cup_size?: string;
   alias?: string;
+  weight?: string;
   work_count: number;
   created_at: string;
   updated_at: string;
@@ -485,10 +490,10 @@ export async function addActor(name: string, photo?: string, bio?: string, birth
   }
 }
 
-export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string, alias?: string): Promise<Actor> {
-  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize, 'alias:', alias);
+export async function updateActor(id: number, name: string, photo?: string, bio?: string, birthday?: string, height?: string, measurements?: string, japaneseName?: string, cupSize?: string, alias?: string, weight?: string): Promise<Actor> {
+  console.log('[API] 调用 updateActor, id:', id, 'name:', name, 'photo:', photo, 'japaneseName:', japaneseName, 'cupSize:', cupSize, 'alias:', alias, 'weight:', weight);
   try {
-    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName, cupSize, alias });
+    const result = await invoke<Actor>('update_actor', { id, name, photo, bio, birthday, height, measurements, japaneseName, cupSize, alias, weight });
     console.log('[API] updateActor 成功, 返回:', result);
     return result;
   } catch (err) {
