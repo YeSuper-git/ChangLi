@@ -970,6 +970,7 @@ export interface ActorField {
   field_label: string;
   field_type: string;
   options: string | null;
+  format: string | null;
   sort_order: number;
   enabled: boolean;
   created_at: string;
@@ -980,12 +981,12 @@ export async function getAllActorFields(): Promise<ActorField[]> {
   return invoke<ActorField[]>('get_all_actor_fields');
 }
 
-export async function updateActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null, enabled: boolean): Promise<void> {
-  return invoke('update_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options, enabled });
+export async function updateActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null, format: string | null, enabled: boolean): Promise<void> {
+  return invoke('update_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options, format, enabled });
 }
 
-export async function createActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null): Promise<ActorField> {
-  return invoke<ActorField>('create_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options });
+export async function createActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null, format: string | null): Promise<ActorField> {
+  return invoke<ActorField>('create_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options, format });
 }
 
 export async function deleteActorField(fieldKey: string): Promise<void> {

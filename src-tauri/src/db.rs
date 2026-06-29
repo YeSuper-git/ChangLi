@@ -2788,6 +2788,7 @@ pub struct ActorField {
     pub field_label: String,
     pub field_type: String,
     pub options: Option<String>,
+    pub format: Option<String>,
     pub sort_order: i32,
     pub enabled: bool,
     pub created_at: String,
@@ -2807,6 +2808,7 @@ pub async fn get_all_actor_fields(pool: &SqlitePool) -> Result<Vec<ActorField>> 
             field_label: row.get("field_label"),
             field_type: row.get("field_type"),
             options: row.get("options"),
+            format: row.get("format"),
             sort_order: row.get("sort_order"),
             enabled: row.get::<i32, _>("enabled") != 0,
             created_at: row.get("created_at"),
@@ -2823,14 +2825,16 @@ pub async fn update_actor_field(
     field_label: &str,
     field_type: &str,
     options: Option<&str>,
+    format: Option<&str>,
     enabled: bool,
 ) -> Result<()> {
     sqlx::query(
-        "UPDATE actor_fields SET field_label = ?, field_type = ?, options = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
+        "UPDATE actor_fields SET field_label = ?, field_type = ?, options = ?, format = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
     )
     .bind(field_label)
     .bind(field_type)
     .bind(options)
+    .bind(format)
     .bind(if enabled { 1 } else { 0 })
     .bind(field_key)
     .execute(pool)
@@ -2844,6 +2848,7 @@ pub async fn create_actor_field(
     field_label: &str,
     field_type: &str,
     options: Option<&str>,
+    format: Option<&str>,
 ) -> Result<ActorField> {
     let max_order: i32 =
         sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
@@ -2851,12 +2856,13 @@ pub async fn create_actor_field(
             .await?;
 
     let row = sqlx::query(
-        "INSERT INTO actor_fields (field_key, field_label, field_type, options, sort_order) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actor_fields (field_key, field_label, field_type, options, format, sort_order) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(field_key)
     .bind(field_label)
     .bind(field_type)
     .bind(options)
+    .bind(format)
     .bind(max_order + 1)
     .fetch_one(pool)
     .await?;
@@ -2867,6 +2873,7 @@ pub async fn create_actor_field(
         field_label: row.get("field_label"),
         field_type: row.get("field_type"),
         options: row.get("options"),
+        format: row.get("format"),
         sort_order: row.get("sort_order"),
         enabled: row.get::<i32, _>("enabled") != 0,
         created_at: row.get("created_at"),

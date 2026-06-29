@@ -385,7 +385,7 @@ const SeriesDetail: React.FC = () => {
 
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
@@ -761,7 +761,7 @@ const SeriesDetail: React.FC = () => {
             <div className="px-6 py-5 max-h-96 overflow-y-auto">
               {loadingSeasons ? (
                 <div className="text-gray-500 text-sm flex items-center gap-2 py-4">
-                  <img src={loadingIcon} alt="加载中" className="w-5 h-5" /> 加载中...
+                  <img src={loadingIcon} alt="加载中" className="w-5 h-5 animate-spin" />
                 </div>
               ) : seasons.length > 0 ? (
                 <div className="space-y-3">

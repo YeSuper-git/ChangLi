@@ -28,6 +28,8 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actor_fields(pool).await?;
     add_column_if_not_exists(pool, "actor_fields", "options", "TEXT")
         .await?;
+    add_column_if_not_exists(pool, "actor_fields", "format", "TEXT")
+        .await?;
     Ok(())
 }
 

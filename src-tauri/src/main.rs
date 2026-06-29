@@ -2445,13 +2445,14 @@ async fn update_actor_field_cmd(
     field_label: String,
     field_type: String,
     options: Option<String>,
+    format: Option<String>,
     enabled: bool,
 ) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), enabled)
+    db::update_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), format.as_deref(), enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2463,12 +2464,13 @@ async fn create_actor_field_cmd(
     field_label: String,
     field_type: String,
     options: Option<String>,
+    format: Option<String>,
 ) -> Result<db::ActorField, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::create_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref())
+    db::create_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), format.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

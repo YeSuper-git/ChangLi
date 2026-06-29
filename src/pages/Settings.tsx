@@ -97,6 +97,8 @@ const Settings: React.FC = () => {
 
   const [deleteCatConfirm, setDeleteCatConfirm] = useState<string | null>(null);
   const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
+  const [rescanConfirm, setRescanConfirm] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
   const doDeleteCategory = async (key: string) => {
@@ -113,10 +115,11 @@ const Settings: React.FC = () => {
   const handleRescanCategory = async (key: string) => {
     setRescanningCategory(key);
     try {
-      await rescanCategoryMetadata(key);
+      const result = await rescanCategoryMetadata(key);
+      setToast({ message: `扫描完成，更新了 ${result[0]} 部，跳过 ${result[1]} 部`, type: 'success' });
     } catch (error) {
       console.error('重新扫描大类元数据失败:', error);
-      alert('扫描失败: ' + String(error));
+      setToast({ message: '扫描失败: ' + String(error), type: 'info' });
     } finally {
       setRescanningCategory(null);
     }
@@ -144,6 +147,14 @@ const Settings: React.FC = () => {
       console.error('加载大类失败:', error);
     }
   };
+
+  // Toast 自动消失
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const openAddCategory = () => {
     setEditingCategory(null);
@@ -213,7 +224,7 @@ const Settings: React.FC = () => {
   const [actorFields, setActorFields] = useState<ActorField[]>([]);
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [editingField, setEditingField] = useState<ActorField | null>(null);
-  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[] });
+  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[], format: '' });
   const [fieldContextMenu, setFieldContextMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const [newOptionValue, setNewOptionValue] = useState('');
 
@@ -237,23 +248,25 @@ const Settings: React.FC = () => {
     setEditingField(field);
     let opts: string[] = [];
     try { if (field.options) opts = JSON.parse(field.options); } catch {}
-    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts });
+    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts, format: field.format || '' });
     setShowFieldModal(true);
   };
 
   const openAddField = () => {
     setEditingField(null);
-    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] });
+    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [], format: '' });
     setShowFieldModal(true);
   };
 
   const handleSaveField = async () => {
     try {
       const optionsStr = fieldForm.field_type === 'select' ? JSON.stringify(fieldForm.options) : null;
+      const formatStr = fieldForm.field_type === 'text' && fieldForm.format ? fieldForm.format : null;
       if (editingField) {
-        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, fieldForm.enabled);
+        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, formatStr, fieldForm.enabled);
       } else {
-        await createActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr);
+        const autoKey = fieldForm.field_label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || Date.now().toString(36);
+        await createActorField(autoKey, fieldForm.field_label, fieldForm.field_type, optionsStr, formatStr);
       }
       setShowFieldModal(false);
       loadActorFields();
@@ -274,7 +287,7 @@ const Settings: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
+        <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div>
       </div>
     );
   }
@@ -438,7 +451,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', chinese_sub: '中字', episode: '单位' };
+                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', chinese_sub: '中字', episode: '剧集单位' };
                 return labels[k] || k;
               });
               return (
@@ -446,7 +459,7 @@ const Settings: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900">{cat.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">Key: {cat.key} · 卡片方向: {layoutLabel}</p>
+                      <p className="text-sm text-gray-500 mt-1">卡片方向: {layoutLabel}</p>
                       {cat.scan_path && (
                         <p className="text-xs text-gray-400 mt-1 truncate">扫描路径: {cat.scan_path}</p>
                       )}
@@ -466,7 +479,7 @@ const Settings: React.FC = () => {
                         编辑
                       </button>
                       <button
-                        onClick={() => handleRescanCategory(cat.key)}
+                        onClick={() => setRescanConfirm(cat.key)}
                         disabled={rescanningCategory === cat.key}
                         className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
                       >
@@ -513,19 +526,19 @@ const Settings: React.FC = () => {
           </button>
         </div>
 
-        {actorFields.length > 0 ? (
-          <div className="grid grid-cols-3 gap-4">
+        {(
+          <div className="grid grid-cols-4 gap-4">
             {actorFields.map((field) => (
-              <div key={field.field_key} className="card p-4 cursor-pointer" onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
+              <div key={field.field_key} className="card p-4 cursor-pointer flex flex-col items-center justify-center" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
                 <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
                 <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : '选择'}</p>
+                <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">暂无演员字段配置</p>
-            <p className="text-gray-400 text-sm">点击"新增字段"添加</p>
+            <div className="border-dashed border-2 border-gray-300 rounded-xl p-4 cursor-pointer flex flex-col items-center justify-center hover:bg-gray-50" onClick={openAddField}>
+              <span className="text-gray-400 text-2xl">+</span>
+              <span className="text-xs text-gray-400 mt-1">新增字段</span>
+            </div>
           </div>
         )}
       </section>
@@ -627,17 +640,7 @@ const Settings: React.FC = () => {
                   placeholder="如：动漫"
                 />
               </div>
-              {editingCategory && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">唯一标识 Key</label>
-                  <input
-                    type="text"
-                    value={categoryForm.key}
-                    readOnly
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500"
-                  />
-                </div>
-              )}
+              {/* Key 不展示，由系统管理 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">卡片方向</label>
                 <select
@@ -673,13 +676,19 @@ const Settings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">功能开关</label>
                 <div className="space-y-3">
                   {([
-                    { key: 'tags' as const, label: '标签' },
-                    { key: 'actors' as const, label: '演员' },
-                    { key: 'tracking' as const, label: '追番' },
-                    { key: 'chinese_sub' as const, label: '中文字幕' },
-                  ]).map(({ key, label }) => (
+                    { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
+                    { key: 'actors' as const, label: '演员', tip: '控制是否支持给视频集关联演员' },
+                    { key: 'tracking' as const, label: '追番', tip: '控制是否支持追番/已看完功能' },
+                    { key: 'chinese_sub' as const, label: '中文字幕', tip: '控制是否支持中文字幕标记' },
+                  ]).map(({ key, label, tip }) => (
                     <div key={key} className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">{label}</span>
+                      <span className="text-sm text-gray-700 flex items-center gap-1">
+                        {label}
+                        <span className="group relative">
+                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">{tip}</span>
+                        </span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => setCategoryForm({
@@ -693,7 +702,13 @@ const Settings: React.FC = () => {
                     </div>
                   ))}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">单位</span>
+                    <span className="text-sm text-gray-700 flex items-center gap-1">
+                      剧集单位
+                      <span className="group relative">
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的计数单位（话/部/集）</span>
+                      </span>
+                    </span>
                     <select
                       value={categoryForm.features.episode || '部'}
                       onChange={(e) => setCategoryForm({
@@ -760,18 +775,16 @@ const Settings: React.FC = () => {
           <div className="bg-white rounded-2xl p-8 w-96">
             <h2 className="text-2xl font-bold mb-6">{editingField ? '编辑字段' : '新增字段'}</h2>
             <div className="space-y-4">
-              {!editingField && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">字段标识 *</label>
-                  <input
-                    type="text"
-                    value={fieldForm.field_key}
-                    onChange={(e) => setFieldForm({ ...fieldForm, field_key: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                    placeholder="如：height"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称 *</label>
+                <input
+                  type="text"
+                  value={fieldForm.field_label}
+                  onChange={(e) => setFieldForm({ ...fieldForm, field_label: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="如：身高"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">字段类型</label>
                 <select
@@ -785,16 +798,19 @@ const Settings: React.FC = () => {
                   <option value="select">选择</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称 *</label>
-                <input
-                  type="text"
-                  value={fieldForm.field_label}
-                  onChange={(e) => setFieldForm({ ...fieldForm, field_label: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  placeholder="如：身高"
-                />
-              </div>
+              {fieldForm.field_type === 'text' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">格式配置</label>
+                  <select
+                    value={fieldForm.format || ''}
+                    onChange={(e) => setFieldForm({ ...fieldForm, format: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">普通文本</option>
+                    <option value="uppercase_single">单个大写字母</option>
+                  </select>
+                </div>
+              )}
               {editingField && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">启用</span>
@@ -834,7 +850,7 @@ const Settings: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveField}
-                disabled={!fieldForm.field_label.trim() || (!editingField && !fieldForm.field_key.trim())}
+                disabled={!fieldForm.field_label.trim()}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
                 {editingField ? '保存' : '添加'}
@@ -849,6 +865,38 @@ const Settings: React.FC = () => {
         <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
           <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button>
           <button onClick={() => { if (confirm('确定删除该字段？')) { handleDeleteField(fieldContextMenu.key); } setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
+        </div>
+      )}
+
+      {/* 重新扫描元数据确认弹窗 */}
+      {rescanConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <p className="text-gray-900 text-base mb-6">
+              确定重新扫描该大类的所有视频元数据？
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { handleRescanCategory(rescanConfirm); setRescanConfirm(null); }}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              >
+                确定
+              </button>
+              <button
+                onClick={() => setRescanConfirm(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast 提示 */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
+          {toast.message}
         </div>
       )}
 

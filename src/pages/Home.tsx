@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { getAllCategories, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
+import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
 import { HorizontalScroll } from '../components/HorizontalScroll';
 
@@ -141,14 +142,14 @@ const Home: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-900">我的动漫</h2>
               <Link to="/library?cat=anime" className="text-blue-500 hover:text-blue-600 text-sm font-medium">查看全部 →</Link>
             </div>
-            <div className="text-center text-gray-500 py-12">加载中...</div>
+            <div className="text-center text-gray-500 py-12"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin mx-auto" /></div>
           </section>
           <section className="mb-16">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-900">我的影视</h2>
               <Link to="/library?cat=adult" className="text-blue-500 hover:text-blue-600 text-sm font-medium">查看全部 →</Link>
             </div>
-            <div className="text-center text-gray-500 py-12">加载中...</div>
+            <div className="text-center text-gray-500 py-12"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin mx-auto" /></div>
           </section>
         </>
       )}
