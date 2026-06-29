@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { LogicalSize } from '@tauri-apps/api/dpi';
+import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
+import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { getVideo } from '../utils/api';
 import { init, destroy, setProperty, command, observeProperties } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -44,6 +45,9 @@ const Player: React.FC = () => {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
   const isPlayingRef = useRef(false);
+  const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewSeqRef = useRef(0);
 
   // 初始化 mpv
   useEffect(() => {
@@ -186,15 +190,44 @@ const Player: React.FC = () => {
       const win = getCurrentWindow();
       const newPiP = !isPiP;
       if (newPiP) {
-        // 进入画中画：缩小窗口并置顶
+        // 保存当前窗口大小和位置
+        const currentSize = await win.outerSize();
+        const currentPos = await win.outerPosition();
+        pipOriginalState.current = {
+          size: new LogicalSize(currentSize.width, currentSize.height),
+          position: new LogicalPosition(currentPos.x, currentPos.y),
+        };
+
+        // 进入画中画：缩小窗口到右下角并置顶
+        const screen = await currentMonitor();
+        if (screen) {
+          const pipW = 480;
+          const pipH = 270;
+          const scale = screen.scaleFactor;
+          const screenW = screen.size.width / scale;
+          const screenH = screen.size.height / scale;
+          const margin = 20;
+          await win.setSize(new LogicalSize(pipW, pipH));
+          await win.setPosition(new LogicalPosition(
+            screenW - pipW - margin,
+            screenH - pipH - margin,
+          ));
+        } else {
+          await win.setSize(new LogicalSize(480, 270));
+        }
         await win.setAlwaysOnTop(true);
-        await win.setSize(new LogicalSize(480, 270));
         setIsPiP(true);
         setIsPinned(true);
       } else {
         // 退出画中画：恢复窗口
         await win.setAlwaysOnTop(false);
-        await win.setSize(new LogicalSize(1280, 720));
+        if (pipOriginalState.current) {
+          await win.setSize(pipOriginalState.current.size);
+          await win.setPosition(pipOriginalState.current.position);
+          pipOriginalState.current = null;
+        } else {
+          await win.setSize(new LogicalSize(1280, 720));
+        }
         setIsPiP(false);
         setIsPinned(false);
       }
@@ -214,15 +247,41 @@ const Player: React.FC = () => {
     
     setHoverTime(time);
     setHoverX(x);
-    // 使用 mpv screenshot 生成预览缩略图
-    try {
-      const screenshotPath = `/tmp/changli_preview_${Math.round(time)}.jpg`;
-      command('screenshot-to-file', [screenshotPath, 'single']).catch(() => {});
-    } catch {}
+
+    // 防抖生成预览帧
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+    }
+    const seq = ++previewSeqRef.current;
+    previewTimerRef.current = setTimeout(async () => {
+      try {
+        // 先跳转到目标时间
+        await command('seek', [time, 'absolute']);
+        // 等待帧渲染
+        await new Promise(r => setTimeout(r, 200));
+        // 检查是否还是最新的请求
+        if (seq !== previewSeqRef.current) return;
+        // 截图到临时文件
+        const screenshotPath = `/tmp/changli_preview_${seq}.jpg`;
+        await command('screenshot-to-file', [screenshotPath, 'window']);
+        if (seq !== previewSeqRef.current) return;
+        setThumbnailUrl(convertFileSrc(screenshotPath));
+      } catch {
+        // 截图失败时清空缩略图
+        if (seq === previewSeqRef.current) {
+          setThumbnailUrl(null);
+        }
+      }
+    }, 300);
   }, [duration]);
 
   // 进度条鼠标离开
   const handleProgressBarLeave = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    previewSeqRef.current++;
     setHoverTime(null);
     setThumbnailUrl(null);
   }, []);

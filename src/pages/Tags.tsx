@@ -82,7 +82,7 @@ const Tags: React.FC = () => {
           <div className="bg-white rounded-2xl p-8 w-96">
             <h2 className="text-2xl font-bold mb-6">添加标签</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">标签名称 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">标签名称</label>
               <input
                 type="text"
                 value={newTagName}

@@ -812,15 +812,15 @@ const Settings: React.FC = () => {
                       <button
                         onClick={() => handleMoveCategory(cat.key, 'up')}
                         disabled={categories.indexOf(cat) === 0}
-                        className="px-2 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
                         title="上移"
-                      >↑</button>
+                      >▲ 上移</button>
                       <button
                         onClick={() => handleMoveCategory(cat.key, 'down')}
                         disabled={categories.indexOf(cat) === categories.length - 1}
-                        className="px-2 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
                         title="下移"
-                      >↓</button>
+                      >▼ 下移</button>
                       <button
                         onClick={() => openEditCategory(cat)}
                         className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
@@ -994,7 +994,7 @@ const Settings: React.FC = () => {
             <h2 className="text-2xl font-bold mb-6">{editingCategory ? '编辑大类' : '新增大类'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">大类名称 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">大类名称</label>
                 <input
                   type="text"
                   value={categoryForm.name}
@@ -1139,7 +1139,7 @@ const Settings: React.FC = () => {
             <h2 className="text-2xl font-bold mb-6">{editingField ? '编辑字段' : '新增字段'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称</label>
                 <input
                   type="text"
                   value={fieldForm.field_label}

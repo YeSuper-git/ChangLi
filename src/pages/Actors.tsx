@@ -188,7 +188,7 @@ const Actors: React.FC = () => {
             <h2 className="text-2xl font-bold mb-6">添加演员</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">姓名 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
                 <input
                   type="text"
                   value={newActor.name}

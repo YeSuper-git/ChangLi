@@ -662,7 +662,7 @@ const VideoDetail: React.FC = () => {
               <p className="mt-2 text-sm text-gray-500">新建后会自动选中，保存视频详情时同步关联。</p>
             </div>
             <div className="px-6 py-5">
-              <label className="block text-sm font-medium text-gray-700 mb-2">姓名 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
               <input
                 type="text"
                 value={newActorName}
