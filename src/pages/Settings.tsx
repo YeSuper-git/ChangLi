@@ -6,6 +6,262 @@ import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 import { open } from '@tauri-apps/plugin-dialog';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
+
+const changelogData = [
+  {
+    version: '1.6.2', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['检查更新功能：设置页一键检查并自动更新', '版本更新记录：设置页可查看完整版本历史'] },
+      { category: '修复', items: ['预设模板恢复：缺失的预设模板自动补回', '扩展预设关闭后不再显示在演员管理列表'] },
+      { category: '优化', items: ['编辑字段弹窗移除格式配置下拉', 'CI 构建自动创建 GitHub Release'] },
+    ],
+  },
+  {
+    version: '1.6.1', date: '2026-06-29',
+    changes: [
+      { category: '优化', items: ['预设模板系统完善 + 定制功能实装'] },
+    ],
+  },
+  {
+    version: '1.6.0', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['预设模板系统', '罩杯预设', '右键删除二次确认'] },
+      { category: '优化', items: ['名称字段去掉'] },
+    ],
+  },
+  {
+    version: '1.5.0', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['筛选简化', '演员管理增强'] },
+      { category: '优化', items: ['大类管理优化', 'UI 改进'] },
+    ],
+  },
+  {
+    version: '1.4.0', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['9 项优化', '筛选简化', '大类管理增强'] },
+    ],
+  },
+  {
+    version: '1.3.1', date: '2026-06-29',
+    changes: [
+      { category: '修复', items: ['筛选栏标签和演员分两行独立展示'] },
+    ],
+  },
+  {
+    version: '1.3.0', date: '2026-06-29',
+    changes: [
+      { category: '新功能', items: ['一键扫描功能'] },
+      { category: '优化', items: ['删除写死逻辑'] },
+    ],
+  },
+  {
+    version: '1.2.1', date: '2026-06-28',
+    changes: [
+      { category: '修复', items: ['筛选栏标签/演员兼容', '视频按 display_type 筛选'] },
+    ],
+  },
+  {
+    version: '1.2.0', date: '2026-06-24',
+    changes: [
+      { category: '新功能', items: ['演员字段配置化', '大类 features 实装'] },
+    ],
+  },
+  {
+    version: '1.1.0', date: '2026-06-22',
+    changes: [
+      { category: '新功能', items: ['大类配置化', '演员字段配置化'] },
+    ],
+  },
+  {
+    version: '1.0.5', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['去掉自定义 NSIS 模板，用 Tauri v2 默认模板'] },
+    ],
+  },
+  {
+    version: '1.0.4', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['版本号同步'] },
+    ],
+  },
+  {
+    version: '1.0.3', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['CI 下载 mpv-dev 包获取 libmpv-2.dll', '下线 migrate_actor_photos 一次性迁移函数'] },
+    ],
+  },
+  {
+    version: '1.0.2', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['NSIS 打包 libmpv DLL + 版本号同步', '删除 tauri.conf.json v1 格式配置'] },
+    ],
+  },
+  {
+    version: '1.0.1', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['CI libmpv-wrapper.dll 路径修复'] },
+    ],
+  },
+  {
+    version: '1.0.0', date: '2026-06-22',
+    changes: [
+      { category: '新功能', items: ['内嵌 mpv 播放器', 'CI libmpv 修复'] },
+    ],
+  },
+  {
+    version: '0.9.4', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['Tauri v2 插件注册 + capabilities 权限配置'] },
+    ],
+  },
+  {
+    version: '0.9.3', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['windows 0.61 HWND 类型适配'] },
+    ],
+  },
+  {
+    version: '0.9.2', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['windows 0.61 HWND 类型适配'] },
+    ],
+  },
+  {
+    version: '0.9.1', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['windows crate 升级到 0.61，匹配 Tauri 2.11.3'] },
+    ],
+  },
+  {
+    version: '0.9.0', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['Tauri v2 API import 修复'] },
+    ],
+  },
+  {
+    version: '0.8.9', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['Tauri CLI 升级到 v2，修复 CI 构建'] },
+    ],
+  },
+  {
+    version: '0.8.8', date: '2026-06-22',
+    changes: [
+      { category: '新功能', items: ['Tauri v2 升级'] },
+    ],
+  },
+  {
+    version: '0.8.7', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['切换主海报后同步更新 actors 表'] },
+    ],
+  },
+  {
+    version: '0.8.6', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['展开按钮裁切修复', '时期删除二次确认修复'] },
+    ],
+  },
+  {
+    version: '0.8.5', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['旧数据海报一次性迁移', '回滚特殊逻辑'] },
+    ],
+  },
+  {
+    version: '0.8.4', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['旧数据海报修复', 'FloatingActions', '右键上下自适应'] },
+    ],
+  },
+  {
+    version: '0.8.3', date: '2026-06-22',
+    changes: [
+      { category: '新功能', items: ['右键菜单自适应', '动漫文件夹模式'] },
+    ],
+  },
+  {
+    version: '0.8.2', date: '2026-06-22',
+    changes: [
+      { category: '修复', items: ['海报覆盖bug', '右键移主海报', '时期弹窗', '空时期显示'] },
+    ],
+  },
+  {
+    version: '0.8.1', date: '2026-06-22',
+    changes: [
+      { category: '新功能', items: ['演员多张海报', '时期功能重新设计'] },
+    ],
+  },
+  {
+    version: '0.8.0', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['添加失败toast从右侧平移', '删除确认自定义弹窗'] },
+    ],
+  },
+  {
+    version: '0.7.9', date: '2026-06-21',
+    changes: [
+      { category: '新功能', items: ['6项改动 - 删除修复', 'display_type判断', '海报fallback', '参演作品', '影视模式', '自动关联'] },
+    ],
+  },
+  {
+    version: '0.7.8', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['严重 bug 修复 - 二次确认', '扫描海报保留'] },
+    ],
+  },
+  {
+    version: '0.7.7', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['动漫/影视判断改用 series_actors 实际关联'] },
+    ],
+  },
+  {
+    version: '0.7.6', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['展开按钮检测修复', '排序位置调整'] },
+    ],
+  },
+  {
+    version: '0.7.5', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['详情页标签回滚到 v0.7.1 样式'] },
+    ],
+  },
+  {
+    version: '0.7.4', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['UI 样式修复 - 展开按钮', '排序位置', '影视已看完', '详情标签回滚'] },
+    ],
+  },
+  {
+    version: '0.7.3', date: '2026-06-21',
+    changes: [
+      { category: '修复', items: ['筛选展开按钮样式修复', '自动检测溢出'] },
+    ],
+  },
+  {
+    version: '0.7.2', date: '2026-06-21',
+    changes: [
+      { category: '新功能', items: ['UI 优化 - 筛选折叠', '标题两行', '状态标签行', '动漫去中字'] },
+    ],
+  },
+  {
+    version: '0.7.1', date: '2026-06-21',
+    changes: [
+      { category: '新功能', items: ['视频页筛选加全部', '设置页功能拆分', '曾用名', '输入框优化'] },
+    ],
+  },
+  {
+    version: '0.7.0', date: '2026-06-21',
+    changes: [
+      { category: '新功能', items: ['视频页动漫/影视双标签', '分集海报fallback', '中字识别修复'] },
+    ],
+  },
+];
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -236,7 +492,7 @@ const Settings: React.FC = () => {
   const [actorFields, setActorFields] = useState<ActorField[]>([]);
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [editingField, setEditingField] = useState<ActorField | null>(null);
-  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[], format: '' });
+  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[] });
   const [fieldContextMenu, setFieldContextMenu] = useState<{ key: string; x: number; y: number } | null>(null);
   const [newOptionValue, setNewOptionValue] = useState('');
   const [presetTemplates, setPresetTemplates] = useState<PresetTemplate[]>([]);
@@ -244,6 +500,10 @@ const Settings: React.FC = () => {
   const [presetEnabledMap, setPresetEnabledMap] = useState<Record<string, boolean>>({});
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+  const currentVersion = '1.6.2';
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -281,7 +541,7 @@ const Settings: React.FC = () => {
     setEditingField(field);
     let opts: string[] = [];
     try { if (field.options) opts = JSON.parse(field.options); } catch {}
-    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts, format: field.format || '' });
+    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts });
     setShowFieldModal(true);
   };
 
@@ -291,12 +551,11 @@ const Settings: React.FC = () => {
   const handleSaveField = async () => {
     try {
       const optionsStr = fieldForm.field_type === 'select' ? JSON.stringify(fieldForm.options) : null;
-      const formatStr = fieldForm.field_type === 'text' && fieldForm.format ? fieldForm.format : null;
       if (editingField) {
-        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, formatStr, fieldForm.enabled);
+        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, null, fieldForm.enabled);
       } else {
         const autoKey = fieldForm.field_label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || Date.now().toString(36);
-        await createActorField(autoKey, fieldForm.field_label, fieldForm.field_type, optionsStr, formatStr);
+        await createActorField(autoKey, fieldForm.field_label, fieldForm.field_type, optionsStr, null);
       }
       setShowFieldModal(false);
       loadActorFields();
@@ -311,6 +570,29 @@ const Settings: React.FC = () => {
       loadActorFields();
     } catch (error) {
       console.error('删除演员字段失败:', error);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('检查中...');
+    try {
+      const update = await check();
+      if (update) {
+        setUpdateStatus(`发现新版本 ${update.version}，正在下载...`);
+        await update.downloadAndInstall((progress) => {
+          if (progress.event === 'Finished') {
+            setUpdateStatus('下载完成，准备重启...');
+          }
+        });
+        await relaunch();
+      } else {
+        setUpdateStatus('已是最新版本');
+        setTimeout(() => setUpdateStatus(null), 3000);
+      }
+    } catch (error) {
+      console.error('检查更新失败:', error);
+      setUpdateStatus('检查更新失败: ' + String(error));
+      setTimeout(() => setUpdateStatus(null), 5000);
     }
   };
 
@@ -560,7 +842,12 @@ const Settings: React.FC = () => {
 
         {(() => {
           const presetKeySet = new Set(allPresetTemplates.map(t => t.key));
-          const sorted = [...actorFields.filter(f => f.field_key !== 'name')].sort((a, b) => {
+          const sorted = [...actorFields.filter(f => {
+            if (f.field_key === 'name') return false;
+            // 过滤掉已关闭的扩展预设模板记录
+            if (presetKeySet.has(f.field_key) && !f.enabled) return false;
+            return true;
+          })].sort((a, b) => {
             const aPreset = presetKeySet.has(a.field_key) ? 0 : 1;
             const bPreset = presetKeySet.has(b.field_key) ? 0 : 1;
             return aPreset - bPreset;
@@ -839,19 +1126,7 @@ const Settings: React.FC = () => {
                   <option value="select">选择</option>
                 </select>
               </div>
-              {fieldForm.field_type === 'text' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">格式配置</label>
-                  <select
-                    value={fieldForm.format || ''}
-                    onChange={(e) => setFieldForm({ ...fieldForm, format: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">普通文本</option>
-                    <option value="uppercase_single">单个大写字母</option>
-                  </select>
-                </div>
-              )}
+
               {editingField && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">启用</span>
@@ -1060,6 +1335,84 @@ const Settings: React.FC = () => {
               >
                 稍后再说
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 检查更新 & 版本信息 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">关于</h2>
+            <p className="text-sm text-gray-500 mt-1">当前版本：v{currentVersion}</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {updateStatus && (
+              <span className="text-sm text-gray-500">{updateStatus}</span>
+            )}
+            <button
+              onClick={handleCheckUpdate}
+              disabled={updateStatus === '检查中...'}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+            >
+              检查更新
+            </button>
+            <button
+              onClick={() => setShowChangelog(true)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            >
+              版本更新记录
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 版本更新记录弹窗 */}
+      {showChangelog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl w-[700px] max-h-[85vh] flex flex-col mx-4 shadow-xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold">版本更新记录</h2>
+              <button onClick={() => setShowChangelog(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-6 space-y-2">
+              {changelogData.map((entry) => {
+                const isCurrent = entry.version === currentVersion;
+                const isExpanded = expandedVersion === entry.version;
+                return (
+                  <div key={entry.version} className={`border rounded-lg ${isCurrent ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                    <button
+                      onClick={() => setExpandedVersion(isExpanded ? null : entry.version)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`font-semibold text-sm ${isCurrent ? 'text-blue-700' : 'text-gray-900'}`}>v{entry.version}</span>
+                        <span className="text-xs text-gray-500">{entry.date}</span>
+                        {isCurrent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white">当前</span>}
+                      </div>
+                      <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 pb-4 space-y-3">
+                        {entry.changes.map((group, gi) => (
+                          <div key={gi}>
+                            <p className="text-xs font-semibold text-gray-500 mb-1">{group.category}</p>
+                            <ul className="space-y-1">
+                              {group.items.map((item, ii) => (
+                                <li key={ii} className="text-sm text-gray-700 flex items-start gap-2">
+                                  <span className="text-gray-400 mt-0.5">•</span>
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

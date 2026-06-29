@@ -32,6 +32,7 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         .await?;
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
+    restore_preset_templates(pool).await?;
     Ok(())
 }
 
@@ -1013,6 +1014,51 @@ async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
         .bind(order)
         .execute(pool)
         .await?;
+    }
+
+    Ok(())
+}
+
+async fn restore_preset_templates(pool: &SqlitePool) -> Result<()> {
+    let presets: Vec<(&str, &str, &str, &str, &str, i32, i32)> = vec![
+        ("height", "身高", "number", "[]", r#"{"unit":"cm"}"#, 0, 1),
+        ("weight", "体重", "number", "[]", r#"{"unit":"kg"}"#, 0, 2),
+        ("birthday", "生日", "date", "[]", "{}", 0, 3),
+        (
+            "measurements",
+            "三围",
+            "compound",
+            r#"[{"label":"B","maxLen":2},{"label":"W","maxLen":2},{"label":"H","maxLen":2}]"#,
+            "{}",
+            1,
+            4,
+        ),
+        ("cup_size", "罩杯", "text", "[]", r#"{"maxLength":1,"uppercase":true}"#, 1, 5),
+    ];
+
+    for (key, name, field_type, sub_fields, rules, is_ext, order) in &presets {
+        let exists: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM preset_templates WHERE key = ?",
+        )
+        .bind(key)
+        .fetch_one(pool)
+        .await?;
+
+        if exists == 0 {
+            eprintln!("[migrations] restoring missing preset template: key={}", key);
+            sqlx::query(
+                "INSERT INTO preset_templates (key, name, field_type, sub_fields, rules, is_extension, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(key)
+            .bind(name)
+            .bind(field_type)
+            .bind(sub_fields)
+            .bind(rules)
+            .bind(is_ext)
+            .bind(order)
+            .execute(pool)
+            .await?;
+        }
     }
 
     Ok(())
