@@ -169,13 +169,17 @@ jobs:
           name: changli-v${{ steps.version.outputs.version }}-windows
           path: src-tauri/target/release/bundle/nsis/*.exe
 
-      - name: Generate latest.json
+      - name: Generate and sign latest.json
         shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           EXE_PATH=$(ls src-tauri/target/release/bundle/nsis/*.exe | head -1)
           EXE_NAME=$(basename "$EXE_PATH")
-          EXE_SIZE=$(stat -c%s "$EXE_PATH" 2>/dev/null || stat -f%z "$EXE_PATH")
           VERSION="${{ steps.version.outputs.version }}"
+          # Sign the exe file
+          echo "$TAURI_SIGNING_PRIVATE_KEY" | minisign -S -s /dev/stdin -m "$EXE_PATH" -x "$EXE_PATH.sig"
+          SIG=$(cat "$EXE_PATH.sig" | tail -1)
           cat > src-tauri/target/release/bundle/nsis/latest.json << EOF
           {
             "version": "$VERSION",
@@ -183,7 +187,7 @@ jobs:
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {
               "windows-x86_64": {
-                "signature": "",
+                "signature": "$SIG",
                 "url": "https://github.com/YeSuper-git/ChangLi/releases/download/v${VERSION}/${EXE_NAME}"
               }
             }
