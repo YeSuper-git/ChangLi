@@ -174,12 +174,13 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          EXE_PATH=$(ls src-tauri/target/release/bundle/nsis/*.exe | head -1)
+          EXE_PATH=$(find src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
           EXE_NAME=$(basename "$EXE_PATH")
           VERSION="${{ steps.version.outputs.version }}"
-          # Sign the exe file
-          npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" "$EXE_PATH"
-          SIG=$(cat "$EXE_PATH.sig" | tail -1)
+          echo "Signing $EXE_PATH..."
+          npx tauri signer sign "$EXE_PATH"
+          SIG=$(tail -1 "$EXE_PATH.sig")
+          echo "Signature: $SIG"
           cat > src-tauri/target/release/bundle/nsis/latest.json << EOF
           {
             "version": "$VERSION",

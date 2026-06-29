@@ -1,6 +1,6 @@
 {
   "name": "changli",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "description": "长离 - 全功能视频管理播放平台",
   "scripts": {
     "dev": "vite",
