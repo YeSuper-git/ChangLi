@@ -60,14 +60,19 @@ const Library: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
-  const filterButtonsRef = useRef<HTMLDivElement>(null);
-  const [needsExpand, setNeedsExpand] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const actorsRef = useRef<HTMLDivElement>(null);
+  const [tagsNeedsExpand, setTagsNeedsExpand] = useState(false);
+  const [actorsNeedsExpand, setActorsNeedsExpand] = useState(false);
 
   // 检测筛选按钮区域是否超过一行
   useEffect(() => {
     const checkOverflow = () => {
-      if (filterButtonsRef.current) {
-        setNeedsExpand(filterButtonsRef.current.scrollHeight > filterButtonsRef.current.clientHeight + 2);
+      if (tagsRef.current) {
+        setTagsNeedsExpand(tagsRef.current.scrollHeight > tagsRef.current.clientHeight + 2);
+      }
+      if (actorsRef.current) {
+        setActorsNeedsExpand(actorsRef.current.scrollHeight > actorsRef.current.clientHeight + 2);
       }
     };
     checkOverflow();
@@ -433,49 +438,55 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div ref={filterButtonsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded && !actorExpanded ? 'max-h-[40px]' : ''}`}>
+      <div className="mb-6 flex justify-between items-start">
+        <div className="flex flex-col gap-3 flex-1 min-w-0">
           {features.tags && (
-            <>
-              <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
-              {tags.map((tag) => (
+            <div className="flex items-center gap-2">
+              <div ref={tagsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded ? 'max-h-[40px]' : ''}`}>
+                <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleTagClick(tag.id)}
+                    className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+              {tagsNeedsExpand && (
                 <button
-                  key={tag.id}
-                  onClick={() => handleTagClick(tag.id)}
-                  className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+                  onClick={() => setTagExpanded(!tagExpanded)}
+                  className="category-btn active flex-shrink-0"
                 >
-                  {tag.name}
+                  {tagExpanded ? '收起 ↑' : '展开 ↓'}
                 </button>
-              ))}
-            </>
+              )}
+            </div>
           )}
           {features.actors && (
-            <>
-              <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
-              {actors.map((actor) => (
+            <div className="flex items-center gap-2">
+              <div ref={actorsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!actorExpanded ? 'max-h-[40px]' : ''}`}>
+                <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
+                {actors.map((actor) => (
+                  <button
+                    key={actor.id}
+                    onClick={() => handleActorClick(actor.id)}
+                    className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
+                  >
+                    {actor.name}
+                  </button>
+                ))}
+              </div>
+              {actorsNeedsExpand && (
                 <button
-                  key={actor.id}
-                  onClick={() => handleActorClick(actor.id)}
-                  className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
+                  onClick={() => setActorExpanded(!actorExpanded)}
+                  className="category-btn active flex-shrink-0"
                 >
-                  {actor.name}
+                  {actorExpanded ? '收起 ↑' : '展开 ↓'}
                 </button>
-              ))}
-            </>
-          )}
-          </div>
-          {needsExpand && (
-            <button
-              onClick={() => {
-                const nextExpanded = !tagExpanded && !actorExpanded;
-                setTagExpanded(nextExpanded);
-                setActorExpanded(nextExpanded);
-              }}
-              className="category-btn active flex-shrink-0"
-            >
-              {tagExpanded || actorExpanded ? '收起 ↑' : '展开 ↓'}
-            </button>
+              )}
+            </div>
           )}
         </div>
       </div>
