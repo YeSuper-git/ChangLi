@@ -45,7 +45,7 @@ const Search: React.FC = () => {
   const getCategoryFeatures = (series: VideoSeries): CategoryFeatures => {
     const key = series.display_type || '';
     const cat = categories.find(c => c.key === key);
-    return cat ? parseCategoryFeatures(cat.features) : { tags: false, actors: !!series.has_actor, tracking: false, chinese_sub: false, episode: false };
+    return cat ? parseCategoryFeatures(cat.features) : { tags: false, actors: !!series.has_actor, tracking: false, chinese_sub: false, episode: "部" };
   };
 
   const getCategoryName = (series: VideoSeries): string => {

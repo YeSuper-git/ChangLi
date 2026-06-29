@@ -26,6 +26,8 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         .await?;
     seed_default_categories(pool).await?;
     seed_default_actor_fields(pool).await?;
+    add_column_if_not_exists(pool, "actor_fields", "options", "TEXT")
+        .await?;
     Ok(())
 }
 

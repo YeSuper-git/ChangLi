@@ -928,6 +928,43 @@ pub async fn get_actors(pool: &SqlitePool) -> Result<Vec<Actor>> {
     Ok(actors)
 }
 
+pub async fn get_actors_by_category(pool: &SqlitePool, category_key: &str) -> Result<Vec<Actor>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT a.*, COALESCE(w.work_count, 0) AS work_count
+         FROM actors a
+         JOIN series_actors sa ON sa.actor_id = a.id
+         JOIN video_series vs ON vs.id = sa.series_id
+         LEFT JOIN (
+             SELECT actor_id, COUNT(*) AS work_count
+             FROM (
+                 SELECT va.actor_id, 'video-' || v.id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NULL
+                 UNION
+                 SELECT va.actor_id, 'series-' || v.series_id AS work_key
+                 FROM video_actors va
+                 JOIN videos v ON v.id = va.video_id
+                 WHERE v.series_id IS NOT NULL
+                 UNION
+                 SELECT sa2.actor_id, 'series-' || sa2.series_id AS work_key
+                 FROM series_actors sa2
+             ) actor_works
+             GROUP BY actor_id
+         ) w ON w.actor_id = a.id
+         WHERE (vs.display_type = ? OR (vs.display_type IS NULL AND ? = 'anime'))
+         ORDER BY a.name",
+    )
+    .bind(category_key)
+    .bind(category_key)
+    .fetch_all(pool)
+    .await?;
+
+    let actors = rows.iter().map(actor_from_row).collect();
+
+    Ok(actors)
+}
+
 pub async fn get_actor(pool: &SqlitePool, id: i64) -> Result<Option<Actor>> {
     let row = sqlx::query(
         "SELECT a.*, COALESCE(w.work_count, 0) AS work_count
@@ -1190,6 +1227,31 @@ pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
     let rows = sqlx::query("SELECT * FROM tags ORDER BY name")
         .fetch_all(pool)
         .await?;
+
+    let tags = rows
+        .iter()
+        .map(|row| Tag {
+            id: row.get("id"),
+            name: row.get("name"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    Ok(tags)
+}
+
+pub async fn get_tags_by_category(pool: &SqlitePool, category_key: &str) -> Result<Vec<Tag>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT t.* FROM tags t
+         JOIN series_tags st ON st.tag_id = t.id
+         JOIN video_series vs ON vs.id = st.series_id
+         WHERE (vs.display_type = ? OR (vs.display_type IS NULL AND ? = 'anime'))
+         ORDER BY t.name",
+    )
+    .bind(category_key)
+    .bind(category_key)
+    .fetch_all(pool)
+    .await?;
 
     let tags = rows
         .iter()
@@ -2615,6 +2677,89 @@ pub async fn delete_category(pool: &SqlitePool, key: &str) -> Result<()> {
         .await?;
     Ok(())
 }
+/// 删除某个大类下所有视频数据（不删除本地源文件）
+pub async fn delete_videos_by_category(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64)> {
+    let video_count: (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM videos WHERE series_id IN (SELECT id FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime'))",
+        category_key, category_key
+    ))
+    .fetch_one(pool)
+    .await?;
+
+    let series_count: (i64,) = sqlx::query_as(&format!(
+        "SELECT COUNT(*) FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        category_key, category_key
+    ))
+    .fetch_one(pool)
+    .await?;
+
+    let sub = &format!(
+        "SELECT id FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        category_key, category_key
+    );
+
+    sqlx::query(&format!("DELETE FROM play_history WHERE video_id IN (SELECT id FROM videos WHERE series_id IN ({}))", sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM watch_progress WHERE resource_id IN (SELECT id FROM videos WHERE series_id IN ({}))", sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM videos WHERE series_id IN ({})", sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_tags WHERE series_id IN ({})", sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM video_series WHERE id IN ({})", sub))
+        .execute(pool).await?;
+    sqlx::query(&format!("DELETE FROM series_actors WHERE series_id IN ({})", sub))
+        .execute(pool).await?;
+
+    Ok((video_count.0, series_count.0))
+}
+
+/// 重新扫描某个大类下所有视频集的元数据
+pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64)> {
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        category_key, category_key
+    ))
+    .fetch_all(pool)
+    .await?;
+
+    let mut updated: i64 = 0;
+    let mut skipped: i64 = 0;
+
+    for (id, title, folder_path) in series_list {
+        let source = folder_path.as_deref().unwrap_or(&title);
+        let folder_name = std::path::Path::new(source)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| title.clone());
+        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+            let code = info.code;
+            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+            let folder_path_std = std::path::Path::new(source);
+            let poster = crate::scanner::find_folder_poster(folder_path_std);
+            let poster_base64 = poster
+                .as_deref()
+                .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+            sqlx::query(
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
+            )
+            .bind(&code)
+            .bind(has_chinese_sub)
+            .bind(&new_title)
+            .bind(&poster)
+            .bind(&poster_base64)
+            .bind(id)
+            .execute(pool)
+            .await?;
+            updated += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    Ok((updated, skipped))
+}
 
 pub async fn get_category_by_key(pool: &SqlitePool, key: &str) -> Result<Option<Category>> {
     let row = sqlx::query("SELECT * FROM categories WHERE key = ?")
@@ -2642,6 +2787,7 @@ pub struct ActorField {
     pub field_key: String,
     pub field_label: String,
     pub field_type: String,
+    pub options: Option<String>,
     pub sort_order: i32,
     pub enabled: bool,
     pub created_at: String,
@@ -2660,6 +2806,7 @@ pub async fn get_all_actor_fields(pool: &SqlitePool) -> Result<Vec<ActorField>> 
             field_key: row.get("field_key"),
             field_label: row.get("field_label"),
             field_type: row.get("field_type"),
+            options: row.get("options"),
             sort_order: row.get("sort_order"),
             enabled: row.get::<i32, _>("enabled") != 0,
             created_at: row.get("created_at"),
@@ -2674,12 +2821,16 @@ pub async fn update_actor_field(
     pool: &SqlitePool,
     field_key: &str,
     field_label: &str,
+    field_type: &str,
+    options: Option<&str>,
     enabled: bool,
 ) -> Result<()> {
     sqlx::query(
-        "UPDATE actor_fields SET field_label = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
+        "UPDATE actor_fields SET field_label = ?, field_type = ?, options = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE field_key = ?",
     )
     .bind(field_label)
+    .bind(field_type)
+    .bind(options)
     .bind(if enabled { 1 } else { 0 })
     .bind(field_key)
     .execute(pool)
@@ -2692,6 +2843,7 @@ pub async fn create_actor_field(
     field_key: &str,
     field_label: &str,
     field_type: &str,
+    options: Option<&str>,
 ) -> Result<ActorField> {
     let max_order: i32 =
         sqlx::query_scalar("SELECT COALESCE(MAX(sort_order), 0) FROM actor_fields")
@@ -2699,11 +2851,12 @@ pub async fn create_actor_field(
             .await?;
 
     let row = sqlx::query(
-        "INSERT INTO actor_fields (field_key, field_label, field_type, sort_order) VALUES (?, ?, ?, ?) RETURNING *",
+        "INSERT INTO actor_fields (field_key, field_label, field_type, options, sort_order) VALUES (?, ?, ?, ?, ?) RETURNING *",
     )
     .bind(field_key)
     .bind(field_label)
     .bind(field_type)
+    .bind(options)
     .bind(max_order + 1)
     .fetch_one(pool)
     .await?;
@@ -2713,6 +2866,7 @@ pub async fn create_actor_field(
         field_key: row.get("field_key"),
         field_label: row.get("field_label"),
         field_type: row.get("field_type"),
+        options: row.get("options"),
         sort_order: row.get("sort_order"),
         enabled: row.get::<i32, _>("enabled") != 0,
         created_at: row.get("created_at"),

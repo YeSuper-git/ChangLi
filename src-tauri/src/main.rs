@@ -1068,6 +1068,15 @@ async fn get_actors(state: State<'_, AppState>) -> Result<Vec<db::Actor>, String
 }
 
 #[tauri::command]
+async fn get_actors_by_category(state: State<'_, AppState>, category_key: String) -> Result<Vec<db::Actor>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_actors_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_actor(state: State<'_, AppState>, id: i64) -> Result<Option<db::Actor>, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -1346,6 +1355,15 @@ async fn get_tags(state: State<'_, AppState>) -> Result<Vec<db::Tag>, String> {
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::get_tags(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_tags_by_category(state: State<'_, AppState>, category_key: String) -> Result<Vec<db::Tag>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_tags_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1883,12 +1901,14 @@ fn main() {
             add_video_to_series,
             remove_video_from_series,
             get_actors,
+            get_actors_by_category,
             get_actor,
             add_actor,
             update_actor,
             delete_actor,
             get_actor_resources,
             get_tags,
+            get_tags_by_category,
             add_tag,
             delete_tag,
             get_resource_tags,
@@ -1924,8 +1944,10 @@ fn main() {
             delete_all_videos,
             delete_all_anime,
             delete_all_adult,
+            delete_videos_by_category,
             rescan_anime_metadata,
             rescan_adult_metadata,
+            rescan_category_metadata,
             get_series_seasons,
             delete_season,
             create_season,
@@ -2106,6 +2128,23 @@ async fn delete_all_adult(state: State<'_, AppState>) -> Result<(i64, i64), Stri
     };
     db::delete_all_adult(&pool).await.map_err(|e| e.to_string())
 }
+#[tauri::command]
+async fn delete_videos_by_category(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_videos_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::rescan_category_metadata(&pool, &category_key).await.map_err(|e| e.to_string())
+}
 
 // ==================== 大类配置 Commands ====================
 
@@ -2197,7 +2236,43 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
     let mut added: i64 = 0;
     let mut updated: i64 = 0;
 
-    // 2. 遍历子文件夹
+    // 2. 检查 scan_path 下是否有子文件夹
+    let mut has_subdirs = false;
+    let mut has_videos = false;
+    if let Ok(check_entries) = std::fs::read_dir(&scan_path) {
+        for e in check_entries.filter_map(|e| e.ok()) {
+            if e.path().is_dir() { has_subdirs = true; }
+            if e.path().is_file() && scanner::is_video_file(&e.path()) { has_videos = true; }
+        }
+    }
+
+    // 如果没有子文件夹但有视频文件，把 scan_path 本身当一个视频集
+    if !has_subdirs && has_videos {
+        let folder_name = std::path::Path::new(&scan_path)
+            .file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
+        let scan_result = scanner::scan_directory(&scan_path).await.map_err(|e| e.to_string())?;
+        if !scan_result.videos.is_empty() {
+            let poster = scan_result.posters.values().next().cloned();
+            let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+            if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
+                db::update_video_series_poster(&pool, existing.id, poster.as_deref(), poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+                updated += 1;
+            } else {
+                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("completed"), poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                if let Some(c) = code {
+                    let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                }
+                db::add_videos_batch(&pool, scan_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+                let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                added += 1;
+            }
+        }
+        return Ok(ScanResult { added, updated });
+    }
+
+    // 3. 遍历子文件夹
     let entries = std::fs::read_dir(&scan_path).map_err(|e| e.to_string())?;
     for entry in entries {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -2368,13 +2443,15 @@ async fn update_actor_field_cmd(
     state: State<'_, AppState>,
     field_key: String,
     field_label: String,
+    field_type: String,
+    options: Option<String>,
     enabled: bool,
 ) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_actor_field(&pool, &field_key, &field_label, enabled)
+    db::update_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), enabled)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2385,12 +2462,13 @@ async fn create_actor_field_cmd(
     field_key: String,
     field_label: String,
     field_type: String,
+    options: Option<String>,
 ) -> Result<db::ActorField, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::create_actor_field(&pool, &field_key, &field_label, &field_type)
+    db::create_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

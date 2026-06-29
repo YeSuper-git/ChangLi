@@ -356,13 +356,6 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>;
-  if (!series) return <div className="text-gray-500">视频集不存在</div>;
-
-  const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
-  const isWatched = series?.is_watched === 1;
-  const isAdult = series ? (series.has_actor || series.display_type === 'adult') : false;
-
   // 大类配置
   const [categories, setCategories] = useState<Category[]>([]);
   useEffect(() => {
@@ -376,6 +369,8 @@ const SeriesDetail: React.FC = () => {
     return categories.find(c => c.key === series.display_type) || null;
   }, [categories, series]);
 
+  const isAdult = series ? (series.has_actor || series.display_type === 'adult') : false;
+
   const features: CategoryFeatures = useMemo(() => {
     if (currentCategory) return parseCategoryFeatures(currentCategory.features);
     // fallback: 和原 isAdult 行为一致
@@ -384,11 +379,17 @@ const SeriesDetail: React.FC = () => {
       actors: isAdult,
       tracking: !isAdult,
       chinese_sub: isAdult,
-      episode: !isAdult,
+      episode: !isAdult ? '话' : '部',
     };
   }, [currentCategory, isAdult]);
 
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
+
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div></div>;
+  if (!series) return <div className="text-gray-500">视频集不存在</div>;
+
+  const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+  const isWatched = series?.is_watched === 1;
 
 
   const handleToggleWatched = async () => {
@@ -695,7 +696,7 @@ const SeriesDetail: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
-                  <button onClick={handleAddEpisode} className="action-btn">{features.episode ? '添加分集' : '添加分部'}</button>
+                  <button onClick={handleAddEpisode} className="action-btn">添加{features.episode === '话' ? '分集' : features.episode === '集' ? '分集' : '分部'}</button>
                 </div>
               </>
             )}
@@ -703,13 +704,13 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">{features.episode ? '分集' : '分部'}</h2>
+      <h2 className="text-xl font-semibold mb-4">{features.episode === '话' || features.episode === '集' ? '分集' : '分部'}</h2>
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
           posterOrientation={series?.poster_orientation || 'unknown'}
           onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
-          useEpisodeWord={features.episode}
+          episodeWord={features.episode || '部'}
           fallbackPoster={series?.poster_data_url}
         />
       ) : (
@@ -887,7 +888,7 @@ interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
   onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
-  useEpisodeWord?: boolean;
+  episodeWord?: string;
   fallbackPoster?: string | null;
 }
 
@@ -895,7 +896,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
   onContextMenu,
-  useEpisodeWord,
+  episodeWord: epWord,
   fallbackPoster,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
@@ -960,7 +961,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         </div>
         <div className="p-2">
           <h3 className="font-medium text-xs line-clamp-1 mb-1">
-            {video.episode_number ? `第${video.episode_number}${useEpisodeWord ? '话' : '部'}` : video.file_name}
+            {video.episode_number ? `第${video.episode_number}${epWord || '部'}` : video.file_name}
           </h3>
           {video.episode_number && (
             <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>

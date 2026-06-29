@@ -28,7 +28,7 @@ const Home: React.FC = () => {
         actors: isLegacyAdult,
         tracking: !isLegacyAdult,
         chinese_sub: isLegacyAdult,
-        episode: !isLegacyAdult,
+        episode: !isLegacyAdult ? '话' : '部',
       };
     }
     return parseCategoryFeatures(cat.features);
@@ -38,7 +38,7 @@ const Home: React.FC = () => {
 
   const getEpisodeWord = (series: VideoSeries): string => {
     const features = getCategoryFeatures(series);
-    return features.episode ? '话' : '部';
+    return features.episode || '部';
   };
 
   return (
@@ -70,7 +70,7 @@ const Home: React.FC = () => {
                       <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                       <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                        {series.status === 'completed' ? `全${series.video_count}${getEpisodeWord(series)}` : `更新至第${series.video_count}${getEpisodeWord(series)}`}
+                        {series.status === 'completed' ? `共${series.video_count}${getEpisodeWord(series)}` : `更新至第${series.video_count}${getEpisodeWord(series)}`}
                       </div>
                     </div>
                     <div className="mt-2">
@@ -95,7 +95,7 @@ const Home: React.FC = () => {
         const isPortrait = cat.card_layout === 'portrait';
         const gridCols = isPortrait ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4';
         const aspectClass = isPortrait ? 'aspect-[3/4]' : 'aspect-video';
-        const epWord = features.episode ? '话' : '部';
+        const epWord = features.episode || '部';
 
         return (
           <section key={cat.key} className="mb-16">
@@ -117,7 +117,7 @@ const Home: React.FC = () => {
                       </span>
                     )}
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.status === 'completed' ? `全${series.video_count}${epWord}` : `更新至第${series.video_count}${epWord}`}
+                      {series.status === 'completed' || !features.tracking ? `共${series.video_count}${epWord}` : `更新至第${series.video_count}${epWord}`}
                     </div>
                   </div>
                   <div className="mt-2">

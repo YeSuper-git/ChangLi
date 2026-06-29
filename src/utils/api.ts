@@ -393,6 +393,14 @@ export async function deleteAllAdult(): Promise<{ videoCount: number; seriesCoun
   const [videoCount, seriesCount] = await invoke<[number, number]>('delete_all_adult');
   return { videoCount, seriesCount };
 }
+export async function deleteVideosByCategory(categoryKey: string): Promise<{ videoCount: number; seriesCount: number }> {
+  const [videoCount, seriesCount] = await invoke<[number, number]>('delete_videos_by_category', { categoryKey });
+  return { videoCount, seriesCount };
+}
+
+export async function rescanCategoryMetadata(categoryKey: string): Promise<[number, number]> {
+  return invoke<[number, number]>('rescan_category_metadata', { categoryKey });
+}
 
 export async function rescanAllSeriesMetadata(): Promise<[number, number]> {
   return invoke<[number, number]>('rescan_all_series_metadata');
@@ -447,6 +455,10 @@ export async function getActors(): Promise<Actor[]> {
     console.error('[API] getActors 失败:', err);
     throw err;
   }
+}
+
+export async function getActorsByCategory(categoryKey: string): Promise<Actor[]> {
+  return invoke<Actor[]>('get_actors_by_category', { categoryKey });
 }
 
 export async function getActor(id: number): Promise<Actor | null> {
@@ -549,6 +561,10 @@ export async function getTags(): Promise<Tag[]> {
     console.error('[API] getTags 失败:', err);
     throw err;
   }
+}
+
+export async function getTagsByCategory(categoryKey: string): Promise<Tag[]> {
+  return invoke<Tag[]>('get_tags_by_category', { categoryKey });
 }
 
 export async function addTag(name: string): Promise<Tag> {
@@ -904,14 +920,18 @@ export interface CategoryFeatures {
   actors: boolean;
   tracking: boolean;
   chinese_sub: boolean;
-  episode: boolean;
+  episode: string;
 }
 
 export function parseCategoryFeatures(features: string): CategoryFeatures {
   try {
-    return JSON.parse(features);
+    const parsed = JSON.parse(features);
+    if (typeof parsed.episode === 'boolean') {
+      parsed.episode = parsed.episode ? '话' : '部';
+    }
+    return parsed;
   } catch {
-    return { tags: false, actors: false, tracking: false, chinese_sub: false, episode: false };
+    return { tags: false, actors: false, tracking: false, chinese_sub: false, episode: '部' };
   }
 }
 
@@ -949,6 +969,7 @@ export interface ActorField {
   field_key: string;
   field_label: string;
   field_type: string;
+  options: string | null;
   sort_order: number;
   enabled: boolean;
   created_at: string;
@@ -959,12 +980,12 @@ export async function getAllActorFields(): Promise<ActorField[]> {
   return invoke<ActorField[]>('get_all_actor_fields');
 }
 
-export async function updateActorField(fieldKey: string, fieldLabel: string, enabled: boolean): Promise<void> {
-  return invoke('update_actor_field_cmd', { fieldKey, fieldLabel, enabled });
+export async function updateActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null, enabled: boolean): Promise<void> {
+  return invoke('update_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options, enabled });
 }
 
-export async function createActorField(fieldKey: string, fieldLabel: string, fieldType: string): Promise<ActorField> {
-  return invoke<ActorField>('create_actor_field_cmd', { fieldKey, fieldLabel, fieldType });
+export async function createActorField(fieldKey: string, fieldLabel: string, fieldType: string, options: string | null): Promise<ActorField> {
+  return invoke<ActorField>('create_actor_field_cmd', { fieldKey, fieldLabel, fieldType, options });
 }
 
 export async function deleteActorField(fieldKey: string): Promise<void> {

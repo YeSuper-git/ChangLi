@@ -10,6 +10,8 @@ import {
   getAllCategories,
   parseCategoryFeatures,
   scanCategory,
+  getTagsByCategory,
+  getActorsByCategory,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -21,7 +23,7 @@ import { useLibraryStore } from '../store/libraryStore';
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tags, actors, series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
@@ -39,6 +41,8 @@ const Library: React.FC = () => {
     return searchParams.get('cat') || 'anime';
   });
   const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
+  const [actors, setActors] = useState<{ id: number; name: string; work_count: number; [k: string]: any }[]>([]);
 
   // 加载大类配置
   useEffect(() => {
@@ -46,6 +50,16 @@ const Library: React.FC = () => {
       .then(setCategories)
       .catch((err) => console.error('[Library] 加载大类配置失败:', err));
   }, []);
+
+  // 按大类加载标签和演员
+  const loadCategoryFilters = useCallback(() => {
+    getTagsByCategory(mainCategory).then(setTags).catch(() => setTags([]));
+    getActorsByCategory(mainCategory).then(setActors).catch(() => setActors([]));
+  }, [mainCategory]);
+
+  useEffect(() => {
+    loadCategoryFilters();
+  }, [loadCategoryFilters]);
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
   const [chineseSubFilter, setChineseSubFilter] = useState(false);
@@ -349,11 +363,11 @@ const Library: React.FC = () => {
     actors: mainCategory === 'adult',
     tracking: mainCategory === 'anime',
     chinese_sub: mainCategory === 'adult',
-    episode: mainCategory === 'anime',
+    episode: mainCategory === 'anime' ? ('话' as string) : ('部' as string),
   } as CategoryFeatures;
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const epWord = features.episode ? '话' : '部';
+  const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) =>
     (series.title.toLowerCase().includes(normalizedSearch) ||

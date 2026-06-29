@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteAllAnime, deleteAllAdult, rescanAnimeMetadata, rescanAdultMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -95,83 +95,30 @@ const Settings: React.FC = () => {
     }
   };
 
-  const [deletingAnime, setDeletingAnime] = useState(false);
-  const [deletingAdult, setDeletingAdult] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'anime' | 'adult' } | null>(null);
-  const [deleteAnimeResult, setDeleteAnimeResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
-  const [deleteAdultResult, setDeleteAdultResult] = useState<{ videoCount: number; seriesCount: number } | null>(null);
+  const [deleteCatConfirm, setDeleteCatConfirm] = useState<string | null>(null);
+  const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
-  const handleDeleteAllAnime = () => {
-    setDeleteConfirm({ type: 'anime' });
-  };
-
-  const doDeleteAllAnime = async () => {
-    console.log('[DEBUG] handleDeleteAllAnime: 用户确认删除动漫数据');
-    setDeletingAnime(true);
-    setDeleteAnimeResult(null);
+  const doDeleteCategory = async (key: string) => {
     try {
-      const result = await deleteAllAnime();
-      setDeleteAnimeResult(result);
+      await deleteVideosByCategory(key);
       await refreshSeries();
     } catch (error) {
-      console.error('删除所有动漫失败:', error);
+      console.error('删除大类视频失败:', error);
       alert('删除失败: ' + String(error));
     } finally {
-      setDeletingAnime(false);
     }
   };
 
-  const handleDeleteAllAdult = () => {
-    setDeleteConfirm({ type: 'adult' });
-  };
-
-  const doDeleteAllAdult = async () => {
-    console.log('[DEBUG] handleDeleteAllAdult: 用户确认删除影视数据');
-    setDeletingAdult(true);
-    setDeleteAdultResult(null);
+  const handleRescanCategory = async (key: string) => {
+    setRescanningCategory(key);
     try {
-      const result = await deleteAllAdult();
-      setDeleteAdultResult(result);
-      await refreshSeries();
+      await rescanCategoryMetadata(key);
     } catch (error) {
-      console.error('删除所有影视失败:', error);
-      alert('删除失败: ' + String(error));
-    } finally {
-      setDeletingAdult(false);
-    }
-  };
-
-  const [rescanningAnime, setRescanningAnime] = useState(false);
-  const [rescanningAdult, setRescanningAdult] = useState(false);
-  const [rescanAnimeResult, setRescanAnimeResult] = useState<[number, number] | null>(null);
-  const [rescanAdultResult, setRescanAdultResult] = useState<[number, number] | null>(null);
-
-  const handleRescanAnimeMetadata = async () => {
-    setRescanningAnime(true);
-    setRescanAnimeResult(null);
-    try {
-      const result = await rescanAnimeMetadata();
-      setRescanAnimeResult(result);
-    } catch (error) {
-      console.error('重新扫描动漫元数据失败:', error);
+      console.error('重新扫描大类元数据失败:', error);
       alert('扫描失败: ' + String(error));
     } finally {
-      setRescanningAnime(false);
-    }
-  };
-
-  const handleRescanAdultMetadata = async () => {
-    setRescanningAdult(true);
-    setRescanAdultResult(null);
-    try {
-      const result = await rescanAdultMetadata();
-      setRescanAdultResult(result);
-    } catch (error) {
-      console.error('重新扫描影视元数据失败:', error);
-      alert('扫描失败: ' + String(error));
-    } finally {
-      setRescanningAdult(false);
+      setRescanningCategory(null);
     }
   };
 
@@ -183,7 +130,7 @@ const Settings: React.FC = () => {
     key: '',
     name: '',
     card_layout: 'auto' as 'portrait' | 'landscape' | 'auto',
-    features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: true } as CategoryFeatures,
+    features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
     scan_path: '' as string,
   });
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
@@ -200,7 +147,7 @@ const Settings: React.FC = () => {
 
   const openAddCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ key: '', name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: true }, scan_path: '' });
+    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: '话' }, scan_path: '' });
     setShowCategoryModal(true);
   };
 
@@ -211,14 +158,15 @@ const Settings: React.FC = () => {
   };
 
   const handleSaveCategory = async () => {
-    if (!categoryForm.key.trim() || !categoryForm.name.trim()) return;
+    const key = categoryForm.key.trim() || Date.now().toString(36);
+    if (!categoryForm.name.trim()) return;
     try {
       const featuresStr = JSON.stringify(categoryForm.features);
       const scanPath = categoryForm.scan_path.trim() || null;
       if (editingCategory) {
-        await updateCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
+        await updateCategory(key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
       } else {
-        await createCategory(categoryForm.key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
+        await createCategory(key, categoryForm.name, categoryForm.card_layout, featuresStr, scanPath);
         if (scanPath) {
           setScanAfterCreate(true);
         }
@@ -265,8 +213,16 @@ const Settings: React.FC = () => {
   const [actorFields, setActorFields] = useState<ActorField[]>([]);
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [editingField, setEditingField] = useState<ActorField | null>(null);
-  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true });
-  const [fieldDeleteConfirm, setFieldDeleteConfirm] = useState<string | null>(null);
+  const [fieldForm, setFieldForm] = useState({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] as string[] });
+  const [fieldContextMenu, setFieldContextMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const [newOptionValue, setNewOptionValue] = useState('');
+
+  useEffect(() => {
+    if (!fieldContextMenu) return;
+    const close = () => setFieldContextMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [fieldContextMenu]);
 
   const loadActorFields = async () => {
     try {
@@ -279,22 +235,25 @@ const Settings: React.FC = () => {
 
   const openEditField = (field: ActorField) => {
     setEditingField(field);
-    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled });
+    let opts: string[] = [];
+    try { if (field.options) opts = JSON.parse(field.options); } catch {}
+    setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts });
     setShowFieldModal(true);
   };
 
   const openAddField = () => {
     setEditingField(null);
-    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true });
+    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] });
     setShowFieldModal(true);
   };
 
   const handleSaveField = async () => {
     try {
+      const optionsStr = fieldForm.field_type === 'select' ? JSON.stringify(fieldForm.options) : null;
       if (editingField) {
-        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.enabled);
+        await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, fieldForm.enabled);
       } else {
-        await createActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type);
+        await createActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr);
       }
       setShowFieldModal(false);
       loadActorFields();
@@ -314,7 +273,7 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /> 加载中...</div>
       </div>
     );
@@ -365,92 +324,7 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
-      {/* 视频管理 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">视频管理</h2>
-            <p className="text-sm text-gray-500 mt-1">分别删除动漫或影视数据（不删除本地源文件）</p>
-          </div>
-        </div>
-        <div className="card p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">删除所有动漫视频集及其视频，保留演员和标签数据。</p>
-              {deleteAnimeResult && (
-                <p className="text-sm text-green-600 mt-2">
-                  ✓ 已删除 {deleteAnimeResult.videoCount} 个视频，{deleteAnimeResult.seriesCount} 个视频集
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleDeleteAllAnime}
-              disabled={deletingAnime}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-            >
-              {deletingAnime ? '删除中...' : '删除所有动漫'}
-            </button>
-          </div>
-        </div>
-        <div className="card p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">删除所有影视视频集及其视频，保留演员和标签数据。</p>
-              {deleteAdultResult && (
-                <p className="text-sm text-green-600 mt-2">
-                  ✓ 已删除 {deleteAdultResult.videoCount} 个视频，{deleteAdultResult.seriesCount} 个视频集
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleDeleteAllAdult}
-              disabled={deletingAdult}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-            >
-              {deletingAdult ? '删除中...' : '删除所有影视'}
-            </button>
-          </div>
-        </div>
 
-        <div className="card p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">重新解析所有动漫视频集的文件名，补充缺失的番号（code）和中文字幕标记。</p>
-              {rescanAnimeResult && (
-                <p className="text-sm text-green-600 mt-2">
-                  ✓ 已更新 {rescanAnimeResult[0]} 部，跳过 {rescanAnimeResult[1]} 部
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleRescanAnimeMetadata}
-              disabled={rescanningAnime}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
-            >
-              {rescanningAnime ? '扫描中...' : '重新扫描动漫元数据'}
-            </button>
-          </div>
-        </div>
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">重新解析所有影视视频集的文件名，无条件覆盖已有数据。</p>
-              {rescanAdultResult && (
-                <p className="text-sm text-green-600 mt-2">
-                  ✓ 已更新 {rescanAdultResult[0]} 部，跳过 {rescanAdultResult[1]} 部
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleRescanAdultMetadata}
-              disabled={rescanningAdult}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
-            >
-              {rescanningAdult ? '扫描中...' : '重新扫描影视元数据'}
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* 标签管理 */}
       <section className="mb-12">
@@ -564,7 +438,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追踪', chinese_sub: '中字', episode: '集数' };
+                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', chinese_sub: '中字', episode: '单位' };
                 return labels[k] || k;
               });
               return (
@@ -592,6 +466,19 @@ const Settings: React.FC = () => {
                         编辑
                       </button>
                       <button
+                        onClick={() => handleRescanCategory(cat.key)}
+                        disabled={rescanningCategory === cat.key}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                      >
+                        {rescanningCategory === cat.key ? '扫描中...' : '扫描元数据'}
+                      </button>
+                      <button
+                        onClick={() => setDeleteCatConfirm(cat.key)}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                      >
+                        删除视频
+                      </button>
+                      <button
                         onClick={() => setCategoryDeleteConfirm(cat.key)}
                         className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                       >
@@ -615,7 +502,7 @@ const Settings: React.FC = () => {
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold">演员字段管理</h2>
+            <h2 className="text-xl font-semibold">演员管理</h2>
             <p className="text-sm text-gray-500 mt-1">配置演员详情页显示的字段</p>
           </div>
           <button
@@ -627,34 +514,11 @@ const Settings: React.FC = () => {
         </div>
 
         {actorFields.length > 0 ? (
-          <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
             {actorFields.map((field) => (
-              <div key={field.field_key} className="card p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{field.field_label}</h3>
-                    <p className="text-sm text-gray-500 mt-1">Key: {field.field_key} · 类型: {field.field_type}</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs mt-2 ${field.enabled ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {field.enabled ? '已启用' : '已禁用'}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => openEditField(field)}
-                      className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
-                    >
-                      编辑
-                    </button>
-                    {field.field_key !== 'name' && (
-                      <button
-                        onClick={() => setFieldDeleteConfirm(field.field_key)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                      >
-                        删除
-                      </button>
-                    )}
-                  </div>
-                </div>
+              <div key={field.field_key} className="card p-4 cursor-pointer" onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
+                <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
+                <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : '选择'}</p>
               </div>
             ))}
           </div>
@@ -666,26 +530,22 @@ const Settings: React.FC = () => {
         )}
       </section>
 
-      {/* 删除二次确认弹窗 */}
-      {deleteConfirm && (
+      {/* 大类视频删除确认弹窗 */}
+      {deleteCatConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
             <p className="text-gray-900 text-base mb-6">
-              该操作会删除所有{deleteConfirm.type === 'anime' ? '动漫' : '影视'}，请谨慎操作
+              确定要删除「{categories.find(c => c.key === deleteCatConfirm)?.name || deleteCatConfirm}」下的所有视频吗？此操作不可恢复。
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  if (deleteConfirm.type === 'anime') doDeleteAllAnime();
-                  else doDeleteAllAdult();
-                  setDeleteConfirm(null);
-                }}
+                onClick={() => { doDeleteCategory(deleteCatConfirm); setDeleteCatConfirm(null); }}
                 className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
               >
                 狠心删除
               </button>
               <button
-                onClick={() => setDeleteConfirm(null)}
+                onClick={() => setDeleteCatConfirm(null)}
                 className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
               >
                 返回
@@ -767,17 +627,17 @@ const Settings: React.FC = () => {
                   placeholder="如：动漫"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">唯一标识 Key *</label>
-                <input
-                  type="text"
-                  value={categoryForm.key}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, key: e.target.value })}
-                  readOnly={!!editingCategory}
-                  className={`w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 ${editingCategory ? 'bg-gray-100 text-gray-500' : ''}`}
-                  placeholder="如：anime"
-                />
-              </div>
+              {editingCategory && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">唯一标识 Key</label>
+                  <input
+                    type="text"
+                    value={categoryForm.key}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">卡片方向</label>
                 <select
@@ -815,9 +675,8 @@ const Settings: React.FC = () => {
                   {([
                     { key: 'tags' as const, label: '标签' },
                     { key: 'actors' as const, label: '演员' },
-                    { key: 'tracking' as const, label: '追踪' },
+                    { key: 'tracking' as const, label: '追番' },
                     { key: 'chinese_sub' as const, label: '中文字幕' },
-                    { key: 'episode' as const, label: '集数' },
                   ]).map(({ key, label }) => (
                     <div key={key} className="flex items-center justify-between">
                       <span className="text-sm text-gray-700">{label}</span>
@@ -833,6 +692,21 @@ const Settings: React.FC = () => {
                       </button>
                     </div>
                   ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">单位</span>
+                    <select
+                      value={categoryForm.features.episode || '部'}
+                      onChange={(e) => setCategoryForm({
+                        ...categoryForm,
+                        features: { ...categoryForm.features, episode: e.target.value }
+                      })}
+                      className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="话">话</option>
+                      <option value="部">部</option>
+                      <option value="集">集</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -887,34 +761,32 @@ const Settings: React.FC = () => {
             <h2 className="text-2xl font-bold mb-6">{editingField ? '编辑字段' : '新增字段'}</h2>
             <div className="space-y-4">
               {!editingField && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">字段标识 *</label>
-                    <input
-                      type="text"
-                      value={fieldForm.field_key}
-                      onChange={(e) => setFieldForm({ ...fieldForm, field_key: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                      placeholder="如：height"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">字段类型</label>
-                    <select
-                      value={fieldForm.field_type}
-                      onChange={(e) => setFieldForm({ ...fieldForm, field_type: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="text">文本</option>
-                      <option value="number">数字</option>
-                      <option value="date">日期</option>
-                      <option value="select">选择</option>
-                    </select>
-                  </div>
-                </>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">字段标识 *</label>
+                  <input
+                    type="text"
+                    value={fieldForm.field_key}
+                    onChange={(e) => setFieldForm({ ...fieldForm, field_key: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    placeholder="如：height"
+                  />
+                </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">显示名称 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">字段类型</label>
+                <select
+                  value={fieldForm.field_type}
+                  onChange={(e) => setFieldForm({ ...fieldForm, field_type: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                >
+                  <option value="text">文本</option>
+                  <option value="number">数字</option>
+                  <option value="date">日期</option>
+                  <option value="select">选择</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称 *</label>
                 <input
                   type="text"
                   value={fieldForm.field_label}
@@ -933,6 +805,23 @@ const Settings: React.FC = () => {
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fieldForm.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
+                </div>
+              )}
+              {fieldForm.field_type === 'select' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">选项配置</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(fieldForm.options || []).map((opt, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm">
+                        {opt}
+                        <button onClick={() => { const newOpts = [...(fieldForm.options || [])]; newOpts.splice(i, 1); setFieldForm({ ...fieldForm, options: newOpts }); }} className="text-gray-400 hover:text-red-500">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="text" value={newOptionValue} onChange={(e) => setNewOptionValue(e.target.value)} placeholder="新选项" className="flex-1 px-3 py-2 border rounded-lg" onKeyDown={(e) => { if (e.key === 'Enter' && newOptionValue.trim()) { setFieldForm({ ...fieldForm, options: [...(fieldForm.options || []), newOptionValue.trim()] }); setNewOptionValue(''); } }} />
+                    <button onClick={() => { if (newOptionValue.trim()) { setFieldForm({ ...fieldForm, options: [...(fieldForm.options || []), newOptionValue.trim()] }); setNewOptionValue(''); } }} className="px-3 py-2 bg-gray-100 rounded-lg">添加</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -955,28 +844,11 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 演员字段删除确认弹窗 */}
-      {fieldDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <p className="text-gray-900 text-base mb-6">
-              确定要删除字段「{actorFields.find(f => f.field_key === fieldDeleteConfirm)?.field_label || fieldDeleteConfirm}」吗？
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { handleDeleteField(fieldDeleteConfirm); setFieldDeleteConfirm(null); }}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
-              >
-                确认删除
-              </button>
-              <button
-                onClick={() => setFieldDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-              >
-                取消
-              </button>
-            </div>
-          </div>
+      {/* 演员字段右键菜单 */}
+      {fieldContextMenu && (
+        <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
+          <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button>
+          <button onClick={() => { if (confirm('确定删除该字段？')) { handleDeleteField(fieldContextMenu.key); } setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
         </div>
       )}
 
