@@ -178,7 +178,7 @@ jobs:
           EXE_NAME=$(basename "$EXE_PATH")
           VERSION="${{ steps.version.outputs.version }}"
           # Sign the exe file
-          echo "$TAURI_SIGNING_PRIVATE_KEY" | minisign -S -s /dev/stdin -m "$EXE_PATH" -x "$EXE_PATH.sig"
+          npx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" "$EXE_PATH"
           SIG=$(cat "$EXE_PATH.sig" | tail -1)
           cat > src-tauri/target/release/bundle/nsis/latest.json << EOF
           {
