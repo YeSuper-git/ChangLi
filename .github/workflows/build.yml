@@ -170,8 +170,7 @@ jobs:
           releaseBody: "ChangLi v__VERSION__"
           releaseDraft: false
           prerelease: false
-          uploadUpdaterJson: true
-          uploadUpdaterSignatures: true
+          includeUpdaterJson: true
           updaterJsonPreferNsis: true
 
       - name: Upload Windows artifact
