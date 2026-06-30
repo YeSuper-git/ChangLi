@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, updateActorWorkPeriod, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields } from '../utils/api';
+import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, updateActorWorkPeriod, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields, incrementActorView } from '../utils/api';
 import type { Actor, Video, ActorPeriod, ActorPhoto, ActorField } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
+import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
 import backIcon from '../assets/icons/back.svg';
@@ -23,6 +24,8 @@ const ActorDetail: React.FC = () => {
     }
   };
   const [actor, setActor] = useState<Actor | null>(null);
+  const { refreshActors } = useLibraryStore();
+  const viewCountedRef = useRef(false);
   const [resources, setResources] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -69,9 +72,16 @@ const ActorDetail: React.FC = () => {
 
   useEffect(() => {
     if (id) {
+      viewCountedRef.current = false;
       loadActor(parseInt(id), { scrollToTop: true, resetPhoto: true });
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!actor || viewCountedRef.current) return;
+    viewCountedRef.current = true;
+    incrementActorView(actor.id).then(() => refreshActors()).catch(() => {});
+  }, [actor, refreshActors]);
 
   useEffect(() => {
     if (editFromUrl && actor) {

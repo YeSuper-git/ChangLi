@@ -127,6 +127,7 @@ pub struct Actor {
     pub alias: Option<String>,
     pub weight: Option<String>,
     pub work_count: i64,
+    pub view_count: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -919,7 +920,7 @@ pub async fn get_actors(pool: &SqlitePool) -> Result<Vec<Actor>> {
              ) actor_works
              GROUP BY actor_id
          ) w ON w.actor_id = a.id
-         ORDER BY a.name",
+         ORDER BY a.view_count DESC, a.updated_at DESC, a.name",
     )
     .fetch_all(pool)
     .await?;
@@ -954,7 +955,7 @@ pub async fn get_actors_by_category(pool: &SqlitePool, category_key: &str) -> Re
              GROUP BY actor_id
          ) w ON w.actor_id = a.id
          WHERE (vs.display_type = ? OR (vs.display_type IS NULL AND ? = 'anime'))
-         ORDER BY a.name",
+         ORDER BY a.view_count DESC, a.updated_at DESC, a.name",
     )
     .bind(category_key)
     .bind(category_key)
@@ -995,6 +996,14 @@ pub async fn get_actor(pool: &SqlitePool, id: i64) -> Result<Option<Actor>> {
     .await?;
 
     Ok(row.map(|row| actor_from_row(&row)))
+}
+
+pub async fn increment_actor_view_count(pool: &SqlitePool, actor_id: i64) -> Result<()> {
+    sqlx::query("UPDATE actors SET view_count = view_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(actor_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn add_actor(
@@ -1126,6 +1135,7 @@ fn actor_from_row(row: &SqliteRow) -> Actor {
         alias: row.try_get("alias").ok().flatten(),
         weight: row.try_get("weight").ok().flatten(),
         work_count: row.try_get("work_count").unwrap_or(0),
+        view_count: row.try_get("view_count").unwrap_or(0),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     }

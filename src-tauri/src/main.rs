@@ -1088,6 +1088,15 @@ async fn get_actors_by_category(state: State<'_, AppState>, category_key: String
 }
 
 #[tauri::command]
+async fn increment_actor_view(state: State<'_, AppState>, actor_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::increment_actor_view_count(&pool, actor_id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_actor(state: State<'_, AppState>, id: i64) -> Result<Option<db::Actor>, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -1963,6 +1972,7 @@ fn main() {
             remove_video_from_series,
             get_actors,
             get_actors_by_category,
+            increment_actor_view,
             get_actor,
             add_actor,
             update_actor,

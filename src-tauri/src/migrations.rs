@@ -34,6 +34,7 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         .await?;
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
+    add_column_if_not_exists(pool, "actors", "view_count", "INTEGER NOT NULL DEFAULT 0").await?;
     Ok(())
 }
 

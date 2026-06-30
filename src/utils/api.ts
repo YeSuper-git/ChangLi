@@ -437,6 +437,7 @@ export interface Actor {
   alias?: string;
   weight?: string;
   work_count: number;
+  view_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -464,6 +465,10 @@ export async function getActors(): Promise<Actor[]> {
 
 export async function getActorsByCategory(categoryKey: string): Promise<Actor[]> {
   return invoke<Actor[]>('get_actors_by_category', { categoryKey });
+}
+
+export async function incrementActorView(actorId: number): Promise<void> {
+  return invoke<void>('increment_actor_view', { actorId });
 }
 
 export async function getActor(id: number): Promise<Actor | null> {
