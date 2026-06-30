@@ -177,7 +177,7 @@ const Home: React.FC = () => {
             {actors.slice(0, 10).map((actor) => {
               const photoDataUrl = actorPhotoDataUrl(actor);
               return (
-                <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block flex-shrink-0 w-40 snap-start">
+                <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block flex-shrink-0 w-[260px] snap-start">
                   <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden rounded-xl">
                     {photoDataUrl ? (
                       <img src={photoDataUrl} alt={actor.name} className="w-full h-full object-cover" />
@@ -193,7 +193,7 @@ const Home: React.FC = () => {
               );
             })}
 
-            <Link to="/actors" className="card block flex-shrink-0 w-40 snap-start">
+            <Link to="/actors" className="card block flex-shrink-0 w-[260px] snap-start">
               <div className="aspect-[3/4] rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-500 hover:text-blue-500 hover:border-blue-400 transition-colors">
                 <div className="text-center">
                   <div className="text-2xl mb-1">›</div>

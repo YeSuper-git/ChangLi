@@ -5,7 +5,7 @@
 @keyframes changliToastIn {
   from {
     opacity: 0;
-    transform: translate(-12px, -8px);
+    transform: translate(12px, -8px);
   }
   to {
     opacity: 1;
