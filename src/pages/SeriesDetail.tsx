@@ -420,8 +420,9 @@ const SeriesDetail: React.FC = () => {
   return (
     <div className="changli-page">
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="text-sm text-rose-500 hover:underline flex items-center gap-1">
-          <img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}
+        <button type="button" onClick={handleBack} className="changli-back-link">
+          <span className="changli-back-icon"><img src={backIcon} alt="返回" /></span>
+          <span>{backLabel}</span>
         </button>
       </div>
 
@@ -468,7 +469,7 @@ const SeriesDetail: React.FC = () => {
                                   key={actor.id}
                                   type="button"
                                   onClick={() => toggleActor(actor.id)}
-                                  className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                                  className={`px-3 py-1 rounded-full text-sm font-semibold border transition-colors ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'}`}
                                 >
                                   {actor.name}
                                 </button>
@@ -477,7 +478,7 @@ const SeriesDetail: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setShowNewActorModal(true)}
-                              className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                              className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                             >
                               + 新建演员
                             </button>
@@ -524,7 +525,7 @@ const SeriesDetail: React.FC = () => {
                             key={tag.id}
                             type="button"
                             onClick={() => toggleTag(tag.id)}
-                            className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                            className={`px-3 py-1 rounded-full text-sm font-semibold border transition-colors ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'}`}
                           >
                             {tag.name}
                           </button>
@@ -533,7 +534,7 @@ const SeriesDetail: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setCreatingTag(true)}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                       >
                         + 新建标签
                       </button>

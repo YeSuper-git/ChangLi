@@ -547,21 +547,26 @@ const Library: React.FC = () => {
         )}
       </div>
 
-      <div className="mb-6 flex gap-3 flex-wrap">
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
-          className="category-btn"
-        >
-          <option value="created_at">添加时间</option>
-          <option value="title">名称</option>
-        </select>
-        <button
-          onClick={() => toggleSortOrder()}
-          className="category-btn"
-        >
-          {sortOrder === 'desc' ? '降序 ↓' : '升序 ↑'}
-        </button>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="changli-sort-panel">
+          <span className="changli-sort-label">排序</span>
+          <span className="changli-sort-select-wrap">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
+              className="changli-sort-select"
+            >
+              <option value="created_at">添加时间</option>
+              <option value="title">名称</option>
+            </select>
+          </span>
+          <button
+            onClick={() => toggleSortOrder()}
+            className="category-btn"
+          >
+            {sortOrder === 'desc' ? '最新在前 ↓' : '最早在前 ↑'}
+          </button>
+        </div>
       </div>
 
       <div className="changli-toolbar mb-10 p-3">
@@ -594,7 +599,7 @@ const Library: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={selectedIds.size === filteredSeries.length ? deselectAll : selectAll}
-              className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-100"
+              className="action-btn"
             >
               {selectedIds.size === filteredSeries.length ? '取消全选' : '全选'}
             </button>
@@ -604,13 +609,13 @@ const Library: React.FC = () => {
             <button
               onClick={handleBatchDelete}
               disabled={selectedIds.size === 0}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="action-btn action-btn-danger disabled:opacity-40 disabled:cursor-not-allowed"
             >
               删除选中{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
             </button>
             <button
               onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
-              className="px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-100"
+              className="action-btn"
             >
               取消
             </button>
@@ -629,7 +634,7 @@ const Library: React.FC = () => {
                   navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}` } });
                 }}}
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
+                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white rounded-2xl' : ''}`}
               >
                 <div className={`card relative w-full overflow-hidden transition-shadow duration-200 group-hover:shadow-xl ${isPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
                   {selectMode && (
@@ -655,7 +660,7 @@ const Library: React.FC = () => {
                   <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
                   <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                   {features.chinese_sub && series.has_chinese_sub === 1 && (
-                    <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                    <span className="absolute bottom-2 left-2 changli-brand-badge text-xs font-bold px-2 py-0.5">
                       中字
                     </span>
                   )}
