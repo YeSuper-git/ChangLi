@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.8 (2026-06-30)
+
+### 改进
+- 设置页检查更新改为 GitHub Release API：不再依赖 Tauri updater 的 `latest.json`/`.sig`
+- 检测到新版本时自动打开最新 Windows 安装包下载链接，用户按安装器完成更新
+- 移除 Tauri updater 插件和权限残留，避免发布链路再被 updater 签名产物卡住
+
 ## v1.7.7 (2026-06-30)
 
 ### 新增

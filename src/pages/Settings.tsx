@@ -7,10 +7,40 @@ import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 import Switch from '../components/Switch';
 import { open } from '@tauri-apps/plugin-dialog';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { notify } from '../utils/notify';
 import { changelogData, currentVersion } from '../generated/versionInfo';
+
+type GitHubRelease = {
+  tag_name: string;
+  html_url: string;
+  body?: string | null;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+  }>;
+};
+
+const normalizeVersion = (version: string) => version.replace(/^v/i, '').trim();
+
+const compareVersions = (a: string, b: string) => {
+  const left = normalizeVersion(a).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const right = normalizeVersion(b).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(left.length, right.length);
+
+  for (let i = 0; i < length; i += 1) {
+    const diff = (left[i] || 0) - (right[i] || 0);
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+};
+
+const findWindowsInstaller = (release: GitHubRelease) => (
+  release.assets.find((asset) => /x64-setup\.exe$/i.test(asset.name)) ||
+  release.assets.find((asset) => /\.exe$/i.test(asset.name)) ||
+  release.assets.find((asset) => /\.msi$/i.test(asset.name))
+);
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -333,23 +363,38 @@ const Settings: React.FC = () => {
   const handleCheckUpdate = async () => {
     setUpdateStatus('检查中...');
     notify({ message: '正在检查更新...', type: 'info' });
+
     try {
-      const update = await check();
-      if (update) {
-        setUpdateStatus(`发现新版本 ${update.version}，正在下载...`);
-        notify({ message: `发现新版本 ${update.version}，正在下载...`, type: 'info' });
-        await update.downloadAndInstall((progress) => {
-          if (progress.event === 'Finished') {
-            setUpdateStatus('下载完成，准备重启...');
-            notify({ message: '下载完成，准备重启...', type: 'success' });
-          }
-        });
-        await relaunch();
-      } else {
+      const response = await fetch('https://api.github.com/repos/YeSuper-git/ChangLi/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub Release API 返回 ${response.status}`);
+      }
+
+      const release = await response.json() as GitHubRelease;
+      const latestVersion = normalizeVersion(release.tag_name);
+
+      if (compareVersions(latestVersion, currentVersion) <= 0) {
         setUpdateStatus('已是最新版本');
         notify({ message: '已是最新版本', type: 'success' });
-        setTimeout(() => setUpdateStatus(null), 3000);
+        setTimeout(() => setUpdateStatus(null), 5000);
+        return;
       }
+
+      const installer = findWindowsInstaller(release);
+      const downloadUrl = installer?.browser_download_url || release.html_url;
+
+      setUpdateStatus(`发现新版本 v${latestVersion}，已打开下载链接`);
+      notify({
+        message: installer
+          ? `发现新版本 v${latestVersion}，已打开安装包下载链接`
+          : `发现新版本 v${latestVersion}，已打开发布页面`,
+        type: 'success'
+      });
+      await openExternal(downloadUrl);
+      setTimeout(() => setUpdateStatus(null), 8000);
     } catch (error) {
       console.error('检查更新失败:', error);
       setUpdateStatus('检查更新失败');

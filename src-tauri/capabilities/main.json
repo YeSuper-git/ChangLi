@@ -36,7 +36,6 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
-    "libmpv:default",
-    "updater:default"
+    "libmpv:default"
   ]
 }
