@@ -1,15 +1,14 @@
 {
   "name": "changli",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "长离 - 全功能视频管理播放平台",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:build": "tauri build && bash scripts/post-build.sh",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:dev": "tauri dev"
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "^2.7.1",
