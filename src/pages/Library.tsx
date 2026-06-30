@@ -18,6 +18,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
@@ -76,6 +77,7 @@ const Library: React.FC = () => {
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
   const actorsRef = useRef<HTMLDivElement>(null);
@@ -101,7 +103,7 @@ const Library: React.FC = () => {
   // Toast 自动消失
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
+      const timer = setTimeout(() => setToast(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
@@ -408,8 +410,8 @@ const Library: React.FC = () => {
 
   const deselectAll = () => setSelectedIds(new Set());
 
-  const handleBatchDelete = async () => {
-    if (!confirm(`确定删除选中的 ${selectedIds.size} 个项目？`)) return;
+  const doBatchDelete = async () => {
+    setBatchDeleteConfirm(false);
     for (const key of selectedIds) {
       const [type, idStr] = key.split('-');
       const id = parseInt(idStr);
@@ -426,6 +428,10 @@ const Library: React.FC = () => {
     if (activeActorId !== null) {
       await filterByActor(activeActorId);
     }
+  };
+
+  const handleBatchDelete = async () => {
+    setBatchDeleteConfirm(true);
   };
 
   return (
@@ -726,6 +732,16 @@ const Library: React.FC = () => {
         {toast.message}
       </div>
     )}
+
+    <ConfirmDialog
+      open={batchDeleteConfirm}
+      title="批量删除"
+      message={`确定删除选中的 ${selectedIds.size} 个项目？此操作不可恢复。`}
+      confirmText="确认删除"
+      danger
+      onConfirm={doBatchDelete}
+      onCancel={() => setBatchDeleteConfirm(false)}
+    />
 
     {/* 一键扫描确认弹窗 */}
     {scanConfirm && (

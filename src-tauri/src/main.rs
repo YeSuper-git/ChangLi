@@ -13,7 +13,7 @@ mod site_config;
 mod storage;
 
 use image::ImageReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::{Manager, State};
 use tokio::sync::Mutex;
 
@@ -1254,6 +1254,35 @@ async fn open_data_dir() -> Result<(), String> {
     open::that(&data_dir).map_err(|e| e.to_string())
 }
 
+fn preview_temp_dir() -> PathBuf {
+    std::env::temp_dir().join("changli-preview")
+}
+
+#[tauri::command]
+async fn create_preview_file_path(seq: u64) -> Result<String, String> {
+    let dir = preview_temp_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let filename = format!("preview-{}-{seq}.jpg", uuid::Uuid::new_v4());
+    Ok(dir.join(filename).to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn delete_preview_file(path: String) -> Result<(), String> {
+    let target = PathBuf::from(&path);
+    let preview_dir = preview_temp_dir();
+    let canonical_dir = preview_dir.canonicalize().map_err(|e| e.to_string())?;
+
+    if target.exists() {
+        let canonical_target = target.canonicalize().map_err(|e| e.to_string())?;
+        if !canonical_target.starts_with(&canonical_dir) {
+            return Err("拒绝删除非 ChangLi 预览临时文件".to_string());
+        }
+        std::fs::remove_file(canonical_target).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 async fn delete_actor(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let pool = {
@@ -1578,6 +1607,23 @@ async fn remove_series_actor(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn update_actor_work_period(
+    state: State<'_, AppState>,
+    actor_id: i64,
+    work_type: String,
+    work_id: i64,
+    period_id: Option<i64>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_actor_work_period(&pool, actor_id, &work_type, work_id, period_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // 播放器相关命令
 #[tauri::command]
 async fn play_video(
@@ -1869,10 +1915,10 @@ fn main() {
         .manage(AppState {
             db: Mutex::new(None),
         })
-        .setup(|app| {
-            if let Err(error) = player::register_shortcuts(&app.handle()) {
-                eprintln!("[ChangLi] 注册播放窗口快捷键失败: {error:#}");
-            }
+        .setup(|_app| {
+            // 播放器主路径已切到前端 /player/:id + tauri-plugin-libmpv。
+            // 旧的外部 mpv 播放窗口只保留给历史 play_video 命令兜底，不再注册全局快捷键，
+            // 避免快捷键误创建旧架构的 player WebView 窗口。
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -1938,6 +1984,7 @@ fn main() {
             get_series_actors,
             add_series_actor,
             remove_series_actor,
+            update_actor_work_period,
             play_video,
             get_play_history,
             get_recent_watch_items,
@@ -1947,6 +1994,8 @@ fn main() {
             update_video,
             save_actor_photo,
             save_video_thumbnail,
+            create_preview_file_path,
+            delete_preview_file,
             get_storage_info,
             open_data_dir,
             toggle_favorite,

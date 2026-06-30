@@ -36,6 +36,7 @@ import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeat
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function extractCode(folderName: string): { code: string; hasChineseSub: boolean } {
   const match = folderName.match(/[A-Za-z]+-\d+[A-Za-z]*/);
@@ -102,6 +103,7 @@ const SeriesDetail: React.FC = () => {
   const [showSeasonManager, setShowSeasonManager] = useState(false);
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -780,9 +782,7 @@ const SeriesDetail: React.FC = () => {
                       <button
                         onClick={() => {
                           const label = s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`;
-                          if (confirm(`确定要删除"${label}"吗？该季下所有 ${s.video_count} 个视频将被删除。`)) {
-                            handleDeleteSeason(s.season);
-                          }
+                          setSeasonDeleteConfirm({ season: s.season, label, videoCount: s.video_count });
                         }}
                         className="action-btn action-btn-danger text-xs"
                       >
@@ -806,6 +806,20 @@ const SeriesDetail: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!seasonDeleteConfirm}
+        title="删除季"
+        message={seasonDeleteConfirm ? `确定要删除「${seasonDeleteConfirm.label}」吗？该季下所有 ${seasonDeleteConfirm.videoCount} 个视频将被删除。` : ''}
+        confirmText="确认删除"
+        danger
+        onConfirm={() => {
+          if (!seasonDeleteConfirm) return;
+          handleDeleteSeason(seasonDeleteConfirm.season);
+          setSeasonDeleteConfirm(null);
+        }}
+        onCancel={() => setSeasonDeleteConfirm(null)}
+      />
 
       {actorNotice && (
         <div className="fixed right-6 top-6 z-50 max-w-sm rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl">
