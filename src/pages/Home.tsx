@@ -112,7 +112,7 @@ const Home: React.FC = () => {
         <section className="mb-16">
           <div className="changli-section-title">
             <h2 className="text-2xl font-bold text-gray-900">我的追番</h2>
-            <Link to="/library?favorite=1" className="changli-section-link">查看全部 ›</Link>
+            <Link to="/library?favorite=1&scope=all" className="changli-section-link">查看全部 ›</Link>
           </div>
           {favorites.length > 0 ? (
             <HorizontalScroll

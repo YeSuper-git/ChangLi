@@ -39,6 +39,7 @@ const Library: React.FC = () => {
   const [typeFilter] = useState<'all' | 'series' | 'video'>(() => {
     return (searchParams.get('type') as 'all' | 'series' | 'video') || 'all';
   });
+  const [scopeAll, setScopeAll] = useState(() => searchParams.get('scope') === 'all');
   const [mainCategory, setMainCategory] = useState<string>(() => {
     return searchParams.get('cat') || '';
   });
@@ -62,9 +63,14 @@ const Library: React.FC = () => {
 
   // 按大类加载标签和演员
   const loadCategoryFilters = useCallback(() => {
+    if (scopeAll) {
+      setTags([]);
+      setActors([]);
+      return;
+    }
     getTagsByCategory(mainCategory).then(setTags).catch(() => setTags([]));
     getActorsByCategory(mainCategory).then(setActors).catch(() => setActors([]));
-  }, [mainCategory]);
+  }, [mainCategory, scopeAll]);
 
   useEffect(() => {
     loadCategoryFilters();
@@ -104,7 +110,7 @@ const Library: React.FC = () => {
     // 窗口 resize 时重新检测
     window.addEventListener('resize', checkOverflow);
     return () => window.removeEventListener('resize', checkOverflow);
-  }, [tags, actors, mainCategory]);
+  }, [tags, actors, mainCategory, scopeAll]);
 
 
   // 同步筛选状态到 URL 参数
@@ -130,9 +136,10 @@ const Library: React.FC = () => {
       type: typeFilter !== 'all' ? typeFilter : null,
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
-      cat: mainCategory !== 'anime' ? mainCategory : null,
+      scope: scopeAll ? 'all' : null,
+      cat: !scopeAll && mainCategory !== 'anime' ? mainCategory : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -152,6 +159,14 @@ const Library: React.FC = () => {
       setActorFilteredSeries(null);
     }
   }, [storeSeries, activeTagId, activeActorId]);
+
+  useEffect(() => {
+    if (!scopeAll) return;
+    setActiveTagId(null);
+    setTagFilteredSeries(null);
+    setActiveActorId(null);
+    setActorFilteredSeries(null);
+  }, [scopeAll]);
 
   // 恢复标签筛选
   useEffect(() => {
@@ -211,7 +226,8 @@ const Library: React.FC = () => {
     if (typeFilter !== 'all') params.set('type', typeFilter);
     if (favoriteFilter) params.set('favorite', '1');
     if (watchedFilter) params.set('watched', '1');
-    if (mainCategory !== 'anime') params.set('cat', mainCategory);
+    if (scopeAll) params.set('scope', 'all');
+    if (!scopeAll && mainCategory !== 'anime') params.set('cat', mainCategory);
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   };
@@ -373,24 +389,49 @@ const Library: React.FC = () => {
 
   const normalizedSearch = searchTerm.toLowerCase();
   const currentCategory = useMemo(() => categories.find(c => c.key === mainCategory), [categories, mainCategory]);
+  const getSeriesCategory = useCallback((series: VideoSeries) => {
+    return categories.find(c => c.key === series.display_type)
+      || categories.find(c => !series.display_type && !series.has_actor && c.key === 'anime')
+      || categories.find(c => series.has_actor && c.key === 'adult')
+      || null;
+  }, [categories]);
+  const getSeriesFeatures = useCallback((series: VideoSeries): CategoryFeatures | null => {
+    const category = getSeriesCategory(series);
+    return category ? parseCategoryFeatures(category.features) : null;
+  }, [getSeriesCategory]);
   const currentFeatures = useMemo(() => currentCategory ? parseCategoryFeatures(currentCategory.features) : null, [currentCategory]);
 
   // fallback: 当 categories 未加载时使用默认值
-  const features = currentFeatures || {
+  const features = scopeAll ? {
+    tags: false,
+    actors: false,
+    tracking: true,
+    chinese_sub: false,
+    episode: '部',
+  } as CategoryFeatures : currentFeatures || {
     tags: mainCategory === 'anime',
     actors: mainCategory === 'adult',
     tracking: mainCategory === 'anime',
     chinese_sub: mainCategory === 'adult',
     episode: mainCategory === 'anime' ? ('话' as string) : ('部' as string),
   } as CategoryFeatures;
-  const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
-  const categoryDisplayName = currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
+  const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
+  const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
   const epWord = features.episode || '部';
 
-  const filteredSeries = seriesList.filter((series) =>
-    (series.title.toLowerCase().includes(normalizedSearch) ||
-    (series.description || '').toLowerCase().includes(normalizedSearch)) && (!favoriteFilter || favoriteIds.has(`s-${series.id}`)) && (!watchedFilter || watchedIds.has(series.id)) && (!chineseSubFilter || series.has_chinese_sub === 1) && (series.display_type === mainCategory || (!series.display_type && mainCategory === 'anime'))
-  );
+  const filteredSeries = seriesList.filter((series) => {
+    const matchesText = series.title.toLowerCase().includes(normalizedSearch)
+      || (series.description || '').toLowerCase().includes(normalizedSearch);
+    const matchesCategory = scopeAll
+      || series.display_type === mainCategory
+      || (!series.display_type && mainCategory === 'anime');
+
+    return matchesText
+      && (!favoriteFilter || favoriteIds.has(`s-${series.id}`))
+      && (!watchedFilter || watchedIds.has(series.id))
+      && (!chineseSubFilter || series.has_chinese_sub === 1)
+      && matchesCategory;
+  });
 
   const toggleSelect = (key: string) => {
     setSelectedIds(prev => {
@@ -438,11 +479,21 @@ const Library: React.FC = () => {
     <div className="changli-page">
       <div className="changli-page-header">
         <div className="flex items-center gap-4">
+          {scopeAll && (
+            <h1 className="changli-heading-xl cursor-default transition-all">我的追番</h1>
+          )}
           {[...categories].sort((a, b) => a.sort_order - b.sort_order).map((cat) => (
             <h1
               key={cat.key}
-              className={`cursor-pointer transition-all ${mainCategory === cat.key ? 'changli-heading-xl' : 'text-2xl font-bold text-gray-400 hover:text-gray-600'}`}
-              onClick={() => { setMainCategory(cat.key); setActiveActorId(null); setActorFilteredSeries(null); setActiveTagId(null); setTagFilteredSeries(null); }}
+              className={`cursor-pointer transition-all ${!scopeAll && mainCategory === cat.key ? 'changli-heading-xl' : 'text-2xl font-bold text-gray-400 hover:text-gray-600'}`}
+              onClick={() => {
+                setScopeAll(false);
+                setMainCategory(cat.key);
+                setActiveActorId(null);
+                setActorFilteredSeries(null);
+                setActiveTagId(null);
+                setTagFilteredSeries(null);
+              }}
             >
               {cat.name}
             </h1>
@@ -455,7 +506,7 @@ const Library: React.FC = () => {
           )}
         </div>
         <div className="flex gap-3">
-          {currentCategory?.scan_path && (
+          {!scopeAll && currentCategory?.scan_path && (
             <button
               onClick={() => setScanConfirm(true)}
               disabled={categoryScanning}
@@ -620,59 +671,66 @@ const Library: React.FC = () => {
 
       {filteredSeries.length > 0 && (
         <div className="mb-12">
-          <div className={`grid gap-5 auto-rows-max ${isPortrait ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
-            {filteredSeries.map((series) => (
-              <div
-                key={series.id}
-                onClick={() => { if (!selectMode) {
-                  const filterSearch = buildFilterSearch();
-                  navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}` } });
-                }}}
-                onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
-                className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
-              >
-                <div className={`card relative w-full overflow-hidden transition-shadow duration-200 group-hover:shadow-xl ${isPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
-                  {selectMode && (
-                    <div
-                      className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
-                      style={{
-                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : 'white',
-                        borderColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : '#d1d5db',
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleSelect(`s-${series.id}`);
-                      }}
-                    >
-                      {selectedIds.has(`s-${series.id}`) && (
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
+          <div className={`grid gap-5 auto-rows-max ${scopeAll ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : isPortrait ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
+            {filteredSeries.map((series) => {
+              const itemCategory = getSeriesCategory(series);
+              const itemFeatures = getSeriesFeatures(series) || features;
+              const itemIsPortrait = scopeAll ? itemCategory?.card_layout === 'portrait' : isPortrait;
+              const itemEpWord = itemFeatures.episode || epWord;
+
+              return (
+                <div
+                  key={series.id}
+                  onClick={() => { if (!selectMode) {
+                    const filterSearch = buildFilterSearch();
+                    navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}` } });
+                  }}}
+                  onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
+                  className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
+                >
+                  <div className={`card relative w-full overflow-hidden transition-shadow duration-200 group-hover:shadow-xl ${itemIsPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
+                    {selectMode && (
+                      <div
+                        className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
+                        style={{
+                          backgroundColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : 'white',
+                          borderColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : '#d1d5db',
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleSelect(`s-${series.id}`);
+                        }}
+                      >
+                        {selectedIds.has(`s-${series.id}`) && (
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    )}
+                    <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+                    <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
+                    {itemFeatures.chinese_sub && series.has_chinese_sub === 1 && (
+                      <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
+                        中字
+                      </span>
+                    )}
+                    <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
+                      {series.status === 'completed' || !itemFeatures.tracking ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
                     </div>
-                  )}
-                  <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
-                  <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  {features.chinese_sub && series.has_chinese_sub === 1 && (
-                    <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-sm">
-                      中字
-                    </span>
-                  )}
-                  <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                    {series.status === 'completed' ? `全${series.video_count}${epWord}` : `更新至第${series.video_count}${epWord}`}
+                  </div>
+                  <div className="mt-2">
+                    <h3 className="text-sm font-semibold text-zinc-900 truncate group-hover:text-rose-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
+                      {series.code ? `[${series.code}] ${series.title}` : series.title}
+                    </h3>
+                    <div className="text-xs text-zinc-500 mt-0.5">
+                      {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${itemEpWord}` : '尚未观看'}
+                    </div>
                   </div>
                 </div>
-                <div className="mt-2">
-                  <h3 className="text-sm font-semibold text-zinc-900 truncate group-hover:text-rose-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
-                    {series.code ? `[${series.code}] ${series.title}` : series.title}
-                  </h3>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${epWord}` : '尚未观看'}
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
