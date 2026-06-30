@@ -891,7 +891,7 @@ const ActorDetail: React.FC = () => {
               <>
                 {currentPhotoIndex > 0 && (
                   <button
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="changli-photo-arrow absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                     onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.max(0, prev - 1)); }}
                   >
                     ‹
@@ -899,7 +899,7 @@ const ActorDetail: React.FC = () => {
                 )}
                 {(currentPhotoIndex < photos.length - 1 || (photos.length > 0 && currentPhotoIndex < photos.length)) && (
                   <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="changli-photo-arrow absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                     onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.min(photos.length, prev + 1)); }}
                   >
                     ›

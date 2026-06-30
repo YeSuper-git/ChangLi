@@ -515,7 +515,7 @@ const VideoDetail: React.FC = () => {
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'
                             }`}
                           >
                             {tag.name}
@@ -525,7 +525,7 @@ const VideoDetail: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setCreatingTag(true)}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                       >
                         + 新建标签
                       </button>
@@ -593,7 +593,7 @@ const VideoDetail: React.FC = () => {
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'
                             }`}
                           >
                             {actor.name}
@@ -603,7 +603,7 @@ const VideoDetail: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowNewActorModal(true)}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                       >
                         + 新建演员
                       </button>
