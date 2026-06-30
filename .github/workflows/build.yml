@@ -185,23 +185,21 @@ jobs:
           $msiDir = "src-tauri/target/release/bundle/msi"
 
           $updaterAssets = @(
-            "$nsisDir/*.zip",
-            "$nsisDir/*.zip.sig",
-            "$nsisDir/*.exe.sig",
-            "$msiDir/*.zip",
-            "$msiDir/*.zip.sig",
-            "$msiDir/*.msi.sig"
-          )
-          gh release upload $tag @updaterAssets --clobber
+            (Get-ChildItem $nsisDir -Filter "*.exe.sig" -ErrorAction SilentlyContinue),
+            (Get-ChildItem $msiDir -Filter "*.msi.sig" -ErrorAction SilentlyContinue)
+          ) | Where-Object { $_ }
+          if ($updaterAssets.Count -gt 0) {
+            gh release upload $tag @($updaterAssets.FullName) --clobber
+          }
 
-          $nsisZip = Get-ChildItem $nsisDir -Filter "*.nsis.zip" | Select-Object -First 1
-          $nsisSig = Get-ChildItem $nsisDir -Filter "*.nsis.zip.sig" | Select-Object -First 1
-          if (-not $nsisZip -or -not $nsisSig) {
-            throw "NSIS updater zip/signature not found"
+          $nsisExe = Get-ChildItem $nsisDir -Filter "*.exe" | Select-Object -First 1
+          $nsisSig = Get-ChildItem $nsisDir -Filter "*.exe.sig" | Select-Object -First 1
+          if (-not $nsisExe -or -not $nsisSig) {
+            throw "NSIS updater executable/signature not found"
           }
 
           $signature = (Get-Content $nsisSig.FullName -Raw).Trim()
-          $url = "$releaseUrl/$($nsisZip.Name)"
+          $url = "$releaseUrl/$($nsisExe.Name)"
           $latest = [ordered]@{
             version = $env:VERSION
             notes = "ChangLi $tag"
