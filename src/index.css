@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes changliToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-12px, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

@@ -1195,16 +1195,14 @@ pub async fn update_actor_period(pool: &SqlitePool, id: i64, name: &str) -> Resu
 }
 
 pub async fn delete_actor_period(pool: &SqlitePool, id: i64) -> Result<()> {
-    // Set period_id to NULL for all associated works (归入演员名时期)
+    // Set period_id to NULL for all associated works (归入演员名时期).
+    // Resource actors are stored in video_actors in the current schema; do not touch
+    // legacy resource_actors because existing databases may have that table without period_id.
     sqlx::query("UPDATE video_actors SET period_id = NULL WHERE period_id = ?")
         .bind(id)
         .execute(pool)
         .await?;
     sqlx::query("UPDATE series_actors SET period_id = NULL WHERE period_id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    sqlx::query("UPDATE resource_actors SET period_id = NULL WHERE period_id = ?")
         .bind(id)
         .execute(pool)
         .await?;

@@ -8,6 +8,7 @@ import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
+import { notify } from '../utils/notify';
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,7 +42,6 @@ const ActorDetail: React.FC = () => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoContextMenu, setPhotoContextMenu] = useState<{ photoId: number; x: number; y: number } | null>(null);
   const [addingWork, setAddingWork] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [periods, setPeriods] = useState<ActorPeriod[]>([]);
   const [workPeriodMap, setWorkPeriodMap] = useState<Record<string, number>>({});
   // 时期右键菜单
@@ -73,13 +73,6 @@ const ActorDetail: React.FC = () => {
     }
   }, [id]);
 
-  // Toast 自动消失
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
   useEffect(() => {
     if (editFromUrl && actor) {
       setEditing(true);
@@ -396,17 +389,17 @@ const ActorDetail: React.FC = () => {
           // 显示扫描结果
           const { added, updated } = result;
           if (added > 0 && updated > 0) {
-            setToast({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
+            notify({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
           } else if (added > 0) {
-            setToast({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
+            notify({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
           } else if (updated > 0) {
-            setToast({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
+            notify({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
           } else {
-            setToast({ message: '未发现新作品', type: 'info' });
+            notify({ message: '未发现新作品', type: 'info' });
           }
         } catch (error) {
           console.error('[Actor] 添加作品失败:', error);
-          setToast({ message: '请添加该演员对应的视频哦', type: 'info' });
+          notify({ message: '请添加该演员对应的视频哦', type: 'info' });
         } finally {
           setAddingWork(false);
         }
@@ -461,10 +454,10 @@ const ActorDetail: React.FC = () => {
         return next;
       });
       setPeriodAssignModal(null);
-      setToast({ message: periodId === undefined ? '已归入演员名时期' : '已分配到指定时期', type: 'success' });
+      notify({ message: periodId === undefined ? '已归入演员名时期' : '已分配到指定时期', type: 'success' });
     } catch (error) {
       console.error('[Actor] 分配时期失败:', error);
-      setToast({ message: '分配时期失败: ' + String(error), type: 'info' });
+      notify({ message: '分配时期失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -520,7 +513,7 @@ const ActorDetail: React.FC = () => {
       if (actor) loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 删除视频失败:', error);
-      alert('删除失败: ' + String(error));
+      notify({ message: '删除失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -531,7 +524,7 @@ const ActorDetail: React.FC = () => {
       if (actor) loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 删除视频集失败:', error);
-      alert('删除失败: ' + String(error));
+      notify({ message: '删除失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -540,10 +533,10 @@ const ActorDetail: React.FC = () => {
       const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
       if (actor) loadActor(actor.id);
-      setToast({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Actor] 重新扫描元数据失败:', error);
-      setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });
+      notify({ message: '重新扫描失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -602,7 +595,7 @@ const ActorDetail: React.FC = () => {
       setPeriods(prev => [...prev, period]);
       setNewPeriodName('');
       setShowAddPeriodModal(false);
-      setToast({ message: `时期"${period.name}"已创建`, type: 'success' });
+      notify({ message: `时期"${period.name}"已创建`, type: 'success' });
     } catch (error) {
       console.error('[Actor] 添加时期失败:', error);
     }
@@ -614,7 +607,7 @@ const ActorDetail: React.FC = () => {
       await updateActorPeriod(periodId, editingPeriodName.trim());
       setPeriods(prev => prev.map(p => p.id === periodId ? { ...p, name: editingPeriodName.trim() } : p));
       setEditingPeriodId(null);
-      setToast({ message: '时期名称已更新', type: 'success' });
+      notify({ message: '时期名称已更新', type: 'success' });
     } catch (error) {
       console.error('[Actor] 更新时期失败:', error);
     }
@@ -629,10 +622,10 @@ const ActorDetail: React.FC = () => {
         const periodMap = await getActorWorkPeriodMap(actor.id);
         setWorkPeriodMap(periodMap);
       }
-      setToast({ message: '时期已删除，作品已归入演员名时期', type: 'info' });
+      notify({ message: '时期已删除，作品已归入演员名时期', type: 'info' });
     } catch (error) {
       console.error('[Actor] 删除时期失败:', error);
-      setToast({ message: '删除时期失败: ' + String(error), type: 'info' });
+      notify({ message: '删除时期失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -680,10 +673,10 @@ const ActorDetail: React.FC = () => {
           setPhotos(photosData);
           // 切换到新添加的照片
           setCurrentPhotoIndex(photosData.length - 1);
-          setToast({ message: '海报添加成功', type: 'success' });
+          notify({ message: '海报添加成功', type: 'success' });
         } catch (error) {
           console.error('[Actor] 添加海报失败:', error);
-          setToast({ message: '添加海报失败', type: 'info' });
+          notify({ message: '添加海报失败', type: 'info' });
         } finally {
           setUploadingPhoto(false);
         }
@@ -704,7 +697,7 @@ const ActorDetail: React.FC = () => {
         setCurrentPhotoIndex(Math.max(0, photosData.length - 1));
       }
       setPhotoContextMenu(null);
-      setToast({ message: '海报已删除', type: 'info' });
+      notify({ message: '海报已删除', type: 'info' });
     } catch (error) {
       console.error('[Actor] 删除海报失败:', error);
     }
@@ -719,7 +712,7 @@ const ActorDetail: React.FC = () => {
       setPhotos(photosData);
       setCurrentPhotoIndex(0);
       setPhotoContextMenu(null);
-      setToast({ message: '主海报已更新', type: 'success' });
+      notify({ message: '主海报已更新', type: 'success' });
     } catch (error) {
       console.error('[Actor] 设置主海报失败:', error);
     }
@@ -1307,7 +1300,7 @@ const ActorDetail: React.FC = () => {
                         setPeriodContextMenu({ periodId: period.id, x: e.clientX, y: e.clientY });
                       }}
                     >
-                      {period.name}
+                      <span title={period.name}>{period.name}</span>
                     </h3>
                   )}
                   {periodItems.length > 0 ? (
@@ -1569,15 +1562,6 @@ const ActorDetail: React.FC = () => {
       onConfirm={runConfirmDialog}
       onCancel={() => setConfirmDialog(null)}
     />
-
-    {/* Toast 提示 */}
-    {toast && (
-      <div className="fixed top-20 right-6 z-50" style={{ animation: 'slideInRight 0.3s ease-out' }}>
-        <div className="px-5 py-4 rounded-xl shadow-xl text-base text-gray-900 bg-white border border-gray-300">
-          {toast.message}
-        </div>
-      </div>
-    )}
 
     <FloatingActions onRefresh={actor ? async () => { await loadActor(actor.id); } : undefined} refreshLabel="刷新" />
     </>

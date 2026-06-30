@@ -37,6 +37,7 @@ import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { notify } from '../utils/notify';
 
 function extractCode(folderName: string): { code: string; hasChineseSub: boolean } {
   const match = folderName.match(/[A-Za-z]+-\d+[A-Za-z]*/);
@@ -169,7 +170,7 @@ const SeriesDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('加载视频集失败:', error);
-      alert('加载视频集失败: ' + String(error));
+      notify({ message: '加载视频集失败: ' + String(error), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -209,7 +210,7 @@ const SeriesDetail: React.FC = () => {
     if (!name) return;
     const duplicated = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
     if (duplicated) {
-      alert(`标签"${name}"已存在，不能重复添加。`);
+      notify({ message: `标签"${name}"已存在，不能重复添加。`, type: 'info' });
       return;
     }
     try {
@@ -220,7 +221,7 @@ const SeriesDetail: React.FC = () => {
       setCreatingTag(false);
     } catch (error) {
       console.error('新建标签失败:', error);
-      alert(`新建标签失败：${String(error)}`);
+      notify({ message: `新建标签失败：${String(error)}`, type: 'error' });
     }
   };
 
@@ -244,7 +245,7 @@ const SeriesDetail: React.FC = () => {
       setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
       console.error('新建演员失败:', error);
-      alert(`新建演员失败：${String(error)}`);
+      notify({ message: `新建演员失败：${String(error)}`, type: 'error' });
     }
   };
 
@@ -260,7 +261,7 @@ const SeriesDetail: React.FC = () => {
     if (!series) return;
     const title = editData.title.trim();
     if (!title) {
-      alert('标题不能为空');
+      notify({ message: '标题不能为空', type: 'info' });
       return;
     }
     setSaving(true);
@@ -274,7 +275,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);
-      alert('保存失败: ' + String(error));
+      notify({ message: '保存失败: ' + String(error), type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -294,7 +295,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('添加分集失败:', error);
-      alert('添加分集失败: ' + String(error));
+      notify({ message: '添加分集失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -305,7 +306,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('移除分集失败:', error);
-      alert('移除失败: ' + String(error));
+      notify({ message: '移除失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -316,7 +317,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('删除分集失败:', error);
-      alert('删除失败: ' + String(error));
+      notify({ message: '删除失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -342,7 +343,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('删除季失败:', error);
-      alert('删除季失败: ' + String(error));
+      notify({ message: '删除季失败: ' + String(error), type: 'error' });
     }
   };
 

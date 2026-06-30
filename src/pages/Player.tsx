@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { getVideo } from '../utils/api';
+import { getVideo, playVideo } from '../utils/api';
 import { init, destroy, setProperty, command, observeProperties } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
 
@@ -21,6 +21,7 @@ const Player: React.FC = () => {
   
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState('');
+  const [windowsNativeMode, setWindowsNativeMode] = useState(false);
   
   // 播放器状态
   const [isPlaying, setIsPlaying] = useState(false);
@@ -57,6 +58,16 @@ const Player: React.FC = () => {
       try {
         setLoading(true);
         setError('');
+
+        // Windows WebView + libmpv 渲染路径容易黑屏但有声音；Windows 统一走后端原生 mpv 窗口。
+        if (navigator.userAgent.includes('Windows')) {
+          await playVideo(parseInt(id));
+          setWindowsNativeMode(true);
+          setIsPlaying(true);
+          isPlayingRef.current = true;
+          setLoading(false);
+          return;
+        }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -107,6 +118,9 @@ const Player: React.FC = () => {
 
         // 加载视频
         await command('loadfile', [currentVideo.file_path, 'replace']);
+        await setProperty('pause', false);
+        isPlayingRef.current = true;
+        setIsPlaying(true);
         
         setLoading(false);
       } catch (err) {
@@ -390,6 +404,18 @@ const Player: React.FC = () => {
         <Link to="/library" className="text-blue-400 hover:text-blue-300">
           返回视频库
         </Link>
+      </div>
+    );
+  }
+
+  if (windowsNativeMode) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-black text-white">
+        <div className="text-lg mb-3">已使用 Windows 原生 mpv 播放器打开</div>
+        <div className="text-sm text-gray-400 mb-6">为避免 Win11 WebView 黑屏问题，Windows 下自动切换到原生播放窗口。</div>
+        <button onClick={() => navigate(-1)} className="px-4 py-2 rounded-lg bg-white text-gray-900 hover:bg-gray-100">
+          返回
+        </button>
       </div>
     );
   }

@@ -15,6 +15,7 @@ import VideoDetail from './pages/VideoDetail';
 import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
 import { useLibraryStore } from './store/libraryStore';
+import ToastProvider from './components/ToastProvider';
 
 function App() {
   const isPlayerWindow = getCurrentWindow().label === 'player';
@@ -68,6 +69,7 @@ function App() {
   return (
     <Router>
       <Layout>
+        <ToastProvider />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />

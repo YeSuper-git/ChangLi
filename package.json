@@ -3,12 +3,13 @@
   "version": "1.7.5",
   "description": "长离 - 全功能视频管理播放平台",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "generate:version-info": "node scripts/generate-version-info.mjs",
+    "dev": "npm run generate:version-info && vite",
+    "build": "npm run generate:version-info && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:build": "tauri build",
-    "tauri:dev": "tauri dev"
+    "tauri:dev": "npm run generate:version-info && tauri dev"
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "^2.7.1",

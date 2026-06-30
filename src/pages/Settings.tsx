@@ -9,268 +9,8 @@ import Switch from '../components/Switch';
 import { open } from '@tauri-apps/plugin-dialog';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-
-const changelogData = [
-  {
-    version: '1.6.6', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['切换类型支持多大类选择', '首页加刷新+返回顶部', '刷新按钮反馈toast', '大类排序支持', '生日/身高/体重/三围上下箭头', '罩杯A-Z上下箭头'] },
-      { category: '修复', items: ['体重编辑不生效', '动漫标签筛选显示0个', '演员详情页滚动到顶部', '关闭扩展预设后详情态不展示', '删掉actor_fields的name字段'] },
-      { category: '优化', items: ['扩展预设弹窗隐藏类型标签', '问号tooltip边缘自适应', '去掉必填星号', '刷新按钮位置固定', '删掉restore_preset_templates迁移'] },
-    ],
-  },
-  {
-    version: '1.6.2', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['检查更新功能：设置页一键检查并自动更新', '版本更新记录：设置页可查看完整版本历史'] },
-      { category: '修复', items: ['预设模板恢复：缺失的预设模板自动补回', '扩展预设关闭后不再显示在演员管理列表'] },
-      { category: '优化', items: ['编辑字段弹窗移除格式配置下拉', 'CI 构建自动创建 GitHub Release'] },
-    ],
-  },
-  {
-    version: '1.6.1', date: '2026-06-29',
-    changes: [
-      { category: '优化', items: ['预设模板系统完善 + 定制功能实装'] },
-    ],
-  },
-  {
-    version: '1.6.0', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['预设模板系统', '罩杯预设', '右键删除二次确认'] },
-      { category: '优化', items: ['名称字段去掉'] },
-    ],
-  },
-  {
-    version: '1.5.0', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['筛选简化', '演员管理增强'] },
-      { category: '优化', items: ['大类管理优化', 'UI 改进'] },
-    ],
-  },
-  {
-    version: '1.4.0', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['9 项优化', '筛选简化', '大类管理增强'] },
-    ],
-  },
-  {
-    version: '1.3.1', date: '2026-06-29',
-    changes: [
-      { category: '修复', items: ['筛选栏标签和演员分两行独立展示'] },
-    ],
-  },
-  {
-    version: '1.3.0', date: '2026-06-29',
-    changes: [
-      { category: '新功能', items: ['一键扫描功能'] },
-      { category: '优化', items: ['删除写死逻辑'] },
-    ],
-  },
-  {
-    version: '1.2.1', date: '2026-06-28',
-    changes: [
-      { category: '修复', items: ['筛选栏标签/演员兼容', '视频按 display_type 筛选'] },
-    ],
-  },
-  {
-    version: '1.2.0', date: '2026-06-24',
-    changes: [
-      { category: '新功能', items: ['演员字段配置化', '大类 features 实装'] },
-    ],
-  },
-  {
-    version: '1.1.0', date: '2026-06-22',
-    changes: [
-      { category: '新功能', items: ['大类配置化', '演员字段配置化'] },
-    ],
-  },
-  {
-    version: '1.0.5', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['去掉自定义 NSIS 模板，用 Tauri v2 默认模板'] },
-    ],
-  },
-  {
-    version: '1.0.4', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['版本号同步'] },
-    ],
-  },
-  {
-    version: '1.0.3', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['CI 下载 mpv-dev 包获取 libmpv-2.dll', '下线 migrate_actor_photos 一次性迁移函数'] },
-    ],
-  },
-  {
-    version: '1.0.2', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['NSIS 打包 libmpv DLL + 版本号同步', '删除 tauri.conf.json v1 格式配置'] },
-    ],
-  },
-  {
-    version: '1.0.1', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['CI libmpv-wrapper.dll 路径修复'] },
-    ],
-  },
-  {
-    version: '1.0.0', date: '2026-06-22',
-    changes: [
-      { category: '新功能', items: ['内嵌 mpv 播放器', 'CI libmpv 修复'] },
-    ],
-  },
-  {
-    version: '0.9.4', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['Tauri v2 插件注册 + capabilities 权限配置'] },
-    ],
-  },
-  {
-    version: '0.9.3', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['windows 0.61 HWND 类型适配'] },
-    ],
-  },
-  {
-    version: '0.9.2', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['windows 0.61 HWND 类型适配'] },
-    ],
-  },
-  {
-    version: '0.9.1', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['windows crate 升级到 0.61，匹配 Tauri 2.11.3'] },
-    ],
-  },
-  {
-    version: '0.9.0', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['Tauri v2 API import 修复'] },
-    ],
-  },
-  {
-    version: '0.8.9', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['Tauri CLI 升级到 v2，修复 CI 构建'] },
-    ],
-  },
-  {
-    version: '0.8.8', date: '2026-06-22',
-    changes: [
-      { category: '新功能', items: ['Tauri v2 升级'] },
-    ],
-  },
-  {
-    version: '0.8.7', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['切换主海报后同步更新 actors 表'] },
-    ],
-  },
-  {
-    version: '0.8.6', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['展开按钮裁切修复', '时期删除二次确认修复'] },
-    ],
-  },
-  {
-    version: '0.8.5', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['旧数据海报一次性迁移', '回滚特殊逻辑'] },
-    ],
-  },
-  {
-    version: '0.8.4', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['旧数据海报修复', 'FloatingActions', '右键上下自适应'] },
-    ],
-  },
-  {
-    version: '0.8.3', date: '2026-06-22',
-    changes: [
-      { category: '新功能', items: ['右键菜单自适应', '动漫文件夹模式'] },
-    ],
-  },
-  {
-    version: '0.8.2', date: '2026-06-22',
-    changes: [
-      { category: '修复', items: ['海报覆盖bug', '右键移主海报', '时期弹窗', '空时期显示'] },
-    ],
-  },
-  {
-    version: '0.8.1', date: '2026-06-22',
-    changes: [
-      { category: '新功能', items: ['演员多张海报', '时期功能重新设计'] },
-    ],
-  },
-  {
-    version: '0.8.0', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['添加失败toast从右侧平移', '删除确认自定义弹窗'] },
-    ],
-  },
-  {
-    version: '0.7.9', date: '2026-06-21',
-    changes: [
-      { category: '新功能', items: ['6项改动 - 删除修复', 'display_type判断', '海报fallback', '参演作品', '影视模式', '自动关联'] },
-    ],
-  },
-  {
-    version: '0.7.8', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['严重 bug 修复 - 二次确认', '扫描海报保留'] },
-    ],
-  },
-  {
-    version: '0.7.7', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['动漫/影视判断改用 series_actors 实际关联'] },
-    ],
-  },
-  {
-    version: '0.7.6', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['展开按钮检测修复', '排序位置调整'] },
-    ],
-  },
-  {
-    version: '0.7.5', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['详情页标签回滚到 v0.7.1 样式'] },
-    ],
-  },
-  {
-    version: '0.7.4', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['UI 样式修复 - 展开按钮', '排序位置', '影视已看完', '详情标签回滚'] },
-    ],
-  },
-  {
-    version: '0.7.3', date: '2026-06-21',
-    changes: [
-      { category: '修复', items: ['筛选展开按钮样式修复', '自动检测溢出'] },
-    ],
-  },
-  {
-    version: '0.7.2', date: '2026-06-21',
-    changes: [
-      { category: '新功能', items: ['UI 优化 - 筛选折叠', '标题两行', '状态标签行', '动漫去中字'] },
-    ],
-  },
-  {
-    version: '0.7.1', date: '2026-06-21',
-    changes: [
-      { category: '新功能', items: ['视频页筛选加全部', '设置页功能拆分', '曾用名', '输入框优化'] },
-    ],
-  },
-  {
-    version: '0.7.0', date: '2026-06-21',
-    changes: [
-      { category: '新功能', items: ['视频页动漫/影视双标签', '分集海报fallback', '中字识别修复'] },
-    ],
-  },
-];
+import { notify } from '../utils/notify';
+import { changelogData, currentVersion } from '../generated/versionInfo';
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -376,7 +116,6 @@ const Settings: React.FC = () => {
   const [deleteCatConfirm, setDeleteCatConfirm] = useState<string | null>(null);
   const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
   const [rescanConfirm, setRescanConfirm] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
 
   const doDeleteCategory = async (key: string) => {
@@ -385,7 +124,7 @@ const Settings: React.FC = () => {
       await refreshSeries();
     } catch (error) {
       console.error('删除大类视频失败:', error);
-      alert('删除失败: ' + String(error));
+      notify({ message: '删除失败: ' + String(error), type: 'error' });
     } finally {
     }
   };
@@ -394,10 +133,10 @@ const Settings: React.FC = () => {
     setRescanningCategory(key);
     try {
       const result = await rescanCategoryMetadata(key);
-      setToast({ message: `扫描完成，更新了 ${result[0]} 部，跳过 ${result[1]} 部`, type: 'success' });
+      notify({ message: `扫描完成，更新了 ${result[0]} 部，跳过 ${result[1]} 部`, type: 'success' });
     } catch (error) {
       console.error('重新扫描大类元数据失败:', error);
-      setToast({ message: '扫描失败: ' + String(error), type: 'info' });
+      notify({ message: '扫描失败: ' + String(error), type: 'info' });
     } finally {
       setRescanningCategory(null);
     }
@@ -426,13 +165,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Toast 自动消失
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   const openAddCategory = () => {
     setEditingCategory(null);
@@ -471,10 +203,10 @@ const Settings: React.FC = () => {
     setScanAfterCreate(false);
     try {
       const result = await scanCategory(categoryForm.key);
-      alert(`扫描完成：添加了 ${result.added} 部，更新了 ${result.updated} 部`);
+      notify({ message: `扫描完成：添加了 ${result.added} 部，更新了 ${result.updated} 部`, type: 'success' });
     } catch (error) {
       console.error('扫描失败:', error);
-      alert('扫描失败: ' + String(error));
+      notify({ message: '扫描失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -529,7 +261,6 @@ const Settings: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
-  const currentVersion = '1.6.6';
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -601,23 +332,28 @@ const Settings: React.FC = () => {
 
   const handleCheckUpdate = async () => {
     setUpdateStatus('检查中...');
+    notify({ message: '正在检查更新...', type: 'info' });
     try {
       const update = await check();
       if (update) {
         setUpdateStatus(`发现新版本 ${update.version}，正在下载...`);
+        notify({ message: `发现新版本 ${update.version}，正在下载...`, type: 'info' });
         await update.downloadAndInstall((progress) => {
           if (progress.event === 'Finished') {
             setUpdateStatus('下载完成，准备重启...');
+            notify({ message: '下载完成，准备重启...', type: 'success' });
           }
         });
         await relaunch();
       } else {
         setUpdateStatus('已是最新版本');
+        notify({ message: '已是最新版本', type: 'success' });
         setTimeout(() => setUpdateStatus(null), 3000);
       }
     } catch (error) {
       console.error('检查更新失败:', error);
-      setUpdateStatus('检查更新失败: ' + String(error));
+      setUpdateStatus('检查更新失败');
+      notify({ message: '检查更新失败: ' + String(error), type: 'error' });
       setTimeout(() => setUpdateStatus(null), 5000);
     }
   };
@@ -1335,13 +1071,6 @@ const Settings: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Toast 提示 */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
-          {toast.message}
         </div>
       )}
 

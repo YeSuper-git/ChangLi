@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notify } from '../utils/notify';
 
 interface FloatingActionsProps {
   onRefresh?: () => void;
@@ -8,7 +9,6 @@ interface FloatingActionsProps {
 const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLabel = '刷新' }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,14 +17,6 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Toast auto-dismiss
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -35,9 +27,9 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
     setRefreshing(true);
     try {
       await onRefresh();
-      setToast({ message: '刷新成功', type: 'success' });
+      notify({ message: '刷新成功', type: 'success' });
     } catch (error) {
-      setToast({ message: '刷新失败', type: 'error' });
+      notify({ message: '刷新失败', type: 'error' });
     } finally {
       setRefreshing(false);
     }
@@ -71,14 +63,6 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
           </svg>
         </button>
       </div>
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed z-[60]" style={{ right: '24px', bottom: onRefresh ? (showScrollTop ? '156px' : '96px') : (showScrollTop ? '96px' : '24px'), animation: 'fadeIn 0.3s ease-in' }}>
-          <div className={`px-4 py-3 rounded-xl shadow-xl text-sm border ${toast.type === 'success' ? 'bg-white border-gray-300 text-gray-900' : 'bg-white border-red-300 text-red-700'}`}>
-            {toast.message}
-          </div>
-        </div>
-      )}
     </>
   );
 };

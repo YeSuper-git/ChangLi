@@ -20,6 +20,7 @@ import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
+import { notify } from '../utils/notify';
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ const Library: React.FC = () => {
     return (searchParams.get('type') as 'all' | 'series' | 'video') || 'all';
   });
   const [mainCategory, setMainCategory] = useState<string>(() => {
-    return searchParams.get('cat') || 'anime';
+    return searchParams.get('cat') || '';
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
@@ -73,7 +74,6 @@ const Library: React.FC = () => {
   });
   const [actorFilteredSeries, setActorFilteredSeries] = useState<VideoSeries[] | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
@@ -100,13 +100,6 @@ const Library: React.FC = () => {
     return () => window.removeEventListener('resize', checkOverflow);
   }, [tags, actors, mainCategory]);
 
-  // Toast 自动消失
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   // 同步筛选状态到 URL 参数
   const syncParams = useCallback((updates: Record<string, string | null>) => {
@@ -239,17 +232,17 @@ const Library: React.FC = () => {
           // 显示导入结果
           const { added, updated } = result;
           if (added > 0 && updated > 0) {
-            setToast({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
+            notify({ message: `添加成功，本次添加了 ${added} 部作品，更新了 ${updated} 部已有作品`, type: 'success' });
           } else if (added > 0) {
-            setToast({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
+            notify({ message: `添加成功，本次添加了 ${added} 部作品`, type: 'success' });
           } else if (updated > 0) {
-            setToast({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
+            notify({ message: `更新了 ${updated} 部已有作品`, type: 'info' });
           } else {
-            setToast({ message: '未发现新作品', type: 'info' });
+            notify({ message: '未发现新作品', type: 'info' });
           }
         } catch (error) {
           console.error('[Library] 导入失败:', error);
-          alert('导入失败: ' + String(error));
+          notify({ message: '导入失败: ' + String(error), type: 'error' });
         } finally {
           setScanning(false);
         }
@@ -273,7 +266,7 @@ const Library: React.FC = () => {
       }
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
-      alert('删除视频集失败: ' + String(error));
+      notify({ message: '删除视频集失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -300,10 +293,10 @@ const Library: React.FC = () => {
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
-      setToast({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Library] 重新扫描元数据失败:', error);
-      setToast({ message: '重新扫描失败: ' + String(error), type: 'info' });
+      notify({ message: '重新扫描失败: ' + String(error), type: 'info' });
     }
   };
 
@@ -326,10 +319,10 @@ const Library: React.FC = () => {
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
-      setToast({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
+      notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
     } catch (error) {
       console.error('[Library] 切换类型失败:', error);
-      setToast({ message: '切换类型失败: ' + String(error), type: 'info' });
+      notify({ message: '切换类型失败: ' + String(error), type: 'info' });
       setTypeSwitchConfirm(null);
     }
   };
@@ -344,17 +337,17 @@ const Library: React.FC = () => {
       if (activeActorId !== null) await filterByActor(activeActorId);
       const { added, updated } = result;
       if (added > 0 && updated > 0) {
-        setToast({ message: `扫描完成，添加了 ${added} 部，更新了 ${updated} 部`, type: 'success' });
+        notify({ message: `扫描完成，添加了 ${added} 部，更新了 ${updated} 部`, type: 'success' });
       } else if (added > 0) {
-        setToast({ message: `扫描完成，添加了 ${added} 部`, type: 'success' });
+        notify({ message: `扫描完成，添加了 ${added} 部`, type: 'success' });
       } else if (updated > 0) {
-        setToast({ message: `扫描完成，更新了 ${updated} 部`, type: 'info' });
+        notify({ message: `扫描完成，更新了 ${updated} 部`, type: 'info' });
       } else {
-        setToast({ message: '扫描完成，未发现新作品', type: 'info' });
+        notify({ message: '扫描完成，未发现新作品', type: 'info' });
       }
     } catch (error) {
       console.error('[Library] 一键扫描失败:', error);
-      setToast({ message: '扫描失败: ' + String(error), type: 'info' });
+      notify({ message: '扫描失败: ' + String(error), type: 'info' });
     } finally {
       setCategoryScanning(false);
     }
@@ -725,13 +718,6 @@ const Library: React.FC = () => {
         </div>
       )}
     </div>
-
-    {/* Toast 提示 */}
-    {toast && (
-      <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm" style={{ animation: 'fadeIn 0.3s ease-in' }}>
-        {toast.message}
-      </div>
-    )}
 
     <ConfirmDialog
       open={batchDeleteConfirm}

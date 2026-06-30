@@ -24,6 +24,7 @@ import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
+import { notify } from '../utils/notify';
 
 const VideoDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -208,7 +209,7 @@ const VideoDetail: React.FC = () => {
       await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
     } catch (error) {
       console.error('保存失败:', error);
-      alert(`保存失败：${String(error)}`);
+      notify({ message: `保存失败：${String(error)}`, type: 'error' });
     }
   };
 
@@ -228,7 +229,7 @@ const VideoDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('选择海报失败:', error);
-      alert(`选择海报失败：${String(error)}`);
+      notify({ message: `选择海报失败：${String(error)}`, type: 'error' });
     }
   };
 
@@ -250,7 +251,7 @@ const VideoDetail: React.FC = () => {
 
     const duplicated = allTags.find((tag) => tag.name.trim().toLowerCase() === name.toLowerCase());
     if (duplicated) {
-      alert(`标签“${name}”已存在，不能重复添加。`);
+      notify({ message: `标签“${name}”已存在，不能重复添加。`, type: 'info' });
       return;
     }
 
@@ -262,7 +263,7 @@ const VideoDetail: React.FC = () => {
       setCreatingTag(false);
     } catch (error) {
       console.error('新建标签失败:', error);
-      alert(`新建标签失败：${String(error)}`);
+      notify({ message: `新建标签失败：${String(error)}`, type: 'error' });
     }
   };
 
@@ -288,7 +289,7 @@ const VideoDetail: React.FC = () => {
       setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
       console.error('新建演员失败:', error);
-      alert(`新建演员失败：${String(error)}`);
+      notify({ message: `新建演员失败：${String(error)}`, type: 'error' });
     }
   };
 

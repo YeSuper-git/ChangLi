@@ -6,6 +6,7 @@ import { actorPhotoDataUrl, StaticImagePlaceholder } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import { useLibraryStore } from '../store/libraryStore';
+import { notify } from '../utils/notify';
 
 const Actors: React.FC = () => {
   const navigate = useNavigate();
@@ -53,7 +54,7 @@ const Actors: React.FC = () => {
       await refreshActors();
     } catch (error) {
       console.error('删除演员失败:', error);
-      alert('删除演员失败: ' + String(error));
+      notify({ message: '删除演员失败: ' + String(error), type: 'error' });
     }
   };
 
