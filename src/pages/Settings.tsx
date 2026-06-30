@@ -5,6 +5,7 @@ import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, Pr
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
+import Switch from '../components/Switch';
 import { open } from '@tauri-apps/plugin-dialog';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -1047,16 +1048,14 @@ const Settings: React.FC = () => {
                     <div key={key} className="flex items-center justify-between">
                       <span className="text-sm text-gray-700">{label}</span>
                       <div className="flex items-center gap-2">
-                        <button
-                        type="button"
-                        onClick={() => setCategoryForm({
-                          ...categoryForm,
-                          features: { ...categoryForm.features, [key]: !categoryForm.features[key] }
-                        })}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${categoryForm.features[key] ? 'bg-blue-500' : 'bg-gray-200'}`}
-                        >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${categoryForm.features[key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
+                        <Switch
+                          checked={!!categoryForm.features[key]}
+                          onChange={(checked) => setCategoryForm({
+                            ...categoryForm,
+                            features: { ...categoryForm.features, [key]: checked }
+                          })}
+                          ariaLabel={`${label}开关`}
+                        />
                         <span className="group relative">
                           <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
                           <span className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">{tip}</span>
@@ -1167,13 +1166,11 @@ const Settings: React.FC = () => {
               {editingField && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">启用</span>
-                  <button
-                    type="button"
-                    onClick={() => setFieldForm({ ...fieldForm, enabled: !fieldForm.enabled })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fieldForm.enabled ? 'bg-blue-500' : 'bg-gray-200'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fieldForm.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
+                  <Switch
+                    checked={fieldForm.enabled}
+                    onChange={(checked) => setFieldForm({ ...fieldForm, enabled: checked })}
+                    ariaLabel="演员字段启用开关"
+                  />
                 </div>
               )}
               {fieldForm.field_type === 'select' && (
@@ -1198,13 +1195,11 @@ const Settings: React.FC = () => {
               {editingField && isPresetField(editingField.field_key) && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-700">启用</span>
-                  <button
-                    type="button"
-                    onClick={() => setFieldForm({ ...fieldForm, enabled: !fieldForm.enabled })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fieldForm.enabled ? 'bg-blue-500' : 'bg-gray-200'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fieldForm.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
+                  <Switch
+                    checked={fieldForm.enabled}
+                    onChange={(checked) => setFieldForm({ ...fieldForm, enabled: checked })}
+                    ariaLabel="演员字段启用开关"
+                  />
                 </div>
               )}
             </div>
@@ -1301,13 +1296,14 @@ const Settings: React.FC = () => {
                     <div>
                       <span className="text-sm font-medium text-gray-900">{actorFields.find(f => f.field_key === template.key)?.field_label || template.name}</span>
                     </div>
-                    <button
-                      onClick={async () => {
+                    <Switch
+                      checked={enabled}
+                      onChange={async (checked) => {
                         try {
-                          if (enabled) {
-                            await disablePresetTemplate(template.key);
-                          } else {
+                          if (checked) {
                             await enablePresetTemplate(template.key);
+                          } else {
+                            await disablePresetTemplate(template.key);
                           }
                           // 刷新
                           const fieldsList = await getAllActorFields();
@@ -1321,10 +1317,8 @@ const Settings: React.FC = () => {
                           console.error('切换预设模板失败:', error);
                         }
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-blue-500' : 'bg-gray-200'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                      ariaLabel={`${template.name}预设开关`}
+                    />
                   </div>
                 );
               })}

@@ -18,6 +18,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
 
 const Library: React.FC = () => {
@@ -732,29 +733,15 @@ const Library: React.FC = () => {
       </div>
     )}
 
-    {/* 批量删除确认弹窗 */}
-    {batchDeleteConfirm && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setBatchDeleteConfirm(false)}>
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">批量删除</h3>
-          <p className="text-sm text-gray-600 leading-6 mb-6">确定删除选中的 {selectedIds.size} 个项目？此操作不可恢复。</p>
-          <div className="flex gap-3">
-            <button
-              onClick={doBatchDelete}
-              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
-            >
-              确认删除
-            </button>
-            <button
-              onClick={() => setBatchDeleteConfirm(false)}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    <ConfirmDialog
+      open={batchDeleteConfirm}
+      title="批量删除"
+      message={`确定删除选中的 ${selectedIds.size} 个项目？此操作不可恢复。`}
+      confirmText="确认删除"
+      danger
+      onConfirm={doBatchDelete}
+      onCancel={() => setBatchDeleteConfirm(false)}
+    />
 
     {/* 一键扫描确认弹窗 */}
     {scanConfirm && (

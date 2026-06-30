@@ -5,6 +5,7 @@ import type { Actor, Video, ActorPeriod, ActorPhoto, ActorField } from '../utils
 import { open } from '@tauri-apps/plugin-dialog';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder, videoPosterDataUrl } from '../utils/media';
 import FloatingActions from '../components/FloatingActions';
+import ConfirmDialog from '../components/ConfirmDialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 
@@ -1559,29 +1560,15 @@ const ActorDetail: React.FC = () => {
       </div>
     )}
 
-    {/* 统一确认弹窗 */}
-    {confirmDialog && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmDialog(null)}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">{confirmDialog.title}</h3>
-          <p className="text-sm text-gray-600 leading-6 mb-6">{confirmDialog.message}</p>
-          <div className="flex gap-3">
-            <button
-              className={`flex-1 px-4 py-2 text-white rounded-lg text-sm font-medium ${confirmDialog.danger ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}`}
-              onClick={runConfirmDialog}
-            >
-              {confirmDialog.confirmText || '确认'}
-            </button>
-            <button
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-              onClick={() => setConfirmDialog(null)}
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+    <ConfirmDialog
+      open={!!confirmDialog}
+      title={confirmDialog?.title || ''}
+      message={confirmDialog?.message || ''}
+      confirmText={confirmDialog?.confirmText || '确认'}
+      danger={confirmDialog?.danger}
+      onConfirm={runConfirmDialog}
+      onCancel={() => setConfirmDialog(null)}
+    />
 
     {/* Toast 提示 */}
     {toast && (

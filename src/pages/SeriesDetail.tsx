@@ -36,6 +36,7 @@ import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeat
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function extractCode(folderName: string): { code: string; hasChineseSub: boolean } {
   const match = folderName.match(/[A-Za-z]+-\d+[A-Za-z]*/);
@@ -806,33 +807,19 @@ const SeriesDetail: React.FC = () => {
         </div>
       )}
 
-      {seasonDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSeasonDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-gray-900 mb-3">删除季</h3>
-            <p className="text-sm text-gray-600 leading-6 mb-6">
-              确定要删除「{seasonDeleteConfirm.label}」吗？该季下所有 {seasonDeleteConfirm.videoCount} 个视频将被删除。
-            </p>
-            <div className="flex gap-3">
-              <button
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
-                onClick={() => {
-                  handleDeleteSeason(seasonDeleteConfirm.season);
-                  setSeasonDeleteConfirm(null);
-                }}
-              >
-                确认删除
-              </button>
-              <button
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                onClick={() => setSeasonDeleteConfirm(null)}
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!seasonDeleteConfirm}
+        title="删除季"
+        message={seasonDeleteConfirm ? `确定要删除「${seasonDeleteConfirm.label}」吗？该季下所有 ${seasonDeleteConfirm.videoCount} 个视频将被删除。` : ''}
+        confirmText="确认删除"
+        danger
+        onConfirm={() => {
+          if (!seasonDeleteConfirm) return;
+          handleDeleteSeason(seasonDeleteConfirm.season);
+          setSeasonDeleteConfirm(null);
+        }}
+        onCancel={() => setSeasonDeleteConfirm(null)}
+      />
 
       {actorNotice && (
         <div className="fixed right-6 top-6 z-50 max-w-sm rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-xl">
