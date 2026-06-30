@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { getAllCategories, parseCategoryFeatures } from '../utils/api';
@@ -11,6 +11,14 @@ import FloatingActions from '../components/FloatingActions';
 const Home: React.FC = () => {
   const { actors, series: storeSeries, favorites, refreshSeries } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>([]);
+  const hotActorsRef = useRef<HTMLDivElement>(null);
+
+  const scrollHotActors = (direction: 'left' | 'right') => {
+    const el = hotActorsRef.current;
+    if (!el) return;
+    const amount = Math.round(el.clientWidth * 0.7);
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -163,29 +171,67 @@ const Home: React.FC = () => {
             查看全部 →
           </Link>
         </div>
-        <div className="grid grid-cols-4 gap-6">
-          {actors.slice(0, 4).map((actor) => {
-            const photoDataUrl = actorPhotoDataUrl(actor);
-            return (
-              <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block">
-                <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
-                  {photoDataUrl ? (
-                    <img src={photoDataUrl} alt={actor.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <StaticImagePlaceholder kind="actor" />
-                  )}
+
+        <div className="relative group">
+          <div ref={hotActorsRef} className="flex gap-5 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory scrollbar-hide">
+            {actors.slice(0, 10).map((actor) => {
+              const photoDataUrl = actorPhotoDataUrl(actor);
+              return (
+                <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block flex-shrink-0 w-40 snap-start">
+                  <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden rounded-xl">
+                    {photoDataUrl ? (
+                      <img src={photoDataUrl} alt={actor.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <StaticImagePlaceholder kind="actor" />
+                    )}
+                  </div>
+                  <div className="mt-2 px-1">
+                    <h3 className="font-semibold text-gray-900 mb-0.5 truncate" title={actor.name}>{actor.name}</h3>
+                    <div className="text-xs text-gray-500 truncate">{actor.birthday ? `${actor.birthday}` : ''}</div>
+                  </div>
+                </Link>
+              );
+            })}
+
+            <Link to="/actors" className="card block flex-shrink-0 w-40 snap-start">
+              <div className="aspect-[3/4] rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-500 hover:text-blue-500 hover:border-blue-400 transition-colors">
+                <div className="text-center">
+                  <div className="text-2xl mb-1">›</div>
+                  <div className="text-sm">查看更多</div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1">{actor.name}</h3>
-                  <div className="text-sm text-gray-500">{actor.birthday ? `${actor.birthday}` : ''}</div>
-                </div>
-              </Link>
-            );
-          })}
-          {actors.length === 0 && (
-            <div className="col-span-4 text-center text-gray-500 py-12">暂无演员</div>
+              </div>
+              <div className="mt-2 px-1">
+                <div className="font-semibold text-gray-900">演员列表</div>
+                <div className="text-xs text-gray-500">查看全部演员</div>
+              </div>
+            </Link>
+          </div>
+
+          {actors.length > 0 && (
+            <>
+              <button
+                type="button"
+                aria-label="向左滚动"
+                className="absolute left-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => scrollHotActors('left')}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                aria-label="向右滚动"
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => scrollHotActors('right')}
+              >
+                ›
+              </button>
+            </>
           )}
         </div>
+
+        {actors.length === 0 && (
+          <div className="text-center text-gray-500 py-12">暂无演员</div>
+        )}
       </section>
 
     <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新" />

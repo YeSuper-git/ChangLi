@@ -50,7 +50,13 @@ const Library: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     getAllCategories()
-      .then(setCategories)
+      .then((data) => {
+        setCategories(data);
+        if (!searchParams.get('cat')) {
+          const sorted = [...data].sort((a, b) => a.sort_order - b.sort_order);
+          if (sorted.length > 0) setMainCategory(sorted[0].key);
+        }
+      })
       .catch((err) => console.error('[Library] 加载大类配置失败:', err));
   }, []);
 
