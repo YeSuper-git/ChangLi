@@ -39,7 +39,7 @@ const ToastProvider: React.FC = () => {
   if (items.length === 0) return null;
 
   return (
-    <div className="fixed left-5 top-5 z-[9999] flex max-w-[360px] flex-col gap-2 pointer-events-none">
+    <div className="fixed right-5 top-16 z-[9999] flex max-w-[360px] flex-col gap-2 pointer-events-none">
       {items.map((item) => (
         <div
           key={item.id}
