@@ -109,31 +109,34 @@ const Downloads: React.FC = () => {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-10">下载管理</h1>
+    <div className="changli-page">
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">下载管理</h1>
+        <span className="changli-soft-chip">{downloads.length} 个任务</span>
+      </div>
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-4 gap-6 mb-10">
-        <div className="card p-6">
-          <div className="text-3xl font-bold text-blue-600 mb-1">{stats.downloading}</div>
+        <div className="card changli-stat-card p-6">
+          <div className="text-3xl font-bold text-rose-600 mb-1">{stats.downloading}</div>
           <div className="text-sm text-gray-500">下载中</div>
         </div>
-        <div className="card p-6">
+        <div className="card changli-stat-card p-6">
           <div className="text-3xl font-bold text-yellow-600 mb-1">{stats.paused}</div>
           <div className="text-sm text-gray-500">已暂停</div>
         </div>
-        <div className="card p-6">
+        <div className="card changli-stat-card p-6">
           <div className="text-3xl font-bold text-green-600 mb-1">{stats.completed}</div>
           <div className="text-sm text-gray-500">已完成</div>
         </div>
-        <div className="card p-6">
+        <div className="card changli-stat-card p-6">
           <div className="text-3xl font-bold text-red-600 mb-1">{stats.error}</div>
           <div className="text-sm text-gray-500">失败</div>
         </div>
       </div>
 
       {/* 添加下载 */}
-      <div className="card p-8 mb-10">
+      <div className="changli-panel p-8 mb-10">
         <h3 className="text-lg font-semibold text-gray-900 mb-6">添加下载</h3>
         <div className="flex gap-4">
           <input
@@ -147,7 +150,7 @@ const Downloads: React.FC = () => {
           <button
             onClick={handleAddDownload}
             disabled={adding || !magnetInput.trim()}
-            className="px-8 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
+            className="action-btn action-btn-primary disabled:opacity-50"
           >
             {adding ? '添加中...' : '添加'}
           </button>
@@ -160,7 +163,7 @@ const Downloads: React.FC = () => {
       </div>
 
       {/* 筛选标签 */}
-      <div className="flex gap-3 mb-8">
+      <div className="changli-toolbar flex gap-3 mb-8 p-3">
         {[
           { key: 'all', label: '全部' },
           { key: 'downloading', label: '下载中' },
@@ -182,10 +185,10 @@ const Downloads: React.FC = () => {
       {filteredDownloads.length > 0 ? (
         <div className="space-y-4">
           {filteredDownloads.map((download) => (
-            <div key={download.id} className="card p-6">
+            <div key={download.id} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl"></div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-rose-50 to-orange-100 rounded-2xl ring-1 ring-black/5"></div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{download.file_name || '未知文件'}</h3>
                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
@@ -236,7 +239,7 @@ const Downloads: React.FC = () => {
               {download.status === 'downloading' && (
                 <div className="progress-bar">
                   <div
-                    className="progress-fill bg-blue-500"
+                    className="progress-fill"
                     style={{ width: `${download.progress}%` }}
                   ></div>
                 </div>
@@ -245,7 +248,7 @@ const Downloads: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16">
+        <div className="changli-empty-state">
           <p className="text-gray-500 text-lg">
             {activeTab === 'all' ? '暂无下载任务' : `暂无${activeTab === 'downloading' ? '下载中' : activeTab === 'paused' ? '已暂停' : activeTab === 'completed' ? '已完成' : '失败'}的任务`}
           </p>

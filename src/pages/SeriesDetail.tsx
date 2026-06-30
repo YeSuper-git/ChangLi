@@ -418,16 +418,16 @@ const SeriesDetail: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="changli-page">
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+        <button type="button" onClick={handleBack} className="text-sm text-rose-500 hover:underline flex items-center gap-1">
           <img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}
         </button>
       </div>
 
-      <div className="card p-6 mb-8">
+      <div className="changli-detail-hero changli-panel p-6 mb-8">
         <div className="flex gap-6">
-          <div className={`w-80 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
+          <div className={`w-80 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm ring-1 ring-black/5 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
             <div
               className={`relative w-full h-full group ${editing ? 'cursor-pointer' : ''}`}
               onClick={editing ? handleSelectPoster : undefined}
@@ -468,7 +468,7 @@ const SeriesDetail: React.FC = () => {
                                   key={actor.id}
                                   type="button"
                                   onClick={() => toggleActor(actor.id)}
-                                  className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                                  className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
                                 >
                                   {actor.name}
                                 </button>
@@ -524,7 +524,7 @@ const SeriesDetail: React.FC = () => {
                             key={tag.id}
                             type="button"
                             onClick={() => toggleTag(tag.id)}
-                            className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                            className={`px-3 py-1 rounded-full text-sm border ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
                           >
                             {tag.name}
                           </button>
@@ -584,7 +584,7 @@ const SeriesDetail: React.FC = () => {
               <>
                 {features.chinese_sub ? (
                   <>
-                    <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
+                    <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
                     <div className="flex items-center gap-2 mb-3">
                       <button
                         onClick={handleToggleChineseSub}
@@ -593,10 +593,10 @@ const SeriesDetail: React.FC = () => {
                         <img
                           src={translateIcon}
                           alt="中文字幕"
-                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-blue' : 'text-gray-400'}`}
-                          style={series.has_chinese_sub === 1 ? { filter: 'invert(27%) sepia(88%) saturate(2553%) hue-rotate(212deg) brightness(97%) contrast(97%)' } : {}}
+                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-red' : 'text-gray-400'}`}
+                          style={series.has_chinese_sub === 1 ? { filter: 'invert(42%) sepia(88%) saturate(1621%) hue-rotate(315deg) brightness(98%) contrast(98%)' } : {}}
                         />
-                        <span className={series.has_chinese_sub === 1 ? 'text-blue-500' : 'text-gray-400'}>
+                        <span className={series.has_chinese_sub === 1 ? 'text-rose-500' : 'text-gray-400'}>
                           中字
                         </span>
                       </button>
@@ -630,7 +630,7 @@ const SeriesDetail: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <h1 className="text-2xl font-bold mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
+                    <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
                     <div className="flex items-center gap-2 mb-3">
                       <button
                         onClick={() => toggleFavorite(series.id, 'series')}
@@ -660,7 +660,7 @@ const SeriesDetail: React.FC = () => {
                       </button>
                     </div>
                     <div className="mb-2">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
                         {series.status === 'completed' ? '已完结' : '连载中'}
                       </span>
                     </div>
@@ -684,7 +684,7 @@ const SeriesDetail: React.FC = () => {
                         key={actor.id}
                         to={`/actors/${actor.id}`}
                         state={{ from: `/series/${series.id}`, backLabel: '返回视频集详情' }}
-                        className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-blue-600"
+                        className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-rose-600"
                       >
                         {actor.name}
                       </Link>
@@ -708,7 +708,10 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">{features.episode === '话' || features.episode === '集' ? '分集' : '分部'}</h2>
+      <div className="changli-section-title">
+        <h2 className="text-xl font-semibold">{features.episode === '话' || features.episode === '集' ? '分集' : '分部'}</h2>
+        <span className="changli-soft-chip">{videos.length} {features.episode || '部'}</span>
+      </div>
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
@@ -718,13 +721,13 @@ const SeriesDetail: React.FC = () => {
           fallbackPoster={series?.poster_data_url}
         />
       ) : (
-        <div className="text-gray-500 py-10 text-center">暂无分集</div>
+        <div className="changli-empty-state text-gray-500">暂无分集</div>
       )}
 
       {/* 右键菜单 */}
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+          className="changli-context-menu fixed z-50 py-2 w-fit"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           ref={(node) => {
             if (node) {
@@ -756,13 +759,13 @@ const SeriesDetail: React.FC = () => {
 
       {/* 管理季面板 */}
       {showSeasonManager && (
-        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
-            <div className="border-b border-gray-100 px-6 py-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">管理</p>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,540px)] !p-0">
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">管理</p>
               <h2 className="mt-1 text-2xl font-bold text-gray-900">季管理</h2>
             </div>
-            <div className="px-6 py-5 max-h-96 overflow-y-auto">
+            <div className="changli-modal-body max-h-96 overflow-y-auto">
               {loadingSeasons ? (
                 <div className="text-gray-500 text-sm flex items-center gap-2 py-4">
                   <img src={loadingIcon} alt="加载中" className="w-5 h-5 animate-spin" />
@@ -770,7 +773,7 @@ const SeriesDetail: React.FC = () => {
               ) : seasons.length > 0 ? (
                 <div className="space-y-3">
                   {seasons.map((s) => (
-                    <div key={`${s.season}-${s.subtitle || ''}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={`${s.season}-${s.subtitle || ''}`} className="flex items-center justify-between rounded-2xl border border-gray-100 bg-[#f8f9fc] p-3">
                       <div>
                         <span className="text-sm font-medium text-gray-900">
                           {s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`}
@@ -796,10 +799,10 @@ const SeriesDetail: React.FC = () => {
                 <div className="text-gray-500 text-sm py-4">暂无季信息</div>
               )}
             </div>
-            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div className="changli-modal-footer">
               <button
                 onClick={() => setShowSeasonManager(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 关闭
               </button>
@@ -843,15 +846,15 @@ const SeriesDetail: React.FC = () => {
       )}
 
       {showNewActorModal && (
-        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
-            <div className="border-b border-gray-100 px-6 py-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">演员资料</p>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,448px)] !p-0">
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">演员资料</p>
               <h2 className="mt-1 text-2xl font-bold text-gray-900">新建演员</h2>
               <p className="mt-2 text-sm text-gray-500">新建后会自动选中，保存视频集详情时同步关联。</p>
             </div>
-            <div className="px-6 py-5">
-              <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+            <div className="changli-modal-body">
+              <label className="changli-form-label">姓名</label>
               <input
                 type="text"
                 value={newActorName}
@@ -863,25 +866,25 @@ const SeriesDetail: React.FC = () => {
                     setNewActorName('');
                   }
                 }}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                className="changli-input"
                 placeholder="输入演员姓名"
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-2">新建后会自动选中，稍后可去演员中补充海报和详细信息。</p>
             </div>
-            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div className="changli-modal-footer">
               <button
                 onClick={() => {
                   setShowNewActorModal(false);
                   setNewActorName('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleCreateActor}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary flex-1"
               >
                 添加
               </button>
@@ -959,7 +962,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
       <Link
         key={video.id}
         to={`/player/${video.id}`}
-        className="card block cursor-pointer"
+        className="card block cursor-pointer overflow-hidden"
         onContextMenu={(e) => {
           if (onContextMenu) {
             e.preventDefault();
@@ -970,13 +973,13 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         <div
           className={`${
             posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
-          } bg-gray-100 overflow-hidden relative`}
+          } bg-gray-100 overflow-hidden relative rounded-t-xl`}
         >
           <SmartPoster src={poster} alt={video.file_name} posterOrientation={posterOrientation} />
 
         </div>
         <div className="p-2">
-          <h3 className="font-medium text-xs line-clamp-1 mb-1">
+          <h3 className="font-semibold text-xs line-clamp-1 mb-1 text-gray-900">
             {video.episode_number ? `第${video.episode_number}${epWord || '部'}` : video.file_name}
           </h3>
           {video.episode_number && (
@@ -1000,7 +1003,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   return (
     <div className="space-y-8">
       {seasonGroups.map(([, group]) => (
-        <div key={`${group.season}-${group.subtitle || ''}`}>
+        <div key={`${group.season}-${group.subtitle || ''}`} className="changli-panel p-5">
           <h3 className="text-xl font-semibold mb-4">{getSeasonLabel(group.season, group.subtitle)}</h3>
           <div className={gridClass}>
             {group.videos

@@ -435,13 +435,13 @@ const Library: React.FC = () => {
 
   return (
     <>
-    <div>
-      <div className="flex items-center justify-between mb-10">
+    <div className="changli-page">
+      <div className="changli-page-header">
         <div className="flex items-center gap-4">
           {[...categories].sort((a, b) => a.sort_order - b.sort_order).map((cat) => (
             <h1
               key={cat.key}
-              className={`font-bold cursor-pointer transition-all ${mainCategory === cat.key ? 'text-4xl' : 'text-2xl text-gray-400'}`}
+              className={`cursor-pointer transition-all ${mainCategory === cat.key ? 'changli-heading-xl' : 'text-2xl font-bold text-gray-400 hover:text-gray-600'}`}
               onClick={() => { setMainCategory(cat.key); setActiveActorId(null); setActorFilteredSeries(null); setActiveTagId(null); setTagFilteredSeries(null); }}
             >
               {cat.name}
@@ -449,8 +449,8 @@ const Library: React.FC = () => {
           ))}
           {categories.length === 0 && (
             <>
-              <h1 className="font-bold cursor-pointer transition-all text-4xl">动漫</h1>
-              <h1 className="font-bold cursor-pointer transition-all text-2xl text-gray-400">影视</h1>
+              <h1 className="changli-heading-xl cursor-pointer transition-all">动漫</h1>
+              <h1 className="text-2xl font-bold cursor-pointer transition-all text-gray-400">影视</h1>
             </>
           )}
         </div>
@@ -459,7 +459,7 @@ const Library: React.FC = () => {
             <button
               onClick={() => setScanConfirm(true)}
               disabled={categoryScanning}
-              className="px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 disabled:opacity-50"
+              className="action-btn action-btn-primary disabled:opacity-50"
             >
               {categoryScanning ? '扫描中...' : '一键扫描'}
             </button>
@@ -467,14 +467,14 @@ const Library: React.FC = () => {
           <button
             onClick={importPath}
             disabled={scanning}
-            className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
+            className="action-btn action-btn-primary disabled:opacity-50"
           >
             {scanning ? '添加中...' : '添加'}
           </button>
         </div>
       </div>
 
-      <div className="mb-6 flex justify-between items-start">
+      <div className="changli-toolbar mb-6 flex justify-between items-start p-4">
         <div className="flex flex-col gap-3 flex-1 min-w-0">
           {features.tags && (
             <div className="flex items-center gap-2">
@@ -564,7 +564,7 @@ const Library: React.FC = () => {
         </button>
       </div>
 
-      <div className="mb-10">
+      <div className="changli-toolbar mb-10 p-3">
         <div className="flex items-center gap-3">
           <input
             type="text"
@@ -582,7 +582,7 @@ const Library: React.FC = () => {
                 setSelectMode(true);
               }
             }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${selectMode ? 'bg-blue-500 text-white border-blue-500' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${selectMode ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white border-transparent shadow-sm' : 'border-gray-200 text-gray-700 hover:bg-gray-50 hover:-translate-y-0.5'}`}
           >
             {selectMode ? '取消选择' : '选择'}
           </button>
@@ -590,7 +590,7 @@ const Library: React.FC = () => {
       </div>
 
       {selectMode && (
-        <div className="mb-4 flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+        <div className="changli-toolbar mb-4 flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={selectedIds.size === filteredSeries.length ? deselectAll : selectAll}
@@ -631,13 +631,13 @@ const Library: React.FC = () => {
                 onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                 className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-blue-500 rounded-xl' : ''}`}
               >
-                <div className={`card relative w-full overflow-hidden ${isPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
+                <div className={`card relative w-full overflow-hidden transition-shadow duration-200 group-hover:shadow-xl ${isPortrait ? 'aspect-[3/4]' : 'aspect-video'}`}>
                   {selectMode && (
                     <div
                       className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors"
                       style={{
-                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : 'white',
-                        borderColor: selectedIds.has(`s-${series.id}`) ? '#3b82f6' : '#d1d5db',
+                        backgroundColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : 'white',
+                        borderColor: selectedIds.has(`s-${series.id}`) ? '#fb5b7b' : '#d1d5db',
                       }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -664,7 +664,7 @@ const Library: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-2">
-                  <h3 className="text-sm font-medium text-zinc-900 truncate group-hover:text-blue-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
+                  <h3 className="text-sm font-semibold text-zinc-900 truncate group-hover:text-rose-600" title={series.code ? `[${series.code}] ${series.title}` : series.title}>
                     {series.code ? `[${series.code}] ${series.title}` : series.title}
                   </h3>
                   <div className="text-xs text-zinc-500 mt-0.5">
@@ -679,7 +679,7 @@ const Library: React.FC = () => {
 
 
       {filteredSeries.length === 0 && (
-        <div className="text-center py-16">
+        <div className="changli-empty-state">
           <p className="text-gray-500 text-lg mb-4">{searchTerm ? '没有找到匹配的视频' : `暂无${categoryDisplayName}`}</p>
           {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
         </div>
@@ -687,24 +687,24 @@ const Library: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+          className="changli-context-menu fixed z-50 py-2 w-fit"
           style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={handleEditContextItem}
           >
             编辑
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={() => handleRescanMetadata(contextMenu.id)}
           >
             重新扫描元数据
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={() => {
               
               handleSwitchType(contextMenu.id);
@@ -713,7 +713,7 @@ const Library: React.FC = () => {
             切换类型
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="changli-menu-item changli-menu-item-danger"
             onClick={() => {
               const key = `${contextMenu.type}-${contextMenu.id}`;
               requestSecondConfirm(key, () => handleDeleteSeries(contextMenu.id));
@@ -737,8 +737,8 @@ const Library: React.FC = () => {
 
     {/* 一键扫描确认弹窗 */}
     {scanConfirm && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+      <div className="changli-modal-backdrop">
+        <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
             确定对「{categoryDisplayName}」执行一键扫描？<br />
             <span className="text-sm text-gray-500">扫描路径：{currentCategory?.scan_path}</span>
@@ -746,13 +746,13 @@ const Library: React.FC = () => {
           <div className="flex gap-3">
             <button
               onClick={handleCategoryScan}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              className="action-btn action-btn-primary flex-1 text-sm"
             >
               确认扫描
             </button>
             <button
               onClick={() => setScanConfirm(false)}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              className="action-btn flex-1 text-sm"
             >
               取消
             </button>
@@ -763,14 +763,14 @@ const Library: React.FC = () => {
 
     {/* 切换类型 - 大类选择弹窗 */}
     {typeSwitchSeriesId !== null && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setTypeSwitchSeriesId(null)}>
-        <div className="bg-white rounded-2xl p-6 min-w-64 shadow-xl" onClick={e => e.stopPropagation()}>
+      <div className="changli-modal-backdrop" onClick={() => setTypeSwitchSeriesId(null)}>
+        <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
           <h3 className="text-lg font-bold text-gray-900 mb-4">切换到</h3>
           <div className="space-y-2 mb-4">
             {categories.filter(c => c.key !== mainCategory).map(cat => (
               <button
                 key={cat.key}
-                className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                className="changli-list-option"
                 onClick={() => handleSwitchTypeTo(typeSwitchSeriesId, cat.key, cat.name)}
               >
                 {cat.name}
@@ -789,21 +789,21 @@ const Library: React.FC = () => {
 
     {/* 切换类型确认弹窗 */}
     {typeSwitchConfirm && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+      <div className="changli-modal-backdrop">
+        <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
             确定切换到「{typeSwitchConfirm.categoryName}」？
           </p>
           <div className="flex gap-3">
             <button
               onClick={doSwitchType}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              className="action-btn action-btn-primary flex-1 text-sm"
             >
               确认
             </button>
             <button
               onClick={() => setTypeSwitchConfirm(null)}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              className="action-btn flex-1 text-sm"
             >
               取消
             </button>

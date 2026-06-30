@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { notify } from '../utils/notify';
 
 interface FloatingActionsProps {
@@ -8,15 +8,6 @@ interface FloatingActionsProps {
 
 const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLabel = '刷新' }) => {
   const [refreshing, setRefreshing] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 300);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -42,7 +33,7 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white shadow-lg flex items-center justify-center cursor-pointer disabled:opacity-50"
+            className="w-12 h-12 rounded-2xl bg-white/85 hover:bg-white text-rose-500 border border-white/70 shadow-xl backdrop-blur-md flex items-center justify-center cursor-pointer disabled:opacity-50 transition-all hover:-translate-y-1 active:scale-95"
             aria-label={refreshLabel}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -55,7 +46,7 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
         )}
         <button
           onClick={scrollToTop}
-          className={`w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white shadow-lg flex items-center justify-center cursor-pointer transition-opacity duration-300 ${showScrollTop ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className="w-12 h-12 rounded-2xl bg-white/85 hover:bg-white text-rose-500 border border-white/70 shadow-xl backdrop-blur-md flex items-center justify-center cursor-pointer transition-all hover:-translate-y-1 active:scale-95"
           aria-label="返回顶部"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">

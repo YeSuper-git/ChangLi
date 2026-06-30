@@ -120,10 +120,12 @@ const Search: React.FC = () => {
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-10">搜索</h1>
+    <div className="changli-page">
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">搜索</h1>
+      </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-4 mb-10">
+      <form onSubmit={handleSubmit} className="changli-toolbar flex gap-4 mb-10 p-3">
         <input
           type="search"
           value={keyword}
@@ -135,7 +137,7 @@ const Search: React.FC = () => {
         <button
           type="submit"
           disabled={!keyword.trim()}
-          className="px-8 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
+          className="action-btn action-btn-primary disabled:opacity-50"
         >
           搜索
         </button>
@@ -143,8 +145,8 @@ const Search: React.FC = () => {
 
       {searched && (
         <div>
-          <div className="text-gray-500 mb-8">
-            找到 {results.length} 个本地结果
+          <div className="changli-section-title">
+            <span className="text-gray-500">找到 {results.length} 个本地结果</span>
           </div>
 
           {results.length > 0 ? (
@@ -160,7 +162,7 @@ const Search: React.FC = () => {
                     ? 'aspect-[3/4]'
                     : 'aspect-video';
                 return (
-                  <Link key={`${item.type}-${item.id}`} to={target} className="card flex flex-col no-underline group">
+                  <Link key={`${item.type}-${item.id}`} to={target} className="card flex flex-col no-underline group overflow-hidden">
                     <div className={`relative w-full ${aspectClass} bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-xl overflow-hidden flex items-center justify-center`}>
                       {item.type === 'actor' ? (
                         imageDataUrl ? (
@@ -180,7 +182,7 @@ const Search: React.FC = () => {
                       <div className="inline-flex px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-xs mb-2">
                         {item.type === 'series' ? '视频集' : '演员'}
                       </div>
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600">{item.title}</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2 group-hover:text-rose-600">{item.title}</h3>
                       <p className="text-xs text-gray-500 line-clamp-1">{item.subtitle}</p>
                     </div>
                   </Link>
@@ -188,7 +190,7 @@ const Search: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="text-center py-16">
+            <div className="changli-empty-state">
               <p className="text-gray-500 text-lg">没有找到匹配的视频或演员</p>
             </div>
           )}
@@ -196,7 +198,7 @@ const Search: React.FC = () => {
       )}
 
       {!searched && (
-        <div className="text-center py-16">
+        <div className="changli-empty-state">
           <p className="text-gray-500 text-lg">在右上角或这里输入关键词，支持模糊搜索视频和演员</p>
         </div>
       )}

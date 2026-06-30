@@ -166,7 +166,7 @@ const ActorDetail: React.FC = () => {
                       inputMode="numeric"
                       value={mParts[idx]}
                       onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                      className="w-14 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm pr-5"
+                      className="w-14 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-5"
                     />
                     <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
                       <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px] px-0.5" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
@@ -188,7 +188,7 @@ const ActorDetail: React.FC = () => {
                   const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
                   setEditForm({ ...editForm, cup_size: val });
                 }}
-                className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-5"
                 maxLength={1}
               />
               <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
@@ -209,7 +209,7 @@ const ActorDetail: React.FC = () => {
                     const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
                     setEditForm({ ...editForm, height: v });
                   }}
-                  className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                  className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-6"
                 />
                 <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                   <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(editForm.height, 10) || 0; const v = Math.min(cur + 1, 200); setEditForm({ ...editForm, height: String(v) }); }}>▲</button>
@@ -232,7 +232,7 @@ const ActorDetail: React.FC = () => {
                     const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
                     setEditForm({ ...editForm, weight: v } as any);
                   }}
-                  className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                  className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-6"
                 />
                 <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                   <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(weightVal, 10) || 0; const v = Math.min(cur + 1, 150); setEditForm({ ...editForm, weight: String(v) } as any); }}>▲</button>
@@ -260,7 +260,7 @@ const ActorDetail: React.FC = () => {
                   inputMode="numeric"
                   value={bdParts[0] || ''}
                   onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4); updateBd(0, v); }}
-                  className="w-16 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm pr-5"
+                  className="w-16 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-5"
                   placeholder="年"
                 />
                 <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
@@ -275,7 +275,7 @@ const ActorDetail: React.FC = () => {
                   inputMode="numeric"
                   value={bdParts[1] || ''}
                   onChange={(e) => { let v = e.target.value.replace(/[^0-9]/g, ''); if (v !== '' && parseInt(v, 10) > 12) v = '12'; updateBd(1, v); }}
-                  className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm pr-4"
+                  className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-4"
                   placeholder="月"
                 />
                 <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
@@ -290,7 +290,7 @@ const ActorDetail: React.FC = () => {
                   inputMode="numeric"
                   value={bdParts[2] || ''}
                   onChange={(e) => { let v = e.target.value.replace(/[^0-9]/g, ''); const md = getMaxDay(parseInt(bdParts[1], 10) || 0); if (v !== '' && parseInt(v, 10) > (md || 31)) v = String(md || 31); updateBd(2, v); }}
-                  className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center text-sm pr-4"
+                  className="w-10 px-1 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-4"
                   placeholder="日"
                 />
                 <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
@@ -314,7 +314,7 @@ const ActorDetail: React.FC = () => {
             inputMode="numeric"
             value={value}
             onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+            className="changli-input"
           />
         );
       case 'date':
@@ -323,7 +323,7 @@ const ActorDetail: React.FC = () => {
             type="date"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+            className="changli-input"
           />
         );
       default: // text
@@ -332,7 +332,7 @@ const ActorDetail: React.FC = () => {
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+            className="changli-input"
           />
         );
     }
@@ -845,9 +845,9 @@ const ActorDetail: React.FC = () => {
         to={target}
         state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
         onContextMenu={(event) => openContextMenu(event, isSeries ? 'series' : 'video', isSeries ? resource.series_id! : resource.id, title)}
-        className="card block"
+        className="card block overflow-hidden"
       >
-        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden rounded-t-xl">
           <SmartPoster src={poster} alt={title} />
         </div>
         <div className="p-5">
@@ -865,8 +865,7 @@ const ActorDetail: React.FC = () => {
 
   return (
     <>
-    <div>
-      {/* 返回按钮 */}
+    <div className="changli-page">
       <div className="mb-10">
         <button type="button" onClick={handleBack} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
           <img src={backIcon} alt="返回" className="w-4 h-4" />
@@ -875,11 +874,11 @@ const ActorDetail: React.FC = () => {
       </div>
 
       {/* 演员信息 */}
-      <div className="flex gap-12 mb-16">
+      <div className="changli-detail-hero changli-panel flex gap-12 mb-16 p-6">
         {/* 写真 */}
         <div className="w-80 flex-shrink-0">
           <div 
-            className={`aspect-[3/4] bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl mb-4 overflow-hidden relative group ${editing ? 'cursor-pointer' : ''}`}
+            className={`aspect-[3/4] bg-gradient-to-br from-pink-100 to-rose-200 rounded-3xl mb-4 overflow-hidden relative group shadow-lg ring-1 ring-black/5 ${editing ? 'cursor-pointer' : ''}`}
             onClick={editing ? handleAddPhoto : undefined}
             onContextMenu={(e) => {
               if (photos.length === 0 || currentPhotoIndex >= photos.length) return;
@@ -933,7 +932,7 @@ const ActorDetail: React.FC = () => {
 
             {/* 主海报标记 */}
             {photos.length > 0 && currentPhotoIndex < photos.length && photos[currentPhotoIndex]?.is_primary === 1 && (
-              <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-500/80 text-white text-xs rounded-full">
+              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white text-xs">
                 主海报
               </div>
             )}
@@ -946,7 +945,7 @@ const ActorDetail: React.FC = () => {
                 <div
                   key={photo.id}
                   className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
-                    idx === currentPhotoIndex ? 'border-blue-500 ring-1 ring-blue-300' : 'border-transparent hover:border-gray-300'
+                    idx === currentPhotoIndex ? 'border-rose-400 ring-2 ring-rose-100' : 'border-transparent hover:border-rose-200'
                   }`}
                   onClick={() => setCurrentPhotoIndex(idx)}
                 >
@@ -959,7 +958,7 @@ const ActorDetail: React.FC = () => {
               ))}
               {/* "+" 缩略图按钮 */}
               <div
-                className="flex-shrink-0 w-14 h-14 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 flex items-center justify-center cursor-pointer text-gray-400 hover:text-blue-500 transition-colors"
+                className="flex-shrink-0 w-14 h-14 rounded-lg border-2 border-dashed border-gray-300 hover:border-rose-300 flex items-center justify-center cursor-pointer text-gray-400 hover:text-rose-500 transition-colors"
                 onClick={handleAddPhoto}
               >
                 +
@@ -976,12 +975,12 @@ const ActorDetail: React.FC = () => {
             <div className="space-y-4">
               {/* 姓名 - always shown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+                <label className="changli-form-label">姓名</label>
                 <input
                   type="text"
                   value={editForm.name}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                 />
               </div>
 
@@ -1004,7 +1003,7 @@ const ActorDetail: React.FC = () => {
                         type="text"
                         value={editForm.japanese_name}
                         onChange={(e) => setEditForm({ ...editForm, japanese_name: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                        className="changli-input"
                       />
                     </div>
                     <div>
@@ -1013,7 +1012,7 @@ const ActorDetail: React.FC = () => {
                         type="text"
                         value={editForm.alias}
                         onChange={(e) => setEditForm({ ...editForm, alias: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                        className="changli-input"
                       />
                     </div>
                   </div>
@@ -1034,7 +1033,7 @@ const ActorDetail: React.FC = () => {
                           const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
                           updateBirthday(0, v);
                         }}
-                        className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                        className="w-20 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-6"
                       />
                       <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                         <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[0], 10) || 0; const v = Math.min(cur + 1, 2100); updateBirthday(0, String(v)); }}>▲</button>
@@ -1057,7 +1056,7 @@ const ActorDetail: React.FC = () => {
                           const currentDay = parseInt(bParts[2], 10);
                           if (currentDay > newMaxDay) updateBirthday(2, String(newMaxDay));
                         }}
-                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-5"
                       />
                       <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                         <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(bParts[1], 10) || 0; const v = cur >= 12 ? 1 : cur + 1; updateBirthday(1, String(v)); }}>▲</button>
@@ -1078,7 +1077,7 @@ const ActorDetail: React.FC = () => {
                           if (v !== '' && parseInt(v, 10) > md) v = String(md);
                           updateBirthday(2, v);
                         }}
-                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                        className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-5"
                       />
                       <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                         <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const md = maxDay || 31; const cur = parseInt(bParts[2], 10) || 0; const v = cur >= md ? 1 : cur + 1; updateBirthday(2, String(v)); }}>▲</button>
@@ -1100,7 +1099,7 @@ const ActorDetail: React.FC = () => {
                           const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
                           setEditForm({ ...editForm, height: v });
                         }}
-                        className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-6"
+                        className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-6"
                       />
                       <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                         <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(editForm.height, 10) || 0; const v = Math.min(cur + 1, 200); setEditForm({ ...editForm, height: String(v) }); }}>▲</button>
@@ -1127,7 +1126,7 @@ const ActorDetail: React.FC = () => {
                             inputMode="numeric"
                             value={measureParts[idx]}
                             onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                            className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                            className="w-16 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center pr-5"
                           />
                           <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                             <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(measureParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
@@ -1147,7 +1146,7 @@ const ActorDetail: React.FC = () => {
                       const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
                       setEditForm({ ...editForm, cup_size: val });
                     }}
-                    className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
+                    className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center"
                     maxLength={1}
                   />
                 </div>
@@ -1161,7 +1160,7 @@ const ActorDetail: React.FC = () => {
                 <textarea
                   value={editForm.bio}
                   onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   rows={4}
                 />
               </div>
@@ -1170,7 +1169,7 @@ const ActorDetail: React.FC = () => {
               <div className="flex gap-4">
                 <button
                   onClick={handleSave}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  className="action-btn action-btn-primary"
                 >
                   保存
                 </button>
@@ -1200,7 +1199,7 @@ const ActorDetail: React.FC = () => {
             </div>
           ) : (
             <>
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">{actor.name}</h1>
+              <h1 className="changli-heading-xl mb-4">{actor.name}</h1>
               {actor.japanese_name && (
                 <p className="text-lg text-gray-500 mb-4">{actor.japanese_name}</p>
               )}
@@ -1254,9 +1253,9 @@ const ActorDetail: React.FC = () => {
               <div className="flex gap-4">
                 <button
                   onClick={() => setEditing(true)}
-                  className="px-6 py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800"
+                  className="action-btn action-btn-primary"
                 >
-                  ✏️ 编辑信息
+                  编辑信息
                 </button>
               </div>
             </>
@@ -1266,19 +1265,19 @@ const ActorDetail: React.FC = () => {
 
       {/* 参演作品 */}
       <section>
-        <div className="flex items-center justify-between mb-6">
+        <div className="changli-section-title">
           <h2 className="text-2xl font-bold text-gray-900">参演作品</h2>
           <div className="flex gap-3">
             <button
               onClick={() => { setShowAddPeriodModal(true); setNewPeriodName(''); }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+              className="action-btn text-sm"
             >
               + 添加时期
             </button>
             <button
               onClick={handleAddWork}
               disabled={addingWork}
-              className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:opacity-50"
+              className="action-btn action-btn-primary disabled:opacity-50"
             >
               {addingWork ? '添加中...' : '添加作品'}
             </button>
@@ -1292,7 +1291,7 @@ const ActorDetail: React.FC = () => {
           <div>
             {/* 演员名时期（虚拟，固定最上） */}
             {actorNamePeriodItems.length > 0 && (
-              <div className="mb-8">
+              <div className="changli-panel mb-8 p-5">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{actor.name}</h3>
                 <div className="grid grid-cols-4 gap-6">
                   {actorNamePeriodItems.map(resource => renderWorkCard(resource))}
@@ -1304,7 +1303,7 @@ const ActorDetail: React.FC = () => {
             {sortedPeriods.map(period => {
               const periodItems = workItems.filter(item => getWorkPeriodId(item) === period.id);
               return (
-                <div key={period.id} className="mb-8">
+                <div key={period.id} className="changli-panel mb-8 p-5">
                   {editingPeriodId === period.id ? (
                     <div className="flex items-center gap-2 mb-4">
                       <input
@@ -1314,7 +1313,7 @@ const ActorDetail: React.FC = () => {
                         onBlur={() => handleUpdatePeriod(period.id)}
                         onKeyDown={e => { if (e.key === 'Enter') handleUpdatePeriod(period.id); if (e.key === 'Escape') setEditingPeriodId(null); }}
                         autoFocus
-                        className="px-2 py-1 border border-blue-300 rounded text-lg font-bold focus:outline-none"
+                        className="changli-input max-w-sm text-lg font-bold"
                       />
                     </div>
                   ) : (
@@ -1347,7 +1346,7 @@ const ActorDetail: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="text-center py-16">
+          <div className="changli-empty-state">
             <p className="text-gray-500">暂无参演作品</p>
             <p className="text-gray-400 text-sm mt-2">点击"添加作品"按钮添加</p>
           </div>
@@ -1356,32 +1355,32 @@ const ActorDetail: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+          className="changli-context-menu fixed z-50 py-2 w-fit"
           style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={handleEditContextItem}
           >
             编辑
           </button>
           {contextMenu.type === 'series' && (
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="changli-menu-item"
               onClick={() => handleRescanMetadata(contextMenu.id)}
             >
               重新扫描元数据
             </button>
           )}
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={openAssignPeriodModal}
           >
             分配到时期
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="changli-menu-item changli-menu-item-danger"
             onClick={requestDeleteVideo}
           >
             删除
@@ -1397,12 +1396,12 @@ const ActorDetail: React.FC = () => {
         const canMoveDown = idx >= 0 && idx < sortedP.length - 1;
         return (
           <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+            className="changli-context-menu fixed z-50 py-2 w-fit"
             style={{ left: periodContextMenu.x + 160 > window.innerWidth ? periodContextMenu.x - 160 : periodContextMenu.x, top: periodContextMenu.y + 200 > window.innerHeight ? periodContextMenu.y - 200 : periodContextMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="changli-menu-item"
               onClick={() => {
                 const p = periods.find(pp => pp.id === periodContextMenu.periodId);
                 if (p) {
@@ -1415,20 +1414,20 @@ const ActorDetail: React.FC = () => {
               编辑
             </button>
             <button
-              className={`w-full text-left px-4 py-2 text-sm ${canMoveUp ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              className={`changli-menu-item ${canMoveUp ? '' : 'changli-menu-item-disabled'}`}
               onClick={() => canMoveUp && handleMovePeriod(periodContextMenu.periodId, 'up')}
             >
               ↑ 移位上
             </button>
             <button
-              className={`w-full text-left px-4 py-2 text-sm ${canMoveDown ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              className={`changli-menu-item ${canMoveDown ? '' : 'changli-menu-item-disabled'}`}
               onClick={() => canMoveDown && handleMovePeriod(periodContextMenu.periodId, 'down')}
             >
               ↓ 移位下
             </button>
             <div className="border-t border-gray-100 my-1" />
             <button
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              className="changli-menu-item changli-menu-item-danger"
               onClick={() => requestDeletePeriod(periodContextMenu.periodId)}
             >
               删除
@@ -1445,34 +1444,34 @@ const ActorDetail: React.FC = () => {
         const canMoveDown = idx >= 0 && idx < nonPrimaryPhotos.length - 1;
         return (
           <div
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+            className="changli-context-menu fixed z-50 py-2 w-fit"
             style={{ left: photoContextMenu.x + 160 > window.innerWidth ? photoContextMenu.x - 160 : photoContextMenu.x, top: photoContextMenu.y }}
             onClick={(event) => event.stopPropagation()}
           >
             <button
-              className={`w-full text-left px-4 py-2 text-sm ${canMoveUp ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              className={`changli-menu-item ${canMoveUp ? '' : 'changli-menu-item-disabled'}`}
               onClick={() => canMoveUp && handleReorderPhoto(photoContextMenu.photoId, 'up')}
             >
               ↑ 移位上
             </button>
             <button
-              className={`w-full text-left px-4 py-2 text-sm ${canMoveDown ? 'text-gray-700 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'}`}
+              className={`changli-menu-item ${canMoveDown ? '' : 'changli-menu-item-disabled'}`}
               onClick={() => canMoveDown && handleReorderPhoto(photoContextMenu.photoId, 'down')}
             >
               ↓ 移位下
             </button>
             <div className="border-t border-gray-100 my-1" />
             <button
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="changli-menu-item"
               onClick={() => requestPhotoAction(photoContextMenu.photoId, 'primary')}
             >
-              ⭐ 设为主海报
+              设为主海报
             </button>
             <button
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              className="changli-menu-item changli-menu-item-danger"
               onClick={() => requestPhotoAction(photoContextMenu.photoId, 'delete')}
             >
-              🗑 删除
+              删除
             </button>
           </div>
         );
@@ -1481,13 +1480,13 @@ const ActorDetail: React.FC = () => {
 
     {/* 选择时期弹窗 */}
     {periodSelectVisible && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPeriodSelectVisible(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 min-w-80" onClick={e => e.stopPropagation()}>
+      <div className="changli-modal-backdrop" onClick={() => setPeriodSelectVisible(false)}>
+        <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
           <h3 className="text-lg font-bold text-gray-900 mb-4">选择时期</h3>
           <div className="space-y-2 mb-6">
             {/* 演员名时期（period_id = null） */}
             <button
-              className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+              className="changli-list-option"
               onClick={() => { setPeriodSelectVisible(false); doAddWork(undefined); }}
             >
               {actor?.name}（演员名时期）
@@ -1496,7 +1495,7 @@ const ActorDetail: React.FC = () => {
             {[...periods].sort((a, b) => a.sort_order - b.sort_order).map(period => (
               <button
                 key={period.id}
-                className="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-sm"
+                className="changli-list-option"
                 onClick={() => { setPeriodSelectVisible(false); doAddWork(period.id); }}
               >
                 {period.name}
@@ -1504,7 +1503,7 @@ const ActorDetail: React.FC = () => {
             ))}
           </div>
           <button
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            className="action-btn w-full text-sm"
             onClick={() => setPeriodSelectVisible(false)}
           >
             取消
@@ -1516,8 +1515,8 @@ const ActorDetail: React.FC = () => {
 
     {/* 新增时期弹窗 */}
     {showAddPeriodModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+      <div className="changli-modal-backdrop">
+        <div className="changli-modal-panel">
           <h3 className="text-lg font-bold text-gray-900 mb-4">新增时期</h3>
           <input
             type="text"
@@ -1525,19 +1524,19 @@ const ActorDetail: React.FC = () => {
             onChange={(e) => setNewPeriodName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddPeriod(); if (e.key === 'Escape') { setNewPeriodName(''); setShowAddPeriodModal(false); } }}
             placeholder="输入时期名称"
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 mb-4"
+            className="changli-input mb-4"
             autoFocus
           />
           <div className="flex gap-3">
             <button
               onClick={handleAddPeriod}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+              className="action-btn action-btn-primary flex-1 text-sm"
             >
               确认
             </button>
             <button
               onClick={() => { setNewPeriodName(''); setShowAddPeriodModal(false); }}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+              className="action-btn flex-1 text-sm"
             >
               取消
             </button>
@@ -1548,13 +1547,13 @@ const ActorDetail: React.FC = () => {
 
     {/* 重新分配时期弹窗 */}
     {periodAssignModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPeriodAssignModal(null)}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 min-w-80 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+      <div className="changli-modal-backdrop" onClick={() => setPeriodAssignModal(null)}>
+        <div className="changli-modal-panel !w-[min(100%,420px)]" onClick={e => e.stopPropagation()}>
           <h3 className="text-lg font-bold text-gray-900 mb-2">分配到时期</h3>
           <p className="text-sm text-gray-500 mb-4 truncate">{periodAssignModal.name}</p>
           <div className="space-y-2 mb-6 max-h-80 overflow-auto">
             <button
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors text-sm ${periodAssignModal.currentPeriodId === null ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+              className={`changli-list-option ${periodAssignModal.currentPeriodId === null ? 'changli-list-option-active' : ''}`}
               onClick={() => handleAssignWorkPeriod(undefined)}
             >
               {actor?.name}（演员名时期）
@@ -1562,7 +1561,7 @@ const ActorDetail: React.FC = () => {
             {[...periods].sort((a, b) => a.sort_order - b.sort_order).map(period => (
               <button
                 key={period.id}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-colors text-sm ${periodAssignModal.currentPeriodId === period.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+                className={`changli-list-option ${periodAssignModal.currentPeriodId === period.id ? 'changli-list-option-active' : ''}`}
                 onClick={() => handleAssignWorkPeriod(period.id)}
               >
                 {period.name}
@@ -1570,7 +1569,7 @@ const ActorDetail: React.FC = () => {
             ))}
           </div>
           <button
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            className="action-btn w-full text-sm"
             onClick={() => setPeriodAssignModal(null)}
           >
             取消
