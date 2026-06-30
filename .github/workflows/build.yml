@@ -181,21 +181,43 @@ jobs:
           $ErrorActionPreference = "Stop"
           $tag = "v$env:VERSION"
           $releaseUrl = "https://github.com/${{ github.repository }}/releases/download/$tag"
-          $bundleDir = "src-tauri/target/release/bundle"
-          $nsisExe = Get-ChildItem $bundleDir -Recurse -Filter "*.exe" | Select-Object -First 1
-          $nsisSig = Get-ChildItem $bundleDir -Recurse -Filter "*.exe.sig" | Select-Object -First 1
-          $msiSig = Get-ChildItem $bundleDir -Recurse -Filter "*.msi.sig" | Select-Object -First 1
+          $bundleDir = Join-Path $env:GITHUB_WORKSPACE "src-tauri" "target" "release" "bundle"
 
-          $updaterAssets = @($nsisSig, $msiSig) | Where-Object { $_ }
-          if ($updaterAssets.Count -gt 0) {
-            gh release upload $tag @($updaterAssets.FullName) --clobber
+          # Always log the bundle contents first for CI diagnostics
+          Write-Host "Bundle directory: $bundleDir"
+          if (-not (Test-Path $bundleDir)) {
+            throw "Bundle directory does not exist: $bundleDir — tauri build may have failed"
+          }
+          Get-ChildItem $bundleDir -Recurse -File | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+          # Locate NSIS installer and its signature using the Tauri-specific "-setup" pattern
+          $nsisDir = Join-Path $bundleDir "nsis"
+          $nsisExe = Get-ChildItem $nsisDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisSig = Get-ChildItem $nsisDir -Filter "*-setup.exe.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          # Locate MSI signature
+          $msiDir = Join-Path $bundleDir "msi"
+          $msiSig = Get-ChildItem $msiDir -Filter "*.msi.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          Write-Host "NSIS exe: $($nsisExe.FullName)"
+          Write-Host "NSIS sig: $($nsisSig.FullName)"
+          Write-Host "MSI  sig: $($msiSig.FullName)"
+
+          # Upload .sig files as release assets (needed by updater clients)
+          $sigsToUpload = @($nsisSig, $msiSig) | Where-Object { $_ }
+          if ($sigsToUpload.Count -gt 0) {
+            $sigsToUpload | ForEach-Object { Write-Host "Uploading sig asset: $($_.Name)" }
+            gh release upload $tag @($sigsToUpload.FullName) --clobber
+          } else {
+            throw "No .sig files found — TAURI_SIGNING_PRIVATE_KEY may not be set"
           }
 
+          # Validate NSIS pair before generating latest.json
           if (-not $nsisExe -or -not $nsisSig) {
-            Get-ChildItem $bundleDir -Recurse | Select-Object FullName | Out-String | Write-Host
-            throw "NSIS updater executable/signature not found"
+            throw "NSIS installer or .sig not found. Exe=$($null -ne $nsisExe) Sig=$($null -ne $nsisSig)"
           }
 
+          # Generate latest.json from the NSIS signature
           $signature = (Get-Content $nsisSig.FullName -Raw).Trim()
           $url = "$releaseUrl/$($nsisExe.Name)"
           $latest = [ordered]@{
@@ -209,6 +231,7 @@ jobs:
           }
           $latest | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 latest.json
           gh release upload $tag latest.json --clobber
+          Write-Host "latest.json uploaded to release $tag"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
