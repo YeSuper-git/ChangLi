@@ -6,6 +6,7 @@ import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 import Switch from '../components/Switch';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { notify } from '../utils/notify';
@@ -289,6 +290,7 @@ const Settings: React.FC = () => {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
@@ -386,21 +388,24 @@ const Settings: React.FC = () => {
       const installer = findWindowsInstaller(release);
       const downloadUrl = installer?.browser_download_url || release.html_url;
 
-      setUpdateStatus(`发现新版本 v${latestVersion}，已打开下载链接`);
-      notify({
-        message: installer
-          ? `发现新版本 v${latestVersion}，已打开安装包下载链接`
-          : `发现新版本 v${latestVersion}，已打开发布页面`,
-        type: 'success'
-      });
-      await openExternal(downloadUrl);
-      setTimeout(() => setUpdateStatus(null), 8000);
+      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer) });
+      setUpdateStatus(`发现新版本 v${latestVersion}`);
+      notify({ message: `检测到最新版本 v${latestVersion}`, type: 'info' });
     } catch (error) {
       console.error('检查更新失败:', error);
       setUpdateStatus('检查更新失败');
       notify({ message: '检查更新失败: ' + String(error), type: 'error' });
       setTimeout(() => setUpdateStatus(null), 5000);
     }
+  };
+
+  const handleConfirmUpdateDownload = async () => {
+    if (!pendingUpdate) return;
+    const update = pendingUpdate;
+    setPendingUpdate(null);
+    setUpdateStatus(update.hasInstaller ? `正在打开 v${update.version} 安装包下载链接` : `正在打开 v${update.version} 发布页面`);
+    await openExternal(update.url);
+    setTimeout(() => setUpdateStatus(null), 8000);
   };
 
   if (loading) {
@@ -1221,6 +1226,19 @@ const Settings: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingUpdate}
+        title="检测到新版本"
+        message={pendingUpdate ? `检测到最新版本 v${pendingUpdate.version}，是否跳转下载更新？` : ''}
+        confirmText="是，下载更新"
+        cancelText="取消"
+        onConfirm={handleConfirmUpdateDownload}
+        onCancel={() => {
+          setPendingUpdate(null);
+          setUpdateStatus(null);
+        }}
+      />
     </div>
   );
 };

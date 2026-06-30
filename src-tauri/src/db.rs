@@ -1720,14 +1720,63 @@ pub async fn add_actor_photo(
     .fetch_one(pool)
     .await?;
 
+    if actual_is_primary == 1 {
+        sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(photo)
+            .bind(photo_base64)
+            .bind(actor_id)
+            .execute(pool)
+            .await?;
+    }
+
     Ok(actor_photo_from_row(&row))
 }
 
 pub async fn delete_actor_photo(pool: &SqlitePool, photo_id: i64) -> Result<()> {
+    let deleted = sqlx::query("SELECT actor_id, is_primary FROM actor_photos WHERE id = ?")
+        .bind(photo_id)
+        .fetch_optional(pool)
+        .await?;
+
     sqlx::query("DELETE FROM actor_photos WHERE id = ?")
         .bind(photo_id)
         .execute(pool)
         .await?;
+
+    if let Some(row) = deleted {
+        let actor_id: i64 = row.get("actor_id");
+        let was_primary: i32 = row.get("is_primary");
+        if was_primary == 1 {
+            if let Some(next) = sqlx::query(
+                "SELECT id, photo, photo_base64 FROM actor_photos WHERE actor_id = ? ORDER BY sort_order ASC, created_at ASC LIMIT 1",
+            )
+            .bind(actor_id)
+            .fetch_optional(pool)
+            .await?
+            {
+                let next_id: i64 = next.get("id");
+                let photo: Option<String> = next.try_get("photo").ok().flatten();
+                let photo_base64: Option<String> = next.try_get("photo_base64").ok().flatten();
+                sqlx::query("UPDATE actor_photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE actor_id = ?")
+                    .bind(next_id)
+                    .bind(actor_id)
+                    .execute(pool)
+                    .await?;
+                sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .bind(&photo)
+                    .bind(&photo_base64)
+                    .bind(actor_id)
+                    .execute(pool)
+                    .await?;
+            } else {
+                sqlx::query("UPDATE actors SET photo = NULL, avatar_base64 = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .bind(actor_id)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1753,7 +1802,7 @@ pub async fn set_primary_photo(pool: &SqlitePool, actor_id: i64, photo_id: i64) 
     {
         let photo: Option<String> = row.try_get("photo").ok().flatten();
         let photo_base64: Option<String> = row.try_get("photo_base64").ok().flatten();
-        sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ? WHERE id = ?")
+        sqlx::query("UPDATE actors SET photo = ?, avatar_base64 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
             .bind(&photo)
             .bind(&photo_base64)
             .bind(actor_id)
