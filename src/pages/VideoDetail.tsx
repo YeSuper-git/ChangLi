@@ -66,73 +66,80 @@ const VideoDetail: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (id) {
-      loadVideo(parseInt(id));
-      loadTags();
-      loadActors();
+    if (!id) {
+      setVideo(null);
+      setLoading(false);
+      return;
     }
-  }, [id]);
 
-  useEffect(() => {
-    if (editFromUrl && video) {
-      setEditing(true);
+    const videoId = parseInt(id);
+    if (Number.isNaN(videoId)) {
+      setVideo(null);
+      setLoading(false);
+      return;
     }
-  }, [editFromUrl, video]);
 
-  const loadVideo = async (videoId: number) => {
+    loadVideo(videoId, { initial: true });
+  }, [id, editFromUrl]);
+
+  const loadVideo = async (videoId: number, options: { initial?: boolean; forceEditing?: boolean } = {}) => {
+    if (options.initial) {
+      setLoading(true);
+    }
+
     try {
-      const videoData = await getVideo(videoId);
-      setVideo(videoData);
-      if (videoData) {
-        setEditData({
-          fileName: videoData.file_name,
-          description: videoData.description || '',
-          thumbnail: videoData.thumbnail || '',
-        });
+      const [videoData, tagsList, actorsList] = await Promise.all([
+        getVideo(videoId),
+        getTags(),
+        getActors(),
+      ]);
 
-        if (videoData.series_id) {
-          const [seriesData, episodes] = await getVideoSeriesDetail(videoData.series_id);
-          setSeries(seriesData);
-          setSeriesVideos(episodes);
-          setVideoTags([]);
-          setVideoActors([]);
-          setSelectedTagIds([]);
-          setSelectedActorIds([]);
-        } else {
-          setSeries(null);
-          setSeriesVideos([]);
-          const [tags, actors] = await Promise.all([
-            getResourceTags(videoId),
-            getResourceActors(videoId),
-          ]);
-          setVideoTags(tags);
-          setVideoActors(actors);
-          setSelectedTagIds(tags.map((tag) => tag.id));
-          setSelectedActorIds(actors.map((actor) => actor.id));
-        }
+      let nextSeries: VideoSeries | null = null;
+      let nextSeriesVideos: Video[] = [];
+      let nextVideoTags: Tag[] = [];
+      let nextVideoActors: Actor[] = [];
+      let nextSelectedTagIds: number[] = [];
+      let nextSelectedActorIds: number[] = [];
+
+      if (videoData?.series_id) {
+        const [seriesData, episodes] = await getVideoSeriesDetail(videoData.series_id);
+        nextSeries = seriesData;
+        nextSeriesVideos = episodes;
+      } else if (videoData) {
+        const [tags, actors] = await Promise.all([
+          getResourceTags(videoId),
+          getResourceActors(videoId),
+        ]);
+        nextVideoTags = tags;
+        nextVideoActors = actors;
+        nextSelectedTagIds = tags.map((tag) => tag.id);
+        nextSelectedActorIds = actors.map((actor) => actor.id);
       }
+
+      setVideo(videoData);
+      setAllTags(tagsList);
+      setAllActors(actorsList);
+      setSeries(nextSeries);
+      setSeriesVideos(nextSeriesVideos);
+      setVideoTags(nextVideoTags);
+      setVideoActors(nextVideoActors);
+      setSelectedTagIds(nextSelectedTagIds);
+      setSelectedActorIds(nextSelectedActorIds);
+      setEditData({
+        fileName: videoData?.file_name || '',
+        description: videoData?.description || '',
+        thumbnail: videoData?.thumbnail || '',
+      });
+      setCreatingTag(false);
+      setNewTagName('');
+      setShowNewActorModal(false);
+      setNewActorName('');
+      setEditing(options.forceEditing ?? Boolean(editFromUrl && videoData));
     } catch (error) {
       console.error('加载视频失败:', error);
+      setVideo(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadTags = async () => {
-    try {
-      const tags = await getTags();
-      setAllTags(tags);
-    } catch (error) {
-      console.error('加载标签失败:', error);
-    }
-  };
-
-  const loadActors = async () => {
-    try {
-      const actors = await getActors();
-      setAllActors(actors);
-    } catch (error) {
-      console.error('加载演员失败:', error);
     }
   };
 
@@ -206,7 +213,7 @@ const VideoDetail: React.FC = () => {
       }
       clearEditQuery();
       setEditing(false);
-      await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
+      await loadVideo(video.id, { forceEditing: false });
     } catch (error) {
       console.error('保存失败:', error);
       notify({ message: `保存失败：${String(error)}`, type: 'error' });

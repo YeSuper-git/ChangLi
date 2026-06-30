@@ -82,29 +82,15 @@ const Library: React.FC = () => {
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   const [tagExpanded, setTagExpanded] = useState(false);
   const [actorExpanded, setActorExpanded] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const actorsRef = useRef<HTMLDivElement>(null);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
-  const tagsRef = useRef<HTMLDivElement>(null);
-  const actorsRef = useRef<HTMLDivElement>(null);
-  const [tagsNeedsExpand, setTagsNeedsExpand] = useState(false);
-  const [actorsNeedsExpand, setActorsNeedsExpand] = useState(false);
 
-  // 检测筛选按钮区域是否超过一行
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (tagsRef.current) {
-        setTagsNeedsExpand(tagsRef.current.scrollHeight > tagsRef.current.clientHeight + 2);
-      }
-      if (actorsRef.current) {
-        setActorsNeedsExpand(actorsRef.current.scrollHeight > actorsRef.current.clientHeight + 2);
-      }
-    };
-    checkOverflow();
-    // 窗口 resize 时重新检测
-    window.addEventListener('resize', checkOverflow);
-    return () => window.removeEventListener('resize', checkOverflow);
-  }, [tags, actors, mainCategory]);
+  // 按数量判断是否需要展开按钮（首帧即确定，无跳动）
+  const tagsNeedsExpand = tags.length > 5;
+  const actorsNeedsExpand = actors.length > 5;
 
 
   // 同步筛选状态到 URL 参数
