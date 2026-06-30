@@ -181,20 +181,18 @@ jobs:
           $ErrorActionPreference = "Stop"
           $tag = "v$env:VERSION"
           $releaseUrl = "https://github.com/${{ github.repository }}/releases/download/$tag"
-          $nsisDir = "src-tauri/target/release/bundle/nsis"
-          $msiDir = "src-tauri/target/release/bundle/msi"
+          $bundleDir = "src-tauri/target/release/bundle"
+          $nsisExe = Get-ChildItem $bundleDir -Recurse -Filter "*.exe" | Select-Object -First 1
+          $nsisSig = Get-ChildItem $bundleDir -Recurse -Filter "*.exe.sig" | Select-Object -First 1
+          $msiSig = Get-ChildItem $bundleDir -Recurse -Filter "*.msi.sig" | Select-Object -First 1
 
-          $updaterAssets = @(
-            (Get-ChildItem $nsisDir -Filter "*.exe.sig" -ErrorAction SilentlyContinue),
-            (Get-ChildItem $msiDir -Filter "*.msi.sig" -ErrorAction SilentlyContinue)
-          ) | Where-Object { $_ }
+          $updaterAssets = @($nsisSig, $msiSig) | Where-Object { $_ }
           if ($updaterAssets.Count -gt 0) {
             gh release upload $tag @($updaterAssets.FullName) --clobber
           }
 
-          $nsisExe = Get-ChildItem $nsisDir -Filter "*.exe" | Select-Object -First 1
-          $nsisSig = Get-ChildItem $nsisDir -Filter "*.exe.sig" | Select-Object -First 1
           if (-not $nsisExe -or -not $nsisSig) {
+            Get-ChildItem $bundleDir -Recurse | Select-Object FullName | Out-String | Write-Host
             throw "NSIS updater executable/signature not found"
           }
 
