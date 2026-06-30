@@ -678,11 +678,17 @@ const ActorDetail: React.FC = () => {
         setUploadingPhoto(true);
         try {
           const relativePath = await saveActorPhoto(selected as string);
-          await addActorPhoto(actor.id, relativePath);
-          const photosData = await getActorPhotos(actor.id);
+          const newPhoto = await addActorPhoto(actor.id, relativePath, undefined, photos.length === 0 ? 1 : undefined);
+          const [actorData, photosData] = await Promise.all([
+            getActor(actor.id),
+            getActorPhotos(actor.id),
+          ]);
+          setActor(actorData);
           setPhotos(photosData);
+          await refreshActors();
           // 切换到新添加的照片
-          setCurrentPhotoIndex(photosData.length - 1);
+          const newIndex = photosData.findIndex(photo => photo.id === newPhoto.id);
+          setCurrentPhotoIndex(newIndex >= 0 ? newIndex : Math.max(0, photosData.length - 1));
           notify({ message: '海报添加成功', type: 'success' });
         } catch (error) {
           console.error('[Actor] 添加海报失败:', error);
@@ -700,8 +706,13 @@ const ActorDetail: React.FC = () => {
     if (!actor) return;
     try {
       await deleteActorPhoto(photoId);
-      const photosData = await getActorPhotos(actor.id);
+      const [actorData, photosData] = await Promise.all([
+        getActor(actor.id),
+        getActorPhotos(actor.id),
+      ]);
+      setActor(actorData);
       setPhotos(photosData);
+      await refreshActors();
       // 如果删的是当前显示的，切换到前一张
       if (currentPhotoIndex >= photosData.length) {
         setCurrentPhotoIndex(Math.max(0, photosData.length - 1));
@@ -718,8 +729,13 @@ const ActorDetail: React.FC = () => {
     try {
       await setPrimaryPhoto(actor.id, photoId);
       // 重新排序（主海报在第一位）
-      const photosData = await getActorPhotos(actor.id);
+      const [actorData, photosData] = await Promise.all([
+        getActor(actor.id),
+        getActorPhotos(actor.id),
+      ]);
+      setActor(actorData);
       setPhotos(photosData);
+      await refreshActors();
       setCurrentPhotoIndex(0);
       setPhotoContextMenu(null);
       notify({ message: '主海报已更新', type: 'success' });
@@ -835,7 +851,7 @@ const ActorDetail: React.FC = () => {
           <SmartPoster src={poster} alt={title} />
         </div>
         <div className="p-5">
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{title}</h3>
+          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2" title={title}>{title}</h3>
           {resource.series_has_chinese_sub === 1 && (
             <span className="text-xs text-orange-500">中文字幕</span>
           )}

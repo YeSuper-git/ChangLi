@@ -4,15 +4,9 @@ import { notifyEventName, type NotifyPayload, type NotifyType } from '../utils/n
 type ToastItem = Required<Pick<NotifyPayload, 'message' | 'type'>> & { id: number };
 
 const typeClass: Record<NotifyType, string> = {
-  success: 'border-emerald-200 bg-white text-gray-900',
-  info: 'border-gray-200 bg-white text-gray-900',
-  error: 'border-red-200 bg-white text-red-700',
-};
-
-const accentClass: Record<NotifyType, string> = {
-  success: 'bg-emerald-500',
-  info: 'bg-gray-900',
-  error: 'bg-red-500',
+  success: 'bg-gray-900 text-white',
+  info: 'bg-gray-900 text-white',
+  error: 'bg-red-600 text-white',
 };
 
 const ToastProvider: React.FC = () => {
@@ -39,13 +33,12 @@ const ToastProvider: React.FC = () => {
   if (items.length === 0) return null;
 
   return (
-    <div className="fixed right-5 top-16 z-[9999] flex max-w-[360px] flex-col gap-2 pointer-events-none">
+    <div className="fixed right-4 top-16 z-[9999] flex max-w-[360px] flex-col gap-2 pointer-events-none">
       {items.map((item) => (
         <div
           key={item.id}
-          className={`relative overflow-hidden rounded-xl border px-4 py-3 pl-5 text-sm shadow-xl pointer-events-auto animate-[changliToastIn_220ms_ease-out] ${typeClass[item.type]}`}
+          className={`rounded-lg px-4 py-3 text-sm shadow-lg pointer-events-auto animate-[changliToastIn_300ms_ease-out] ${typeClass[item.type]}`}
         >
-          <span className={`absolute left-0 top-0 h-full w-1 ${accentClass[item.type]}`} />
           {item.message}
         </div>
       ))}

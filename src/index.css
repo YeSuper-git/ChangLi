@@ -5,11 +5,11 @@
 @keyframes changliToastIn {
   from {
     opacity: 0;
-    transform: translate(12px, -8px);
+    transform: translateX(24px);
   }
   to {
     opacity: 1;
-    transform: translate(0, 0);
+    transform: translateX(0);
   }
 }
 
