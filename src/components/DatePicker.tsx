@@ -66,7 +66,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange }) => {
         placeholder="YYYY-MM-DD"
         readOnly
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer bg-white"
+        className="changli-input cursor-pointer"
       />
       
       {isOpen && (
@@ -74,8 +74,8 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange }) => {
           <style>
             {`
               .rdp {
-                --rdp-accent-color: #3b82f6;
-                --rdp-background-color: #3b82f6;
+                --rdp-accent-color: #fb5b7b;
+                --rdp-background-color: #fb5b7b;
                 color: white;
                 margin: 0;
               }
@@ -90,7 +90,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange }) => {
                 background-color: #3f3f46;
               }
               .rdp-day_selected {
-                background-color: #3b82f6 !important;
+                background-color: #fb5b7b !important;
                 color: white !important;
               }
               .rdp-day_today:not(.rdp-day_selected) {
@@ -132,7 +132,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange }) => {
               }
               .rdp-dropdown:focus {
                 outline: none;
-                border-color: #3b82f6;
+                border-color: #fb5b7b;
               }
               .rdp-dropdowns {
                 gap: 8px;

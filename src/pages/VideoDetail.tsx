@@ -303,9 +303,9 @@ const VideoDetail: React.FC = () => {
 
   if (!video) {
     return (
-      <div className="text-center py-16">
+      <div className="changli-empty-state">
         <p className="text-gray-500 text-lg">视频不存在</p>
-        <Link to="/library" className="text-blue-500 hover:text-blue-600 mt-4 inline-block">
+        <Link to="/library" className="mt-4 inline-block text-rose-500 hover:text-rose-600">
           返回视频
         </Link>
       </div>
@@ -331,26 +331,26 @@ const VideoDetail: React.FC = () => {
     : videoPosterDataUrl(video);
 
   return (
-    <div>
+    <div className="changli-page">
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}</button>
+        <button type="button" onClick={handleBack} className="flex items-center gap-1 text-sm text-rose-500 hover:underline"><img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}</button>
       </div>
 
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">视频详情</h1>
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">视频详情</h1>
         <div className="flex gap-4 items-center">
           
           {editing ? (
             <>
               <button
                 onClick={cancelEditing}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn"
               >
                 取消
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary"
               >
                 保存
               </button>
@@ -364,7 +364,7 @@ const VideoDetail: React.FC = () => {
                   beginEditing();
                 }
               }}
-              className="px-4 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
+              className="action-btn action-btn-primary"
             >
               {isSeriesEpisode ? '编辑视频集' : '编辑'}
             </button>
@@ -374,7 +374,7 @@ const VideoDetail: React.FC = () => {
 
       <div className="grid grid-cols-3 gap-8">
         <div className="col-span-2 space-y-6">
-          <div className="card overflow-hidden">
+          <div className="card overflow-hidden transition-shadow duration-200 hover:shadow-xl">
             <div
               className={`aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative group ${editing ? 'cursor-pointer' : ''}`}
               onClick={editing ? handleSelectThumbnail : undefined}
@@ -390,14 +390,14 @@ const VideoDetail: React.FC = () => {
             </div>
           </div>
 
-          <div className="card p-6">
+          <div className="changli-panel p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">文件名</h3>
             {editing ? (
               <input
                 type="text"
                 value={editData.fileName}
                 onChange={(e) => setEditData({ ...editData, fileName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                className="changli-input"
               />
             ) : (
               <div className="flex items-center gap-2">
@@ -421,13 +421,13 @@ const VideoDetail: React.FC = () => {
             )}
           </div>
 
-          <div className="card p-6">
+          <div className="changli-panel p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">简介</h3>
             {editing ? (
               <textarea
                 value={editData.description}
                 onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                className="changli-input"
                 rows={4}
                 placeholder="输入视频简介..."
               />
@@ -436,7 +436,7 @@ const VideoDetail: React.FC = () => {
             )}
           </div>
 
-          <div className="card p-6">
+          <div className="changli-panel p-6">
             <h3 className="text-sm font-medium text-gray-500 mb-4">视频信息</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -462,13 +462,13 @@ const VideoDetail: React.FC = () => {
         <div className="space-y-6">
           <Link
             to={`/player/${video.id}`}
-            className="block w-full px-6 py-4 bg-blue-500 text-white text-center rounded-xl font-medium hover:bg-blue-600"
+            className="block w-full rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-6 py-4 text-center font-semibold text-white shadow-lg shadow-gray-900/15 transition-transform duration-200 hover:-translate-y-0.5"
           >
             ▶️ 播放视频
           </Link>
 
           {isSeriesEpisode ? (
-            <div className="card p-6">
+            <div className="changli-panel p-6">
               <h3 className="text-sm font-medium text-gray-500 mb-4">视频集管理</h3>
               <p className="text-sm text-gray-500 mb-4">
                 这是视频集中的单集。演员和标签归属于整个视频集，不在单个分集上编辑。
@@ -476,7 +476,7 @@ const VideoDetail: React.FC = () => {
               {series && (
                 <Link
                   to={`/series/${series.id}`}
-                  className="block p-3 bg-blue-50 text-blue-700 rounded-lg font-medium hover:bg-blue-100 mb-4"
+                  className="mb-4 block rounded-2xl border border-rose-100 bg-rose-50/70 p-3 font-medium text-rose-700 hover:bg-rose-50"
                 >
                   管理《{series.title}》演员、标签和分集
                 </Link>
@@ -486,7 +486,7 @@ const VideoDetail: React.FC = () => {
                   <Link
                     key={episode.id}
                     to={`/player/${episode.id}`}
-                    className={`block p-2 rounded-lg text-sm ${episode.id === video.id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-700 hover:text-blue-600'}`}
+                    className={`block p-2 rounded-lg text-sm ${episode.id === video.id ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white' : 'bg-gray-50 text-gray-700 hover:text-rose-600'}`}
                   >
                     <span>{episode.file_name}</span>
                     {episode.episode_number && (
@@ -500,7 +500,7 @@ const VideoDetail: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="card p-6">
+              <div className="changli-panel p-6">
                 <h3 className="text-sm font-medium text-gray-500 mb-4">标签</h3>
                 {editing ? (
                   <>
@@ -514,7 +514,7 @@ const VideoDetail: React.FC = () => {
                             onClick={() => toggleTag(tag.id)}
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
-                                ? 'bg-blue-500 border-blue-500 text-white'
+                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white'
                                 : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                             }`}
                           >
@@ -547,10 +547,10 @@ const VideoDetail: React.FC = () => {
                             }
                           }}
                           placeholder="输入标签名"
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100"
                           autoFocus
                         />
-                        <button onClick={handleCreateTag} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+                        <button onClick={handleCreateTag} className="action-btn action-btn-primary text-sm">
                           完成
                         </button>
                         <button
@@ -578,7 +578,7 @@ const VideoDetail: React.FC = () => {
                 )}
               </div>
 
-              <div className="card p-6">
+              <div className="changli-panel p-6">
                 <h3 className="text-sm font-medium text-gray-500 mb-4">演员</h3>
                 {editing ? (
                   <>
@@ -592,7 +592,7 @@ const VideoDetail: React.FC = () => {
                             onClick={() => toggleActor(actor.id)}
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
-                                ? 'bg-blue-500 border-blue-500 text-white'
+                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white'
                                 : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                             }`}
                           >
@@ -619,7 +619,7 @@ const VideoDetail: React.FC = () => {
                         key={actor.id}
                         to={`/actors/${actor.id}`}
                         state={{ from: `/video/${video.id}`, backLabel: '返回视频详情' }}
-                        className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-blue-600"
+                        className="block p-2 bg-gray-50 rounded-lg text-gray-900 hover:text-rose-600"
                       >
                         {actor.name}
                       </Link>
@@ -655,15 +655,15 @@ const VideoDetail: React.FC = () => {
       )}
 
       {showNewActorModal && (
-        <div className="fixed inset-0 bg-gray-900/45 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl">
-            <div className="border-b border-gray-100 px-6 py-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">演员资料</p>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,448px)] !p-0">
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">演员资料</p>
               <h2 className="mt-1 text-2xl font-bold text-gray-900">新建演员</h2>
               <p className="mt-2 text-sm text-gray-500">新建后会自动选中，保存视频详情时同步关联。</p>
             </div>
-            <div className="px-6 py-5">
-              <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+            <div className="changli-modal-body">
+              <label className="changli-form-label">姓名</label>
               <input
                 type="text"
                 value={newActorName}
@@ -675,25 +675,25 @@ const VideoDetail: React.FC = () => {
                     setNewActorName('');
                   }
                 }}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                className="changli-input"
                 placeholder="输入演员姓名"
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-2">新建后会自动选中，稍后可去演员中补充海报和详细信息。</p>
             </div>
-            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div className="changli-modal-footer">
               <button
                 onClick={() => {
                   setShowNewActorModal(false);
                   setNewActorName('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleCreateActor}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary flex-1"
               >
                 添加
               </button>

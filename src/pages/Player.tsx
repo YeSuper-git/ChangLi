@@ -391,17 +391,20 @@ const Player: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black">
-        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex h-[100dvh] items-center justify-center bg-[#050505]">
+        <div className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-white/5 px-8 py-7 text-white shadow-2xl backdrop-blur-xl">
+          <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/25 border-t-[#fb5b7b]"></div>
+          <span className="text-sm text-white/70">正在打开播放器</span>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-black">
-        <div className="text-red-500 text-lg mb-4">{error}</div>
-        <Link to="/library" className="text-blue-400 hover:text-blue-300">
+      <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#050505] px-6 text-white">
+        <div className="mb-5 rounded-3xl border border-red-400/20 bg-red-500/10 px-6 py-4 text-center text-red-100 shadow-2xl backdrop-blur-xl">{error}</div>
+        <Link to="/library" className="action-btn action-btn-primary">
           返回视频库
         </Link>
       </div>
@@ -410,19 +413,21 @@ const Player: React.FC = () => {
 
   if (windowsNativeMode) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-black text-white">
-        <div className="text-lg mb-3">已使用 Windows 原生 mpv 播放器打开</div>
-        <div className="text-sm text-gray-400 mb-6">为避免 Win11 WebView 黑屏问题，Windows 下自动切换到原生播放窗口。</div>
-        <button onClick={() => navigate(-1)} className="px-4 py-2 rounded-lg bg-white text-gray-900 hover:bg-gray-100">
-          返回
-        </button>
+      <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#050505] px-6 text-white">
+        <div className="rounded-3xl border border-white/10 bg-white/5 px-8 py-7 text-center shadow-2xl backdrop-blur-xl">
+          <div className="mb-3 text-lg font-bold">已使用 Windows 原生 mpv 播放器打开</div>
+          <div className="mb-6 max-w-md text-sm text-white/55">为避免 Win11 WebView 黑屏问题，Windows 下自动切换到原生播放窗口。</div>
+          <button onClick={() => navigate(-1)} className="action-btn action-btn-primary">
+            返回
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div 
-      className="relative w-full h-screen bg-black"
+      className="relative h-[100dvh] w-full overflow-hidden bg-[#050505]"
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
@@ -433,44 +438,44 @@ const Player: React.FC = () => {
 
       {/* 控制栏 */}
       <div 
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/72 to-transparent px-5 pb-5 pt-16 transition-opacity duration-300 ${
           showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         {/* 进度条 */}
         <div 
           ref={progressBarRef}
-          className="relative w-full h-1.5 bg-gray-600 rounded-full cursor-pointer group mb-4"
+          className="group relative mb-5 h-2 w-full cursor-pointer rounded-full bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
           onClick={handleProgressBarClick}
           onMouseMove={handleProgressBarHover}
           onMouseLeave={handleProgressBarLeave}
         >
           {/* 已播放进度 */}
           <div 
-            className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
+            className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] shadow-[0_0_18px_rgba(251,91,123,0.35)]"
             style={{ width: `${(currentTime / duration) * 100}%` }}
           />
           
           {/* 拖拽点 */}
           <div 
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_4px_rgba(251,91,123,0.42)] opacity-0 transition-opacity group-hover:opacity-100"
             style={{ left: `${(currentTime / duration) * 100}%` }}
           />
 
           {/* 悬浮预览 */}
           {hoverTime !== null && (
             <div 
-              className="absolute bottom-6 transform -translate-x-1/2 bg-gray-900 rounded-lg overflow-hidden shadow-lg"
+              className="absolute bottom-7 -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#111217]/95 shadow-2xl backdrop-blur-xl"
               style={{ left: `${hoverX}px` }}
             >
               {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt="预览" className="w-32 h-18 object-cover" />
+                <img src={thumbnailUrl} alt="预览" className="w-32 h-[72px] object-cover" />
               ) : (
-                <div className="w-32 h-18 bg-gray-800 flex items-center justify-center">
-                  <span className="text-white text-xs">{formatTime(hoverTime)}</span>
+                <div className="flex h-[72px] w-32 items-center justify-center bg-white/5">
+                  <span className="text-xs text-white">{formatTime(hoverTime)}</span>
                 </div>
               )}
-              <div className="text-white text-xs text-center py-1 bg-gray-900">
+              <div className="bg-black/40 py-1 text-center text-xs text-white">
                 {formatTime(hoverTime)}
               </div>
             </div>
@@ -478,12 +483,12 @@ const Player: React.FC = () => {
         </div>
 
         {/* 控制按钮 */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center gap-4">
             {/* 播放/暂停 */}
             <button 
               onClick={togglePlay}
-              className="text-white hover:text-blue-400 transition-colors"
+              className="text-white transition-colors hover:text-[#fb5b7b]"
             >
               {isPlaying ? (
                 <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
@@ -497,7 +502,7 @@ const Player: React.FC = () => {
             </button>
 
             {/* 时间显示 */}
-            <span className="text-white text-sm">
+            <span className="font-mono text-sm text-white/82">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
@@ -507,7 +512,7 @@ const Player: React.FC = () => {
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => changeVolume(volume === 0 ? 80 : 0)}
-                className="text-white hover:text-blue-400 transition-colors"
+                className="text-white transition-colors hover:text-[#fb5b7b]"
               >
                 {volume === 0 ? (
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -525,7 +530,7 @@ const Player: React.FC = () => {
                 max="100"
                 value={volume}
                 onChange={(e) => changeVolume(parseInt(e.target.value))}
-                className="w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:rounded-full"
+                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/20 accent-[#fb5b7b] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(251,91,123,0.35)]"
               />
             </div>
 
@@ -533,7 +538,7 @@ const Player: React.FC = () => {
             <select
               value={speed}
               onChange={(e) => changeSpeed(parseFloat(e.target.value))}
-              className="bg-gray-800 text-white text-sm px-2 py-1 rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+              className="rounded-xl border border-white/10 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white outline-none transition focus:border-[#fb5b7b]"
             >
               {speedOptions.map((spd) => (
                 <option key={spd} value={spd}>
@@ -545,7 +550,7 @@ const Player: React.FC = () => {
             {/* 画中画 */}
             <button 
               onClick={togglePiP}
-              className={`text-white hover:text-blue-400 transition-colors ${isPiP ? 'text-blue-400' : ''}`}
+              className={`text-white transition-colors hover:text-[#fb5b7b] ${isPiP ? '!text-[#fb5b7b]' : ''}`}
               title="画中画"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -556,7 +561,7 @@ const Player: React.FC = () => {
             {/* 置顶 */}
             <button 
               onClick={togglePin}
-              className={`text-white hover:text-blue-400 transition-colors ${isPinned ? 'text-blue-400' : ''}`}
+              className={`text-white transition-colors hover:text-[#fb5b7b] ${isPinned ? '!text-[#fb5b7b]' : ''}`}
               title="置顶"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
@@ -567,7 +572,7 @@ const Player: React.FC = () => {
             {/* 全屏 */}
             <button 
               onClick={toggleFullscreen}
-              className="text-white hover:text-blue-400 transition-colors"
+              className="text-white transition-colors hover:text-[#fb5b7b]"
               title="全屏"
             >
               {isFullscreen ? (
@@ -585,10 +590,10 @@ const Player: React.FC = () => {
       </div>
 
       {/* 返回按钮 */}
-      <div className={`absolute top-4 left-4 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute left-4 top-4 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
         <button 
           onClick={() => navigate(-1)}
-          className="text-white hover:text-blue-400 transition-colors"
+          className="rounded-full border border-white/10 bg-black/30 p-2 text-white shadow-2xl backdrop-blur-xl transition hover:border-[#fb5b7b]/40 hover:text-[#fb5b7b]"
         >
           <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
             <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />

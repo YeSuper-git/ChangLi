@@ -33,12 +33,12 @@ const Tags: React.FC = () => {
 
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-10">
-        <h1 className="text-3xl font-bold">标签管理</h1>
+    <div className="changli-page">
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">标签管理</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
+          className="action-btn action-btn-primary"
         >
           添加标签
         </button>
@@ -46,12 +46,12 @@ const Tags: React.FC = () => {
 
       {/* 标签列表 */}
       {tags.length > 0 ? (
-        <div className="card p-8">
+        <div className="changli-panel p-8">
           <div className="flex flex-wrap gap-3">
             {tags.map((tag) => (
               <div
                 key={tag.id}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full"
+                className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/78 px-4 py-2 shadow-sm"
               >
                 <span className="text-gray-700">{tag.name}</span>
                 <button
@@ -65,11 +65,11 @@ const Tags: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="text-center py-16">
+        <div className="changli-empty-state">
           <p className="text-gray-500 text-lg mb-4">暂无标签</p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+            className="action-btn action-btn-primary"
           >
             添加第一个标签
           </button>
@@ -78,16 +78,16 @@ const Tags: React.FC = () => {
 
       {/* 添加标签弹窗 */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-96">
-            <h2 className="text-2xl font-bold mb-6">添加标签</h2>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
+            <h2 className="changli-modal-title">添加标签</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">标签名称</label>
+              <label className="changli-form-label">标签名称</label>
               <input
                 type="text"
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                className="changli-input"
                 placeholder="输入标签名称"
                 onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
               />
@@ -95,13 +95,13 @@ const Tags: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleAddTag}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary flex-1"
               >
                 添加
               </button>

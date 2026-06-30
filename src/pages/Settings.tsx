@@ -417,9 +417,9 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-10">
-        <h1 className="text-3xl font-bold">设置</h1>
+    <div className="changli-page">
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">设置</h1>
       </div>
 
       {/* 数据存储 */}
@@ -433,13 +433,13 @@ const Settings: React.FC = () => {
           </div>
           <button
             onClick={() => openDataDir()}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+            className="action-btn action-btn-primary"
           >
             打开数据目录
           </button>
         </div>
 
-        <div className="card p-6 space-y-4">
+        <div className="changli-panel p-6 space-y-4">
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 w-24">当前模式</span>
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
@@ -472,7 +472,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        <div className="card p-6 mb-4">
+        <div className="changli-panel p-6 mb-4">
           <div className="flex gap-3">
             <input
               type="text"
@@ -487,7 +487,7 @@ const Settings: React.FC = () => {
             <button
               onClick={handleAddTag}
               disabled={!newTagName.trim()}
-              className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              className="action-btn action-btn-primary disabled:opacity-50"
             >
               添加标签
             </button>
@@ -510,7 +510,7 @@ const Settings: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-10 text-gray-500">暂无标签</div>
+          <div className="changli-empty-state text-gray-500">暂无标签</div>
         )}
       </section>
 
@@ -520,7 +520,7 @@ const Settings: React.FC = () => {
           <h2 className="text-xl font-semibold">网站管理</h2>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="action-btn action-btn-primary"
           >
             添加网站
           </button>
@@ -529,7 +529,7 @@ const Settings: React.FC = () => {
         {sites.length > 0 ? (
           <div className="space-y-4">
             {sites.map((site) => (
-              <div key={site.id} className="card p-6">
+              <div key={site.id} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{site.name}</h3>
@@ -538,7 +538,7 @@ const Settings: React.FC = () => {
                   </div>
                   <button
                     onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                    className="action-btn action-btn-danger text-sm"
                   >
                     {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
                   </button>
@@ -547,7 +547,7 @@ const Settings: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="changli-empty-state">
             <p className="text-gray-500 mb-4">暂无网站配置</p>
             <p className="text-gray-400 text-sm">添加网站后可以搜索在线资源</p>
           </div>
@@ -563,7 +563,7 @@ const Settings: React.FC = () => {
           </div>
           <button
             onClick={openAddCategory}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="action-btn action-btn-primary"
           >
             新增大类
           </button>
@@ -579,7 +579,7 @@ const Settings: React.FC = () => {
                 return labels[k] || k;
               });
               return (
-                <div key={cat.key} className="card p-6">
+                <div key={cat.key} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900">{cat.name}</h3>
@@ -590,7 +590,7 @@ const Settings: React.FC = () => {
                       {activeFeatures.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {activeFeatures.map((f) => (
-                            <span key={f} className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-xs text-blue-700">{f}</span>
+                            <span key={f} className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700">{f}</span>
                           ))}
                         </div>
                       )}
@@ -599,37 +599,37 @@ const Settings: React.FC = () => {
                       <button
                         onClick={() => handleMoveCategory(cat.key, 'up')}
                         disabled={categories.indexOf(cat) === 0}
-                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
+                        className="action-btn text-sm disabled:opacity-30 disabled:cursor-not-allowed"
                         title="上移"
                       >▲ 上移</button>
                       <button
                         onClick={() => handleMoveCategory(cat.key, 'down')}
                         disabled={categories.indexOf(cat) === categories.length - 1}
-                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
+                        className="action-btn text-sm disabled:opacity-30 disabled:cursor-not-allowed"
                         title="下移"
                       >▼ 下移</button>
                       <button
                         onClick={() => openEditCategory(cat)}
-                        className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+                        className="action-btn action-btn-primary"
                       >
                         编辑
                       </button>
                       <button
                         onClick={() => setRescanConfirm(cat.key)}
                         disabled={rescanningCategory === cat.key}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                        className="action-btn text-sm disabled:opacity-50"
                       >
                         {rescanningCategory === cat.key ? '扫描中...' : '扫描元数据'}
                       </button>
                       <button
                         onClick={() => setDeleteCatConfirm(cat.key)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        className="action-btn action-btn-danger text-sm"
                       >
                         删除视频
                       </button>
                       <button
                         onClick={() => setCategoryDeleteConfirm(cat.key)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        className="action-btn action-btn-danger text-sm"
                       >
                         删除
                       </button>
@@ -640,7 +640,7 @@ const Settings: React.FC = () => {
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="changli-empty-state">
             <p className="text-gray-500 mb-4">暂无大类配置</p>
             <p className="text-gray-400 text-sm">点击"新增大类"添加</p>
           </div>
@@ -657,7 +657,7 @@ const Settings: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={() => { loadPresetTemplates(); setShowPresetModal(true); }}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="action-btn"
             >
               扩展系统预设
             </button>
@@ -679,10 +679,10 @@ const Settings: React.FC = () => {
           return (
             <div className="grid grid-cols-4 gap-4">
               {sorted.map((field) => (
-                <div key={field.field_key} className="card p-4 cursor-pointer flex flex-col items-center justify-center" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
+                <div key={field.field_key} className="changli-panel p-4 cursor-pointer flex flex-col items-center justify-center transition-transform duration-200 hover:-translate-y-0.5" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
                   <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
                   {presetKeySet.has(field.field_key) && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-600 mt-1">预设</span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">预设</span>
                   )}
                   <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : field.field_type === 'compound' ? '复合' : '选择'}</p>
                   <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
@@ -695,21 +695,21 @@ const Settings: React.FC = () => {
 
       {/* 大类视频删除确认弹窗 */}
       {deleteCatConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
               确定要删除「{categories.find(c => c.key === deleteCatConfirm)?.name || deleteCatConfirm}」下的所有视频吗？此操作不可恢复。
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => { doDeleteCategory(deleteCatConfirm); setDeleteCatConfirm(null); }}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                className="action-btn action-btn-danger flex-1 text-sm"
               >
                 狠心删除
               </button>
               <button
                 onClick={() => setDeleteCatConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="action-btn flex-1 text-sm"
               >
                 返回
               </button>
@@ -720,36 +720,36 @@ const Settings: React.FC = () => {
 
       {/* 添加网站弹窗 */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-96">
-            <h2 className="text-2xl font-bold mb-6">添加网站</h2>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
+            <h2 className="changli-modal-title">添加网站</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">网站名称</label>
+                <label className="changli-form-label">网站名称</label>
                 <input
                   type="text"
                   value={newSite.name}
                   onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   placeholder="如：动漫之家"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">网站地址</label>
+                <label className="changli-form-label">网站地址</label>
                 <input
                   type="text"
                   value={newSite.url}
                   onChange={(e) => setNewSite({ ...newSite, url: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   placeholder="https://www.example.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">解析器类型</label>
+                <label className="changli-form-label">解析器类型</label>
                 <select
                   value={newSite.parser_type}
                   onChange={(e) => setNewSite({ ...newSite, parser_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                 >
                   <option value="auto">自动检测</option>
                   <option value="custom">自定义</option>
@@ -759,13 +759,13 @@ const Settings: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleAddSite}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary flex-1"
               >
                 添加
               </button>
@@ -776,27 +776,27 @@ const Settings: React.FC = () => {
 
       {/* 大类编辑/新增弹窗 */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-[480px] max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-6">{editingCategory ? '编辑大类' : '新增大类'}</h2>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel max-h-[90vh] !w-[min(100%,520px)] overflow-y-auto">
+            <h2 className="changli-modal-title">{editingCategory ? '编辑大类' : '新增大类'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">大类名称</label>
+                <label className="changli-form-label">大类名称</label>
                 <input
                   type="text"
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   placeholder="如：动漫"
                 />
               </div>
               {/* Key 不展示，由系统管理 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">卡片方向</label>
+                <label className="changli-form-label">卡片方向</label>
                 <select
                   value={categoryForm.card_layout}
                   onChange={(e) => setCategoryForm({ ...categoryForm, card_layout: e.target.value as 'portrait' | 'landscape' | 'auto' })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                 >
                   <option value="auto">自动</option>
                   <option value="portrait">竖版</option>
@@ -804,19 +804,19 @@ const Settings: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">默认扫描路径</label>
+                <label className="changli-form-label">默认扫描路径</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={categoryForm.scan_path}
                     onChange={(e) => setCategoryForm({ ...categoryForm, scan_path: e.target.value })}
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="changli-input flex-1"
                     placeholder="留空则不启用一键扫描"
                   />
                   <button
                     type="button"
                     onClick={selectScanPath}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                    className="action-btn text-sm"
                   >
                     选择文件夹
                   </button>
@@ -858,7 +858,7 @@ const Settings: React.FC = () => {
                         ...categoryForm,
                         features: { ...categoryForm.features, episode: e.target.value }
                       })}
-                      className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                      className="changli-select !w-auto px-3 py-1 text-sm"
                       >
                       <option value="话">话</option>
                       <option value="部">部</option>
@@ -876,14 +876,14 @@ const Settings: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setShowCategoryModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleSaveCategory}
                 disabled={!categoryForm.key.trim() || !categoryForm.name.trim()}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                className="action-btn action-btn-primary flex-1 disabled:opacity-50"
               >
                 {editingCategory ? '保存' : '添加'}
               </button>
@@ -894,21 +894,21 @@ const Settings: React.FC = () => {
 
       {/* 大类删除确认弹窗 */}
       {categoryDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
-            <p className="text-gray-900 text-base mb-6">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
+            <p className="mb-6 text-base text-gray-900">
               确定要删除大类「{categories.find(c => c.key === categoryDeleteConfirm)?.name || categoryDeleteConfirm}」吗？
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => { handleDeleteCategory(categoryDeleteConfirm); setCategoryDeleteConfirm(null); }}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                className="action-btn action-btn-danger flex-1 text-sm"
               >
                 确认删除
               </button>
               <button
                 onClick={() => setCategoryDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="action-btn flex-1 text-sm"
               >
                 取消
               </button>
@@ -919,28 +919,28 @@ const Settings: React.FC = () => {
 
       {/* 演员字段编辑/新增弹窗 */}
       {showFieldModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-96">
-            <h2 className="text-2xl font-bold mb-6">{editingField ? '编辑字段' : '新增字段'}</h2>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
+            <h2 className="changli-modal-title">{editingField ? '编辑字段' : '新增字段'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">字段名称</label>
+                <label className="changli-form-label">字段名称</label>
                 <input
                   type="text"
                   value={fieldForm.field_label}
                   onChange={(e) => setFieldForm({ ...fieldForm, field_label: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   placeholder="如：身高"
                 />
               </div>
               {!(editingField && isPresetField(editingField.field_key)) && (
                 <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">字段类型</label>
+                <label className="changli-form-label">字段类型</label>
                 <select
                   value={fieldForm.field_type}
                   onChange={(e) => setFieldForm({ ...fieldForm, field_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                 >
                   <option value="text">文本</option>
                   <option value="number">数字</option>
@@ -992,14 +992,14 @@ const Settings: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setShowFieldModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleSaveField}
                 disabled={!fieldForm.field_label.trim()}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                className="action-btn action-btn-primary flex-1 disabled:opacity-50"
               >
                 {editingField ? '保存' : '添加'}
               </button>
@@ -1011,30 +1011,30 @@ const Settings: React.FC = () => {
       {/* 演员字段右键菜单 */}
       {fieldContextMenu && (
         <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
-          <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button>
+          <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="changli-menu-item">编辑</button>
           {!isPresetField(fieldContextMenu.key) && (
-            <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">删除</button>
+            <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="changli-menu-item changli-menu-item-danger">删除</button>
           )}
         </div>
       )}
 
       {/* 重新扫描元数据确认弹窗 */}
       {rescanConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
               确定重新扫描该大类的所有视频元数据？
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => { handleRescanCategory(rescanConfirm); setRescanConfirm(null); }}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                className="action-btn action-btn-primary flex-1 text-sm"
               >
                 确定
               </button>
               <button
                 onClick={() => setRescanConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="action-btn flex-1 text-sm"
               >
                 取消
               </button>
@@ -1045,21 +1045,21 @@ const Settings: React.FC = () => {
 
       {/* 演员字段删除确认弹窗 */}
       {deleteFieldConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
               确定删除该字段？
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => { handleDeleteField(deleteFieldConfirm); setDeleteFieldConfirm(null); }}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                className="action-btn action-btn-danger flex-1 text-sm"
               >
                 确认删除
               </button>
               <button
                 onClick={() => setDeleteFieldConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="action-btn flex-1 text-sm"
               >
                 取消
               </button>
@@ -1070,15 +1070,15 @@ const Settings: React.FC = () => {
 
       {/* 扩展系统预设弹窗 */}
       {showPresetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,480px)]">
             <h2 className="text-xl font-bold mb-4">扩展系统预设</h2>
             <p className="text-sm text-gray-500 mb-4">启用后将在演员管理中显示对应字段</p>
             <div className="space-y-3">
               {presetTemplates.map((template) => {
                 const enabled = presetEnabledMap[template.key] || false;
                 return (
-                  <div key={template.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={template.key} className="flex items-center justify-between rounded-2xl border border-gray-100 bg-[#f8f9fc] p-3">
                     <div>
                       <span className="text-sm font-medium text-gray-900">{actorFields.find(f => f.field_key === template.key)?.field_label || template.name}</span>
                     </div>
@@ -1126,21 +1126,21 @@ const Settings: React.FC = () => {
 
       {/* 新增大类后立即扫描确认弹窗 */}
       {scanAfterCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
               大类已创建，是否立即扫描并添加？
             </p>
             <div className="flex gap-3">
               <button
                 onClick={handleScanAfterCreate}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                className="action-btn action-btn-primary flex-1 text-sm"
               >
                 立即扫描
               </button>
               <button
                 onClick={() => setScanAfterCreate(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                className="action-btn flex-1 text-sm"
               >
                 稍后再说
               </button>
@@ -1163,13 +1163,13 @@ const Settings: React.FC = () => {
             <button
               onClick={handleCheckUpdate}
               disabled={updateStatus === '检查中...'}
-              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              className="action-btn action-btn-primary disabled:opacity-50"
             >
               检查更新
             </button>
             <button
               onClick={() => setShowChangelog(true)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="action-btn"
             >
               版本更新记录
             </button>
@@ -1179,10 +1179,10 @@ const Settings: React.FC = () => {
 
       {/* 版本更新记录弹窗 */}
       {showChangelog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl w-[700px] max-h-[85vh] flex flex-col mx-4 shadow-xl">
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,720px)] max-h-[85vh] flex flex-col !p-0">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold">版本更新记录</h2>
+              <h2 className="changli-modal-title">版本更新记录</h2>
               <button onClick={() => setShowChangelog(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
             </div>
             <div className="overflow-y-auto flex-1 p-6 space-y-2">
@@ -1190,15 +1190,15 @@ const Settings: React.FC = () => {
                 const isCurrent = entry.version === currentVersion;
                 const isExpanded = expandedVersion === entry.version;
                 return (
-                  <div key={entry.version} className={`border rounded-lg ${isCurrent ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                  <div key={entry.version} className={`rounded-2xl border ${isCurrent ? 'border-rose-200 bg-rose-50/70' : 'border-gray-200 bg-white/70'}`}>
                     <button
                       onClick={() => setExpandedVersion(isExpanded ? null : entry.version)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 rounded-lg"
+                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/70 rounded-2xl transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`font-semibold text-sm ${isCurrent ? 'text-blue-700' : 'text-gray-900'}`}>v{entry.version}</span>
+                        <span className={`font-semibold text-sm ${isCurrent ? 'text-rose-700' : 'text-gray-900'}`}>v{entry.version}</span>
                         <span className="text-xs text-gray-500">{entry.date}</span>
-                        {isCurrent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white">当前</span>}
+                        {isCurrent && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white">当前</span>}
                       </div>
                       <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
                     </button>

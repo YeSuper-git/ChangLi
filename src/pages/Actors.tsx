@@ -79,19 +79,19 @@ const Actors: React.FC = () => {
 
   return (
     <>
-    <div>
-      <div className="flex items-center justify-between mb-10">
-        <h1 className="text-3xl font-bold">演员库</h1>
+    <div className="changli-page">
+      <div className="changli-page-header">
+        <h1 className="changli-heading-xl">演员库</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
+          className="action-btn action-btn-primary"
         >
           添加演员
         </button>
       </div>
 
       {/* 搜索栏 */}
-      <div className="mb-10">
+      <div className="changli-toolbar mb-10 p-3">
         <input
           type="text"
           value={searchTerm}
@@ -103,7 +103,7 @@ const Actors: React.FC = () => {
 
       {/* 演员列表 */}
       {filteredActors.length > 0 ? (
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-4">
           {filteredActors.map((actor) => {
             const photoDataUrl = actorPhotoDataUrl(actor);
             return (
@@ -112,7 +112,7 @@ const Actors: React.FC = () => {
               to={`/actors/${actor.id}`}
               state={{ from: '/actors', backLabel: '返回演员列表' }}
               onContextMenu={(event) => openContextMenu(event, actor)}
-              className="card block"
+              className="card block overflow-hidden"
             >
               <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
                 {photoDataUrl ? (
@@ -139,14 +139,14 @@ const Actors: React.FC = () => {
           })}
         </div>
       ) : (
-        <div className="text-center py-16">
+        <div className="changli-empty-state">
           <p className="text-gray-500 text-lg mb-4">
             {searchTerm ? '没有找到匹配的演员' : '暂无演员数据'}
           </p>
           {!searchTerm && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600"
+              className="action-btn action-btn-primary"
             >
               添加第一个演员
             </button>
@@ -156,7 +156,7 @@ const Actors: React.FC = () => {
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-2 w-fit"
+          className="changli-context-menu fixed z-50 py-2 w-fit"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           ref={(node) => {
             if (node) {
@@ -168,13 +168,13 @@ const Actors: React.FC = () => {
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="changli-menu-item"
             onClick={handleEditContextActor}
           >
             编辑
           </button>
           <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="changli-menu-item changli-menu-item-danger"
             onClick={() => requestSecondConfirm(`actor-${contextMenu.id}`, () => handleDeleteActor(contextMenu.id))}
           >
             {pendingKey === `actor-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
@@ -184,26 +184,26 @@ const Actors: React.FC = () => {
 
       {/* 添加演员弹窗 */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 w-96">
-            <h2 className="text-2xl font-bold mb-6">添加演员</h2>
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel">
+            <h2 className="changli-modal-title">添加演员</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+                <label className="changli-form-label">姓名</label>
                 <input
                   type="text"
                   value={newActor.name}
                   onChange={(e) => setNewActor({ ...newActor, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-input"
                   placeholder="输入演员姓名"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">简介</label>
+                <label className="changli-form-label">简介</label>
                 <textarea
                   value={newActor.bio}
                   onChange={(e) => setNewActor({ ...newActor, bio: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                  className="changli-textarea"
                   rows={3}
                   placeholder="输入演员简介"
                 />
@@ -212,13 +212,13 @@ const Actors: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="action-btn flex-1"
               >
                 取消
               </button>
               <button
                 onClick={handleAddActor}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="action-btn action-btn-primary flex-1"
               >
                 添加
               </button>
