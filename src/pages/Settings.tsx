@@ -334,18 +334,18 @@ const Settings: React.FC = () => {
     setUpdateStatus('检查中...');
     notify({ message: '正在检查更新...', type: 'info' });
     try {
-      const update = await check();
-      if (update) {
-        setUpdateStatus(`发现新版本 ${update.version}，正在下载...`);
-        notify({ message: `发现新版本 ${update.version}，正在下载...`, type: 'info' });
-        await update.downloadAndInstall((progress) => {
-          if (progress.event === 'Finished') {
-            setUpdateStatus('下载完成，准备重启...');
-            notify({ message: '下载完成，准备重启...', type: 'success' });
-          }
-        });
-        await relaunch();
-      } else {
+      const response = await fetch('https://api.github.com/repos/YeSuper-git/ChangLi/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'ChangLi-App' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub Release API 返回 ${response.status}`);
+      }
+
+      const release = await response.json() as GitHubRelease;
+      const latestVersion = normalizeVersion(release.tag_name);
+
+      if (compareVersions(latestVersion, currentVersion) <= 0) {
         setUpdateStatus('已是最新版本');
         notify({ message: '已是最新版本', type: 'success' });
         setTimeout(() => setUpdateStatus(null), 3000);

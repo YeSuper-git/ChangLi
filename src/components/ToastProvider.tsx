@@ -4,14 +4,14 @@ import { notifyEventName, type NotifyPayload, type NotifyType } from '../utils/n
 type ToastItem = Required<Pick<NotifyPayload, 'message' | 'type'>> & { id: number };
 
 const typeClass: Record<NotifyType, string> = {
-  success: 'border-emerald-200 bg-white text-gray-900',
-  info: 'border-gray-200 bg-white text-gray-900',
+  success: 'border-gray-800 bg-white text-gray-900',
+  info: 'border-gray-800 bg-white text-gray-900',
   error: 'border-red-200 bg-white text-red-700',
 };
 
 const accentClass: Record<NotifyType, string> = {
-  success: 'bg-emerald-500',
-  info: 'bg-gray-900',
+  success: 'bg-gray-800',
+  info: 'bg-gray-800',
   error: 'bg-red-500',
 };
 

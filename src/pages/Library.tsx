@@ -478,7 +478,7 @@ const Library: React.FC = () => {
         <div className="flex flex-col gap-3 flex-1 min-w-0">
           {features.tags && (
             <div className="flex items-center gap-2">
-              <div ref={tagsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded ? 'max-h-[40px]' : ''}`}>
+              <div ref={tagsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded ? 'max-h-[44px]' : ''}`}>
                 <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
                 {tags.map((tag) => (
                   <button
@@ -502,7 +502,7 @@ const Library: React.FC = () => {
           )}
           {features.actors && (
             <div className="flex items-center gap-2">
-              <div ref={actorsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!actorExpanded ? 'max-h-[40px]' : ''}`}>
+              <div ref={actorsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!actorExpanded ? 'max-h-[44px]' : ''}`}>
                 <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
                 {actors.map((actor) => (
                   <button

@@ -187,7 +187,7 @@ const Home: React.FC = () => {
                   </div>
                   <div className="mt-2 px-1">
                     <h3 className="font-semibold text-gray-900 mb-0.5 truncate" title={actor.name}>{actor.name}</h3>
-                    <div className="text-xs text-gray-500 truncate">{actor.birthday ? `${actor.birthday}` : ''}</div>
+                    <div className="text-xs text-gray-500 truncate">{actor.alias || ''}</div>
                   </div>
                 </Link>
               );

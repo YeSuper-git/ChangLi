@@ -160,7 +160,7 @@ const ActorDetail: React.FC = () => {
               {[0, 1, 2].map((idx) => (
                 <React.Fragment key={idx}>
                   <span className="text-gray-500 text-xs">{['B', 'W', 'H'][idx]}</span>
-                  <div className="relative">
+                  <div className="relative inline-flex">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -180,7 +180,7 @@ const ActorDetail: React.FC = () => {
         }
         case 'cup_size':
           return (
-            <div className="relative">
+            <div className="relative inline-flex">
               <input
                 type="text"
                 value={editForm.cup_size}
@@ -683,6 +683,8 @@ const ActorDetail: React.FC = () => {
           setPhotos(photosData);
           // 切换到新添加的照片
           setCurrentPhotoIndex(photosData.length - 1);
+          // 刷新演员数据以更新主海报显示
+          loadActor(actor.id);
           notify({ message: '海报添加成功', type: 'success' });
         } catch (error) {
           console.error('[Actor] 添加海报失败:', error);
@@ -1124,16 +1126,22 @@ const ActorDetail: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">车灯</label>
-                  <input
-                    type="text"
-                    value={editForm.cup_size}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-                      setEditForm({ ...editForm, cup_size: val });
-                    }}
-                    className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center"
-                    maxLength={1}
-                  />
+                  <div className="relative inline-flex">
+                    <input
+                      type="text"
+                      value={editForm.cup_size}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                        setEditForm({ ...editForm, cup_size: val });
+                      }}
+                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-center pr-5"
+                      maxLength={1}
+                    />
+                    <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
+                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px] px-0.5" onClick={() => { const cur = editForm.cup_size; const next = cur === '' ? 'A' : cur >= 'Z' ? 'A' : String.fromCharCode(cur.charCodeAt(0) + 1); setEditForm({ ...editForm, cup_size: next }); }}>▲</button>
+                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px] px-0.5" onClick={() => { const cur = editForm.cup_size; const next = cur === '' || cur <= 'A' ? 'Z' : String.fromCharCode(cur.charCodeAt(0) - 1); setEditForm({ ...editForm, cup_size: next }); }}>▼</button>
+                    </div>
+                  </div>
                 </div>
               </div>
                 </>
