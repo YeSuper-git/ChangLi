@@ -17,20 +17,22 @@ use std::{
 use windows::{
     core::PCWSTR,
     Win32::{
-        Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
         Graphics::Gdi::{
-            BeginPaint, CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, EndPaint, FillRect,
-            GetStockObject, InvalidateRect, LineTo, MoveToEx, RoundRect, SelectObject, SetBkMode,
-            SetTextColor, TextOutW, FONT_CHARSET, FONT_CLIP_PRECISION, FONT_OUTPUT_PRECISION,
-            FONT_QUALITY, HDC, HFONT, HGDIOBJ, PAINTSTRUCT, PS_SOLID, TRANSPARENT, WHITE_BRUSH,
+            BeginPaint, CreateFontW, CreatePen, CreateRoundRectRgn, CreateSolidBrush, DeleteObject,
+            EndPaint, FillRect, GetStockObject, InvalidateRect, LineTo, MoveToEx, RoundRect,
+            ScreenToClient, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, TextOutW,
+            FONT_CHARSET, FONT_CLIP_PRECISION, FONT_OUTPUT_PRECISION, FONT_QUALITY, HDC, HFONT,
+            HGDIOBJ, PAINTSTRUCT, PS_SOLID, TRANSPARENT, WHITE_BRUSH,
         },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, DrawIconEx,
-            GetMessageW, LoadImageW, PostQuitMessage, RegisterClassW, SetTimer, ShowWindow,
-            TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, DI_NORMAL, HICON, HTCAPTION,
-            IMAGE_ICON, LR_LOADFROMFILE, MSG, SW_SHOW, WM_CLOSE, WM_CREATE, WM_DESTROY,
-            WM_LBUTTONDOWN, WM_NCHITTEST, WM_PAINT, WM_TIMER, WNDCLASSW, WS_POPUP, WS_VISIBLE,
+            GetMessageW, GetSystemMetrics, LoadImageW, PostQuitMessage, RegisterClassW, SetTimer,
+            ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, DI_NORMAL, HICON, HTCAPTION,
+            HTCLIENT, IMAGE_ICON, LR_LOADFROMFILE, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW,
+            WM_CLOSE, WM_CREATE, WM_DESTROY, WM_LBUTTONDOWN, WM_NCHITTEST, WM_PAINT, WM_TIMER,
+            WNDCLASSW, WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -46,8 +48,10 @@ const ICON_BYTES: &[u8] = include_bytes!(concat!(
     "/../src-tauri/icons/icon.ico"
 ));
 
-const W: i32 = 880;
-const H: i32 = 520;
+const W: i32 = 980;
+const H: i32 = 640;
+const SIDEBAR_W: i32 = 318;
+const RADIUS: i32 = 34;
 
 #[derive(Clone, Copy)]
 struct RectI {
@@ -63,22 +67,28 @@ impl RectI {
 }
 
 const CLOSE_RECT: RectI = RectI {
-    x: 832,
-    y: 18,
-    w: 30,
-    h: 30,
+    x: 932,
+    y: 28,
+    w: 32,
+    h: 32,
 };
 const INSTALL_RECT: RectI = RectI {
-    x: 680,
-    y: 444,
-    w: 146,
-    h: 44,
+    x: 832,
+    y: 574,
+    w: 114,
+    h: 46,
 };
 const CANCEL_RECT: RectI = RectI {
-    x: 560,
-    y: 444,
-    w: 98,
-    h: 44,
+    x: 742,
+    y: 574,
+    w: 78,
+    h: 46,
+};
+const TITLE_DRAG_RECT: RectI = RectI {
+    x: 0,
+    y: 0,
+    w: W,
+    h: 74,
 };
 
 fn wide(s: &str) -> Vec<u16> {
@@ -91,7 +101,7 @@ fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
 unsafe fn font(size: i32, weight: i32) -> HFONT {
     let name = wide("Microsoft YaHei UI");
     CreateFontW(
-        size,
+        -size,
         0,
         0,
         0,
@@ -119,6 +129,21 @@ unsafe fn text(hdc: HDC, x: i32, y: i32, s: &str, size: i32, weight: i32, color:
     DeleteObject(HGDIOBJ(f.0)).ok();
 }
 
+unsafe fn fill_rect(hdc: HDC, r: RectI, color: COLORREF) {
+    let brush = CreateSolidBrush(color);
+    FillRect(
+        hdc,
+        &RECT {
+            left: r.x,
+            top: r.y,
+            right: r.x + r.w,
+            bottom: r.y + r.h,
+        },
+        brush,
+    );
+    DeleteObject(HGDIOBJ(brush.0)).ok();
+}
+
 unsafe fn fill_round(hdc: HDC, r: RectI, radius: i32, color: COLORREF) {
     let brush = CreateSolidBrush(color);
     let pen = CreatePen(PS_SOLID, 1, color);
@@ -142,6 +167,12 @@ unsafe fn stroke_round(hdc: HDC, r: RectI, radius: i32, color: COLORREF) {
     DeleteObject(HGDIOBJ(pen.0)).ok();
 }
 
+unsafe fn pill(hdc: HDC, x: i32, y: i32, w: i32, label: &str) {
+    fill_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 153, 154));
+    stroke_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 195, 196));
+    text(hdc, x + 14, y + 8, label, 12, 800, rgb(255, 255, 255));
+}
+
 fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     let mut p = env::temp_dir();
     p.push(name);
@@ -149,183 +180,254 @@ fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     p
 }
 
-unsafe fn draw_sidebar(hdc: HDC) {
+unsafe fn draw_left_gradient(hdc: HDC) {
     for y in 0..H {
         let t = y as f32 / H as f32;
-        let r = (251.0 + (255.0 - 251.0) * t) as u8;
-        let g = (91.0 + (138.0 - 91.0) * t) as u8;
-        let b = (123.0 + (76.0 - 123.0) * t) as u8;
+        let r = (246.0 + (255.0 - 246.0) * t) as u8;
+        let g = (78.0 + (143.0 - 78.0) * t) as u8;
+        let b = (116.0 + (73.0 - 116.0) * t) as u8;
         let pen = CreatePen(PS_SOLID, 1, rgb(r, g, b));
         let old = SelectObject(hdc, HGDIOBJ(pen.0));
         MoveToEx(hdc, 0, y, None).ok();
-        LineTo(hdc, 286, y).ok();
+        LineTo(hdc, SIDEBAR_W, y).ok();
         SelectObject(hdc, old);
         DeleteObject(HGDIOBJ(pen.0)).ok();
     }
 
+    // subtle brand glow blocks from the HTML preview direction
+    fill_round(
+        hdc,
+        RectI {
+            x: -80,
+            y: 350,
+            w: 240,
+            h: 160,
+        },
+        80,
+        rgb(255, 149, 128),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: 178,
+            y: -68,
+            w: 210,
+            h: 170,
+        },
+        80,
+        rgb(255, 126, 112),
+    );
+}
+
+unsafe fn draw_icon(hdc: HDC, x: i32, y: i32, size: i32) {
     let icon_path = write_embedded("changli-installer-icon.ico", ICON_BYTES);
     let icon_path_w = wide(icon_path.to_string_lossy().as_ref());
     let icon = LoadImageW(
         None,
         PCWSTR(icon_path_w.as_ptr()),
         IMAGE_ICON,
-        54,
-        54,
+        size,
+        size,
         LR_LOADFROMFILE,
     )
     .unwrap_or_default();
-    DrawIconEx(hdc, 36, 34, HICON(icon.0), 54, 54, 0, None, DI_NORMAL).ok();
+    DrawIconEx(hdc, x, y, HICON(icon.0), size, size, 0, None, DI_NORMAL).ok();
+}
 
-    text(hdc, 104, 38, "ChangLi", 28, 700, rgb(255, 255, 255));
-    text(hdc, 106, 70, "私人影音资料库", 14, 400, rgb(255, 242, 245));
-    text(hdc, 36, 142, "装好后", 42, 800, rgb(255, 255, 255));
-    text(hdc, 36, 194, "直接进入", 42, 800, rgb(255, 255, 255));
-    text(hdc, 36, 246, "收藏宇宙", 42, 800, rgb(255, 255, 255));
+unsafe fn draw_sidebar(hdc: HDC) {
+    draw_left_gradient(hdc);
+    fill_round(
+        hdc,
+        RectI {
+            x: 34,
+            y: 34,
+            w: 64,
+            h: 64,
+        },
+        24,
+        rgb(255, 255, 255),
+    );
+    draw_icon(hdc, 43, 43, 46);
 
-    for (i, label) in ["本地数据库", "内置播放器", "自动建库"].iter().enumerate() {
-        fill_round(
-            hdc,
-            RectI {
-                x: 36,
-                y: 348 + (i as i32) * 38,
-                w: 116,
-                h: 28,
-            },
-            18,
-            rgb(255, 164, 168),
-        );
-        text(
-            hdc,
-            51,
-            353 + (i as i32) * 38,
-            label,
-            13,
-            700,
-            rgb(255, 255, 255),
-        );
-    }
+    text(hdc, 118, 38, "ChangLi", 26, 800, rgb(255, 255, 255));
+    text(
+        hdc,
+        120,
+        72,
+        "PRIVATE MEDIA LIBRARY",
+        10,
+        700,
+        rgb(255, 237, 242),
+    );
+
+    text(hdc, 36, 148, "装好后", 40, 800, rgb(255, 255, 255));
+    text(hdc, 36, 202, "直接进入", 40, 800, rgb(255, 255, 255));
+    text(hdc, 36, 256, "收藏宇宙", 40, 800, rgb(255, 255, 255));
+    text(
+        hdc,
+        38,
+        318,
+        "本地资料、海报、播放器和收藏路径会原样保留。",
+        13,
+        500,
+        rgb(255, 239, 243),
+    );
+
+    pill(hdc, 36, 392, 120, "本地数据库");
+    pill(hdc, 36, 434, 120, "内置播放器");
+    pill(hdc, 36, 476, 104, "自动建库");
+}
+
+unsafe fn card(hdc: HDC, x: i32, title: &str, body1: &str, body2: &str) {
+    fill_round(
+        hdc,
+        RectI {
+            x,
+            y: 330,
+            w: 156,
+            h: 104,
+        },
+        26,
+        rgb(255, 255, 255),
+    );
+    stroke_round(
+        hdc,
+        RectI {
+            x,
+            y: 330,
+            w: 156,
+            h: 104,
+        },
+        26,
+        rgb(232, 235, 242),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: x + 18,
+            y: 350,
+            w: 26,
+            h: 26,
+        },
+        18,
+        rgb(255, 238, 241),
+    );
+    text(hdc, x + 20, 351, "✓", 18, 800, rgb(238, 82, 118));
+    text(hdc, x + 18, 386, title, 15, 800, rgb(24, 23, 29));
+    text(hdc, x + 18, 410, body1, 12, 400, rgb(113, 113, 122));
+    text(hdc, x + 18, 426, body2, 12, 400, rgb(113, 113, 122));
 }
 
 unsafe fn draw_main(hdc: HDC) {
-    let bg = CreateSolidBrush(rgb(255, 255, 255));
-    FillRect(
+    fill_rect(
         hdc,
-        &RECT {
-            left: 286,
-            top: 0,
-            right: W,
-            bottom: H,
+        RectI {
+            x: SIDEBAR_W,
+            y: 0,
+            w: W - SIDEBAR_W,
+            h: H,
         },
-        bg,
+        rgb(250, 250, 252),
     );
-    DeleteObject(HGDIOBJ(bg.0)).ok();
+    fill_round(
+        hdc,
+        RectI {
+            x: SIDEBAR_W + 28,
+            y: 28,
+            w: 544,
+            h: 504,
+        },
+        34,
+        rgb(255, 255, 255),
+    );
 
-    text(hdc, 330, 44, "●  ○  ○", 17, 700, rgb(251, 91, 123));
+    text(hdc, 366, 56, "●  ○  ○", 16, 800, rgb(244, 80, 116));
     let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
     text(
         hdc,
-        330,
-        78,
+        366,
+        92,
         &format!("ChangLi {version}"),
-        17,
-        700,
-        rgb(251, 91, 123),
+        14,
+        800,
+        rgb(244, 80, 116),
     );
-    text(hdc, 330, 114, "准备安装长离", 36, 800, rgb(24, 23, 29));
+    text(hdc, 366, 130, "准备安装长离", 34, 800, rgb(24, 23, 29));
     text(
         hdc,
-        330,
-        162,
-        "安装完成后即可打开你的本地影音资料库，继续保留原有数据与播放环境。",
-        16,
+        368,
+        180,
+        "安装完成后即可打开你的本地影音资料库，",
+        15,
         400,
-        rgb(107, 114, 128),
+        rgb(102, 102, 116),
+    );
+    text(
+        hdc,
+        368,
+        204,
+        "继续保留原有数据与播放环境。",
+        15,
+        400,
+        rgb(102, 102, 116),
     );
 
     fill_round(
         hdc,
         RectI {
-            x: 330,
-            y: 206,
-            w: 476,
-            h: 76,
+            x: 366,
+            y: 244,
+            w: 478,
+            h: 64,
         },
-        22,
+        24,
         rgb(249, 250, 252),
     );
     stroke_round(
         hdc,
         RectI {
-            x: 330,
-            y: 206,
-            w: 476,
-            h: 76,
+            x: 366,
+            y: 244,
+            w: 478,
+            h: 64,
         },
-        22,
-        rgb(232, 235, 242),
+        24,
+        rgb(230, 232, 238),
     );
-    text(hdc, 352, 222, "安装位置", 14, 700, rgb(107, 114, 128));
+    text(hdc, 388, 258, "安装位置", 12, 700, rgb(113, 113, 122));
     text(
         hdc,
-        352,
-        248,
+        388,
+        281,
         "当前用户 AppData / ChangLi",
-        18,
-        700,
+        16,
+        800,
         rgb(24, 23, 29),
     );
     fill_round(
         hdc,
         RectI {
-            x: 730,
-            y: 228,
-            w: 54,
-            h: 34,
+            x: 774,
+            y: 260,
+            w: 52,
+            h: 32,
         },
-        17,
+        18,
         rgb(255, 238, 241),
     );
-    text(hdc, 742, 236, "更改", 14, 700, rgb(213, 63, 100));
+    text(hdc, 786, 268, "更改", 13, 800, rgb(221, 69, 105));
 
-    let cards = [
-        (330, "保留本地数据", "升级安装会沿用现有资料库。"),
-        (494, "播放器就绪", "内置播放环境，安装后直接使用。"),
-        (658, "一键启动", "完成后可立即打开 ChangLi。"),
-    ];
-    for (x, title, body) in cards {
-        fill_round(
-            hdc,
-            RectI {
-                x,
-                y: 314,
-                w: 148,
-                h: 92,
-            },
-            22,
-            rgb(255, 255, 255),
-        );
-        stroke_round(
-            hdc,
-            RectI {
-                x,
-                y: 314,
-                w: 148,
-                h: 92,
-            },
-            22,
-            rgb(232, 235, 242),
-        );
-        text(hdc, x + 16, 334, title, 16, 800, rgb(24, 23, 29));
-        text(hdc, x + 16, 362, body, 13, 400, rgb(107, 114, 128));
-    }
+    card(hdc, 366, "保留本地数据", "升级安装会沿用", "现有资料库。");
+    card(hdc, 532, "播放器就绪", "内置播放环境，", "安装后直接用。");
+    card(hdc, 698, "一键启动", "完成后可立即", "打开 ChangLi。");
 
     let progress = PROGRESS.load(Ordering::SeqCst);
     fill_round(
         hdc,
         RectI {
-            x: 330,
-            y: 444,
-            w: 196,
+            x: 366,
+            y: 582,
+            w: 184,
             h: 8,
         },
         8,
@@ -335,29 +437,30 @@ unsafe fn draw_main(hdc: HDC) {
         fill_round(
             hdc,
             RectI {
-                x: 330,
-                y: 444,
-                w: 196 * progress / 100,
+                x: 366,
+                y: 582,
+                w: 184 * progress / 100,
                 h: 8,
             },
             8,
-            rgb(251, 91, 123),
+            rgb(244, 80, 116),
         );
     }
+
     let status = if FAILED.load(Ordering::SeqCst) {
         "安装失败，请重新运行安装程序"
     } else if DONE.load(Ordering::SeqCst) {
-        "安装完成 · 可以打开 ChangLi"
+        "安装完成，可以打开 ChangLi"
     } else if INSTALLING.load(Ordering::SeqCst) {
         "正在安装 ChangLi..."
     } else {
-        "准备就绪 · 约 1 分钟完成"
+        "准备就绪，约 1 分钟完成"
     };
-    text(hdc, 330, 462, status, 14, 400, rgb(107, 114, 128));
+    text(hdc, 366, 604, status, 13, 400, rgb(113, 113, 122));
 
     fill_round(hdc, CANCEL_RECT, 22, rgb(255, 255, 255));
-    stroke_round(hdc, CANCEL_RECT, 22, rgb(232, 235, 242));
-    text(hdc, 592, 456, "取消", 16, 700, rgb(82, 82, 91));
+    stroke_round(hdc, CANCEL_RECT, 22, rgb(225, 228, 236));
+    text(hdc, 766, 588, "取消", 15, 800, rgb(82, 82, 91));
 
     let label = if DONE.load(Ordering::SeqCst) {
         "完成"
@@ -366,18 +469,18 @@ unsafe fn draw_main(hdc: HDC) {
     } else {
         "开始安装"
     };
-    fill_round(hdc, INSTALL_RECT, 22, rgb(251, 91, 123));
+    fill_round(hdc, INSTALL_RECT, 24, rgb(244, 80, 116));
     text(
         hdc,
-        if label == "开始安装" { 718 } else { 728 },
-        456,
+        if label == "开始安装" { 858 } else { 872 },
+        588,
         label,
-        16,
+        15,
         800,
         rgb(255, 255, 255),
     );
 
-    text(hdc, 842, 20, "×", 24, 400, rgb(130, 130, 140));
+    text(hdc, 942, 32, "×", 24, 400, rgb(128, 128, 138));
 }
 
 fn start_install(hwnd: HWND) {
@@ -411,9 +514,20 @@ fn start_install(hwnd: HWND) {
     });
 }
 
-unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
+unsafe fn client_point(hwnd: HWND, l: LPARAM) -> (i32, i32) {
+    let mut pt = POINT {
+        x: (l.0 & 0xffff) as i16 as i32,
+        y: ((l.0 >> 16) & 0xffff) as i16 as i32,
+    };
+    ScreenToClient(hwnd, &mut pt).ok();
+    (pt.x, pt.y)
+}
+
+unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, _w: WPARAM, l: LPARAM) -> LRESULT {
     match msg {
         WM_CREATE => {
+            let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, RADIUS, RADIUS);
+            SetWindowRgn(hwnd, Some(region), true);
             SetTimer(Some(hwnd), 1, 120, None);
             LRESULT(0)
         }
@@ -423,7 +537,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) ->
             }
             LRESULT(0)
         }
-        WM_NCHITTEST => LRESULT(HTCAPTION as isize),
+        WM_NCHITTEST => {
+            let (x, y) = client_point(hwnd, l);
+            if CLOSE_RECT.contains(x, y)
+                || INSTALL_RECT.contains(x, y)
+                || CANCEL_RECT.contains(x, y)
+            {
+                LRESULT(HTCLIENT as isize)
+            } else if TITLE_DRAG_RECT.contains(x, y) {
+                LRESULT(HTCAPTION as isize)
+            } else {
+                LRESULT(HTCLIENT as isize)
+            }
+        }
         WM_LBUTTONDOWN => {
             let x = (l.0 & 0xffff) as i16 as i32;
             let y = ((l.0 >> 16) & 0xffff) as i16 as i32;
@@ -441,6 +567,17 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) ->
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);
+            fill_round(
+                hdc,
+                RectI {
+                    x: 0,
+                    y: 0,
+                    w: W,
+                    h: H,
+                },
+                RADIUS,
+                rgb(255, 255, 255),
+            );
             draw_sidebar(hdc);
             draw_main(hdc);
             EndPaint(hwnd, &ps).ok();
@@ -454,7 +591,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) ->
             PostQuitMessage(0);
             LRESULT(0)
         }
-        _ => DefWindowProcW(hwnd, msg, w, l),
+        _ => DefWindowProcW(hwnd, msg, _w, l),
     }
 }
 
@@ -470,14 +607,17 @@ fn main() -> windows::core::Result<()> {
             ..Default::default()
         };
         RegisterClassW(&wc);
+
+        let x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
+        let y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
         let title = wide("ChangLi Installer");
         let hwnd = CreateWindowExW(
             Default::default(),
             PCWSTR(class_name.as_ptr()),
             PCWSTR(title.as_ptr()),
             WS_POPUP | WS_VISIBLE,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
+            x,
+            y,
             W,
             H,
             None,
@@ -486,6 +626,7 @@ fn main() -> windows::core::Result<()> {
             Some(null_mut()),
         )?;
         ShowWindow(hwnd, SW_SHOW);
+
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             TranslateMessage(&msg);
