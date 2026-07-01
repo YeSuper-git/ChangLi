@@ -173,17 +173,34 @@ jobs:
           includeUpdaterJson: false
           args: --bundles nsis
 
+      - name: Build custom installer shell
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $setup) {
+            throw "Inner NSIS setup exe not found"
+          }
+          $env:CHANGLI_NSIS_SETUP = $setup.FullName
+          $env:CHANGLI_APP_VERSION = "${{ steps.version.outputs.version }}"
+          cargo build --manifest-path installer-shell/Cargo.toml --release --target x86_64-pc-windows-msvc
+          $customInstaller = "installer-shell/target/x86_64-pc-windows-msvc/release/changli-installer.exe"
+          if (-not (Test-Path $customInstaller)) {
+            throw "Custom installer shell was not built"
+          }
+          Get-Item $setup.FullName, $customInstaller | Select-Object FullName, Length
+
       - name: Prepare Windows artifact
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $artifactDir = "dist-artifacts"
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
-          if (-not $setup) {
-            throw "NSIS setup exe not found"
+          $customInstaller = "installer-shell/target/x86_64-pc-windows-msvc/release/changli-installer.exe"
+          if (-not (Test-Path $customInstaller)) {
+            throw "Custom installer shell not found"
           }
-          Copy-Item -Path $setup.FullName -Destination $artifactDir -Force
+          Copy-Item -Path $customInstaller -Destination "$artifactDir/ChangLi-${{ steps.version.outputs.version }}-setup.exe" -Force
           Get-ChildItem $artifactDir | Select-Object Name, Length
 
       - name: Upload Windows artifact
