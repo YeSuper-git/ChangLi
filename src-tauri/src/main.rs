@@ -1921,6 +1921,109 @@ async fn reorder_actor_photos_cmd(
         .map_err(|e| e.to_string())
 }
 
+
+#[derive(serde::Serialize)]
+struct ReleaseAssetInfo {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(serde::Serialize)]
+struct LatestReleaseInfo {
+    tag_name: String,
+    html_url: String,
+    assets: Vec<ReleaseAssetInfo>,
+}
+
+#[derive(serde::Deserialize)]
+struct GitHubReleaseAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GitHubLatestRelease {
+    tag_name: String,
+    html_url: String,
+    assets: Vec<GitHubReleaseAsset>,
+}
+
+#[tauri::command]
+async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
+    const REPO: &str = "YeSuper-git/ChangLi";
+    const API_URL: &str = "https://api.github.com/repos/YeSuper-git/ChangLi/releases/latest";
+    const LATEST_URL: &str = "https://github.com/YeSuper-git/ChangLi/releases/latest";
+    const UA: &str = "ChangLi-App/1.0 (+https://github.com/YeSuper-git/ChangLi)";
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+
+    let api_result = client
+        .get(API_URL)
+        .header(reqwest::header::USER_AGENT, UA)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await;
+
+    match api_result {
+        Ok(response) if response.status().is_success() => {
+            let release = response
+                .json::<GitHubLatestRelease>()
+                .await
+                .map_err(|e| format!("解析 GitHub Release 响应失败: {e}"))?;
+            return Ok(LatestReleaseInfo {
+                tag_name: release.tag_name,
+                html_url: release.html_url,
+                assets: release
+                    .assets
+                    .into_iter()
+                    .map(|asset| ReleaseAssetInfo {
+                        name: asset.name,
+                        browser_download_url: asset.browser_download_url,
+                    })
+                    .collect(),
+            });
+        }
+        Ok(response) => {
+            eprintln!("[ChangLi] GitHub Release API 返回 {}，尝试 releases/latest fallback", response.status());
+        }
+        Err(error) => {
+            eprintln!("[ChangLi] GitHub Release API 请求失败: {error}，尝试 releases/latest fallback");
+        }
+    }
+
+    let response = client
+        .get(LATEST_URL)
+        .header(reqwest::header::USER_AGENT, UA)
+        .send()
+        .await
+        .map_err(|e| format!("检查更新失败: {e}"))?;
+    let final_url = response.url().clone();
+    let tag = final_url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|segment| segment.starts_with('v'))
+        .ok_or_else(|| format!("无法解析最新版本地址: {final_url}"))?
+        .to_string();
+    let version = tag.trim_start_matches('v');
+    let installer_name = format!("ChangLi_{version}_x64-setup.exe");
+    let html_url = format!("https://github.com/{REPO}/releases/tag/{tag}");
+    let download_url = format!("https://github.com/{REPO}/releases/download/{tag}/{installer_name}");
+
+    Ok(LatestReleaseInfo {
+        tag_name: tag,
+        html_url,
+        assets: vec![ReleaseAssetInfo {
+            name: installer_name,
+            browser_download_url: download_url,
+        }],
+    })
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_libmpv::init())
@@ -1945,6 +2048,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             init_db,
+            check_latest_release,
             get_sites,
             add_site,
             update_site,

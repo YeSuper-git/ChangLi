@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -367,15 +367,7 @@ const Settings: React.FC = () => {
     notify({ message: '正在检查更新...', type: 'info' });
 
     try {
-      const response = await fetch('https://api.github.com/repos/YeSuper-git/ChangLi/releases/latest', {
-        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'ChangLi-App' }
-      });
-
-      if (!response.ok) {
-        throw new Error(`GitHub Release API 返回 ${response.status}`);
-      }
-
-      const release = await response.json() as GitHubRelease;
+      const release = await checkLatestRelease() as GitHubRelease;
       const latestVersion = normalizeVersion(release.tag_name);
 
       if (compareVersions(latestVersion, currentVersion) <= 0) {
