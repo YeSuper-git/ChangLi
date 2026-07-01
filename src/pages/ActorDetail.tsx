@@ -160,7 +160,7 @@ const ActorDetail: React.FC = () => {
               {[0, 1, 2].map((idx) => (
                 <React.Fragment key={idx}>
                   <span className="text-gray-500 text-xs">{['B', 'W', 'H'][idx]}</span>
-                  <div className="relative">
+                  <div className="relative inline-flex">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -180,7 +180,7 @@ const ActorDetail: React.FC = () => {
         }
         case 'cup_size':
           return (
-            <div className="relative">
+            <div className="relative inline-flex">
               <input
                 type="text"
                 value={editForm.cup_size}
