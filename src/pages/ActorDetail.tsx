@@ -867,8 +867,8 @@ const ActorDetail: React.FC = () => {
     <>
     <div className="changli-page">
       <div className="mb-10">
-        <button type="button" onClick={handleBack} className="text-gray-500 hover:text-gray-700 flex items-center gap-2">
-          <img src={backIcon} alt="返回" className="w-4 h-4" />
+        <button type="button" onClick={handleBack} className="changli-back-link">
+          <span className="changli-back-icon"><img src={backIcon} alt="返回" /></span>
           <span>{backLabel}</span>
         </button>
       </div>
@@ -904,7 +904,7 @@ const ActorDetail: React.FC = () => {
               <>
                 {currentPhotoIndex > 0 && (
                   <button
-                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="changli-photo-arrow absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                     onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.max(0, prev - 1)); }}
                   >
                     ‹
@@ -912,7 +912,7 @@ const ActorDetail: React.FC = () => {
                 )}
                 {(currentPhotoIndex < photos.length - 1 || (photos.length > 0 && currentPhotoIndex < photos.length)) && (
                   <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="changli-photo-arrow absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                     onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(prev => Math.min(photos.length, prev + 1)); }}
                   >
                     ›

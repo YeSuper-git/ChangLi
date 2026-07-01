@@ -165,8 +165,8 @@ const Home: React.FC = () => {
           </div>
 
           {actors.length > 0 ? (
-            <div className="relative group">
-              <div ref={hotActorsRef} className="scrollbar-hide flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 scroll-smooth">
+            <div className="changli-scroll-wrap group">
+              <div ref={hotActorsRef} className="changli-scroll-track scrollbar-hide flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-4 scroll-smooth">
                 {actors.slice(0, 10).map((actor) => {
                   const photoDataUrl = actorPhotoDataUrl(actor);
                   return (
@@ -203,7 +203,7 @@ const Home: React.FC = () => {
               <button
                 type="button"
                 aria-label="向左滚动"
-                className="absolute left-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-600 opacity-0 shadow-sm transition-opacity hover:text-rose-600 group-hover:opacity-100"
+                className="changli-scroll-arrow absolute left-2 top-1/2 z-10 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                 onClick={() => scrollHotActors('left')}
               >
                 ‹
@@ -211,7 +211,7 @@ const Home: React.FC = () => {
               <button
                 type="button"
                 aria-label="向右滚动"
-                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-600 opacity-0 shadow-sm transition-opacity hover:text-rose-600 group-hover:opacity-100"
+                className="changli-scroll-arrow absolute right-2 top-1/2 z-10 -translate-y-1/2 opacity-0 group-hover:opacity-100"
                 onClick={() => scrollHotActors('right')}
               >
                 ›

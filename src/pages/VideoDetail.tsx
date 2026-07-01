@@ -66,73 +66,80 @@ const VideoDetail: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (id) {
-      loadVideo(parseInt(id));
-      loadTags();
-      loadActors();
+    if (!id) {
+      setVideo(null);
+      setLoading(false);
+      return;
     }
-  }, [id]);
 
-  useEffect(() => {
-    if (editFromUrl && video) {
-      setEditing(true);
+    const videoId = parseInt(id);
+    if (Number.isNaN(videoId)) {
+      setVideo(null);
+      setLoading(false);
+      return;
     }
-  }, [editFromUrl, video]);
 
-  const loadVideo = async (videoId: number) => {
+    loadVideo(videoId, { initial: true });
+  }, [id, editFromUrl]);
+
+  const loadVideo = async (videoId: number, options: { initial?: boolean; forceEditing?: boolean } = {}) => {
+    if (options.initial) {
+      setLoading(true);
+    }
+
     try {
-      const videoData = await getVideo(videoId);
-      setVideo(videoData);
-      if (videoData) {
-        setEditData({
-          fileName: videoData.file_name,
-          description: videoData.description || '',
-          thumbnail: videoData.thumbnail || '',
-        });
+      const [videoData, tagsList, actorsList] = await Promise.all([
+        getVideo(videoId),
+        getTags(),
+        getActors(),
+      ]);
 
-        if (videoData.series_id) {
-          const [seriesData, episodes] = await getVideoSeriesDetail(videoData.series_id);
-          setSeries(seriesData);
-          setSeriesVideos(episodes);
-          setVideoTags([]);
-          setVideoActors([]);
-          setSelectedTagIds([]);
-          setSelectedActorIds([]);
-        } else {
-          setSeries(null);
-          setSeriesVideos([]);
-          const [tags, actors] = await Promise.all([
-            getResourceTags(videoId),
-            getResourceActors(videoId),
-          ]);
-          setVideoTags(tags);
-          setVideoActors(actors);
-          setSelectedTagIds(tags.map((tag) => tag.id));
-          setSelectedActorIds(actors.map((actor) => actor.id));
-        }
+      let nextSeries: VideoSeries | null = null;
+      let nextSeriesVideos: Video[] = [];
+      let nextVideoTags: Tag[] = [];
+      let nextVideoActors: Actor[] = [];
+      let nextSelectedTagIds: number[] = [];
+      let nextSelectedActorIds: number[] = [];
+
+      if (videoData?.series_id) {
+        const [seriesData, episodes] = await getVideoSeriesDetail(videoData.series_id);
+        nextSeries = seriesData;
+        nextSeriesVideos = episodes;
+      } else if (videoData) {
+        const [tags, actors] = await Promise.all([
+          getResourceTags(videoId),
+          getResourceActors(videoId),
+        ]);
+        nextVideoTags = tags;
+        nextVideoActors = actors;
+        nextSelectedTagIds = tags.map((tag) => tag.id);
+        nextSelectedActorIds = actors.map((actor) => actor.id);
       }
+
+      setVideo(videoData);
+      setAllTags(tagsList);
+      setAllActors(actorsList);
+      setSeries(nextSeries);
+      setSeriesVideos(nextSeriesVideos);
+      setVideoTags(nextVideoTags);
+      setVideoActors(nextVideoActors);
+      setSelectedTagIds(nextSelectedTagIds);
+      setSelectedActorIds(nextSelectedActorIds);
+      setEditData({
+        fileName: videoData?.file_name || '',
+        description: videoData?.description || '',
+        thumbnail: videoData?.thumbnail || '',
+      });
+      setCreatingTag(false);
+      setNewTagName('');
+      setShowNewActorModal(false);
+      setNewActorName('');
+      setEditing(options.forceEditing ?? Boolean(editFromUrl && videoData));
     } catch (error) {
       console.error('加载视频失败:', error);
+      setVideo(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadTags = async () => {
-    try {
-      const tags = await getTags();
-      setAllTags(tags);
-    } catch (error) {
-      console.error('加载标签失败:', error);
-    }
-  };
-
-  const loadActors = async () => {
-    try {
-      const actors = await getActors();
-      setAllActors(actors);
-    } catch (error) {
-      console.error('加载演员失败:', error);
     }
   };
 
@@ -206,7 +213,7 @@ const VideoDetail: React.FC = () => {
       }
       clearEditQuery();
       setEditing(false);
-      await Promise.all([loadVideo(video.id), loadTags(), loadActors()]);
+      await loadVideo(video.id, { forceEditing: false });
     } catch (error) {
       console.error('保存失败:', error);
       notify({ message: `保存失败：${String(error)}`, type: 'error' });
@@ -333,7 +340,7 @@ const VideoDetail: React.FC = () => {
   return (
     <div className="changli-page">
       <div className="mb-6">
-        <button type="button" onClick={handleBack} className="flex items-center gap-1 text-sm text-rose-500 hover:underline"><img src={backIcon} alt="返回" className="w-4 h-4" /> {backLabel}</button>
+        <button type="button" onClick={handleBack} className="changli-back-link"><span className="changli-back-icon"><img src={backIcon} alt="返回" /></span><span>{backLabel}</span></button>
       </div>
 
       <div className="changli-page-header">
@@ -514,8 +521,8 @@ const VideoDetail: React.FC = () => {
                             onClick={() => toggleTag(tag.id)}
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
-                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white'
-                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'
                             }`}
                           >
                             {tag.name}
@@ -525,7 +532,7 @@ const VideoDetail: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setCreatingTag(true)}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                       >
                         + 新建标签
                       </button>
@@ -592,8 +599,8 @@ const VideoDetail: React.FC = () => {
                             onClick={() => toggleActor(actor.id)}
                             className={`px-3 py-1 rounded-full text-sm border transition-colors ${
                               selected
-                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white'
-                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                                ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'
                             }`}
                           >
                             {actor.name}
@@ -603,7 +610,7 @@ const VideoDetail: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowNewActorModal(true)}
-                        className="px-3 py-1 rounded-full text-sm border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50"
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
                       >
                         + 新建演员
                       </button>
