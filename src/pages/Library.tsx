@@ -25,7 +25,7 @@ import { notify } from '../utils/notify';
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { series: storeSeries, favorites, watchedIds, refreshSeries, sortBy, sortOrder, setSortBy, toggleSortOrder } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, refreshSeries } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
@@ -582,28 +582,6 @@ const Library: React.FC = () => {
             )}
           </>
         )}
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="changli-sort-panel">
-          <span className="changli-sort-label">排序</span>
-          <span className="changli-sort-select-wrap">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'created_at' | 'title')}
-              className="changli-sort-select"
-            >
-              <option value="created_at">添加时间</option>
-              <option value="title">名称</option>
-            </select>
-          </span>
-          <button
-            onClick={() => toggleSortOrder()}
-            className="category-btn"
-          >
-            {sortOrder === 'desc' ? '最新在前 ↓' : '最早在前 ↑'}
-          </button>
-        </div>
       </div>
 
       <div className="changli-toolbar mb-10 p-3">
