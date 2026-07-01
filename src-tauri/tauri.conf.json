@@ -43,6 +43,7 @@
     "windows": {
       "allowDowngrades": false,
       "nsis": {
+        "template": "nsis/installer.nsi",
         "headerImage": "nsis/installer-header.bmp",
         "sidebarImage": "nsis/installer-sidebar.bmp",
         "installerIcon": "icons/icon.ico",
