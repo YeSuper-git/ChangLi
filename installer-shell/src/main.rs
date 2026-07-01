@@ -1,21 +1,60 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-use std::{env, fs, path::PathBuf, process::Command, thread};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process::Command,
+    thread,
+};
 
 use base64::{engine::general_purpose, Engine as _};
+use serde_json::Value;
 use tao::{
-    dpi::LogicalSize,
+    dpi::{LogicalSize, PhysicalPosition},
     event::{Event, StartCause, WindowEvent},
-    event_loop::{ControlFlow, EventLoopBuilder},
+    event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
     window::WindowBuilder,
 };
 use wry::WebViewBuilder;
 
+#[cfg(target_os = "windows")]
+use tao::platform::windows::WindowExtWindows;
+
+#[cfg(target_os = "windows")]
+use windows::Win32::{
+    Foundation::HWND,
+    Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn},
+};
+
+const W: i32 = 980;
+const H: i32 = 640;
+const RADIUS: i32 = 28;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src-tauri/icons/icon.png"
 ));
+
+#[derive(Debug)]
+enum InstallerEvent {
+    Drag,
+    Close,
+    ChooseDir,
+    Install { open_after: bool, startup: bool },
+    InstallDone { success: bool, code: Option<i32> },
+}
+
+fn default_install_dir() -> PathBuf {
+    env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
+        .unwrap_or_else(env::temp_dir)
+        .join("ChangLi")
+}
+
+fn path_label(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', " / ")
+}
 
 fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     let mut p = env::temp_dir();
@@ -24,16 +63,90 @@ fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     p
 }
 
-fn start_install() {
-    thread::spawn(|| {
+fn app_exe_path(install_dir: &Path) -> PathBuf {
+    install_dir.join("ChangLi.exe")
+}
+
+fn launch_app(install_dir: &Path) {
+    let exe = app_exe_path(install_dir);
+    if exe.exists() {
+        let _ = Command::new(exe).spawn();
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn set_startup(install_dir: &Path) {
+    let exe = app_exe_path(install_dir);
+    if !exe.exists() {
+        return;
+    }
+    let run_value = format!("\"{}\"", exe.display());
+    let _ = Command::new("reg")
+        .args([
+            "add",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            "ChangLi",
+            "/t",
+            "REG_SZ",
+            "/d",
+            run_value.as_str(),
+            "/f",
+        ])
+        .status();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_startup(_install_dir: &Path) {}
+
+fn start_install(
+    install_dir: PathBuf,
+    open_after: bool,
+    startup: bool,
+    proxy: EventLoopProxy<InstallerEvent>,
+) {
+    thread::spawn(move || {
         let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES);
-        let _ = Command::new(&setup).arg("/S").status();
+        let mut command = Command::new(&setup);
+        command
+            .arg("/S")
+            .arg(format!("/D={}", install_dir.display()));
+        let status = command.status();
+        let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
+        let code = status.ok().and_then(|s| s.code());
+
+        if success {
+            if startup {
+                set_startup(&install_dir);
+            }
+            if open_after {
+                launch_app(&install_dir);
+            }
+        }
+
+        let _ = proxy.send_event(InstallerEvent::InstallDone { success, code });
     });
 }
 
-fn html() -> String {
+#[cfg(target_os = "windows")]
+fn apply_round_window(hwnd: isize) {
+    unsafe {
+        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, RADIUS, RADIUS);
+        let _ = SetWindowRgn(HWND(hwnd as *mut _), region, true);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_round_window(_hwnd: isize) {}
+
+fn js_call(name: &str, value: &str) -> String {
+    format!("window.{name}({});", serde_json::to_string(value).unwrap())
+}
+
+fn html(default_dir: &Path) -> String {
     let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
     let icon = general_purpose::STANDARD.encode(ICON_BYTES);
+    let default_label = path_label(default_dir);
     format!(
         r#"<!doctype html>
 <html lang="zh-CN">
@@ -43,192 +156,206 @@ fn html() -> String {
 <title>ChangLi Installer</title>
 <style>
   :root {{
-    --rose: #f44975;
-    --rose-2: #ff6d8a;
-    --orange: #ff844a;
-    --ink: #10121b;
-    --muted: #626b7c;
-    --line: #e8ebf2;
-    font-family: "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif;
+    --rose:#f44975; --rose2:#ff6f8d; --orange:#ff8356; --ink:#111421;
+    --muted:#667084; --soft:#f4f6fb; --line:#e7eaf2;
+    font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;
   }}
-  * {{ box-sizing: border-box; }}
-  html, body {{
-    width: 100%; height: 100%; margin: 0; overflow: hidden;
-    background: transparent;
-  }}
-  body {{
-    display: grid; place-items: center;
-    user-select: none;
-  }}
-  .shell {{
-    width: 980px; height: 640px; display: grid; grid-template-columns: 318px 1fr;
-    overflow: hidden; border-radius: 26px;
-    background: #f7f8fc;
-    box-shadow: 0 24px 80px rgba(22, 24, 35, .18);
-  }}
-  .side {{
-    position: relative; overflow: hidden; padding: 32px 32px 28px;
-    color: white;
+  * {{ box-sizing:border-box; }}
+  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:#f4f6fb; }}
+  body {{ user-select:none; }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f4f6fb; }}
+  .drag {{ cursor:default; }}
+  .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
-      radial-gradient(circle at -12% 74%, rgba(255, 153, 101, .96) 0 23%, transparent 24%),
-      radial-gradient(circle at 82% -4%, rgba(255, 132, 103, .96) 0 24%, transparent 25%),
-      linear-gradient(154deg, #f44975 0%, #fb586b 48%, #ff844a 100%);
+      radial-gradient(circle at -18% 74%, rgba(255,164,92,.88) 0 24%, transparent 25%),
+      radial-gradient(circle at 82% -9%, rgba(255,152,103,.95) 0 25%, transparent 26%),
+      linear-gradient(154deg,#f14170 0%,#fb566a 47%,#ff8050 100%);
   }}
-  .side::before {{
-    content: ""; position: absolute; left: 36px; bottom: 156px; width: 154px; height: 90px;
-    border-radius: 30px; background: rgba(255, 113, 100, .62);
+  .side::after {{ content:""; position:absolute; inset:0; opacity:.32;
+    background-image:
+      repeating-linear-gradient(105deg, rgba(255,255,255,.30) 0 1px, transparent 1px 18px),
+      linear-gradient(120deg, transparent 0 52%, rgba(255,255,255,.13) 53%, transparent 56%);
+    mask-image:linear-gradient(180deg,#000 0, transparent 42%);
   }}
-  .brand {{ position: relative; display: flex; gap: 18px; align-items: center; z-index: 1; }}
-  .icon-wrap {{
-    width: 64px; height: 64px; display: grid; place-items: center;
-    border-radius: 16px; background: rgba(255, 246, 248, .98);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  .orb {{ position:absolute; border-radius:999px; background:rgba(255,102,99,.36); filter:blur(.2px); }}
+  .orb.a {{ left:38px; bottom:154px; width:154px; height:90px; border-radius:32px; }}
+  .orb.b {{ left:-50px; bottom:20px; width:150px; height:150px; background:rgba(255,180,91,.38); }}
+  .brand,.hero,.glass-pills,.stack {{ position:relative; z-index:1; }}
+  .brand {{ display:flex; gap:16px; align-items:center; }}
+  .brand img {{ width:64px; height:64px; border-radius:16px; display:block; object-fit:cover; box-shadow:0 8px 22px rgba(142,34,60,.24); }}
+  .wordmark {{ font-size:30px; font-weight:900; letter-spacing:-.03em; line-height:1; }}
+  .tag {{ margin-top:8px; font-size:11px; font-weight:850; letter-spacing:.07em; color:#fff2f6; }}
+  .hero {{ margin-top:54px; }}
+  .hero h1 {{ margin:0; font-size:42px; line-height:1.25; font-weight:950; letter-spacing:-.06em; }}
+  .hero p {{ width:246px; margin:22px 0 0; font-size:13px; line-height:1.78; color:#fff8fa; }}
+  .glass-pills {{ margin-top:42px; display:flex; flex-wrap:wrap; gap:10px; }}
+  .pill {{ padding:8px 16px; border-radius:999px; color:#fff; font-size:13px; font-weight:850;
+    background:linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,.14));
+    border:1px solid rgba(255,255,255,.38); box-shadow:inset 0 1px 0 rgba(255,255,255,.36), 0 10px 24px rgba(159,38,55,.12);
+    backdrop-filter:blur(12px);
   }}
-  .icon-wrap img {{ width: 50px; height: 50px; border-radius: 12px; }}
-  .wordmark {{ font-size: 29px; font-weight: 850; letter-spacing: -.02em; line-height: 1; }}
-  .tag {{ margin-top: 8px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #fff0f4; }}
-  .poster {{ position: relative; z-index: 1; margin-top: 54px; }}
-  .poster h1 {{ margin: 0; font-size: 42px; line-height: 1.24; letter-spacing: -.055em; font-weight: 950; }}
-  .poster p {{ margin: 22px 0 0; width: 244px; font-size: 13px; line-height: 1.75; color: #fff6f8; }}
-  .pills {{ position: relative; z-index: 1; margin-top: 42px; display: flex; flex-wrap: wrap; gap: 10px; }}
-  .pill {{
-    padding: 8px 18px; border-radius: 999px; background: #ffe6ec;
-    color: #e04060; font-size: 13px; font-weight: 850;
+  .stack {{ position:absolute; left:34px; bottom:32px; width:210px; height:106px; }}
+  .glass-card {{ position:absolute; width:150px; height:64px; border-radius:22px;
+    background:linear-gradient(140deg,rgba(255,255,255,.28),rgba(255,255,255,.10));
+    border:1px solid rgba(255,255,255,.32); box-shadow:0 18px 38px rgba(154,46,58,.12); backdrop-filter:blur(14px);
   }}
-  .main {{ position: relative; padding: 30px 34px 20px 28px; }}
-  .close {{
-    position: absolute; right: 18px; top: 18px; width: 36px; height: 36px; border: 0;
-    border-radius: 12px; background: transparent; color: #7d8493; font-size: 24px;
-    cursor: pointer;
-  }}
-  .close:hover {{ background: #eef1f7; color: #10121b; }}
-  .panel {{
-    width: 508px; min-height: 404px; padding: 32px 24px 24px;
-    border-radius: 30px; background: white; border: 1px solid #f3f4f8;
-    box-shadow: 0 20px 60px rgba(50, 56, 77, .045);
-  }}
-  .dots {{ display: flex; gap: 14px; margin-bottom: 22px; }}
-  .dot {{ width: 8px; height: 8px; border-radius: 99px; background: #ffcbd3; }}
-  .dot.active {{ background: var(--rose); }}
-  .version {{ color: var(--rose); font-size: 15px; font-weight: 850; }}
-  h2 {{ margin: 22px 0 8px; color: var(--ink); font-size: 34px; line-height: 1.08; letter-spacing: -.065em; font-weight: 950; }}
-  .desc {{ margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }}
-  .path {{
-    margin-top: 22px; height: 70px; display: flex; align-items: center; gap: 14px; padding: 0 18px;
-    border: 1px solid #e4e8f0; border-radius: 18px; background: #fafbfd;
-  }}
-  .home {{ width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #ffe8ee; color: var(--rose); font-weight: 900; }}
-  .path small {{ display: block; color: var(--muted); font-size: 13px; font-weight: 850; }}
-  .path strong {{ display: block; margin-top: 5px; color: var(--ink); font-size: 17px; }}
-  .change {{ margin-left: auto; border: 0; border-radius: 999px; padding: 8px 15px; background: #ffebf0; color: #d53f64; font-weight: 850; }}
-  .cards {{ margin-top: 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }}
-  .card {{
-    height: 74px; border: 1px solid #eaedf4; border-radius: 18px; padding: 15px 14px;
-    display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start;
-  }}
-  .card:nth-child(1) {{ background: #fff6f8; }}
-  .card:nth-child(2) {{ background: #fff9f4; }}
-  .card:nth-child(3) {{ background: #fafbfd; }}
-  .badge {{ width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #ffe2ea; color: var(--rose); font-weight: 950; }}
-  .card b {{ display: block; color: var(--ink); font-size: 15px; line-height: 1.1; }}
-  .card span {{ display: block; margin-top: 7px; color: #636b7c; font-size: 12px; font-weight: 650; }}
-  .bottom {{ position: absolute; left: 62px; right: 34px; bottom: 20px; display: flex; align-items: end; justify-content: space-between; }}
-  .progress {{ width: 212px; height: 8px; border-radius: 99px; background: #e9ecf3; overflow: hidden; }}
-  .bar {{ width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rose), var(--rose-2)); transition: width .45s ease; }}
-  .status {{ margin-top: 12px; color: var(--muted); font-size: 13px; font-weight: 650; }}
-  .actions {{ display: flex; gap: 12px; }}
-  .btn {{ height: 46px; border-radius: 16px; border: 1px solid #dce0e9; padding: 0 23px; background: white; color: #484c59; font-size: 16px; font-weight: 850; cursor: pointer; }}
-  .primary {{ position: relative; min-width: 114px; border: 0; color: white; background: linear-gradient(180deg, #ff6385, var(--rose)); overflow: hidden; }}
-  .primary::before {{ content: ""; position: absolute; left: 12px; right: 12px; top: 6px; height: 12px; border-radius: 999px; background: rgba(255,255,255,.18); }}
-  .btn:active {{ transform: translateY(1px); }}
+  .glass-card.one {{ left:0; top:28px; }} .glass-card.two {{ left:28px; top:14px; opacity:.82; }} .glass-card.three {{ left:58px; top:0; opacity:.62; }}
+  .main {{ position:relative; padding:48px 34px 26px 38px; }}
+  .close {{ position:absolute; right:18px; top:17px; width:34px; height:34px; border:0; border-radius:12px; background:transparent; color:#858c9b; font-size:24px; cursor:pointer; }}
+  .close:hover {{ background:#e9edf5; color:#111421; }}
+  .topline {{ display:flex; align-items:center; justify-content:space-between; margin-right:54px; }}
+  .steps {{ display:flex; gap:10px; align-items:center; }}
+  .stepbar {{ width:50px; height:8px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .stepdot {{ width:8px; height:8px; border-radius:50%; background:#d9dee8; }}
+  .ver {{ color:#9aa2b2; font-size:13px; font-weight:750; }}
+  .title {{ margin-top:42px; }}
+  .title h2 {{ margin:0 0 14px; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; }}
+  .title p {{ margin:0; width:514px; color:#5f6879; font-size:15px; line-height:1.74; }}
+  .card {{ margin-top:28px; width:532px; border-radius:28px; background:#fff; border:1px solid #eff2f7; box-shadow:0 20px 54px rgba(41,48,70,.07); padding:22px; }}
+  .path-row {{ display:flex; align-items:center; gap:14px; min-height:74px; padding:0 0 18px; border-bottom:1px solid #edf0f6; }}
+  .home {{ width:36px; height:36px; border-radius:13px; display:grid; place-items:center; color:var(--rose); background:#fff0f4; font-weight:950; }}
+  .path-copy {{ flex:1; min-width:0; }}
+  .path-copy small {{ display:block; color:#8b93a4; font-size:12px; font-weight:850; }}
+  .path-copy strong {{ display:block; margin-top:6px; color:var(--ink); font-size:16px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .change {{ border:0; border-radius:999px; padding:9px 16px; background:#ffedf2; color:#cf3d62; font-size:13px; font-weight:900; cursor:pointer; }}
+  .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:18px; }}
+  .flow-item {{ min-height:94px; border-radius:20px; padding:14px 13px; background:#fafbfe; border:1px solid #edf0f6; }}
+  .num {{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:13px; font-weight:950; background:linear-gradient(180deg,var(--rose2),var(--rose)); }}
+  .flow-item b {{ display:block; margin-top:10px; color:var(--ink); font-size:14px; line-height:1.25; }}
+  .flow-item span {{ display:block; margin-top:5px; color:#6b7382; font-size:12px; line-height:1.35; }}
+  .options {{ display:flex; gap:18px; margin-top:18px; padding-top:16px; border-top:1px solid #edf0f6; }}
+  .check {{ display:flex; align-items:center; gap:8px; color:#384050; font-size:13px; font-weight:800; }}
+  .check input {{ accent-color:#f44975; }}
+  .bottom {{ position:absolute; left:38px; right:34px; bottom:26px; display:flex; align-items:center; justify-content:space-between; }}
+  .state {{ color:#687184; font-size:13px; font-weight:700; }}
+  .progress {{ display:none; margin-top:10px; width:238px; height:8px; border-radius:999px; overflow:hidden; background:#e8ecf3; }}
+  .progress.active {{ display:block; }}
+  .bar {{ width:38%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--orange)); animation:slide 1.2s ease-in-out infinite; }}
+  @keyframes slide {{ 0%{{ transform:translateX(-95%); }} 100%{{ transform:translateX(270%); }} }}
+  .actions {{ display:flex; gap:12px; }}
+  .btn {{ height:46px; border-radius:16px; border:1px solid #d9dee8; background:#fff; padding:0 24px; color:#3f4654; font-size:15px; font-weight:900; cursor:pointer; }}
+  .btn:disabled {{ opacity:.55; cursor:not-allowed; }}
+  .primary {{ min-width:118px; border:0; color:white; background:linear-gradient(180deg,#ff6688,var(--rose)); box-shadow:0 12px 24px rgba(244,73,117,.25); }}
 </style>
 </head>
 <body>
   <div class="shell">
-    <aside class="side">
-      <div class="brand">
-        <div class="icon-wrap"><img src="data:image/png;base64,{icon}" alt="ChangLi" /></div>
-        <div><div class="wordmark">ChangLi</div><div class="tag">PRIVATE MEDIA LIBRARY</div></div>
-      </div>
-      <div class="poster">
-        <h1>装好后<br/>直接进入<br/>收藏宇宙</h1>
-        <p>本地资料、海报、播放环境和收藏路径会原样保留。</p>
-      </div>
-      <div class="pills"><span class="pill">本地数据库</span><span class="pill">播放器就绪</span><span class="pill">自动建库</span></div>
+    <aside class="side drag" data-drag="true">
+      <div class="orb a"></div><div class="orb b"></div>
+      <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">PRIVATE MEDIA LIBRARY</div></div></div>
+      <div class="hero"><h1>装好后<br>直接进入<br>收藏宇宙</h1><p>选择安装位置后，安装器会安静写入组件并创建桌面入口。</p></div>
+      <div class="glass-pills"><span class="pill">本地优先</span><span class="pill">安静安装</span><span class="pill">桌面入口</span></div>
+      <div class="stack"><div class="glass-card three"></div><div class="glass-card two"></div><div class="glass-card one"></div></div>
     </aside>
     <main class="main">
-      <button class="close" onclick="window.close()">×</button>
-      <section class="panel">
-        <div class="dots"><i class="dot active"></i><i class="dot"></i><i class="dot"></i></div>
-        <div class="version">ChangLi {version}</div>
-        <h2>准备安装长离</h2>
-        <p class="desc">安装完成后立即打开你的本地影音资料库。<br/>原有数据、海报和播放环境都会继续保留。</p>
-        <div class="path"><div class="home">⌂</div><div><small>安装位置</small><strong>当前用户 AppData / ChangLi</strong></div><button class="change">更改</button></div>
-        <div class="cards">
-          <div class="card"><div class="badge">✓</div><div><b>保留本地数据</b><span>升级沿用现有资料库</span></div></div>
-          <div class="card"><div class="badge">▶</div><div><b>播放器就绪</b><span>安装后直接播放</span></div></div>
-          <div class="card"><div class="badge">↗</div><div><b>一键启动</b><span>完成后立即打开</span></div></div>
-        </div>
+      <button class="close" id="close">×</button>
+      <div class="topline drag" data-drag="true"><div class="steps"><i class="stepbar"></i><i class="stepdot"></i><i class="stepdot"></i></div><div class="ver">v{version}</div></div>
+      <section class="title drag" data-drag="true"><h2>准备安装长离</h2><p>选择安装位置后，安装器会自动写入运行组件并创建桌面入口。<br>过程清楚、安静、不打扰。</p></section>
+      <section class="card">
+        <div class="path-row"><div class="home">⌂</div><div class="path-copy"><small>安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><button class="change" id="choose">更改</button></div>
+        <div class="flow"><div class="flow-item"><div class="num">1</div><b>选择位置</b><span>显示并使用真实安装目录</span></div><div class="flow-item"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
+        <div class="options"><label class="check"><input id="open-after" type="checkbox" checked> 安装后打开</label><label class="check"><input id="startup" type="checkbox"> 开机自启</label></div>
       </section>
-      <div class="bottom">
-        <div><div class="progress"><div class="bar" id="bar"></div></div><div class="status" id="status">准备就绪，约 1 分钟完成</div></div>
-        <div class="actions"><button class="btn" onclick="window.close()">取消</button><button class="btn primary" id="install">开始安装</button></div>
-      </div>
+      <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar"></div></div></div><div class="actions"><button class="btn" id="cancel">取消</button><button class="btn primary" id="install">开始安装</button></div></div>
     </main>
   </div>
 <script>
-  const btn = document.getElementById('install');
-  const bar = document.getElementById('bar');
-  const status = document.getElementById('status');
-  let running = false;
-  btn.addEventListener('click', () => {{
-    if (running) return;
-    running = true;
-    btn.textContent = '安装中';
-    status.textContent = '正在安装 ChangLi...';
-    let p = 8;
-    bar.style.width = p + '%';
-    const timer = setInterval(() => {{
-      p = Math.min(94, p + Math.floor(Math.random() * 9) + 4);
-      bar.style.width = p + '%';
-    }}, 420);
-    window.ipc.postMessage('install');
-    setTimeout(() => {{
-      clearInterval(timer);
-      bar.style.width = '100%';
-      status.textContent = '安装完成，可以打开 ChangLi';
-      btn.textContent = '完成';
-      btn.onclick = () => window.close();
-    }}, 5200);
-  }});
+  const ipc = (value) => window.ipc.postMessage(typeof value === 'string' ? value : JSON.stringify(value));
+  const state = document.getElementById('state');
+  const progress = document.getElementById('progress');
+  const install = document.getElementById('install');
+  const cancel = document.getElementById('cancel');
+  const closeBtn = document.getElementById('close');
+  const choose = document.getElementById('choose');
+  const dir = document.getElementById('install-dir');
+  let installing = false;
+  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('mousedown', e => {{ if (e.button === 0) ipc('drag'); }}));
+  const close = () => {{ if (!installing) ipc('close'); }};
+  closeBtn.onclick = close; cancel.onclick = close;
+  choose.onclick = () => {{ if (!installing) ipc('choose-dir'); }};
+  install.onclick = () => {{
+    if (installing) return;
+    installing = true;
+    install.disabled = true; cancel.disabled = true; closeBtn.disabled = true; choose.disabled = true;
+    install.textContent = '安装中'; state.textContent = '正在安装 ChangLi，请稍候'; progress.classList.add('active');
+    ipc({{ cmd:'install', openAfter:document.getElementById('open-after').checked, startup:document.getElementById('startup').checked }});
+  }};
+  window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
+  window.installDone = (ok, code) => {{
+    progress.classList.remove('active');
+    if (ok) {{ state.textContent = '安装完成'; install.textContent = '完成'; install.disabled = false; install.onclick = () => ipc('close'); }}
+    else {{ state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.disabled = false; installing = false; cancel.disabled = false; closeBtn.disabled = false; choose.disabled = false; }}
+  }};
 </script>
 </body>
 </html>"#,
         icon = icon,
-        version = version
+        version = version,
+        default_label = default_label
     )
 }
 
 fn main() -> wry::Result<()> {
-    let event_loop = EventLoopBuilder::new().build();
-    let window = WindowBuilder::new()
+    let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
+    let proxy = event_loop.create_proxy();
+    let default_dir = default_install_dir();
+
+    let pos = event_loop.primary_monitor().map(|m| {
+        let mp = m.position();
+        let ms = m.size();
+        PhysicalPosition::new(
+            mp.x + (ms.width as i32 - W) / 2,
+            mp.y + (ms.height as i32 - H) / 2,
+        )
+    });
+
+    let mut builder = WindowBuilder::new()
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
-        .with_transparent(true)
-        .with_inner_size(LogicalSize::new(980.0, 640.0))
-        .build(&event_loop)
-        .expect("create installer window");
+        .with_transparent(false)
+        .with_inner_size(LogicalSize::new(W as f64, H as f64));
+    if let Some(pos) = pos {
+        builder = builder.with_position(pos);
+    }
+    let window = builder.build(&event_loop).expect("create installer window");
 
-    let _webview = WebViewBuilder::new()
-        .with_html(html())
+    #[cfg(target_os = "windows")]
+    apply_round_window(window.hwnd());
+
+    let ipc_proxy = proxy.clone();
+    let webview = WebViewBuilder::new()
+        .with_html(html(&default_dir))
         .with_ipc_handler(move |request| {
-            if request.body() == "install" {
-                start_install();
+            let body = request.body();
+            let event = match body.as_str() {
+                "drag" => Some(InstallerEvent::Drag),
+                "close" => Some(InstallerEvent::Close),
+                "choose-dir" => Some(InstallerEvent::ChooseDir),
+                _ => serde_json::from_str::<Value>(body).ok().and_then(|value| {
+                    if value.get("cmd").and_then(Value::as_str) == Some("install") {
+                        Some(InstallerEvent::Install {
+                            open_after: value
+                                .get("openAfter")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(true),
+                            startup: value
+                                .get("startup")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
+                        })
+                    } else {
+                        None
+                    }
+                }),
+            };
+            if let Some(event) = event {
+                let _ = ipc_proxy.send_event(event);
             }
         })
         .build(&window)?;
 
+    let mut install_dir = default_dir;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
@@ -236,7 +363,33 @@ fn main() -> wry::Result<()> {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            }
+            | Event::UserEvent(InstallerEvent::Close) => *control_flow = ControlFlow::Exit,
+            Event::UserEvent(InstallerEvent::Drag) => {
+                let _ = window.drag_window();
+            }
+            Event::UserEvent(InstallerEvent::ChooseDir) => {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_directory(&install_dir)
+                    .pick_folder()
+                {
+                    install_dir = path;
+                    let _ = webview
+                        .evaluate_script(&js_call("setInstallDir", &path_label(&install_dir)));
+                }
+            }
+            Event::UserEvent(InstallerEvent::Install {
+                open_after,
+                startup,
+            }) => start_install(install_dir.clone(), open_after, startup, proxy.clone()),
+            Event::UserEvent(InstallerEvent::InstallDone { success, code }) => {
+                let script = format!(
+                    "window.installDone({}, {});",
+                    success,
+                    code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
+                );
+                let _ = webview.evaluate_script(&script);
+            }
             _ => {}
         }
     });
