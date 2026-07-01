@@ -180,7 +180,7 @@ const Home: React.FC = () => {
                       </div>
                       <div className="px-4 py-3">
                         <h3 className="truncate font-semibold text-gray-900" title={actor.name}>{actor.name}</h3>
-                        <div className="truncate text-xs text-gray-500">{actor.birthday ? `${actor.birthday}` : '暂无生日信息'}</div>
+                        <div className="truncate text-xs text-gray-500">{actor.alias || ''}</div>
                       </div>
                     </Link>
                   );

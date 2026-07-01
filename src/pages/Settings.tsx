@@ -368,7 +368,7 @@ const Settings: React.FC = () => {
 
     try {
       const response = await fetch('https://api.github.com/repos/YeSuper-git/ChangLi/releases/latest', {
-        headers: { Accept: 'application/vnd.github+json' }
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'ChangLi-App' }
       });
 
       if (!response.ok) {
