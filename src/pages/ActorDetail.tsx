@@ -250,7 +250,7 @@ const ActorDetail: React.FC = () => {
             const parts = (editForm.birthday || '').split('-');
             while (parts.length < 3) parts.push('');
             parts[idx] = val;
-            setEditForm({ ...editForm, birthday: parts.join('-') });
+            setEditForm({ ...editForm, birthday: composeBirthday(parts) });
           };
           return (
             <div className="flex gap-1 items-center">
@@ -347,7 +347,7 @@ const ActorDetail: React.FC = () => {
         editForm.name,
         actor.photo,
         editForm.bio || undefined,
-        editForm.birthday ? normalizeBirthday(editForm.birthday) : undefined,
+        normalizeBirthday(editForm.birthday),
         editForm.height || undefined,
         editForm.measurements || undefined,
         editForm.japanese_name || undefined,
@@ -571,7 +571,7 @@ const ActorDetail: React.FC = () => {
     const parts = (editForm.birthday || '').split('-');
     while (parts.length < 3) parts.push('');
     parts[idx] = val;
-    setEditForm({ ...editForm, birthday: parts.join('-') });
+    setEditForm({ ...editForm, birthday: composeBirthday(parts) });
   };
 
   const measureParts = (editForm.measurements || '').split('-');
@@ -588,13 +588,25 @@ const ActorDetail: React.FC = () => {
     setEditForm({ ...editForm, measurements: parts.join('-') });
   };
 
-  const normalizeBirthday = (bd: string): string => {
-    const parts = bd.split('-');
-    if (parts.length !== 3) return bd;
-    const y = parts[0].padStart(4, '0');
-    const m = parts[1].padStart(2, '0');
-    const d = parts[2].padStart(2, '0');
+  const composeBirthday = (parts: string[]): string => {
+    const cleanParts = parts.slice(0, 3).map(part => part.trim());
+    return cleanParts.some(Boolean) ? cleanParts.join('-') : '';
+  };
+
+  const normalizeBirthday = (bd: string): string | undefined => {
+    const parts = bd.split('-').map(part => part.trim());
+    if (parts.length !== 3 || parts.some(part => !part)) return undefined;
+    const [year, month, day] = parts;
+    if (year === '0' || month === '0' || day === '0') return undefined;
+    const y = year.padStart(4, '0');
+    const m = month.padStart(2, '0');
+    const d = day.padStart(2, '0');
+    if (y === '0000' || m === '00' || d === '00') return undefined;
     return `${y}-${m}-${d}`;
+  };
+
+  const shouldShowBirthday = (birthday?: string | null): birthday is string => {
+    return Boolean(normalizeBirthday(birthday || ''));
   };
 
   // 时期管理函数
@@ -1208,7 +1220,7 @@ const ActorDetail: React.FC = () => {
               )}
               
               <div className="grid grid-cols-2 gap-6 mb-8 text-sm">
-                {actor.birthday && isFieldEnabled('birthday') && (
+                {shouldShowBirthday(actor.birthday) && isFieldEnabled('birthday') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">出生日期</span>
                     <span className="font-medium">{actor.birthday}</span>
