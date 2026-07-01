@@ -167,12 +167,6 @@ unsafe fn stroke_round(hdc: HDC, r: RectI, radius: i32, color: COLORREF) {
     DeleteObject(HGDIOBJ(pen.0)).ok();
 }
 
-unsafe fn pill(hdc: HDC, x: i32, y: i32, w: i32, label: &str) {
-    fill_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 153, 154));
-    stroke_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 195, 196));
-    text(hdc, x + 14, y + 8, label, 12, 800, rgb(255, 255, 255));
-}
-
 fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     let mut p = env::temp_dir();
     p.push(name);
@@ -236,86 +230,87 @@ unsafe fn draw_icon(hdc: HDC, x: i32, y: i32, size: i32) {
 
 unsafe fn draw_sidebar(hdc: HDC) {
     draw_left_gradient(hdc);
+
     fill_round(
         hdc,
         RectI {
-            x: 34,
-            y: 34,
+            x: 178,
+            y: -30,
+            w: 170,
+            h: 118,
+        },
+        48,
+        rgb(255, 126, 107),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: -62,
+            y: 338,
+            w: 206,
+            h: 206,
+        },
+        103,
+        rgb(255, 146, 101),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: 36,
+            y: 392,
+            w: 154,
+            h: 90,
+        },
+        30,
+        rgb(255, 117, 100),
+    );
+
+    fill_round(
+        hdc,
+        RectI {
+            x: 32,
+            y: 32,
             w: 64,
             h: 64,
         },
-        24,
-        rgb(255, 255, 255),
+        16,
+        rgb(255, 246, 248),
     );
-    draw_icon(hdc, 43, 43, 46);
+    draw_icon(hdc, 39, 39, 50);
 
-    text(hdc, 118, 38, "ChangLi", 26, 800, rgb(255, 255, 255));
+    text(hdc, 116, 40, "ChangLi", 29, 800, rgb(255, 255, 255));
     text(
         hdc,
-        120,
-        72,
+        118,
+        73,
         "PRIVATE MEDIA LIBRARY",
-        10,
+        11,
         700,
-        rgb(255, 237, 242),
+        rgb(255, 239, 244),
     );
 
-    text(hdc, 36, 148, "装好后", 40, 800, rgb(255, 255, 255));
-    text(hdc, 36, 202, "直接进入", 40, 800, rgb(255, 255, 255));
-    text(hdc, 36, 256, "收藏宇宙", 40, 800, rgb(255, 255, 255));
+    text(hdc, 36, 142, "装好后", 41, 900, rgb(255, 255, 255));
+    text(hdc, 36, 194, "直接进入", 41, 900, rgb(255, 255, 255));
+    text(hdc, 36, 246, "收藏宇宙", 41, 900, rgb(255, 255, 255));
     text(
         hdc,
         38,
-        318,
-        "本地资料、海报、播放器和收藏路径会原样保留。",
+        322,
+        "本地资料、海报、播放环境和收藏路径会原样保留。",
         13,
         500,
-        rgb(255, 239, 243),
+        rgb(255, 246, 248),
     );
 
-    pill(hdc, 36, 392, 120, "本地数据库");
-    pill(hdc, 36, 434, 120, "内置播放器");
-    pill(hdc, 36, 476, 104, "自动建库");
-}
-
-unsafe fn card(hdc: HDC, x: i32, title: &str, body1: &str, body2: &str) {
-    fill_round(
-        hdc,
-        RectI {
-            x,
-            y: 330,
-            w: 156,
-            h: 104,
-        },
-        26,
-        rgb(255, 255, 255),
-    );
-    stroke_round(
-        hdc,
-        RectI {
-            x,
-            y: 330,
-            w: 156,
-            h: 104,
-        },
-        26,
-        rgb(232, 235, 242),
-    );
-    fill_round(
-        hdc,
-        RectI {
-            x: x + 18,
-            y: 350,
-            w: 26,
-            h: 26,
-        },
-        18,
-        rgb(255, 238, 241),
-    );
-    text(hdc, x + 20, 351, "✓", 18, 800, rgb(238, 82, 118));
-    text(hdc, x + 18, 386, title, 15, 800, rgb(24, 23, 29));
-    text(hdc, x + 18, 410, body1, 12, 400, rgb(113, 113, 122));
-    text(hdc, x + 18, 426, body2, 12, 400, rgb(113, 113, 122));
+    let pills = [
+        ("本地数据库", 36, 382, 118),
+        ("播放器就绪", 36, 424, 118),
+        ("自动建库", 166, 424, 88),
+    ];
+    for (label, x, y, w) in pills {
+        fill_round(hdc, RectI { x, y, w, h: 32 }, 16, rgb(255, 230, 236));
+        text(hdc, x + 18, y + 8, label, 13, 800, rgb(224, 64, 96));
+    }
 }
 
 unsafe fn draw_main(hdc: HDC) {
@@ -327,126 +322,228 @@ unsafe fn draw_main(hdc: HDC) {
             w: W - SIDEBAR_W,
             h: H,
         },
-        rgb(250, 250, 252),
+        rgb(247, 248, 252),
     );
+
     fill_round(
         hdc,
         RectI {
-            x: SIDEBAR_W + 28,
-            y: 28,
-            w: 544,
-            h: 504,
+            x: 330,
+            y: 30,
+            w: 508,
+            h: 404,
         },
-        34,
+        30,
         rgb(255, 255, 255),
-    );
-
-    text(hdc, 366, 56, "●  ○  ○", 16, 800, rgb(244, 80, 116));
-    let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
-    text(
-        hdc,
-        366,
-        92,
-        &format!("ChangLi {version}"),
-        14,
-        800,
-        rgb(244, 80, 116),
-    );
-    text(hdc, 366, 130, "准备安装长离", 34, 800, rgb(24, 23, 29));
-    text(
-        hdc,
-        368,
-        180,
-        "安装完成后即可打开你的本地影音资料库，",
-        15,
-        400,
-        rgb(102, 102, 116),
-    );
-    text(
-        hdc,
-        368,
-        204,
-        "继续保留原有数据与播放环境。",
-        15,
-        400,
-        rgb(102, 102, 116),
-    );
-
-    fill_round(
-        hdc,
-        RectI {
-            x: 366,
-            y: 244,
-            w: 478,
-            h: 64,
-        },
-        24,
-        rgb(249, 250, 252),
     );
     stroke_round(
         hdc,
         RectI {
-            x: 366,
-            y: 244,
-            w: 478,
-            h: 64,
+            x: 330,
+            y: 30,
+            w: 508,
+            h: 404,
         },
-        24,
-        rgb(230, 232, 238),
+        30,
+        rgb(243, 244, 248),
     );
-    text(hdc, 388, 258, "安装位置", 12, 700, rgb(113, 113, 122));
-    text(
+
+    fill_round(
         hdc,
-        388,
-        281,
-        "当前用户 AppData / ChangLi",
-        16,
-        800,
-        rgb(24, 23, 29),
+        RectI {
+            x: 354,
+            y: 62,
+            w: 8,
+            h: 8,
+        },
+        4,
+        rgb(244, 73, 117),
     );
     fill_round(
         hdc,
         RectI {
-            x: 774,
-            y: 260,
-            w: 52,
-            h: 32,
+            x: 376,
+            y: 62,
+            w: 8,
+            h: 8,
+        },
+        4,
+        rgb(255, 203, 211),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: 398,
+            y: 62,
+            w: 8,
+            h: 8,
+        },
+        4,
+        rgb(255, 203, 211),
+    );
+
+    let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
+    text(
+        hdc,
+        354,
+        94,
+        &format!("ChangLi {version}"),
+        15,
+        800,
+        rgb(244, 73, 117),
+    );
+    text(hdc, 354, 130, "准备安装长离", 34, 900, rgb(16, 18, 27));
+    text(
+        hdc,
+        356,
+        178,
+        "安装完成后立即打开你的本地影音资料库。",
+        15,
+        500,
+        rgb(91, 97, 112),
+    );
+    text(
+        hdc,
+        356,
+        202,
+        "原有数据、海报和播放环境都会继续保留。",
+        15,
+        500,
+        rgb(91, 97, 112),
+    );
+
+    fill_round(
+        hdc,
+        RectI {
+            x: 354,
+            y: 244,
+            w: 460,
+            h: 70,
         },
         18,
-        rgb(255, 238, 241),
+        rgb(250, 251, 253),
     );
-    text(hdc, 786, 268, "更改", 13, 800, rgb(221, 69, 105));
+    stroke_round(
+        hdc,
+        RectI {
+            x: 354,
+            y: 244,
+            w: 460,
+            h: 70,
+        },
+        18,
+        rgb(228, 232, 240),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: 372,
+            y: 266,
+            w: 26,
+            h: 26,
+        },
+        13,
+        rgb(255, 232, 238),
+    );
+    text(hdc, 380, 269, "⌂", 17, 800, rgb(244, 73, 117));
+    text(hdc, 412, 260, "安装位置", 13, 800, rgb(91, 97, 112));
+    text(
+        hdc,
+        412,
+        284,
+        "当前用户 AppData / ChangLi",
+        17,
+        800,
+        rgb(16, 18, 27),
+    );
+    fill_round(
+        hdc,
+        RectI {
+            x: 742,
+            y: 264,
+            w: 54,
+            h: 30,
+        },
+        15,
+        rgb(255, 235, 240),
+    );
+    text(hdc, 754, 271, "更改", 13, 800, rgb(213, 63, 100));
 
-    card(hdc, 366, "保留本地数据", "升级安装会沿用", "现有资料库。");
-    card(hdc, 532, "播放器就绪", "内置播放环境，", "安装后直接用。");
-    card(hdc, 698, "一键启动", "完成后可立即", "打开 ChangLi。");
+    let cards = [
+        (
+            354,
+            "✓",
+            "保留本地数据",
+            "升级沿用现有资料库",
+            rgb(255, 246, 248),
+        ),
+        (510, "▶", "播放器就绪", "安装后直接播放", rgb(255, 249, 244)),
+        (666, "↗", "一键启动", "完成后立即打开", rgb(250, 251, 253)),
+    ];
+    for (x, mark, title, body, card_bg) in cards {
+        fill_round(
+            hdc,
+            RectI {
+                x,
+                y: 336,
+                w: 140,
+                h: 74,
+            },
+            18,
+            card_bg,
+        );
+        stroke_round(
+            hdc,
+            RectI {
+                x,
+                y: 336,
+                w: 140,
+                h: 74,
+            },
+            18,
+            rgb(234, 237, 244),
+        );
+        fill_round(
+            hdc,
+            RectI {
+                x: x + 16,
+                y: 352,
+                w: 24,
+                h: 24,
+            },
+            12,
+            rgb(255, 226, 234),
+        );
+        text(hdc, x + 23, 355, mark, 15, 900, rgb(244, 73, 117));
+        text(hdc, x + 48, 350, title, 15, 900, rgb(16, 18, 27));
+        text(hdc, x + 48, 374, body, 12, 600, rgb(99, 107, 124));
+    }
 
     let progress = PROGRESS.load(Ordering::SeqCst);
     fill_round(
         hdc,
         RectI {
-            x: 366,
-            y: 582,
-            w: 184,
+            x: 354,
+            y: 458,
+            w: 212,
             h: 8,
         },
         8,
-        rgb(241, 243, 247),
+        rgb(233, 236, 243),
     );
     if progress > 0 {
         fill_round(
             hdc,
             RectI {
-                x: 366,
-                y: 582,
-                w: 184 * progress / 100,
+                x: 354,
+                y: 458,
+                w: 212 * progress / 100,
                 h: 8,
             },
             8,
-            rgb(244, 80, 116),
+            rgb(244, 73, 117),
         );
     }
-
     let status = if FAILED.load(Ordering::SeqCst) {
         "安装失败，请重新运行安装程序"
     } else if DONE.load(Ordering::SeqCst) {
@@ -456,11 +553,11 @@ unsafe fn draw_main(hdc: HDC) {
     } else {
         "准备就绪，约 1 分钟完成"
     };
-    text(hdc, 366, 604, status, 13, 400, rgb(113, 113, 122));
+    text(hdc, 354, 478, status, 13, 600, rgb(91, 97, 112));
 
-    fill_round(hdc, CANCEL_RECT, 22, rgb(255, 255, 255));
-    stroke_round(hdc, CANCEL_RECT, 22, rgb(225, 228, 236));
-    text(hdc, 766, 588, "取消", 15, 800, rgb(82, 82, 91));
+    fill_round(hdc, CANCEL_RECT, 16, rgb(255, 255, 255));
+    stroke_round(hdc, CANCEL_RECT, 16, rgb(220, 224, 233));
+    text(hdc, 765, 588, "取消", 16, 800, rgb(72, 76, 89));
 
     let label = if DONE.load(Ordering::SeqCst) {
         "完成"
@@ -469,18 +566,29 @@ unsafe fn draw_main(hdc: HDC) {
     } else {
         "开始安装"
     };
-    fill_round(hdc, INSTALL_RECT, 24, rgb(244, 80, 116));
+    fill_round(hdc, INSTALL_RECT, 16, rgb(244, 73, 117));
+    fill_round(
+        hdc,
+        RectI {
+            x: INSTALL_RECT.x + 12,
+            y: INSTALL_RECT.y + 6,
+            w: INSTALL_RECT.w - 24,
+            h: 12,
+        },
+        8,
+        rgb(255, 103, 135),
+    );
     text(
         hdc,
-        if label == "开始安装" { 858 } else { 872 },
+        if label == "开始安装" { 856 } else { 873 },
         588,
         label,
-        15,
-        800,
+        16,
+        900,
         rgb(255, 255, 255),
     );
 
-    text(hdc, 942, 32, "×", 24, 400, rgb(128, 128, 138));
+    text(hdc, 842, 20, "×", 24, 400, rgb(130, 130, 140));
 }
 
 fn start_install(hwnd: HWND) {
