@@ -1,6 +1,10 @@
 # Changelog
 
-## v1.7.13 (2026-07-01)
+## v1.7.14 (2026-07-01)
+
+### 优化
+- 合并 PR #17：统一视频库筛选面板，将标签、演员、状态筛选整合到同一个 `changli-filter-panel`，去掉割裂的白色大卡片和深色投影，展开/收起改为更顺滑的 max-height 过渡
+- 合并 PR #18：提升视频详情页跳转响应，...[truncated]
 
 ### 修复
 - 合并 PR #14：修复设置页“检查更新”在用户端持续返回 GitHub Release API 403 的问题；改为 Tauri 后端请求 GitHub，并在 API 失败时 fallback 到 `/releases/latest` 重定向解析版本
