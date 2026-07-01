@@ -668,8 +668,6 @@ const Settings: React.FC = () => {
           const presetKeySet = new Set(allPresetTemplates.map(t => t.key));
           const sorted = [...actorFields.filter(f => {
             if (f.field_key === 'name') return false;
-            // 过滤掉已关闭的扩展预设模板记录
-            if (presetKeySet.has(f.field_key) && !f.enabled) return false;
             return true;
           })].sort((a, b) => {
             const aPreset = presetKeySet.has(a.field_key) ? 0 : 1;
