@@ -1048,3 +1048,18 @@ export async function enablePresetTemplate(key: string): Promise<void> {
 export async function disablePresetTemplate(key: string): Promise<void> {
   return invoke('disable_preset_template_cmd', { key });
 }
+
+export interface ReleaseAssetInfo {
+  name: string;
+  browser_download_url: string;
+}
+
+export interface LatestReleaseInfo {
+  tag_name: string;
+  html_url: string;
+  assets: ReleaseAssetInfo[];
+}
+
+export async function checkLatestRelease(): Promise<LatestReleaseInfo> {
+  return invoke<LatestReleaseInfo>('check_latest_release');
+}
