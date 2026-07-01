@@ -18,6 +18,9 @@ use tao::{
 use wry::WebViewBuilder;
 
 #[cfg(target_os = "windows")]
+use winreg::{enums::*, RegKey};
+
+#[cfg(target_os = "windows")]
 use tao::platform::windows::WindowExtWindows;
 
 #[cfg(target_os = "windows")]
@@ -40,16 +43,72 @@ enum InstallerEvent {
     Drag,
     Close,
     ChooseDir,
-    Install { open_after: bool, startup: bool },
+    Install,
     InstallDone { success: bool, code: Option<i32> },
 }
 
+#[cfg(target_os = "windows")]
+fn display_icon_parent(value: &str) -> Option<PathBuf> {
+    let cleaned = value.trim().trim_matches('"');
+    let exe_end = cleaned.to_ascii_lowercase().find(".exe")? + 4;
+    let path = PathBuf::from(&cleaned[..exe_end]);
+    path.parent().map(Path::to_path_buf)
+}
+
+#[cfg(target_os = "windows")]
+fn find_existing_install_dir() -> Option<PathBuf> {
+    let roots = [
+        RegKey::predef(HKEY_CURRENT_USER),
+        RegKey::predef(HKEY_LOCAL_MACHINE),
+    ];
+    let paths = [
+        r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+    ];
+
+    for root in roots {
+        for path in paths {
+            let Ok(uninstall) = root.open_subkey_with_flags(path, KEY_READ) else {
+                continue;
+            };
+            for key in uninstall.enum_keys().flatten() {
+                let Ok(app) = uninstall.open_subkey_with_flags(key, KEY_READ) else {
+                    continue;
+                };
+                let name: String = app.get_value("DisplayName").unwrap_or_default();
+                if !(name.contains("ChangLi") || name.contains("长离")) {
+                    continue;
+                }
+                if let Ok(location) = app.get_value::<String, _>("InstallLocation") {
+                    let dir = PathBuf::from(location.trim().trim_matches('"'));
+                    if !dir.as_os_str().is_empty() {
+                        return Some(dir);
+                    }
+                }
+                if let Ok(icon) = app.get_value::<String, _>("DisplayIcon") {
+                    if let Some(dir) = display_icon_parent(&icon) {
+                        return Some(dir);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn find_existing_install_dir() -> Option<PathBuf> {
+    None
+}
+
 fn default_install_dir() -> PathBuf {
-    env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
-        .unwrap_or_else(env::temp_dir)
-        .join("ChangLi")
+    find_existing_install_dir().unwrap_or_else(|| {
+        env::var_os("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
+            .unwrap_or_else(env::temp_dir)
+            .join("ChangLi")
+    })
 }
 
 fn path_label(path: &Path) -> String {
@@ -63,67 +122,15 @@ fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     p
 }
 
-fn app_exe_path(install_dir: &Path) -> PathBuf {
-    install_dir.join("ChangLi.exe")
-}
-
-fn launch_app(install_dir: &Path) {
-    let exe = app_exe_path(install_dir);
-    if exe.exists() {
-        let _ = Command::new(exe).spawn();
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn set_startup(install_dir: &Path) {
-    let exe = app_exe_path(install_dir);
-    if !exe.exists() {
-        return;
-    }
-    let run_value = format!("\"{}\"", exe.display());
-    let _ = Command::new("reg")
-        .args([
-            "add",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            "ChangLi",
-            "/t",
-            "REG_SZ",
-            "/d",
-            run_value.as_str(),
-            "/f",
-        ])
-        .status();
-}
-
-#[cfg(not(target_os = "windows"))]
-fn set_startup(_install_dir: &Path) {}
-
-fn start_install(
-    install_dir: PathBuf,
-    open_after: bool,
-    startup: bool,
-    proxy: EventLoopProxy<InstallerEvent>,
-) {
+fn start_install(install_dir: PathBuf, proxy: EventLoopProxy<InstallerEvent>) {
     thread::spawn(move || {
         let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES);
-        let mut command = Command::new(&setup);
-        command
+        let status = Command::new(&setup)
             .arg("/S")
-            .arg(format!("/D={}", install_dir.display()));
-        let status = command.status();
+            .arg(format!("/D={}", install_dir.display()))
+            .status();
         let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
         let code = status.ok().and_then(|s| s.code());
-
-        if success {
-            if startup {
-                set_startup(&install_dir);
-            }
-            if open_after {
-                launch_app(&install_dir);
-            }
-        }
-
         let _ = proxy.send_event(InstallerEvent::InstallDone { success, code });
     });
 }
@@ -207,6 +214,11 @@ fn html(default_dir: &Path) -> String {
   .steps {{ display:flex; gap:10px; align-items:center; }}
   .stepbar {{ width:50px; height:8px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
   .stepdot {{ width:8px; height:8px; border-radius:50%; background:#d9dee8; }}
+  .steps.install .stepbar {{ width:8px; background:#d9dee8; box-shadow:none; }}
+  .steps.install .stepdot.one {{ width:50px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .steps.done .stepbar,.steps.done .stepdot.one {{ width:8px; background:#b9f0d2; box-shadow:none; }}
+  .steps.done .stepdot.two {{ width:50px; border-radius:99px; background:linear-gradient(90deg,#34d399,#10b981); box-shadow:0 8px 18px rgba(16,185,129,.22); }}
+  .steps.fail .stepbar {{ background:#ef4444; }}
   .ver {{ color:#9aa2b2; font-size:13px; font-weight:750; }}
   .title {{ margin-top:42px; }}
   .title h2 {{ margin:0 0 14px; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; }}
@@ -219,7 +231,10 @@ fn html(default_dir: &Path) -> String {
   .path-copy strong {{ display:block; margin-top:6px; color:var(--ink); font-size:16px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
   .change {{ border:0; border-radius:999px; padding:9px 16px; background:#ffedf2; color:#cf3d62; font-size:13px; font-weight:900; cursor:pointer; }}
   .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:18px; }}
-  .flow-item {{ min-height:94px; border-radius:20px; padding:14px 13px; background:#fafbfe; border:1px solid #edf0f6; }}
+  .flow-item {{ min-height:94px; border-radius:20px; padding:14px 13px; background:#fafbfe; border:1px solid #edf0f6; transition:.2s ease; }}
+  .flow-item.active {{ background:#fff4f7; border-color:#ffc3d0; box-shadow:0 12px 28px rgba(244,73,117,.12); }}
+  .flow-item.done {{ background:#f0fdf6; border-color:#bbf7d0; }}
+  .flow-item.fail {{ background:#fff1f2; border-color:#fecdd3; }}
   .num {{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:13px; font-weight:950; background:linear-gradient(180deg,var(--rose2),var(--rose)); }}
   .flow-item b {{ display:block; margin-top:10px; color:var(--ink); font-size:14px; line-height:1.25; }}
   .flow-item span {{ display:block; margin-top:5px; color:#6b7382; font-size:12px; line-height:1.35; }}
@@ -242,25 +257,24 @@ fn html(default_dir: &Path) -> String {
   <div class="shell">
     <aside class="side drag" data-drag="true">
       <div class="orb a"></div><div class="orb b"></div>
-      <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">PRIVATE MEDIA LIBRARY</div></div></div>
+      <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">私人影音资料库</div></div></div>
       <div class="hero"><h1>装好后<br>直接进入<br>收藏宇宙</h1><p>选择安装位置后，安装器会安静写入组件并创建桌面入口。</p></div>
-      <div class="glass-pills"><span class="pill">本地优先</span><span class="pill">安静安装</span><span class="pill">桌面入口</span></div>
+      <div class="glass-pills"><span class="pill">本地优先</span><span class="pill">路径识别</span><span class="pill">桌面入口</span></div>
       <div class="stack"><div class="glass-card three"></div><div class="glass-card two"></div><div class="glass-card one"></div></div>
     </aside>
     <main class="main">
       <button class="close" id="close">×</button>
-      <div class="topline drag" data-drag="true"><div class="steps"><i class="stepbar"></i><i class="stepdot"></i><i class="stepdot"></i></div><div class="ver">v{version}</div></div>
+      <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div><div class="ver">v{version}</div></div>
       <section class="title drag" data-drag="true"><h2>准备安装长离</h2><p>选择安装位置后，安装器会自动写入运行组件并创建桌面入口。<br>过程清楚、安静、不打扰。</p></section>
       <section class="card">
         <div class="path-row"><div class="home">⌂</div><div class="path-copy"><small>安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><button class="change" id="choose">更改</button></div>
-        <div class="flow"><div class="flow-item"><div class="num">1</div><b>选择位置</b><span>显示并使用真实安装目录</span></div><div class="flow-item"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
-        <div class="options"><label class="check"><input id="open-after" type="checkbox" checked> 安装后打开</label><label class="check"><input id="startup" type="checkbox"> 开机自启</label></div>
+        <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b>检测位置</b><span>优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
       </section>
       <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar"></div></div></div><div class="actions"><button class="btn" id="cancel">取消</button><button class="btn primary" id="install">开始安装</button></div></div>
     </main>
   </div>
 <script>
-  const ipc = (value) => window.ipc.postMessage(typeof value === 'string' ? value : JSON.stringify(value));
+  const ipc = (value) => window.ipc.postMessage(JSON.stringify(value));
   const state = document.getElementById('state');
   const progress = document.getElementById('progress');
   const install = document.getElementById('install');
@@ -268,23 +282,46 @@ fn html(default_dir: &Path) -> String {
   const closeBtn = document.getElementById('close');
   const choose = document.getElementById('choose');
   const dir = document.getElementById('install-dir');
+  const steps = document.getElementById('steps');
+  const flow1 = document.getElementById('flow-1');
+  const flow2 = document.getElementById('flow-2');
+  const flow3 = document.getElementById('flow-3');
   let installing = false;
-  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('mousedown', e => {{ if (e.button === 0) ipc('drag'); }}));
-  const close = () => {{ if (!installing) ipc('close'); }};
+  let mouseDown = false;
+  const setPhase = (phase) => {{
+    steps.className = 'steps ' + (phase === 'ready' ? '' : phase);
+    [flow1, flow2, flow3].forEach(el => el.classList.remove('active', 'done', 'fail'));
+    if (phase === 'ready') flow1.classList.add('active');
+    if (phase === 'install') {{ flow1.classList.add('done'); flow2.classList.add('active'); }}
+    if (phase === 'done') {{ flow1.classList.add('done'); flow2.classList.add('done'); flow3.classList.add('done'); }}
+    if (phase === 'fail') flow2.classList.add('fail');
+  }};
+  setPhase('ready');
+  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('pointerdown', e => {{
+    if (e.button !== 0 || e.target.closest('button,input,label')) return;
+    mouseDown = true;
+    ipc({{ cmd:'drag' }});
+  }}));
+  window.addEventListener('pointerup', () => {{ mouseDown = false; }});
+  const close = () => {{ if (!installing) ipc({{ cmd:'close' }}); }};
   closeBtn.onclick = close; cancel.onclick = close;
-  choose.onclick = () => {{ if (!installing) ipc('choose-dir'); }};
+  choose.onclick = () => {{ if (!installing) ipc({{ cmd:'choose-dir' }}); }};
   install.onclick = () => {{
     if (installing) return;
     installing = true;
+    setPhase('install');
     install.disabled = true; cancel.disabled = true; closeBtn.disabled = true; choose.disabled = true;
     install.textContent = '安装中'; state.textContent = '正在安装 ChangLi，请稍候'; progress.classList.add('active');
-    ipc({{ cmd:'install', openAfter:document.getElementById('open-after').checked, startup:document.getElementById('startup').checked }});
+    ipc({{ cmd:'install' }});
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{
     progress.classList.remove('active');
-    if (ok) {{ state.textContent = '安装完成'; install.textContent = '完成'; install.disabled = false; install.onclick = () => ipc('close'); }}
-    else {{ state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.disabled = false; installing = false; cancel.disabled = false; closeBtn.disabled = false; choose.disabled = false; }}
+    if (ok) {{
+      setPhase('done'); state.textContent = '安装完成'; install.textContent = '完成'; install.disabled = false; install.onclick = () => ipc({{ cmd:'close' }});
+    }} else {{
+      setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.disabled = false; installing = false; cancel.disabled = false; closeBtn.disabled = false; choose.disabled = false;
+    }}
   }};
 </script>
 </body>
@@ -328,27 +365,15 @@ fn main() -> wry::Result<()> {
         .with_html(html(&default_dir))
         .with_ipc_handler(move |request| {
             let body = request.body();
-            let event = match body.as_str() {
-                "drag" => Some(InstallerEvent::Drag),
-                "close" => Some(InstallerEvent::Close),
-                "choose-dir" => Some(InstallerEvent::ChooseDir),
-                _ => serde_json::from_str::<Value>(body).ok().and_then(|value| {
-                    if value.get("cmd").and_then(Value::as_str) == Some("install") {
-                        Some(InstallerEvent::Install {
-                            open_after: value
-                                .get("openAfter")
-                                .and_then(Value::as_bool)
-                                .unwrap_or(true),
-                            startup: value
-                                .get("startup")
-                                .and_then(Value::as_bool)
-                                .unwrap_or(false),
-                        })
-                    } else {
-                        None
-                    }
-                }),
-            };
+            let event = serde_json::from_str::<Value>(body).ok().and_then(|value| {
+                match value.get("cmd").and_then(Value::as_str) {
+                    Some("drag") => Some(InstallerEvent::Drag),
+                    Some("close") => Some(InstallerEvent::Close),
+                    Some("choose-dir") => Some(InstallerEvent::ChooseDir),
+                    Some("install") => Some(InstallerEvent::Install),
+                    _ => None,
+                }
+            });
             if let Some(event) = event {
                 let _ = ipc_proxy.send_event(event);
             }
@@ -378,10 +403,9 @@ fn main() -> wry::Result<()> {
                         .evaluate_script(&js_call("setInstallDir", &path_label(&install_dir)));
                 }
             }
-            Event::UserEvent(InstallerEvent::Install {
-                open_after,
-                startup,
-            }) => start_install(install_dir.clone(), open_after, startup, proxy.clone()),
+            Event::UserEvent(InstallerEvent::Install) => {
+                start_install(install_dir.clone(), proxy.clone())
+            }
             Event::UserEvent(InstallerEvent::InstallDone { success, code }) => {
                 let script = format!(
                     "window.installDone({}, {});",

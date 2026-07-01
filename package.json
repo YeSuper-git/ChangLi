@@ -1,6 +1,6 @@
 {
   "name": "changli",
-  "version": "1.7.20",
+  "version": "1.7.21",
   "description": "长离 - 全功能视频管理播放平台",
   "scripts": {
     "generate:version-info": "node scripts/generate-version-info.mjs",
