@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.17 (2026-07-01)
+
+### 新增
+- 合并 PR #22：新增独立 Rust/Win32 自定义安装器外壳，不再把自定义页面塞进 NSIS 默认 wizard 框架
+- 自定义安装器在编译期嵌入内层 NSIS setup，点击开始安装后写入临时目录并静默执行 `/S`
+
+### 优化
+- Windows Release 最终资产保持 `ChangLi_<version>_x64-setup.exe` 命名，并用自定义安装器外壳覆盖 tauri-action 生成的内层 NSIS 资产，保证用户下载到的是新外壳
+- 移除完整 NSIS template 文件和 tauri.conf 中的 `nsis.template` 配置，回退到内层 NSIS 只负责真实安装后端
+- 更新安装器 UI 文档，明确当前架构是“自定义外壳 + 内层静默 NSIS”
+
 ## v1.7.16 (2026-07-01)
 
 ### 新增

@@ -63,7 +63,7 @@ $env:CHANGLI_APP_VERSION = "${{ steps.version.outputs.version }}"
 cargo build --manifest-path installer-shell/Cargo.toml --release --target x86_64-pc-windows-msvc
 
 # 上传最终自定义安装器
-ChangLi-${{ steps.version.outputs.version }}-setup.exe
+ChangLi_${{ steps.version.outputs.version }}_x64-setup.exe
 ```
 
 ## 验证边界

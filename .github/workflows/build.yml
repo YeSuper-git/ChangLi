@@ -200,8 +200,20 @@ jobs:
           if (-not (Test-Path $customInstaller)) {
             throw "Custom installer shell not found"
           }
-          Copy-Item -Path $customInstaller -Destination "$artifactDir/ChangLi-${{ steps.version.outputs.version }}-setup.exe" -Force
+          Copy-Item -Path $customInstaller -Destination "$artifactDir/ChangLi_${{ steps.version.outputs.version }}_x64-setup.exe" -Force
           Get-ChildItem $artifactDir | Select-Object Name, Length
+
+      - name: Replace release asset with custom installer
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $asset = "dist-artifacts/ChangLi_${{ steps.version.outputs.version }}_x64-setup.exe"
+          if (-not (Test-Path $asset)) {
+            throw "Custom release asset not found"
+          }
+          gh release upload "v${{ steps.version.outputs.version }}" $asset --clobber
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
