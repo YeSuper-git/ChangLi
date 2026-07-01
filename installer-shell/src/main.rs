@@ -1,177 +1,21 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
-#![allow(unused_must_use)]
 
-use std::{
-    env,
-    ffi::OsStr,
-    fs,
-    os::windows::ffi::OsStrExt,
-    path::PathBuf,
-    process::Command,
-    ptr::null_mut,
-    sync::atomic::{AtomicBool, AtomicI32, Ordering},
-    thread,
-    time::Duration,
+use std::{env, fs, path::PathBuf, process::Command, thread};
+
+use base64::{engine::general_purpose, Engine as _};
+use tao::{
+    dpi::LogicalSize,
+    event::{Event, StartCause, WindowEvent},
+    event_loop::{ControlFlow, EventLoopBuilder},
+    window::WindowBuilder,
 };
-
-use windows::{
-    core::PCWSTR,
-    Win32::{
-        Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
-        Graphics::Gdi::{
-            BeginPaint, CreateFontW, CreatePen, CreateRoundRectRgn, CreateSolidBrush, DeleteObject,
-            EndPaint, FillRect, GetStockObject, InvalidateRect, LineTo, MoveToEx, RoundRect,
-            ScreenToClient, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, TextOutW,
-            FONT_CHARSET, FONT_CLIP_PRECISION, FONT_OUTPUT_PRECISION, FONT_QUALITY, HDC, HFONT,
-            HGDIOBJ, PAINTSTRUCT, PS_SOLID, TRANSPARENT, WHITE_BRUSH,
-        },
-        System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, DrawIconEx,
-            GetMessageW, GetSystemMetrics, LoadImageW, PostQuitMessage, RegisterClassW, SetTimer,
-            ShowWindow, TranslateMessage, CS_HREDRAW, CS_VREDRAW, DI_NORMAL, HICON, HTCAPTION,
-            HTCLIENT, IMAGE_ICON, LR_LOADFROMFILE, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW,
-            WM_CLOSE, WM_CREATE, WM_DESTROY, WM_LBUTTONDOWN, WM_NCHITTEST, WM_PAINT, WM_TIMER,
-            WNDCLASSW, WS_POPUP, WS_VISIBLE,
-        },
-    },
-};
-
-static INSTALLING: AtomicBool = AtomicBool::new(false);
-static DONE: AtomicBool = AtomicBool::new(false);
-static FAILED: AtomicBool = AtomicBool::new(false);
-static PROGRESS: AtomicI32 = AtomicI32::new(0);
+use wry::WebViewBuilder;
 
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../src-tauri/icons/icon.ico"
+    "/../src-tauri/icons/icon.png"
 ));
-
-const W: i32 = 980;
-const H: i32 = 640;
-const SIDEBAR_W: i32 = 318;
-const RADIUS: i32 = 34;
-
-#[derive(Clone, Copy)]
-struct RectI {
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-}
-impl RectI {
-    fn contains(self, x: i32, y: i32) -> bool {
-        x >= self.x && x <= self.x + self.w && y >= self.y && y <= self.y + self.h
-    }
-}
-
-const CLOSE_RECT: RectI = RectI {
-    x: 932,
-    y: 28,
-    w: 32,
-    h: 32,
-};
-const INSTALL_RECT: RectI = RectI {
-    x: 832,
-    y: 574,
-    w: 114,
-    h: 46,
-};
-const CANCEL_RECT: RectI = RectI {
-    x: 742,
-    y: 574,
-    w: 78,
-    h: 46,
-};
-const TITLE_DRAG_RECT: RectI = RectI {
-    x: 0,
-    y: 0,
-    w: W,
-    h: 74,
-};
-
-fn wide(s: &str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(Some(0)).collect()
-}
-fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
-    COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16))
-}
-
-unsafe fn font(size: i32, weight: i32) -> HFONT {
-    let name = wide("Microsoft YaHei UI");
-    CreateFontW(
-        -size,
-        0,
-        0,
-        0,
-        weight,
-        0,
-        0,
-        0,
-        FONT_CHARSET(1),
-        FONT_OUTPUT_PRECISION(0),
-        FONT_CLIP_PRECISION(0),
-        FONT_QUALITY(5),
-        0,
-        PCWSTR(name.as_ptr()),
-    )
-}
-
-unsafe fn text(hdc: HDC, x: i32, y: i32, s: &str, size: i32, weight: i32, color: COLORREF) {
-    let f = font(size, weight);
-    let old = SelectObject(hdc, HGDIOBJ(f.0));
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, color);
-    let ws = wide(s);
-    TextOutW(hdc, x, y, &ws[..ws.len() - 1]).ok();
-    SelectObject(hdc, old);
-    DeleteObject(HGDIOBJ(f.0)).ok();
-}
-
-unsafe fn fill_rect(hdc: HDC, r: RectI, color: COLORREF) {
-    let brush = CreateSolidBrush(color);
-    FillRect(
-        hdc,
-        &RECT {
-            left: r.x,
-            top: r.y,
-            right: r.x + r.w,
-            bottom: r.y + r.h,
-        },
-        brush,
-    );
-    DeleteObject(HGDIOBJ(brush.0)).ok();
-}
-
-unsafe fn fill_round(hdc: HDC, r: RectI, radius: i32, color: COLORREF) {
-    let brush = CreateSolidBrush(color);
-    let pen = CreatePen(PS_SOLID, 1, color);
-    let old_b = SelectObject(hdc, HGDIOBJ(brush.0));
-    let old_p = SelectObject(hdc, HGDIOBJ(pen.0));
-    RoundRect(hdc, r.x, r.y, r.x + r.w, r.y + r.h, radius, radius).ok();
-    SelectObject(hdc, old_b);
-    SelectObject(hdc, old_p);
-    DeleteObject(HGDIOBJ(brush.0)).ok();
-    DeleteObject(HGDIOBJ(pen.0)).ok();
-}
-
-unsafe fn stroke_round(hdc: HDC, r: RectI, radius: i32, color: COLORREF) {
-    let brush = GetStockObject(WHITE_BRUSH);
-    let pen = CreatePen(PS_SOLID, 1, color);
-    let old_b = SelectObject(hdc, brush);
-    let old_p = SelectObject(hdc, HGDIOBJ(pen.0));
-    RoundRect(hdc, r.x, r.y, r.x + r.w, r.y + r.h, radius, radius).ok();
-    SelectObject(hdc, old_b);
-    SelectObject(hdc, old_p);
-    DeleteObject(HGDIOBJ(pen.0)).ok();
-}
-
-unsafe fn pill(hdc: HDC, x: i32, y: i32, w: i32, label: &str) {
-    fill_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 153, 154));
-    stroke_round(hdc, RectI { x, y, w, h: 32 }, 18, rgb(255, 195, 196));
-    text(hdc, x + 14, y + 8, label, 12, 800, rgb(255, 255, 255));
-}
 
 fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     let mut p = env::temp_dir();
@@ -180,458 +24,220 @@ fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
     p
 }
 
-unsafe fn draw_left_gradient(hdc: HDC) {
-    for y in 0..H {
-        let t = y as f32 / H as f32;
-        let r = (246.0 + (255.0 - 246.0) * t) as u8;
-        let g = (78.0 + (143.0 - 78.0) * t) as u8;
-        let b = (116.0 + (73.0 - 116.0) * t) as u8;
-        let pen = CreatePen(PS_SOLID, 1, rgb(r, g, b));
-        let old = SelectObject(hdc, HGDIOBJ(pen.0));
-        MoveToEx(hdc, 0, y, None).ok();
-        LineTo(hdc, SIDEBAR_W, y).ok();
-        SelectObject(hdc, old);
-        DeleteObject(HGDIOBJ(pen.0)).ok();
-    }
-
-    // subtle brand glow blocks from the HTML preview direction
-    fill_round(
-        hdc,
-        RectI {
-            x: -80,
-            y: 350,
-            w: 240,
-            h: 160,
-        },
-        80,
-        rgb(255, 149, 128),
-    );
-    fill_round(
-        hdc,
-        RectI {
-            x: 178,
-            y: -68,
-            w: 210,
-            h: 170,
-        },
-        80,
-        rgb(255, 126, 112),
-    );
-}
-
-unsafe fn draw_icon(hdc: HDC, x: i32, y: i32, size: i32) {
-    let icon_path = write_embedded("changli-installer-icon.ico", ICON_BYTES);
-    let icon_path_w = wide(icon_path.to_string_lossy().as_ref());
-    let icon = LoadImageW(
-        None,
-        PCWSTR(icon_path_w.as_ptr()),
-        IMAGE_ICON,
-        size,
-        size,
-        LR_LOADFROMFILE,
-    )
-    .unwrap_or_default();
-    DrawIconEx(hdc, x, y, HICON(icon.0), size, size, 0, None, DI_NORMAL).ok();
-}
-
-unsafe fn draw_sidebar(hdc: HDC) {
-    draw_left_gradient(hdc);
-    fill_round(
-        hdc,
-        RectI {
-            x: 34,
-            y: 34,
-            w: 64,
-            h: 64,
-        },
-        24,
-        rgb(255, 255, 255),
-    );
-    draw_icon(hdc, 43, 43, 46);
-
-    text(hdc, 118, 38, "ChangLi", 26, 800, rgb(255, 255, 255));
-    text(
-        hdc,
-        120,
-        72,
-        "PRIVATE MEDIA LIBRARY",
-        10,
-        700,
-        rgb(255, 237, 242),
-    );
-
-    text(hdc, 36, 148, "装好后", 40, 800, rgb(255, 255, 255));
-    text(hdc, 36, 202, "直接进入", 40, 800, rgb(255, 255, 255));
-    text(hdc, 36, 256, "收藏宇宙", 40, 800, rgb(255, 255, 255));
-    text(
-        hdc,
-        38,
-        318,
-        "本地资料、海报、播放器和收藏路径会原样保留。",
-        13,
-        500,
-        rgb(255, 239, 243),
-    );
-
-    pill(hdc, 36, 392, 120, "本地数据库");
-    pill(hdc, 36, 434, 120, "内置播放器");
-    pill(hdc, 36, 476, 104, "自动建库");
-}
-
-unsafe fn card(hdc: HDC, x: i32, title: &str, body1: &str, body2: &str) {
-    fill_round(
-        hdc,
-        RectI {
-            x,
-            y: 330,
-            w: 156,
-            h: 104,
-        },
-        26,
-        rgb(255, 255, 255),
-    );
-    stroke_round(
-        hdc,
-        RectI {
-            x,
-            y: 330,
-            w: 156,
-            h: 104,
-        },
-        26,
-        rgb(232, 235, 242),
-    );
-    fill_round(
-        hdc,
-        RectI {
-            x: x + 18,
-            y: 350,
-            w: 26,
-            h: 26,
-        },
-        18,
-        rgb(255, 238, 241),
-    );
-    text(hdc, x + 20, 351, "✓", 18, 800, rgb(238, 82, 118));
-    text(hdc, x + 18, 386, title, 15, 800, rgb(24, 23, 29));
-    text(hdc, x + 18, 410, body1, 12, 400, rgb(113, 113, 122));
-    text(hdc, x + 18, 426, body2, 12, 400, rgb(113, 113, 122));
-}
-
-unsafe fn draw_main(hdc: HDC) {
-    fill_rect(
-        hdc,
-        RectI {
-            x: SIDEBAR_W,
-            y: 0,
-            w: W - SIDEBAR_W,
-            h: H,
-        },
-        rgb(250, 250, 252),
-    );
-    fill_round(
-        hdc,
-        RectI {
-            x: SIDEBAR_W + 28,
-            y: 28,
-            w: 544,
-            h: 504,
-        },
-        34,
-        rgb(255, 255, 255),
-    );
-
-    text(hdc, 366, 56, "●  ○  ○", 16, 800, rgb(244, 80, 116));
-    let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
-    text(
-        hdc,
-        366,
-        92,
-        &format!("ChangLi {version}"),
-        14,
-        800,
-        rgb(244, 80, 116),
-    );
-    text(hdc, 366, 130, "准备安装长离", 34, 800, rgb(24, 23, 29));
-    text(
-        hdc,
-        368,
-        180,
-        "安装完成后即可打开你的本地影音资料库，",
-        15,
-        400,
-        rgb(102, 102, 116),
-    );
-    text(
-        hdc,
-        368,
-        204,
-        "继续保留原有数据与播放环境。",
-        15,
-        400,
-        rgb(102, 102, 116),
-    );
-
-    fill_round(
-        hdc,
-        RectI {
-            x: 366,
-            y: 244,
-            w: 478,
-            h: 64,
-        },
-        24,
-        rgb(249, 250, 252),
-    );
-    stroke_round(
-        hdc,
-        RectI {
-            x: 366,
-            y: 244,
-            w: 478,
-            h: 64,
-        },
-        24,
-        rgb(230, 232, 238),
-    );
-    text(hdc, 388, 258, "安装位置", 12, 700, rgb(113, 113, 122));
-    text(
-        hdc,
-        388,
-        281,
-        "当前用户 AppData / ChangLi",
-        16,
-        800,
-        rgb(24, 23, 29),
-    );
-    fill_round(
-        hdc,
-        RectI {
-            x: 774,
-            y: 260,
-            w: 52,
-            h: 32,
-        },
-        18,
-        rgb(255, 238, 241),
-    );
-    text(hdc, 786, 268, "更改", 13, 800, rgb(221, 69, 105));
-
-    card(hdc, 366, "保留本地数据", "升级安装会沿用", "现有资料库。");
-    card(hdc, 532, "播放器就绪", "内置播放环境，", "安装后直接用。");
-    card(hdc, 698, "一键启动", "完成后可立即", "打开 ChangLi。");
-
-    let progress = PROGRESS.load(Ordering::SeqCst);
-    fill_round(
-        hdc,
-        RectI {
-            x: 366,
-            y: 582,
-            w: 184,
-            h: 8,
-        },
-        8,
-        rgb(241, 243, 247),
-    );
-    if progress > 0 {
-        fill_round(
-            hdc,
-            RectI {
-                x: 366,
-                y: 582,
-                w: 184 * progress / 100,
-                h: 8,
-            },
-            8,
-            rgb(244, 80, 116),
-        );
-    }
-
-    let status = if FAILED.load(Ordering::SeqCst) {
-        "安装失败，请重新运行安装程序"
-    } else if DONE.load(Ordering::SeqCst) {
-        "安装完成，可以打开 ChangLi"
-    } else if INSTALLING.load(Ordering::SeqCst) {
-        "正在安装 ChangLi..."
-    } else {
-        "准备就绪，约 1 分钟完成"
-    };
-    text(hdc, 366, 604, status, 13, 400, rgb(113, 113, 122));
-
-    fill_round(hdc, CANCEL_RECT, 22, rgb(255, 255, 255));
-    stroke_round(hdc, CANCEL_RECT, 22, rgb(225, 228, 236));
-    text(hdc, 766, 588, "取消", 15, 800, rgb(82, 82, 91));
-
-    let label = if DONE.load(Ordering::SeqCst) {
-        "完成"
-    } else if INSTALLING.load(Ordering::SeqCst) {
-        "安装中"
-    } else {
-        "开始安装"
-    };
-    fill_round(hdc, INSTALL_RECT, 24, rgb(244, 80, 116));
-    text(
-        hdc,
-        if label == "开始安装" { 858 } else { 872 },
-        588,
-        label,
-        15,
-        800,
-        rgb(255, 255, 255),
-    );
-
-    text(hdc, 942, 32, "×", 24, 400, rgb(128, 128, 138));
-}
-
-fn start_install(hwnd: HWND) {
-    if INSTALLING.swap(true, Ordering::SeqCst) || DONE.load(Ordering::SeqCst) {
-        return;
-    }
-    PROGRESS.store(8, Ordering::SeqCst);
-    let hwnd_raw = hwnd.0 as isize;
-    thread::spawn(move || {
-        let hwnd = HWND(hwnd_raw as *mut _);
+fn start_install() {
+    thread::spawn(|| {
         let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES);
-        for p in [18, 30, 46, 62] {
-            PROGRESS.store(p, Ordering::SeqCst);
-            unsafe {
-                InvalidateRect(Some(hwnd), None, false).ok();
-            }
-            thread::sleep(Duration::from_millis(260));
-        }
-        let result = Command::new(&setup).arg("/S").status();
-        match result {
-            Ok(s) if s.success() => {
-                PROGRESS.store(100, Ordering::SeqCst);
-                DONE.store(true, Ordering::SeqCst);
-            }
-            _ => FAILED.store(true, Ordering::SeqCst),
-        }
-        INSTALLING.store(false, Ordering::SeqCst);
-        unsafe {
-            InvalidateRect(Some(hwnd), None, false).ok();
-        }
+        let _ = Command::new(&setup).arg("/S").status();
     });
 }
 
-unsafe fn client_point(hwnd: HWND, l: LPARAM) -> (i32, i32) {
-    let mut pt = POINT {
-        x: (l.0 & 0xffff) as i16 as i32,
-        y: ((l.0 >> 16) & 0xffff) as i16 as i32,
-    };
-    ScreenToClient(hwnd, &mut pt).ok();
-    (pt.x, pt.y)
+fn html() -> String {
+    let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
+    let icon = general_purpose::STANDARD.encode(ICON_BYTES);
+    format!(
+        r#"<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChangLi Installer</title>
+<style>
+  :root {{
+    --rose: #f44975;
+    --rose-2: #ff6d8a;
+    --orange: #ff844a;
+    --ink: #10121b;
+    --muted: #626b7c;
+    --line: #e8ebf2;
+    font-family: "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif;
+  }}
+  * {{ box-sizing: border-box; }}
+  html, body {{
+    width: 100%; height: 100%; margin: 0; overflow: hidden;
+    background: transparent;
+  }}
+  body {{
+    display: grid; place-items: center;
+    user-select: none;
+  }}
+  .shell {{
+    width: 980px; height: 640px; display: grid; grid-template-columns: 318px 1fr;
+    overflow: hidden; border-radius: 26px;
+    background: #f7f8fc;
+    box-shadow: 0 24px 80px rgba(22, 24, 35, .18);
+  }}
+  .side {{
+    position: relative; overflow: hidden; padding: 32px 32px 28px;
+    color: white;
+    background:
+      radial-gradient(circle at -12% 74%, rgba(255, 153, 101, .96) 0 23%, transparent 24%),
+      radial-gradient(circle at 82% -4%, rgba(255, 132, 103, .96) 0 24%, transparent 25%),
+      linear-gradient(154deg, #f44975 0%, #fb586b 48%, #ff844a 100%);
+  }}
+  .side::before {{
+    content: ""; position: absolute; left: 36px; bottom: 156px; width: 154px; height: 90px;
+    border-radius: 30px; background: rgba(255, 113, 100, .62);
+  }}
+  .brand {{ position: relative; display: flex; gap: 18px; align-items: center; z-index: 1; }}
+  .icon-wrap {{
+    width: 64px; height: 64px; display: grid; place-items: center;
+    border-radius: 16px; background: rgba(255, 246, 248, .98);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  }}
+  .icon-wrap img {{ width: 50px; height: 50px; border-radius: 12px; }}
+  .wordmark {{ font-size: 29px; font-weight: 850; letter-spacing: -.02em; line-height: 1; }}
+  .tag {{ margin-top: 8px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #fff0f4; }}
+  .poster {{ position: relative; z-index: 1; margin-top: 54px; }}
+  .poster h1 {{ margin: 0; font-size: 42px; line-height: 1.24; letter-spacing: -.055em; font-weight: 950; }}
+  .poster p {{ margin: 22px 0 0; width: 244px; font-size: 13px; line-height: 1.75; color: #fff6f8; }}
+  .pills {{ position: relative; z-index: 1; margin-top: 42px; display: flex; flex-wrap: wrap; gap: 10px; }}
+  .pill {{
+    padding: 8px 18px; border-radius: 999px; background: #ffe6ec;
+    color: #e04060; font-size: 13px; font-weight: 850;
+  }}
+  .main {{ position: relative; padding: 30px 34px 20px 28px; }}
+  .close {{
+    position: absolute; right: 18px; top: 18px; width: 36px; height: 36px; border: 0;
+    border-radius: 12px; background: transparent; color: #7d8493; font-size: 24px;
+    cursor: pointer;
+  }}
+  .close:hover {{ background: #eef1f7; color: #10121b; }}
+  .panel {{
+    width: 508px; min-height: 404px; padding: 32px 24px 24px;
+    border-radius: 30px; background: white; border: 1px solid #f3f4f8;
+    box-shadow: 0 20px 60px rgba(50, 56, 77, .045);
+  }}
+  .dots {{ display: flex; gap: 14px; margin-bottom: 22px; }}
+  .dot {{ width: 8px; height: 8px; border-radius: 99px; background: #ffcbd3; }}
+  .dot.active {{ background: var(--rose); }}
+  .version {{ color: var(--rose); font-size: 15px; font-weight: 850; }}
+  h2 {{ margin: 22px 0 8px; color: var(--ink); font-size: 34px; line-height: 1.08; letter-spacing: -.065em; font-weight: 950; }}
+  .desc {{ margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }}
+  .path {{
+    margin-top: 22px; height: 70px; display: flex; align-items: center; gap: 14px; padding: 0 18px;
+    border: 1px solid #e4e8f0; border-radius: 18px; background: #fafbfd;
+  }}
+  .home {{ width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #ffe8ee; color: var(--rose); font-weight: 900; }}
+  .path small {{ display: block; color: var(--muted); font-size: 13px; font-weight: 850; }}
+  .path strong {{ display: block; margin-top: 5px; color: var(--ink); font-size: 17px; }}
+  .change {{ margin-left: auto; border: 0; border-radius: 999px; padding: 8px 15px; background: #ffebf0; color: #d53f64; font-weight: 850; }}
+  .cards {{ margin-top: 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }}
+  .card {{
+    height: 74px; border: 1px solid #eaedf4; border-radius: 18px; padding: 15px 14px;
+    display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start;
+  }}
+  .card:nth-child(1) {{ background: #fff6f8; }}
+  .card:nth-child(2) {{ background: #fff9f4; }}
+  .card:nth-child(3) {{ background: #fafbfd; }}
+  .badge {{ width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #ffe2ea; color: var(--rose); font-weight: 950; }}
+  .card b {{ display: block; color: var(--ink); font-size: 15px; line-height: 1.1; }}
+  .card span {{ display: block; margin-top: 7px; color: #636b7c; font-size: 12px; font-weight: 650; }}
+  .bottom {{ position: absolute; left: 62px; right: 34px; bottom: 20px; display: flex; align-items: end; justify-content: space-between; }}
+  .progress {{ width: 212px; height: 8px; border-radius: 99px; background: #e9ecf3; overflow: hidden; }}
+  .bar {{ width: 0%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rose), var(--rose-2)); transition: width .45s ease; }}
+  .status {{ margin-top: 12px; color: var(--muted); font-size: 13px; font-weight: 650; }}
+  .actions {{ display: flex; gap: 12px; }}
+  .btn {{ height: 46px; border-radius: 16px; border: 1px solid #dce0e9; padding: 0 23px; background: white; color: #484c59; font-size: 16px; font-weight: 850; cursor: pointer; }}
+  .primary {{ position: relative; min-width: 114px; border: 0; color: white; background: linear-gradient(180deg, #ff6385, var(--rose)); overflow: hidden; }}
+  .primary::before {{ content: ""; position: absolute; left: 12px; right: 12px; top: 6px; height: 12px; border-radius: 999px; background: rgba(255,255,255,.18); }}
+  .btn:active {{ transform: translateY(1px); }}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand">
+        <div class="icon-wrap"><img src="data:image/png;base64,{icon}" alt="ChangLi" /></div>
+        <div><div class="wordmark">ChangLi</div><div class="tag">PRIVATE MEDIA LIBRARY</div></div>
+      </div>
+      <div class="poster">
+        <h1>装好后<br/>直接进入<br/>收藏宇宙</h1>
+        <p>本地资料、海报、播放环境和收藏路径会原样保留。</p>
+      </div>
+      <div class="pills"><span class="pill">本地数据库</span><span class="pill">播放器就绪</span><span class="pill">自动建库</span></div>
+    </aside>
+    <main class="main">
+      <button class="close" onclick="window.close()">×</button>
+      <section class="panel">
+        <div class="dots"><i class="dot active"></i><i class="dot"></i><i class="dot"></i></div>
+        <div class="version">ChangLi {version}</div>
+        <h2>准备安装长离</h2>
+        <p class="desc">安装完成后立即打开你的本地影音资料库。<br/>原有数据、海报和播放环境都会继续保留。</p>
+        <div class="path"><div class="home">⌂</div><div><small>安装位置</small><strong>当前用户 AppData / ChangLi</strong></div><button class="change">更改</button></div>
+        <div class="cards">
+          <div class="card"><div class="badge">✓</div><div><b>保留本地数据</b><span>升级沿用现有资料库</span></div></div>
+          <div class="card"><div class="badge">▶</div><div><b>播放器就绪</b><span>安装后直接播放</span></div></div>
+          <div class="card"><div class="badge">↗</div><div><b>一键启动</b><span>完成后立即打开</span></div></div>
+        </div>
+      </section>
+      <div class="bottom">
+        <div><div class="progress"><div class="bar" id="bar"></div></div><div class="status" id="status">准备就绪，约 1 分钟完成</div></div>
+        <div class="actions"><button class="btn" onclick="window.close()">取消</button><button class="btn primary" id="install">开始安装</button></div>
+      </div>
+    </main>
+  </div>
+<script>
+  const btn = document.getElementById('install');
+  const bar = document.getElementById('bar');
+  const status = document.getElementById('status');
+  let running = false;
+  btn.addEventListener('click', () => {{
+    if (running) return;
+    running = true;
+    btn.textContent = '安装中';
+    status.textContent = '正在安装 ChangLi...';
+    let p = 8;
+    bar.style.width = p + '%';
+    const timer = setInterval(() => {{
+      p = Math.min(94, p + Math.floor(Math.random() * 9) + 4);
+      bar.style.width = p + '%';
+    }}, 420);
+    window.ipc.postMessage('install');
+    setTimeout(() => {{
+      clearInterval(timer);
+      bar.style.width = '100%';
+      status.textContent = '安装完成，可以打开 ChangLi';
+      btn.textContent = '完成';
+      btn.onclick = () => window.close();
+    }}, 5200);
+  }});
+</script>
+</body>
+</html>"#,
+        icon = icon,
+        version = version
+    )
 }
 
-unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, _w: WPARAM, l: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, RADIUS, RADIUS);
-            SetWindowRgn(hwnd, Some(region), true);
-            SetTimer(Some(hwnd), 1, 120, None);
-            LRESULT(0)
-        }
-        WM_TIMER => {
-            if INSTALLING.load(Ordering::SeqCst) {
-                InvalidateRect(Some(hwnd), None, false).ok();
-            }
-            LRESULT(0)
-        }
-        WM_NCHITTEST => {
-            let (x, y) = client_point(hwnd, l);
-            if CLOSE_RECT.contains(x, y)
-                || INSTALL_RECT.contains(x, y)
-                || CANCEL_RECT.contains(x, y)
-            {
-                LRESULT(HTCLIENT as isize)
-            } else if TITLE_DRAG_RECT.contains(x, y) {
-                LRESULT(HTCAPTION as isize)
-            } else {
-                LRESULT(HTCLIENT as isize)
-            }
-        }
-        WM_LBUTTONDOWN => {
-            let x = (l.0 & 0xffff) as i16 as i32;
-            let y = ((l.0 >> 16) & 0xffff) as i16 as i32;
-            if CLOSE_RECT.contains(x, y) || CANCEL_RECT.contains(x, y) {
-                DestroyWindow(hwnd).ok();
-            } else if INSTALL_RECT.contains(x, y) {
-                if DONE.load(Ordering::SeqCst) {
-                    DestroyWindow(hwnd).ok();
-                } else {
-                    start_install(hwnd);
-                }
-            }
-            LRESULT(0)
-        }
-        WM_PAINT => {
-            let mut ps = PAINTSTRUCT::default();
-            let hdc = BeginPaint(hwnd, &mut ps);
-            fill_round(
-                hdc,
-                RectI {
-                    x: 0,
-                    y: 0,
-                    w: W,
-                    h: H,
-                },
-                RADIUS,
-                rgb(255, 255, 255),
-            );
-            draw_sidebar(hdc);
-            draw_main(hdc);
-            EndPaint(hwnd, &ps).ok();
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            DestroyWindow(hwnd).ok();
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            PostQuitMessage(0);
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, _w, l),
-    }
-}
+fn main() -> wry::Result<()> {
+    let event_loop = EventLoopBuilder::new().build();
+    let window = WindowBuilder::new()
+        .with_title("ChangLi Installer")
+        .with_decorations(false)
+        .with_resizable(false)
+        .with_transparent(true)
+        .with_inner_size(LogicalSize::new(980.0, 640.0))
+        .build(&event_loop)
+        .expect("create installer window");
 
-fn main() -> windows::core::Result<()> {
-    unsafe {
-        let instance = GetModuleHandleW(None)?;
-        let class_name = wide("ChangLiCustomInstaller");
-        let wc = WNDCLASSW {
-            hInstance: instance.into(),
-            lpszClassName: PCWSTR(class_name.as_ptr()),
-            lpfnWndProc: Some(wndproc),
-            style: CS_HREDRAW | CS_VREDRAW,
-            ..Default::default()
-        };
-        RegisterClassW(&wc);
+    let _webview = WebViewBuilder::new()
+        .with_html(html())
+        .with_ipc_handler(move |request| {
+            if request.body() == "install" {
+                start_install();
+            }
+        })
+        .build(&window)?;
 
-        let x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
-        let y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
-        let title = wide("ChangLi Installer");
-        let hwnd = CreateWindowExW(
-            Default::default(),
-            PCWSTR(class_name.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            WS_POPUP | WS_VISIBLE,
-            x,
-            y,
-            W,
-            H,
-            None,
-            None,
-            Some(instance.into()),
-            Some(null_mut()),
-        )?;
-        ShowWindow(hwnd, SW_SHOW);
-
-        let mut msg = MSG::default();
-        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::NewEvents(StartCause::Init) => {}
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            _ => {}
         }
-    }
-    Ok(())
+    });
 }
