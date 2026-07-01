@@ -1095,7 +1095,7 @@ fn image_mime_from_path(path: &Path) -> &'static str {
     }
 }
 
-fn image_data_url(path: &Path) -> Option<String> {
+pub fn image_data_url(path: &Path) -> Option<String> {
     let bytes = std::fs::read(path).ok()?;
     let encoded = BASE64_STANDARD.encode(bytes);
     Some(format!(

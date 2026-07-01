@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
@@ -85,28 +85,9 @@ const Library: React.FC = () => {
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
-  const tagsRef = useRef<HTMLDivElement>(null);
-  const actorsRef = useRef<HTMLDivElement>(null);
-  const [tagsNeedsExpand, setTagsNeedsExpand] = useState(false);
-  const [actorsNeedsExpand, setActorsNeedsExpand] = useState(false);
-  const [overflowChecked, setOverflowChecked] = useState(false);
-
-  // 检测筛选按钮区域是否超过一行
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (tagsRef.current) {
-        setTagsNeedsExpand(tagsRef.current.scrollHeight > tagsRef.current.clientHeight + 2);
-      }
-      if (actorsRef.current) {
-        setActorsNeedsExpand(actorsRef.current.scrollHeight > actorsRef.current.clientHeight + 2);
-      }
-      setOverflowChecked(true);
-    };
-    checkOverflow();
-    // 窗口 resize 时重新检测
-    window.addEventListener('resize', checkOverflow);
-    return () => window.removeEventListener('resize', checkOverflow);
-  }, [tags, actors, mainCategory]);
+  // 按数量判断是否需要展开按钮（首帧即确定，无跳动）
+  const tagsNeedsExpand = tags.length > 5;
+  const actorsNeedsExpand = actors.length > 5;
 
 
   // 同步筛选状态到 URL 参数
@@ -480,7 +461,7 @@ const Library: React.FC = () => {
         <div className="flex flex-col gap-3 flex-1 min-w-0">
           {features.tags && (
             <div className="flex items-center gap-2">
-              <div ref={tagsRef} className={`flex gap-3 flex-wrap overflow-hidden ${overflowChecked && !tagExpanded ? 'max-h-[44px]' : ''}`}>
+              <div className={`flex gap-3 flex-wrap overflow-hidden ${tagsNeedsExpand && !tagExpanded ? 'max-h-[40px]' : ''}`}>
                 <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
                 {tags.map((tag) => (
                   <button
@@ -492,7 +473,7 @@ const Library: React.FC = () => {
                   </button>
                 ))}
               </div>
-              {overflowChecked && tagsNeedsExpand && (
+              {tagsNeedsExpand && (
                 <button
                   onClick={() => setTagExpanded(!tagExpanded)}
                   className="category-btn active flex-shrink-0"
@@ -504,7 +485,7 @@ const Library: React.FC = () => {
           )}
           {features.actors && (
             <div className="flex items-center gap-2">
-              <div ref={actorsRef} className={`flex gap-3 flex-wrap overflow-hidden ${overflowChecked && !actorExpanded ? 'max-h-[44px]' : ''}`}>
+              <div className={`flex gap-3 flex-wrap overflow-hidden ${actorsNeedsExpand && !actorExpanded ? 'max-h-[40px]' : ''}`}>
                 <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
                 {actors.map((actor) => (
                   <button
@@ -516,7 +497,7 @@ const Library: React.FC = () => {
                   </button>
                 ))}
               </div>
-              {overflowChecked && actorsNeedsExpand && (
+              {actorsNeedsExpand && (
                 <button
                   onClick={() => setActorExpanded(!actorExpanded)}
                   className="category-btn active flex-shrink-0"

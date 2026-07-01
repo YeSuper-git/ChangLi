@@ -1860,11 +1860,20 @@ async fn add_actor_photo_cmd(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let stored_photo = photo.as_deref().map(normalize_photo_path_for_storage);
+    // 如果没传 base64，从文件路径读取生成
+    let effective_base64 = if photo_base64.is_some() {
+        photo_base64
+    } else if let Some(ref path) = stored_photo {
+        let resolved = storage::resolve_data_path(path);
+        db::image_data_url(&resolved)
+    } else {
+        None
+    };
     db::add_actor_photo(
         &pool,
         actor_id,
         stored_photo.as_deref(),
-        photo_base64.as_deref(),
+        effective_base64.as_deref(),
         is_primary.unwrap_or(0),
     )
     .await
