@@ -511,17 +511,18 @@ const Library: React.FC = () => {
         </div>
       </div>
 
-      <div className="changli-toolbar mb-6 flex justify-between items-start p-4">
-        <div className="flex flex-col gap-3 flex-1 min-w-0">
-          {features.tags && (
-            <div className="flex items-center gap-2">
-              <div ref={tagsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!tagExpanded ? 'max-h-[40px]' : ''}`}>
-                <button onClick={() => handleTagClick(null)} className={`category-btn ${activeTagId === null ? 'active' : ''}`}>标签</button>
+      <div className="changli-filter-panel mb-8">
+        {features.tags && (
+          <>
+            <div className="changli-filter-group">
+              <div className="changli-filter-label">标签</div>
+              <div ref={tagsRef} className={`changli-filter-row ${tagExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+                <button onClick={() => handleTagClick(null)} className={`changli-filter-pill ${activeTagId === null ? 'active' : ''}`}>全部标签</button>
                 {tags.map((tag) => (
                   <button
                     key={tag.id}
                     onClick={() => handleTagClick(tag.id)}
-                    className={`category-btn ${activeTagId === tag.id ? 'active' : ''}`}
+                    className={`changli-filter-pill ${activeTagId === tag.id ? 'active' : ''}`}
                   >
                     {tag.name}
                   </button>
@@ -530,22 +531,26 @@ const Library: React.FC = () => {
               {tagsNeedsExpand && (
                 <button
                   onClick={() => setTagExpanded(!tagExpanded)}
-                  className="category-btn active flex-shrink-0"
+                  className="changli-filter-more"
                 >
                   {tagExpanded ? '收起 ↑' : '展开 ↓'}
                 </button>
               )}
             </div>
-          )}
-          {features.actors && (
-            <div className="flex items-center gap-2">
-              <div ref={actorsRef} className={`flex gap-3 flex-wrap overflow-hidden ${!actorExpanded ? 'max-h-[40px]' : ''}`}>
-                <button onClick={() => filterByActor(null)} className={`category-btn ${activeActorId === null ? 'active' : ''}`}>演员</button>
+            <div className="changli-filter-divider" />
+          </>
+        )}
+        {features.actors && (
+          <>
+            <div className="changli-filter-group">
+              <div className="changli-filter-label">演员</div>
+              <div ref={actorsRef} className={`changli-filter-row ${actorExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+                <button onClick={() => filterByActor(null)} className={`changli-filter-pill ${activeActorId === null ? 'active' : ''}`}>全部演员</button>
                 {actors.map((actor) => (
                   <button
                     key={actor.id}
                     onClick={() => handleActorClick(actor.id)}
-                    className={`category-btn ${activeActorId === actor.id ? 'active' : ''}`}
+                    className={`changli-filter-pill ${activeActorId === actor.id ? 'active' : ''}`}
                   >
                     {actor.name}
                   </button>
@@ -554,34 +559,37 @@ const Library: React.FC = () => {
               {actorsNeedsExpand && (
                 <button
                   onClick={() => setActorExpanded(!actorExpanded)}
-                  className="category-btn active flex-shrink-0"
+                  className="changli-filter-more"
                 >
                   {actorExpanded ? '收起 ↑' : '展开 ↓'}
                 </button>
               )}
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-6 flex gap-3 flex-wrap">
-        {features.tracking ? (
-          <>
-            <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
-            <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`category-btn ${favoriteFilter ? 'active' : ''}`}>已追番</button>
-            <button onClick={() => setWatchedFilter(!watchedFilter)} className={`category-btn ${watchedFilter ? 'active' : ''}`}>已看完</button>
-            {features.chinese_sub && (
-              <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
-            )}
-          </>
-        ) : (
-          <>
-            <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`category-btn ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
-            {features.chinese_sub && (
-              <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`category-btn ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
-            )}
+            <div className="changli-filter-divider" />
           </>
         )}
+        <div className="changli-filter-group">
+          <div className="changli-filter-label">状态</div>
+          <div className="changli-filter-row is-expanded">
+            {features.tracking ? (
+              <>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+                <button onClick={() => setWatchedFilter(!watchedFilter)} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
+                {features.chinese_sub && (
+                  <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+                )}
+              </>
+            ) : (
+              <>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                {features.chinese_sub && (
+                  <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="changli-toolbar mb-10 p-3">

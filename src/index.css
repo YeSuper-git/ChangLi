@@ -690,6 +690,104 @@ body.player-window-document,
   box-shadow: 0 12px 25px rgba(23, 24, 28, 0.14);
 }
 
+.changli-filter-panel {
+  border: 1px solid rgba(232, 235, 242, 0.92);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  padding: 16px;
+  box-shadow: 0 12px 30px rgba(33, 38, 48, 0.045), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+}
+
+.changli-filter-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.changli-filter-label {
+  flex: 0 0 auto;
+  width: 44px;
+  padding-top: 9px;
+  color: #8a909d;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.changli-filter-row {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  transition: max-height 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+
+.changli-filter-row.is-collapsed {
+  max-height: 42px;
+}
+
+.changli-filter-row.is-expanded {
+  max-height: 220px;
+}
+
+.changli-filter-pill {
+  border-radius: 999px;
+  border: 1px solid #e7e9ef;
+  background: rgba(247, 248, 251, 0.88);
+  color: #3f4550;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.changli-filter-pill:hover {
+  border-color: rgba(251, 91, 123, 0.22);
+  background: rgba(255, 246, 248, 0.95);
+  color: #c72e55;
+  transform: translateY(-1px);
+}
+
+.changli-filter-pill.active {
+  border-color: rgba(251, 91, 123, 0.26);
+  background: linear-gradient(135deg, rgba(251, 91, 123, 0.14), rgba(255, 138, 76, 0.14));
+  color: #c72e55;
+  box-shadow: inset 0 0 0 1px rgba(251, 91, 123, 0.08);
+}
+
+.changli-filter-more {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px dashed rgba(251, 91, 123, 0.26);
+  background: rgba(255, 255, 255, 0.62);
+  color: #c72e55;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.changli-filter-more:hover {
+  background: rgba(255, 246, 248, 0.95);
+  border-color: rgba(251, 91, 123, 0.36);
+  transform: translateY(-1px);
+}
+
+.changli-filter-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: linear-gradient(90deg, transparent, rgba(232, 235, 242, 0.92), transparent);
+}
+
 /* 分类按钮 */
 .category-btn {
   padding: 10px 20px;
