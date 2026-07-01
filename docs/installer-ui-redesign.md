@@ -1,106 +1,78 @@
-# ChangLi Windows 安装器 UI 设计落地
+# ChangLi Windows 自定义安装器
 
-## 目标
+## 结论
 
-完全摒弃默认 NSIS 欢迎/路径选择/start menu 页面，把 Windows 安装器升级为 ChangLi 自有品牌安装前端。
+NSIS `template` 只能替换 wizard 内部页面，外层仍然是 NSIS 默认安装器框架。要做到“完全不是默认安装器”，必须让用户打开的是 ChangLi 自己的安装器外壳。
 
-## 当前落地范围
+当前方案：
 
-本次启用 Tauri v2 NSIS `template`：
+1. Tauri 仍然在 CI 中生成内层 NSIS 安装包，用于真实文件复制、注册表、快捷方式、卸载信息。
+2. CI 随后编译 `installer-shell`。
+3. `installer-shell` 在编译期通过 `CHANGLI_NSIS_SETUP` 把内层 NSIS exe 嵌入到自定义安装器 exe。
+4. 用户最终下载/打开的是 `ChangLi-{version}-setup.exe`，看到的是 ChangLi 自定义窗口，不再直接看到 NSIS wizard。
+5. 点击“开始安装”后，自定义安装器把内层 NSIS 写入临时目录并用 `/S` 静默执行。
 
-```json
-"template": "nsis/installer.nsi"
-```
+## 文件
 
-并基于 Tauri v2 默认模板保留底层安装能力：
+- `installer-shell/`
+  - 独立 Rust/Win32 自定义安装器外壳
+  - 无 NSIS 默认窗口
+  - 无 WebView/Electron 依赖
+  - 绘制 ChangLi 品牌 UI
+- `.github/workflows/build.yml`
+  - 先通过 `tauri-action` 生成内层 NSIS 安装包
+  - 再编译 `installer-shell`
+  - 最终上传自定义安装器 exe
+- `src-tauri/tauri.conf.json`
+  - 不再引用 `nsis/installer.nsi` template
+  - 保留默认 NSIS 作为静默安装后端
+- `src/index.css`
+  - 删除 `.changli-wordmark::before`
+  - 程序本体左上角不再显示旧橙色伪图标
 
-- WebView2 检查与安装逻辑
-- 旧版本检测与覆盖安装逻辑
-- 文件复制、资源复制、external binaries 复制
-- 注册表写入
-- 桌面/开始菜单快捷方式
-- 卸载逻辑
-- 安静安装/被动安装参数
+## 自定义安装器 UI
 
-页面层改为 ChangLi 自定义安装前端。
+自定义窗口内容：
 
-## 已替换的默认页面
-
-`src-tauri/nsis/installer.nsi` 中已移除默认：
-
-- `MUI_PAGE_WELCOME`
-- `MUI_PAGE_DIRECTORY`
-- `MUI_PAGE_STARTMENU`
-- `MUI_PAGE_FINISH`
-- `MULTIUSER_PAGE_INSTALLMODE`
-
-替换为：
-
-```nsi
-Page custom ChangLiBrandPageCreate ChangLiBrandPageLeave
-```
-
-## 自定义安装页内容
-
-自定义页包括：
-
-- 左侧 rose/orange ChangLi 品牌侧栏
-- 真实 ChangLi app 图标，不使用“长”字占位
-- 版本提示：`ChangLi ${VERSION}`
+- 左侧 rose/orange ChangLi 品牌区
+- 真实 ChangLi app 图标
+- 标题：`装好后 / 直接进入 / 收藏宇宙`
+- 能力标签：本地数据库 / 内置播放器 / 自动建库
+- 右侧安装信息区
+- 版本：`ChangLi {version}`
 - 主标题：`准备安装长离`
-- 说明文案：本地影音资料库、保留数据、播放环境
 - 安装位置卡片
-- “更改”按钮，使用 `nsDialogs::SelectFolderDialog` 选择安装目录
 - 三张能力卡：
   - 保留本地数据
   - 播放器就绪
   - 一键启动
-- 底部状态文案：`准备就绪 · 约 1 分钟完成`
-- 默认向导按钮重命名：
-  - 下一步 → `开始安装`
-  - 取消 → `取消`
-  - 上一步隐藏
+- 底部进度条
+- `取消` / `开始安装` 按钮
 
-## 自定义完成页
+## 工作流
 
-安装完成后不使用默认 `MUI_PAGE_FINISH`，改为 `ChangLiFinishPageCreate`：
+发布时：
 
-- 左侧沿用 ChangLi 品牌侧栏
-- 标题：`长离已安装完成`
-- 展示安装路径摘要
-- 勾选项：`完成后立即打开 ChangLi`
-- 底部状态：`本地数据已保留 · 快捷方式已创建 · 播放环境已就绪`
-- 默认向导按钮重命名：`完成`
+```powershell
+# tauri-action 生成内层 NSIS
+args: --bundles nsis
 
-## 资源
+# 编译自定义安装器外壳
+$env:CHANGLI_NSIS_SETUP = $setup.FullName
+$env:CHANGLI_APP_VERSION = "${{ steps.version.outputs.version }}"
+cargo build --manifest-path installer-shell/Cargo.toml --release --target x86_64-pc-windows-msvc
 
-- `src-tauri/nsis/installer-sidebar.bmp`
-  - 左侧品牌主视觉，尺寸 164 x 314
-- `src-tauri/nsis/installer-header.bmp`
-  - 备用 header 视觉，尺寸 150 x 57
-- `src-tauri/nsis/installer.nsi`
-  - 完整自定义 NSIS template
-- `src/assets/brand/app-icon.png`
-  - React 顶栏真实 app 图标
-
-## 主程序顶栏修复
-
-`src/components/Layout.tsx` 使用真实 app 图标 + `长离` 文本。
-
-`src/index.css` 删除了旧的：
-
-```css
-.changli-wordmark::before
+# 上传最终自定义安装器
+ChangLi-${{ steps.version.outputs.version }}-setup.exe
 ```
 
-因此不会再出现原来的橙色伪图标，也不是在旧图标右侧新增真实图标，而是彻底替换旧图标。
+## 验证边界
 
-## 验证说明
+macOS 本机可验证：
 
-macOS 本机可以验证：
+- 前端构建
+- Tauri 配置 JSON
+- Rust 主程序 `cargo check`
+- installer-shell 格式化
 
-```bash
-npm run build
-```
-
-Windows NSIS installer template 必须通过 Windows CI / Windows 构建机生成真实 `.exe` 后做最终安装器视觉和安装流程验证。
+自定义 Windows 安装器的真实窗口和安装流程必须通过 GitHub Actions `windows-latest` 构建后验证。
