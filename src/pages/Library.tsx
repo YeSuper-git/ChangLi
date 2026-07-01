@@ -733,7 +733,7 @@ const Library: React.FC = () => {
                   key={series.id}
                   onClick={() => { if (!selectMode) {
                     const filterSearch = buildFilterSearch();
-                    navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}` } });
+                    navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}`, seriesSnapshot: series } });
                   }}}
                   onContextMenu={(event) => openContextMenu(event, 'series', series.id, series.title)}
                   className={`cursor-pointer group ${selectMode && selectedIds.has(`s-${series.id}`) ? 'ring-2 ring-rose-400 ring-offset-2 ring-offset-white rounded-2xl' : ''}`}

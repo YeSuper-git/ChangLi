@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open } from '@tauri-apps/plugin-dialog';
 import backIcon from '../assets/icons/back.svg';
@@ -39,6 +39,26 @@ import { useLibraryStore } from '../store/libraryStore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { notify } from '../utils/notify';
 
+interface SeriesDetailCacheEntry {
+  series: VideoSeries | null;
+  videos: Video[];
+  seriesTags: Tag[];
+  seriesActors: Actor[];
+}
+
+const seriesDetailCache = new Map<number, SeriesDetailCacheEntry>();
+
+function toEditData(series: VideoSeries) {
+  return {
+    title: series.title,
+    description: series.description || '',
+    poster: series.poster || '',
+    status: series.status === 'completed' ? 'completed' as const : 'ongoing' as const,
+    code: series.code || '',
+    has_chinese_sub: series.has_chinese_sub === 1,
+  };
+}
+
 function extractCode(folderName: string): { code: string; hasChineseSub: boolean } {
   const match = folderName.match(/[A-Za-z]+-\d+[A-Za-z]*/);
   if (!match) return { code: '', hasChineseSub: false };
@@ -64,7 +84,7 @@ const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { favorites, toggleFavorite, refreshSeries } = useLibraryStore();
+  const { favorites, toggleFavorite, refreshSeries, tags: cachedTags, actors: cachedActors } = useLibraryStore();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const editFromUrl = searchParams.get('edit') === '1';
@@ -77,25 +97,30 @@ const SeriesDetail: React.FC = () => {
     }
   };
   const seriesId = Number(id);
+  const routeState = location.state as { from?: string; backLabel?: string; filterSearch?: string; seriesSnapshot?: VideoSeries } | null;
+  const cachedDetail = Number.isFinite(seriesId) ? seriesDetailCache.get(seriesId) : undefined;
+  const initialSeries = cachedDetail?.series || routeState?.seriesSnapshot || null;
 
-  const [series, setSeries] = useState<VideoSeries | null>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [series, setSeries] = useState<VideoSeries | null>(initialSeries);
+  const [videos, setVideos] = useState<Video[]>(cachedDetail?.videos || []);
+  const [loading, setLoading] = useState(!initialSeries);
+  const [refreshing, setRefreshing] = useState(Boolean(initialSeries));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userTouchedSub, setUserTouchedSub] = useState(false);
   const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed'; code: string; has_chinese_sub: boolean }>({ title: '', description: '', poster: '', status: 'ongoing', code: '', has_chinese_sub: false });
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [seriesTags, setSeriesTags] = useState<Tag[]>([]);
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [seriesTags, setSeriesTags] = useState<Tag[]>(cachedDetail?.seriesTags || []);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>(cachedDetail?.seriesTags.map((tag) => tag.id) || []);
   const [newTagName, setNewTagName] = useState('');
   const [creatingTag, setCreatingTag] = useState(false);
   const [showNewActorModal, setShowNewActorModal] = useState(false);
   const [allActors, setAllActors] = useState<Actor[]>([]);
-  const [seriesActors, setSeriesActors] = useState<Actor[]>([]);
-  const [selectedActorIds, setSelectedActorIds] = useState<number[]>([]);
+  const [seriesActors, setSeriesActors] = useState<Actor[]>(cachedDetail?.seriesActors || []);
+  const [selectedActorIds, setSelectedActorIds] = useState<number[]>(cachedDetail?.seriesActors.map((actor) => actor.id) || []);
   const [newActorName, setNewActorName] = useState('');
   const [actorNotice, setActorNotice] = useState('');
+  const [editOptionsLoaded, setEditOptionsLoaded] = useState(false);
   // 使用后端返回的 poster_orientation 字段，不再动态检测
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   // 右键菜单
@@ -108,8 +133,21 @@ const SeriesDetail: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    setEditOptionsLoaded(false);
+    const nextCached = Number.isFinite(seriesId) ? seriesDetailCache.get(seriesId) : undefined;
+    const nextSeries = nextCached?.series || routeState?.seriesSnapshot || null;
+    setSeries(nextSeries);
+    setVideos(nextCached?.videos || []);
+    setSeriesTags(nextCached?.seriesTags || []);
+    setSeriesActors(nextCached?.seriesActors || []);
+    setSelectedTagIds(nextCached?.seriesTags.map((tag) => tag.id) || []);
+    setSelectedActorIds(nextCached?.seriesActors.map((actor) => actor.id) || []);
+    if (nextSeries) {
+      setEditData(toEditData(nextSeries));
+    }
+    setLoading(!nextSeries);
     if (seriesId) {
-      loadSeries();
+      loadSeries({ silent: Boolean(nextSeries) });
     }
   }, [seriesId]);
 
@@ -141,40 +179,58 @@ const SeriesDetail: React.FC = () => {
     };
   }, [contextMenu, clearPending]);
 
-  const loadSeries = async () => {
+  const loadSeries = useCallback(async (options: { silent?: boolean } = {}) => {
+    if (!seriesId) return;
+    if (!options.silent) setLoading(true);
+    else setRefreshing(true);
     try {
-      const [seriesData, seriesVideos] = await getVideoSeriesDetail(seriesId);
-      const [tags, actors, selectedTags, selectedActors] = await Promise.all([
-        getTags(),
-        getActors(),
+      const [[seriesData, seriesVideos], selectedTags, selectedActors] = await Promise.all([
+        getVideoSeriesDetail(seriesId),
         getSeriesTags(seriesId),
         getSeriesActors(seriesId),
       ]);
       setSeries(seriesData);
       setVideos(seriesVideos);
-      setAllTags(tags);
-      setAllActors(actors);
       setSeriesTags(selectedTags);
       setSeriesActors(selectedActors);
       setSelectedTagIds(selectedTags.map((tag) => tag.id));
       setSelectedActorIds(selectedActors.map((actor) => actor.id));
       if (seriesData) {
-        setEditData({
-          title: seriesData.title,
-          description: seriesData.description || '',
-          poster: seriesData.poster || '',
-          status: seriesData.status === 'completed' ? 'completed' : 'ongoing',
-          code: seriesData.code || '',
-          has_chinese_sub: seriesData.has_chinese_sub === 1,
-        });
+        setEditData(toEditData(seriesData));
       }
+      seriesDetailCache.set(seriesId, { series: seriesData, videos: seriesVideos, seriesTags: selectedTags, seriesActors: selectedActors });
     } catch (error) {
       console.error('加载视频集失败:', error);
       notify({ message: '加载视频集失败: ' + String(error), type: 'error' });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [seriesId]);
+
+  const loadEditOptions = useCallback(async () => {
+    if (editOptionsLoaded) return;
+    if (cachedTags.length > 0) setAllTags(cachedTags);
+    if (cachedActors.length > 0) setAllActors(cachedActors);
+    try {
+      const [tags, actors] = await Promise.all([
+        cachedTags.length > 0 ? Promise.resolve(cachedTags) : getTags(),
+        cachedActors.length > 0 ? Promise.resolve(cachedActors) : getActors(),
+      ]);
+      setAllTags(tags);
+      setAllActors(actors);
+      setEditOptionsLoaded(true);
+    } catch (error) {
+      console.error('加载编辑选项失败:', error);
+      notify({ message: '加载编辑选项失败: ' + String(error), type: 'error' });
+    }
+  }, [cachedActors, cachedTags, editOptionsLoaded]);
+
+  useEffect(() => {
+    if (editing) {
+      loadEditOptions();
+    }
+  }, [editing, loadEditOptions]);
 
   const handleSelectPoster = async () => {
     const selected = await open({
@@ -347,7 +403,7 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const backState = location.state as { from?: string; backLabel?: string } | null;
+  const backState = routeState;
   const fallbackBackTo = fromActor ? `/actors/${fromActor}` : '/library';
   const fallbackBackLabel = fromActor ? '返回演员详情' : '返回视频';
   const backTo = backState?.from || fallbackBackTo;
@@ -389,7 +445,7 @@ const SeriesDetail: React.FC = () => {
 
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div></div>;
+  if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
@@ -419,6 +475,9 @@ const SeriesDetail: React.FC = () => {
 
   return (
     <div className="changli-page">
+      {refreshing && (
+        <div className="fixed right-6 top-20 z-40 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-xs font-medium text-gray-500 shadow-sm">同步中</div>
+      )}
       <div className="mb-6">
         <button type="button" onClick={handleBack} className="changli-back-link">
           <span className="changli-back-icon"><img src={backIcon} alt="返回" /></span>
