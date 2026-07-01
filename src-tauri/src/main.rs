@@ -728,7 +728,9 @@ async fn scan_videos_for_actor(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
 
-    // 校验文件夹名 = 演员的 name 或 japanese_name
+    // 校验文件夹名
+    // 如果指定了时期，用时期名校验；否则用演员名校验
+    // 也支持番号格式的文件夹名（如 STARS-667C[标题]）
     let actor = db::get_actor(&pool, actor_id)
         .await
         .map_err(|e| e.to_string())?
@@ -738,16 +740,39 @@ async fn scan_videos_for_actor(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     let folder_trimmed = folder_name.trim();
-    let name_matches = folder_trimmed.eq_ignore_ascii_case(actor.name.trim());
-    let jp_matches = actor
-        .japanese_name
-        .as_deref()
-        .map(|jp| folder_trimmed.eq_ignore_ascii_case(jp.trim()))
-        .unwrap_or(false);
-    if !name_matches && !jp_matches {
+
+    // 如果指定了时期，用时期名校验
+    let period_name = if let Some(pid) = period_id {
+        db::get_actor_periods(&pool, actor_id)
+            .await
+            .ok()
+            .and_then(|periods| periods.into_iter().find(|p| p.id == pid).map(|p| p.name))
+    } else {
+        None
+    };
+
+    let name_matches = if let Some(ref pname) = period_name {
+        folder_trimmed.eq_ignore_ascii_case(pname.trim())
+    } else {
+        folder_trimmed.eq_ignore_ascii_case(actor.name.trim())
+            || actor
+                .japanese_name
+                .as_deref()
+                .map(|jp| folder_trimmed.eq_ignore_ascii_case(jp.trim()))
+                .unwrap_or(false)
+    };
+
+    // 如果名称不匹配，检查是否是番号格式的文件夹
+    let is_video_folder = !name_matches
+        && scanner::parse_adult_filename(folder_trimmed).is_some();
+
+    if !name_matches && !is_video_folder {
+        let expected = period_name
+            .as_deref()
+            .unwrap_or(&actor.name);
         return Err(format!(
-            "文件夹名 '{}' 不匹配演员 '{}' 或其日文名",
-            folder_name, actor.name
+            "文件夹名 '{}' 不匹配 '{}' 或番号格式",
+            folder_name, expected
         ));
     }
 

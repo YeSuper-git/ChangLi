@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChangLi Installer Preview</title>
+  <style>
+    :root {
+      --rose: #fb5b7b;
+      --orange: #ff8a4c;
+      --ink: #18191f;
+      --muted: #717784;
+      --line: rgba(228, 231, 238, 0.92);
+      --panel: rgba(255, 255, 255, 0.82);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(251, 91, 123, 0.22), transparent 32%),
+        radial-gradient(circle at 86% 82%, rgba(255, 138, 76, 0.25), transparent 34%),
+        linear-gradient(135deg, #f8f3f5 0%, #f7f8fb 48%, #fff7f2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+    }
+    .frame {
+      width: 980px;
+      height: 640px;
+      border-radius: 34px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.52);
+      box-shadow: 0 34px 90px rgba(36, 39, 48, 0.20), inset 0 1px 0 rgba(255,255,255,0.9);
+      backdrop-filter: blur(22px) saturate(160%);
+    }
+    .window {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 26px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,250,248,0.86));
+      display: grid;
+      grid-template-columns: 318px 1fr;
+    }
+    .sidebar {
+      position: relative;
+      overflow: hidden;
+      padding: 32px;
+      color: white;
+      background:
+        radial-gradient(circle at 25% 12%, rgba(255, 255, 255, 0.38), transparent 25%),
+        radial-gradient(circle at 74% 86%, rgba(255, 187, 123, 0.42), transparent 30%),
+        linear-gradient(160deg, #fb5b7b 0%, #f45d69 40%, #ff8a4c 100%);
+    }
+    .sidebar:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.13) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.13) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.55), transparent 74%);
+    }
+    .brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
+    .icon {
+      width: 58px; height: 58px; border-radius: 18px;
+      display: grid; place-items: center;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.34);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 14px 30px rgba(112, 24, 44, 0.22);
+      font-size: 30px; font-weight: 900;
+    }
+    .brand h1 { margin: 0; font-size: 26px; letter-spacing: -0.04em; }
+    .brand p { margin: 3px 0 0; opacity: .78; font-size: 13px; }
+    .hero-copy { position: relative; z-index: 1; margin-top: 74px; }
+    .hero-copy .kicker { font-size: 13px; font-weight: 800; opacity: .78; letter-spacing: .18em; }
+    .hero-copy h2 { margin: 14px 0 12px; font-size: 42px; line-height: 1.05; letter-spacing: -0.07em; }
+    .hero-copy p { margin: 0; width: 210px; line-height: 1.8; font-size: 14px; opacity: .84; }
+    .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
+    .chip { padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.24); font-size: 12px; font-weight: 750; }
+    .poster-stack { position: absolute; z-index: 0; left: 48px; bottom: -74px; width: 230px; height: 210px; opacity: .58; }
+    .poster { position: absolute; width: 92px; height: 132px; border-radius: 16px; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 18px 50px rgba(94, 22, 31, .22); }
+    .poster:nth-child(1) { left: 0; top: 24px; transform: rotate(-12deg); }
+    .poster:nth-child(2) { left: 70px; top: 0; transform: rotate(5deg); background: rgba(255,255,255,0.28); }
+    .poster:nth-child(3) { left: 138px; top: 32px; transform: rotate(13deg); }
+    .main { padding: 34px 40px 30px; display: flex; flex-direction: column; }
+    .titlebar { display: flex; justify-content: space-between; align-items: center; }
+    .steps { display: flex; gap: 10px; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 99px; background: #d9dce4; }
+    .dot.active { width: 28px; background: linear-gradient(90deg, var(--rose), var(--orange)); }
+    .version { font-size: 13px; color: var(--muted); font-weight: 700; }
+    .content { margin-top: 52px; }
+    .content h3 { margin: 0; font-size: 38px; line-height: 1.05; letter-spacing: -0.06em; }
+    .content > p { margin: 16px 0 0; max-width: 480px; color: #626876; line-height: 1.75; font-size: 15px; }
+    .install-card { margin-top: 34px; border: 1px solid var(--line); border-radius: 24px; background: var(--panel); padding: 18px; box-shadow: 0 16px 40px rgba(35, 40, 50, .07), inset 0 1px 0 rgba(255,255,255,.84); }
+    .path { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 16px; border-radius: 18px; background: #f7f8fb; border: 1px solid rgba(230,233,240,.92); }
+    .path span:first-child { color: #8b919c; font-size: 12px; font-weight: 800; }
+    .path strong { display: block; margin-top: 4px; font-size: 14px; }
+    .change { border: 0; border-radius: 999px; background: white; color: #c72e55; padding: 10px 14px; font-weight: 850; box-shadow: 0 8px 20px rgba(34,39,48,.08); }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+    .feature { padding: 14px; min-height: 104px; border-radius: 18px; background: white; border: 1px solid rgba(230,233,240,.86); }
+    .feature .mark { width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 12px; background: linear-gradient(135deg, rgba(251,91,123,.13), rgba(255,138,76,.15)); color: #c72e55; font-weight: 900; }
+    .feature h4 { margin: 0 0 5px; font-size: 14px; }
+    .feature p { margin: 0; color: #828894; font-size: 12px; line-height: 1.55; }
+    .footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .progress { flex: 1; }
+    .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: #7c828f; font-weight: 750; margin-bottom: 9px; }
+    .bar { height: 9px; border-radius: 999px; background: #eceff5; overflow: hidden; }
+    .bar div { width: 62%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rose), var(--orange)); box-shadow: 0 0 18px rgba(251,91,123,.38); }
+    .actions { display: flex; gap: 10px; }
+    .btn { border: 1px solid #e2e5ec; border-radius: 16px; padding: 13px 18px; font-weight: 850; background: white; color: #3e4450; }
+    .btn.primary { border-color: transparent; color: white; background: linear-gradient(135deg, var(--rose), var(--orange)); box-shadow: 0 16px 34px rgba(251,91,123,.24); padding-inline: 28px; }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <section class="window">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="icon">长</div>
+          <div><h1>ChangLi</h1><p>私人影音资料库</p></div>
+        </div>
+        <div class="hero-copy">
+          <div class="kicker">INSTALLER</div>
+          <h2>装好后<br />直接进入收藏宇宙</h2>
+          <p>本地优先，离线可用，海报、演员、标签和追番状态一起带进桌面。</p>
+        </div>
+        <div class="chips">
+          <span class="chip">本地数据库</span>
+          <span class="chip">内置播放器</span>
+          <span class="chip">自动建库</span>
+        </div>
+        <div class="poster-stack"><div class="poster"></div><div class="poster"></div><div class="poster"></div></div>
+      </aside>
+      <section class="main">
+        <div class="titlebar">
+          <div class="steps"><span class="dot active"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="version">ChangLi 1.7.13</div>
+        </div>
+        <div class="content">
+          <h3>准备安装长离</h3>
+          <p>选择安装位置后，安装器会自动写入运行组件并创建桌面入口。过程清楚、安静、不打扰。</p>
+          <div class="install-card">
+            <div class="path">
+              <div><span>安装位置</span><strong>C:\Program Files\ChangLi</strong></div>
+              <button class="change">更改</button>
+            </div>
+            <div class="feature-grid">
+              <div class="feature"><div class="mark">1</div><h4>保留本地数据</h4><p>更新安装时不会覆盖用户资料库。</p></div>
+              <div class="feature"><div class="mark">2</div><h4>播放器就绪</h4><p>自动放置必要运行资源。</p></div>
+              <div class="feature"><div class="mark">3</div><h4>一键启动</h4><p>完成后可直接打开应用。</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="progress"><div class="progress-top"><span>安装准备</span><span>62%</span></div><div class="bar"><div></div></div></div>
+          <div class="actions"><button class="btn">取消</button><button class="btn primary">开始安装</button></div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
