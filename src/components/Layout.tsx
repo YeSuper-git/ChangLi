@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import PageMotion from './PageMotion';
 import settingsIcon from '../assets/icons/settings.svg';
 import searchIcon from '../assets/icons/search.svg';
+import appIcon from '../assets/brand/app-icon.png';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -35,8 +36,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
-              <Link to="/" className="changli-wordmark text-xl font-bold text-gray-900 no-underline">
-                长离
+              <Link to="/" className="changli-wordmark flex items-center gap-3 text-xl font-bold text-gray-900 no-underline">
+                <img src={appIcon} alt="长离" className="h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5" />
+                <span>长离</span>
               </Link>
               <div className="flex gap-2">
                 {navItems.map((item) => (
