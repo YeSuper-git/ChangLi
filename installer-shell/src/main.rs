@@ -43,6 +43,7 @@ enum InstallerEvent {
     Close,
     ChooseDir,
     Install,
+    CloseAndLaunch,
     InstallDone { success: bool, code: Option<i32> },
 }
 
@@ -134,6 +135,13 @@ fn start_install(install_dir: PathBuf, proxy: EventLoopProxy<InstallerEvent>) {
     });
 }
 
+fn launch_installed_app(install_dir: &Path) {
+    let exe = install_dir.join("ChangLi.exe");
+    if exe.exists() {
+        let _ = Command::new(exe).current_dir(install_dir).spawn();
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn apply_round_window(hwnd: isize) {
     unsafe {
@@ -168,22 +176,25 @@ fn html(default_dir: &Path) -> String {
   }}
   * {{ box-sizing:border-box; }}
   a {{ text-decoration:none; }}
-  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:#f4f6fb; }}
+  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f4f6fb; }}
+  body.closing .shell {{ transform:scale(.985); opacity:0; filter:blur(6px); }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f4f6fb; border-radius:28px; outline:1px solid rgba(255,255,255,.78); box-shadow:0 28px 90px rgba(31,35,49,.20), 0 1px 0 rgba(255,255,255,.88) inset; transition:opacity .18s ease, transform .18s ease, filter .18s ease; animation:shellIn .32s cubic-bezier(.16,1,.3,1) both; }}
+  @keyframes shellIn {{ from{{ opacity:0; transform:translateY(10px) scale(.985); filter:blur(4px); }} to{{ opacity:1; transform:translateY(0) scale(1); filter:blur(0); }} }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
-      radial-gradient(circle at -18% 74%, rgba(255,164,92,.88) 0 24%, transparent 25%),
-      radial-gradient(circle at 82% -9%, rgba(255,152,103,.95) 0 25%, transparent 26%),
+      radial-gradient(circle at -18% 74%, rgba(255,164,92,.70) 0 24%, transparent 25%),
+      radial-gradient(circle at 82% -9%, rgba(255,152,103,.82) 0 25%, transparent 26%),
       linear-gradient(154deg,#f14170 0%,#fb566a 47%,#ff8050 100%);
   }}
-  .side::after {{ content:""; position:absolute; inset:0; opacity:.32;
+  .side::before {{ content:""; position:absolute; inset:0; opacity:.34;
     background-image:
-      repeating-linear-gradient(105deg, rgba(255,255,255,.30) 0 1px, transparent 1px 18px),
-      linear-gradient(120deg, transparent 0 52%, rgba(255,255,255,.13) 53%, transparent 56%);
-    mask-image:linear-gradient(180deg,#000 0, transparent 42%);
+      repeating-linear-gradient(90deg, rgba(255,255,255,.30) 0 1px, transparent 1px 22px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.18) 0 1px, transparent 1px 22px);
+    mask-image:linear-gradient(180deg,#000 0, rgba(0,0,0,.72) 45%, transparent 82%);
   }}
+  .side::after {{ content:""; position:absolute; inset:0; background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 28%,transparent 72%,rgba(255,255,255,.18)); pointer-events:none; }}
   .orb {{ position:absolute; border-radius:999px; background:rgba(255,102,99,.36); filter:blur(.2px); }}
   .orb.a {{ left:38px; bottom:154px; width:154px; height:90px; border-radius:32px; }}
   .orb.b {{ left:-50px; bottom:20px; width:150px; height:150px; background:rgba(255,180,91,.38); }}
@@ -201,13 +212,15 @@ fn html(default_dir: &Path) -> String {
     border:1px solid rgba(255,255,255,.38); box-shadow:inset 0 1px 0 rgba(255,255,255,.36), 0 10px 24px rgba(159,38,55,.12);
     backdrop-filter:blur(12px);
   }}
-  .stack {{ position:absolute; left:34px; bottom:32px; width:210px; height:106px; }}
-  .glass-card {{ position:absolute; width:150px; height:64px; border-radius:22px;
-    background:linear-gradient(140deg,rgba(255,255,255,.28),rgba(255,255,255,.10));
-    border:1px solid rgba(255,255,255,.32); box-shadow:0 18px 38px rgba(154,46,58,.12); backdrop-filter:blur(14px);
+  .stack {{ position:absolute; left:43px; bottom:32px; width:230px; height:130px; }}
+  .glass-card {{ position:absolute; width:130px; height:72px; border-radius:24px; transform-origin:50% 100%;
+    background:linear-gradient(140deg,rgba(255,255,255,.36),rgba(255,255,255,.12));
+    border:1px solid rgba(255,255,255,.38); box-shadow:0 18px 42px rgba(154,46,58,.16), inset 0 1px 0 rgba(255,255,255,.45); backdrop-filter:blur(16px) saturate(150%);
   }}
-  .glass-card.one {{ left:0; top:28px; }} .glass-card.two {{ left:28px; top:14px; opacity:.82; }} .glass-card.three {{ left:58px; top:0; opacity:.62; }}
-  .main {{ position:relative; padding:48px 34px 26px 38px; }}
+  .glass-card.one {{ left:14px; top:44px; transform:rotate(-45deg); z-index:1; }} .glass-card.two {{ left:50px; top:20px; transform:rotate(0deg); opacity:.84; z-index:2; }} .glass-card.three {{ left:88px; top:44px; transform:rotate(45deg); opacity:.70; z-index:1; }}
+  .main {{ position:relative; padding:48px 34px 26px 38px; background:radial-gradient(circle at 88% 12%,rgba(255,255,255,.92),transparent 28%), linear-gradient(180deg,#fbfcff,#f6f8fc); }}
+  .main::before {{ content:""; position:absolute; inset:0; background:linear-gradient(115deg,rgba(255,255,255,.64),transparent 26%,transparent 78%,rgba(255,255,255,.52)); pointer-events:none; }}
+  .main > * {{ position:relative; z-index:1; }}
   .close {{ position:absolute; right:18px; top:17px; width:34px; height:34px; border:0; border-radius:12px; background:transparent; color:#858c9b; font-size:24px; cursor:pointer; display:grid; place-items:center; line-height:1; }}
   .close:hover {{ background:#e9edf5; color:#111421; }}
   .topline {{ display:flex; align-items:center; justify-content:space-between; margin-right:54px; }}
@@ -223,7 +236,7 @@ fn html(default_dir: &Path) -> String {
   .title {{ margin-top:42px; }}
   .title h2 {{ margin:0 0 14px; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; }}
   .title p {{ margin:0; width:514px; color:#5f6879; font-size:15px; line-height:1.74; }}
-  .card {{ margin-top:28px; width:532px; border-radius:28px; background:#fff; border:1px solid #eff2f7; box-shadow:0 20px 54px rgba(41,48,70,.07); padding:22px; }}
+  .card {{ margin-top:28px; width:532px; border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.88)); border:1px solid rgba(255,255,255,.92); box-shadow:0 24px 64px rgba(41,48,70,.095), inset 0 1px 0 rgba(255,255,255,.92); padding:22px; }}
   .path-row {{ display:flex; align-items:center; gap:14px; min-height:74px; padding:0 0 18px; border-bottom:1px solid #edf0f6; }}
   .home {{ width:36px; height:36px; border-radius:13px; display:grid; place-items:center; color:var(--rose); background:#fff0f4; font-weight:950; }}
   .path-copy {{ flex:1; min-width:0; }}
@@ -248,13 +261,14 @@ fn html(default_dir: &Path) -> String {
   .bar {{ width:38%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--orange)); animation:slide 1.2s ease-in-out infinite; }}
   @keyframes slide {{ 0%{{ transform:translateX(-95%); }} 100%{{ transform:translateX(270%); }} }}
   .actions {{ display:flex; gap:12px; }}
-  .btn {{ height:46px; border-radius:16px; border:1px solid #d9dee8; background:#fff; padding:0 24px; color:#3f4654; font-size:15px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }}
+  .btn {{ height:46px; border-radius:16px; border:1px solid #d9dee8; background:linear-gradient(180deg,#fff,#f8f9fd); padding:0 24px; color:#3f4654; font-size:15px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; box-shadow:inset 0 1px 0 rgba(255,255,255,.92); }}
   .btn.disabled,.change.disabled,.close.disabled {{ opacity:.55; pointer-events:none; cursor:not-allowed; }}
-  .primary {{ min-width:118px; border:0; color:white; background:linear-gradient(180deg,#ff6688,var(--rose)); box-shadow:0 12px 24px rgba(244,73,117,.25); }}
+  .primary {{ min-width:118px; border:0; color:white; background:linear-gradient(180deg,#ff7d99,#f44975 58%,#e83266); box-shadow:0 14px 28px rgba(244,73,117,.30), inset 0 1px 0 rgba(255,255,255,.34); }}
+  .primary.launch {{ min-width:178px; background:linear-gradient(180deg,#ff8ca3,#f44975 54%,#ff8356); }}
 </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="shell" data-drag="true">
     <aside class="side drag" data-drag="true">
       <div class="orb a"></div><div class="orb b"></div>
       <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">私人影音资料库</div></div></div>
@@ -263,14 +277,14 @@ fn html(default_dir: &Path) -> String {
       <div class="stack"><div class="glass-card three"></div><div class="glass-card two"></div><div class="glass-card one"></div></div>
     </aside>
     <main class="main">
-      <a class="close" id="close" href="changli://close">×</a>
+      <a class="close" id="close" href="changli://close" data-close="true">×</a>
       <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div><div class="ver">v{version}</div></div>
       <section class="title drag" data-drag="true"><h2>准备安装长离</h2><p>选择安装位置后，安装器会自动写入运行组件并创建桌面入口。<br>过程清楚、安静、不打扰。</p></section>
       <section class="card">
         <div class="path-row"><div class="home">⌂</div><div class="path-copy"><small>安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
         <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b>检测位置</b><span>优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
       </section>
-      <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
+      <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close" data-close="true">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
     </main>
   </div>
 <script>
@@ -294,10 +308,19 @@ fn html(default_dir: &Path) -> String {
     if (phase === 'fail') flow2.classList.add('fail');
   }};
   setPhase('ready');
-  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('mousedown', e => {{
+  document.addEventListener('mousedown', e => {{
     if (e.button !== 0 || e.target.closest('a,button,input,label')) return;
     window.location.href = 'changli://drag';
-  }}));
+  }});
+  document.addEventListener('click', e => {{
+    const el = e.target.closest('a');
+    if (!el) return;
+    const href = el.getAttribute('href') || '';
+    if (el.dataset.close === 'true' || href === 'changli://launch-close') {{
+      e.preventDefault(); document.body.classList.add('closing');
+      setTimeout(() => {{ window.location.href = href; }}, 170);
+    }}
+  }});
   window.setInstalling = () => {{
     setPhase('install');
     install.classList.add('disabled'); cancel.classList.add('disabled'); closeBtn.classList.add('disabled'); choose.classList.add('disabled');
@@ -307,7 +330,7 @@ fn html(default_dir: &Path) -> String {
   window.installDone = (ok, code) => {{
     progress.classList.remove('active');
     if (ok) {{
-      setPhase('done'); state.textContent = '安装完成'; install.textContent = '完成'; install.href = 'changli://close'; install.classList.remove('disabled');
+      setPhase('done'); state.textContent = '安装完成，可以直接打开长离'; install.textContent = '关闭并打开长离'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
@@ -339,7 +362,8 @@ fn main() -> wry::Result<()> {
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
-        .with_transparent(false)
+        .with_transparent(true)
+        .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
     if let Some(pos) = pos {
         builder = builder.with_position(pos);
@@ -351,6 +375,7 @@ fn main() -> wry::Result<()> {
 
     let nav_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
+        .with_transparent(true)
         .with_html(html(&default_dir))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {
@@ -359,6 +384,7 @@ fn main() -> wry::Result<()> {
                     "close" => Some(InstallerEvent::Close),
                     "choose-dir" => Some(InstallerEvent::ChooseDir),
                     "install" => Some(InstallerEvent::Install),
+                    "launch-close" => Some(InstallerEvent::CloseAndLaunch),
                     _ => None,
                 };
                 if let Some(event) = event {
@@ -370,6 +396,8 @@ fn main() -> wry::Result<()> {
         })
         .build(&window)?;
 
+    window.set_visible(true);
+
     let mut install_dir = default_dir;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -380,6 +408,10 @@ fn main() -> wry::Result<()> {
                 ..
             }
             | Event::UserEvent(InstallerEvent::Close) => *control_flow = ControlFlow::Exit,
+            Event::UserEvent(InstallerEvent::CloseAndLaunch) => {
+                launch_installed_app(&install_dir);
+                *control_flow = ControlFlow::Exit;
+            }
             Event::UserEvent(InstallerEvent::Drag) => {
                 let _ = window.drag_window();
             }

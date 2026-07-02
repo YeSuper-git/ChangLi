@@ -44,16 +44,13 @@ const Library: React.FC = () => {
     return searchParams.get('cat') || '';
   });
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoriesReady, setCategoriesReady] = useState(false);
   const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
   const [actors, setActors] = useState<{ id: number; name: string; work_count: number; [k: string]: any }[]>([]);
-  const [filtersReady, setFiltersReady] = useState(false);
 
   // 加载大类配置。未准备好前先不渲染真实页面，避免跳转后标题/筛选/卡片分批冒出来。
   useEffect(() => {
     let cancelled = false;
     window.scrollTo(0, 0);
-    setCategoriesReady(false);
     getAllCategories()
       .then((data) => {
         if (cancelled) return;
@@ -64,25 +61,19 @@ const Library: React.FC = () => {
         }
       })
       .catch((err) => console.error('[Library] 加载大类配置失败:', err))
-      .finally(() => {
-        if (!cancelled) setCategoriesReady(true);
-      });
     return () => { cancelled = true; };
   }, []);
 
   // 按大类加载标签和演员。一次性落状态，避免筛选栏分批抖动。
   const loadCategoryFilters = useCallback(async () => {
-    setFiltersReady(false);
     if (scopeAll) {
       setTags([]);
       setActors([]);
-      setFiltersReady(true);
       return;
     }
     if (!mainCategory) {
       setTags([]);
       setActors([]);
-      setFiltersReady(true);
       return;
     }
     try {
@@ -92,8 +83,8 @@ const Library: React.FC = () => {
       ]);
       setTags(nextTags);
       setActors(nextActors);
-    } finally {
-      setFiltersReady(true);
+    } catch (error) {
+      console.error('[Library] 加载筛选失败:', error);
     }
   }, [mainCategory, scopeAll]);
 
@@ -429,7 +420,6 @@ const Library: React.FC = () => {
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
   const epWord = features.episode || '部';
-  const libraryReady = categoriesReady && (scopeAll || filtersReady);
 
   const filteredSeries = seriesList.filter((series) => {
     const matchesText = series.title.toLowerCase().includes(normalizedSearch)
@@ -486,56 +476,9 @@ const Library: React.FC = () => {
     setBatchDeleteConfirm(true);
   };
 
-  if (!libraryReady) {
-    return (
-      <div className="changli-page">
-        <div className="changli-page-header">
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-24 rounded-2xl bg-zinc-200/80" />
-            <div className="h-8 w-20 rounded-2xl bg-zinc-100" />
-          </div>
-          <div className="flex gap-3">
-            <div className="h-10 w-24 rounded-xl bg-zinc-100" />
-            <div className="h-10 w-20 rounded-xl bg-zinc-100" />
-          </div>
-        </div>
-        <div className="changli-toolbar mb-6 p-4">
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={`tag-skeleton-${index}`} className="h-11 w-20 rounded-full bg-zinc-100" />
-              ))}
-            </div>
-            <div className="flex gap-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={`actor-skeleton-${index}`} className="h-11 w-20 rounded-full bg-zinc-100" />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="mb-6 flex gap-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={`filter-skeleton-${index}`} className="h-11 w-24 rounded-full bg-zinc-100" />
-          ))}
-        </div>
-        <div className="mb-6 h-11 w-72 rounded-2xl bg-zinc-100" />
-        <div className="changli-toolbar mb-10 h-16 p-3" />
-        <div className="grid grid-cols-4 gap-5">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div key={`series-skeleton-${index}`}>
-              <div className="aspect-[3/4] rounded-2xl bg-zinc-100" />
-              <div className="mt-2 h-4 rounded bg-zinc-100" />
-              <div className="mt-2 h-3 w-2/3 rounded bg-zinc-100" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
-    <div className="changli-page">
+    <div className="changli-page changli-library-instant">
       <div className="changli-page-header">
         <div className="flex items-center gap-4">
           {scopeAll && (
