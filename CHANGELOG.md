@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.30 (2026-07-02)
+
+### 优化
+- 安装器恢复透明窗口路线：窗口和 WebView 重新启用透明，`html/body` 改回透明背景。
+- 外层窗口扩大到 1000×660，内部 980×640 安装器居中保留 10px 透明缓冲区，让 CSS 圆角和阴影有抗锯齿空间，避免圆角外填充白底。
+- 保留 WebView2 数据目录固定到 `%LOCALAPPDATA%/ChangLi/InstallerWebView2`，避免在安装器当前目录生成运行数据文件夹。
+
+### 验证
+- `npm run build`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+- `npm run tauri:build`
+
 ## v1.7.29 (2026-07-02)
 
 ### 优化

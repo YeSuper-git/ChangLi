@@ -31,8 +31,8 @@ use windows::Win32::{
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
-const W: i32 = 980;
-const H: i32 = 640;
+const W: i32 = 1000;
+const H: i32 = 660;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -192,9 +192,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   }}
   * {{ box-sizing:border-box; }}
   a {{ text-decoration:none; }}
-  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:#f6f8fc; }}
+  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell {{ width:980px; height:640px; margin:10px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -447,7 +447,7 @@ fn main() -> wry::Result<()> {
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
-        .with_transparent(false)
+        .with_transparent(true)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
     if let Some(pos) = pos {
@@ -460,7 +460,7 @@ fn main() -> wry::Result<()> {
     let nav_proxy = proxy.clone();
     let mut web_context = WebContext::new(Some(webview_data_dir()));
     let webview = WebViewBuilder::with_web_context(&mut web_context)
-        .with_transparent(false)
+        .with_transparent(true)
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {
