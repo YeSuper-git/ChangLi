@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.31 (2026-07-02)
+
+### 优化
+- 安装器透明外壳改为父窗口透明 + WebView2 子窗口内嵌：外层窗口保持 1000×660，WebView2 仅放置在内部 10px 偏移处的 980×640 区域。
+- 移除 HTML 主体自身的 10px margin，避免 WebView2 继续覆盖透明缓冲区导致圆角外白底；圆角与阴影仍由内部 `.shell` 绘制。
+- 保留 WebView2 数据目录固定到 `%LOCALAPPDATA%/ChangLi/InstallerWebView2`。
+
+### 验证
+- `npm run build`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+- `npm run tauri:build`
+
 ## v1.7.30 (2026-07-02)
 
 ### 优化

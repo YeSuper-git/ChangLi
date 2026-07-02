@@ -14,7 +14,10 @@ use tao::{
     event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
     window::WindowBuilder,
 };
-use wry::{WebContext, WebViewBuilder};
+use wry::{
+    dpi::{LogicalPosition as WebLogicalPosition, LogicalSize as WebLogicalSize},
+    Rect, WebContext, WebViewBuilder,
+};
 
 #[cfg(target_os = "windows")]
 use tao::platform::windows::WindowExtWindows;
@@ -194,7 +197,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; margin:10px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -460,6 +463,10 @@ fn main() -> wry::Result<()> {
     let nav_proxy = proxy.clone();
     let mut web_context = WebContext::new(Some(webview_data_dir()));
     let webview = WebViewBuilder::with_web_context(&mut web_context)
+        .with_bounds(Rect {
+            position: WebLogicalPosition::new(10, 10).into(),
+            size: WebLogicalSize::new(980, 640).into(),
+        })
         .with_transparent(true)
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
@@ -480,7 +487,7 @@ fn main() -> wry::Result<()> {
             }
             true
         })
-        .build(&window)?;
+        .build_as_child(&window)?;
 
     let mut install_dir = default_dir;
     event_loop.run(move |event, _, control_flow| {
