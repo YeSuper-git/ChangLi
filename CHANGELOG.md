@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.7.23 (2026-07-02)
+
+### 修复
+- 修复 Windows WebView2 安装器按钮无响应：按钮改为 `changli://close` / `changli://choose-dir` / `changli://install` 链接，Rust 侧用 `with_navigation_handler` 拦截导航触发事件。
+- 不再依赖 `window.ipc.postMessage`，规避真实 Windows artifact 中 JS→Rust IPC 不通导致的安装、取消、更改、关闭全部无反应问题。
+- 点击安装后由 Rust 侧触发 `window.setInstalling()` 更新进度状态，再执行内层静默安装。
+
+### 验证
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.22 (2026-07-02)
 
 ### 修复
