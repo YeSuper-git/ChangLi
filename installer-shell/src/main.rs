@@ -14,7 +14,19 @@ use tao::{
     event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
     window::WindowBuilder,
 };
-use wry::WebViewBuilder;
+use wry::{WebContext, WebViewBuilder};
+
+#[cfg(target_os = "windows")]
+use tao::platform::windows::WindowExtWindows;
+
+#[cfg(target_os = "windows")]
+use windows::Win32::{
+    Foundation::HWND,
+    Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+        DWM_WINDOW_CORNER_PREFERENCE,
+    },
+};
 
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
@@ -100,6 +112,15 @@ fn fallback_install_dir() -> PathBuf {
         .join("ChangLi")
 }
 
+fn webview_data_dir() -> PathBuf {
+    env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
+        .unwrap_or_else(env::temp_dir)
+        .join("ChangLi")
+        .join("InstallerWebView2")
+}
+
 fn path_label(path: &Path) -> String {
     path.to_string_lossy().replace('\\', " / ")
 }
@@ -131,6 +152,22 @@ fn launch_installed_app(install_dir: &Path) {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn apply_smooth_corners(hwnd: isize) {
+    unsafe {
+        let preference = DWMWCP_ROUND;
+        let _ = DwmSetWindowAttribute(
+            HWND(hwnd as *mut _),
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &preference as *const DWM_WINDOW_CORNER_PREFERENCE as *const _,
+            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+        );
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_smooth_corners(_hwnd: isize) {}
+
 fn js_call(name: &str, value: &str) -> String {
     format!("window.{name}({});", serde_json::to_string(value).unwrap())
 }
@@ -155,9 +192,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   }}
   * {{ box-sizing:border-box; }}
   a {{ text-decoration:none; }}
-  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
+  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:#f6f8fc; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); clip-path:inset(0 round 34px); }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -373,7 +410,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   window.installDone = (ok, code) => {{
     if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
-      setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '关闭并打开'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
+      setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '完成并启动'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '完成'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       progress.classList.remove('active');
       setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
@@ -410,17 +447,20 @@ fn main() -> wry::Result<()> {
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
-        .with_transparent(true)
+        .with_transparent(false)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
     if let Some(pos) = pos {
         builder = builder.with_position(pos);
     }
     let window = builder.build(&event_loop).expect("create installer window");
+    #[cfg(target_os = "windows")]
+    apply_smooth_corners(window.hwnd());
 
     let nav_proxy = proxy.clone();
-    let webview = WebViewBuilder::new()
-        .with_transparent(true)
+    let mut web_context = WebContext::new(Some(webview_data_dir()));
+    let webview = WebViewBuilder::with_web_context(&mut web_context)
+        .with_transparent(false)
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {

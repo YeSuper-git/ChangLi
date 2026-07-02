@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.29 (2026-07-02)
+
+### 优化
+- 安装完成后的按钮文案改为“完成”和“完成并启动”。
+- 修复 v1.7.28 圆角处理导致四角和底部漏出白底的问题，窗口改回非透明实底并使用 Windows DWM 原生圆角偏好。
+- 固定安装器 WebView2 数据目录到 `%LOCALAPPDATA%/ChangLi/InstallerWebView2`，避免安装器启动时在当前目录生成运行数据文件夹。
+
+### 验证
+- `npm run build`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.28 (2026-07-02)
 
 ### 优化
