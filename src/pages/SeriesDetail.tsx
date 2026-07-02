@@ -20,6 +20,7 @@ import {
   getSeriesActors,
   getSeriesSeasons,
   getSeriesTags,
+  getSeriesPlaybackVideo,
   getTags,
   getVideoSeriesDetail,
   removeSeriesActor,
@@ -30,6 +31,7 @@ import {
   toggleWatched,
   toggleChineseSub,
   getAllCategories,
+  formatSeriesWatchLabel,
   parseCategoryFeatures,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
@@ -450,7 +452,48 @@ const SeriesDetail: React.FC = () => {
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
   const isWatched = series?.is_watched === 1;
+  const epWord = features.episode || '部';
+  const lastWatchedEpisode = series.last_watched_episode || 0;
+  const watchProgressLabel = formatSeriesWatchLabel(series, epWord);
+  const watchProgressHint = isWatched
+    ? `${series.video_count}${epWord}全部完成`
+    : lastWatchedEpisode > 0
+      ? `共${series.video_count}${epWord}，下次可从${watchProgressLabel.replace(/^看到/, '')}继续`
+      : `共${series.video_count}${epWord}，还没有观看记录`;
+  const watchProgressPercent = isWatched
+    ? 100
+    : series.video_count > 0 && lastWatchedEpisode > 0
+      ? Math.min(100, Math.round((lastWatchedEpisode / series.video_count) * 100))
+      : 0;
+  const orderedVideos = [...videos].sort((a, b) => {
+    const seasonA = a.season ?? 0;
+    const seasonB = b.season ?? 0;
+    if (seasonA !== seasonB) return seasonA - seasonB;
+    const episodeA = a.episode_number ?? Number.MAX_SAFE_INTEGER;
+    const episodeB = b.episode_number ?? Number.MAX_SAFE_INTEGER;
+    if (episodeA !== episodeB) return episodeA - episodeB;
+    return a.file_name.localeCompare(b.file_name);
+  });
+  const hasWatchProgress = !isWatched && lastWatchedEpisode > 0;
+  const playButtonLabel = hasWatchProgress ? '继续观看' : '立即观看';
+  const playButtonHint = hasWatchProgress
+    ? `上次观看到${watchProgressLabel.replace(/^看到/, '')}`
+    : orderedVideos.length > 0
+      ? `从第1${epWord}开始`
+      : '暂无可播放分集';
 
+  const handlePrimaryPlay = async () => {
+    if (!series || orderedVideos.length === 0) return;
+    try {
+      const target = hasWatchProgress
+        ? await getSeriesPlaybackVideo(series.id)
+        : orderedVideos[0];
+      if (target) navigate(`/player/${target.id}`);
+    } catch (error) {
+      console.error('[SeriesDetail] 播放入口失败:', error);
+      notify({ message: '打开播放失败: ' + String(error), type: 'error' });
+    }
+  };
 
   const handleToggleWatched = async () => {
     if (!series) return;
@@ -564,14 +607,19 @@ const SeriesDetail: React.FC = () => {
                     />
                   </>
                 ) : (
-                  <select
-                    value={editData.status}
-                    onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
-                    className="search-input"
-                  >
-                    <option value="ongoing">连载中</option>
-                    <option value="completed">已完结</option>
-                  </select>
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-2">追番状态</div>
+                    <label className="changli-select-wrap">
+                      <select
+                        value={editData.status}
+                        onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
+                        className="changli-select changli-select-lg"
+                      >
+                        <option value="ongoing">连载中</option>
+                        <option value="completed">已完结</option>
+                      </select>
+                    </label>
+                  </div>
                 )}
                 {features.tags && (
                   <div>
@@ -726,7 +774,42 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   </>
                 )}
-                <p className="text-gray-500 mb-4">{series.video_count} 集</p>
+                <div className="mb-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handlePrimaryPlay}
+                    disabled={orderedVideos.length === 0}
+                    className="group flex min-w-[232px] items-center justify-between gap-4 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-5 py-4 text-left text-white shadow-[0_18px_38px_rgba(251,91,123,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(251,91,123,0.28)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
+                  >
+                    <span>
+                      <span className="block text-base font-extrabold leading-none">{playButtonLabel}</span>
+                      <span className="mt-1 block text-xs font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
+                    </span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-lg font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                  </button>
+                </div>
+                <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-3">
+                    <div className="text-xs font-medium text-gray-400">总集数</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-900">{series.video_count} {epWord}</div>
+                  </div>
+                  <div className={`rounded-2xl border px-4 py-3 ${isWatched ? 'border-yellow-200 bg-yellow-50/70' : lastWatchedEpisode > 0 ? 'border-rose-100 bg-rose-50/70' : 'border-gray-100 bg-gray-50/80'}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-400">观看进度</div>
+                        <div className={`mt-1 text-lg font-semibold ${isWatched ? 'text-yellow-700' : lastWatchedEpisode > 0 ? 'text-rose-600' : 'text-gray-900'}`}>{watchProgressLabel}</div>
+                      </div>
+                      <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-gray-500 shadow-sm">{watchProgressPercent}%</span>
+                    </div>
+                    <div className="mt-3 h-1.5 rounded-full bg-white/80 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${isWatched ? 'bg-yellow-400' : 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c]'}`}
+                        style={{ width: `${watchProgressPercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 text-xs text-gray-400">{watchProgressHint}</div>
+                  </div>
+                </div>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
                   {features.tags && (

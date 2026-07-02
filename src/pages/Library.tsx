@@ -8,6 +8,7 @@ import {
   rescanSingleSeriesMetadata,
   switchSeriesTypeTo,
   getAllCategories,
+  formatSeriesWatchLabel,
   parseCategoryFeatures,
   scanCategory,
   getTagsByCategory,
@@ -29,7 +30,7 @@ const Library: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTagId, setActiveTagId] = useState<number | null>(() => {
@@ -46,6 +47,9 @@ const Library: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
   const [actors, setActors] = useState<{ id: number; name: string; work_count: number; [k: string]: any }[]>([]);
+  const defaultCategoryKey = useMemo(() => {
+    return [...categories].sort((a, b) => a.sort_order - b.sort_order)[0]?.key || 'anime';
+  }, [categories]);
 
   // 加载大类配置。未准备好前先不渲染真实页面，避免跳转后标题/筛选/卡片分批冒出来。
   useEffect(() => {
@@ -139,9 +143,10 @@ const Library: React.FC = () => {
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
       scope: scopeAll ? 'all' : null,
-      cat: !scopeAll && mainCategory !== 'anime' ? mainCategory : null,
+      cat: !scopeAll && mainCategory && mainCategory !== defaultCategoryKey ? mainCategory : null,
+      q: searchTerm.trim() ? searchTerm.trim() : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, searchTerm, defaultCategoryKey, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -229,7 +234,8 @@ const Library: React.FC = () => {
     if (favoriteFilter) params.set('favorite', '1');
     if (watchedFilter) params.set('watched', '1');
     if (scopeAll) params.set('scope', 'all');
-    if (!scopeAll && mainCategory !== 'anime') params.set('cat', mainCategory);
+    if (!scopeAll && mainCategory && mainCategory !== defaultCategoryKey) params.set('cat', mainCategory);
+    if (searchTerm.trim()) params.set('q', searchTerm.trim());
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   };
@@ -718,7 +724,7 @@ const Library: React.FC = () => {
                       {series.code ? `[${series.code}] ${series.title}` : series.title}
                     </h3>
                     <div className="text-xs text-zinc-500 mt-0.5">
-                      {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${itemEpWord}` : '尚未观看'}
+                      {formatSeriesWatchLabel(series, itemEpWord)}
                     </div>
                   </div>
                 </div>

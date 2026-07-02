@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { getAllCategories, parseCategoryFeatures } from '../utils/api';
+import { formatSeriesWatchLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
@@ -70,7 +70,7 @@ const Home: React.FC = () => {
         <div className="mt-2 min-w-0">
           <h3 className="truncate text-sm font-semibold text-zinc-900 transition-colors group-hover:text-rose-600" title={series.title}>{series.title}</h3>
           <div className="mt-0.5 truncate text-xs text-zinc-500">
-            {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${epWord}` : '尚未观看'}
+            {formatSeriesWatchLabel(series, epWord)}
           </div>
         </div>
       </Link>

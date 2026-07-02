@@ -434,6 +434,36 @@ body {
   padding: 10px 14px;
 }
 
+.changli-select {
+  appearance: none;
+  padding-right: 42px;
+}
+
+.changli-select-lg {
+  min-height: 48px;
+  border-radius: 16px;
+  padding: 12px 46px 12px 16px;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.changli-select-wrap {
+  position: relative;
+  display: block;
+}
+
+.changli-select-wrap::after {
+  content: '⌄';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-56%);
+  color: #9aa0ac;
+  font-size: 16px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
 .changli-textarea {
   padding: 10px 14px;
   resize: vertical;
@@ -686,6 +716,7 @@ body.player-window-document,
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.66);
   padding: 16px;
+  overflow: visible;
   box-shadow: 0 12px 30px rgba(33, 38, 48, 0.045), inset 0 1px 0 rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(16px) saturate(145%);
   -webkit-backdrop-filter: blur(16px) saturate(145%);
@@ -712,17 +743,19 @@ body.player-window-document,
   flex: 1;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: -6px;
+  padding-top: 6px;
   min-width: 0;
   overflow: hidden;
   transition: max-height 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
 }
 
 .changli-filter-row.is-collapsed {
-  max-height: 42px;
+  max-height: 48px;
 }
 
 .changli-filter-row.is-expanded {
-  max-height: 220px;
+  max-height: 226px;
 }
 
 .changli-filter-pill {
