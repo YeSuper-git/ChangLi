@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.7.28 (2026-07-02)
+
+### 优化
+- 安装器左侧文案、INSTALLER 标识、说明小字、三个功能标签、品牌副标题位置和右上版本号继续按旧预览稿对齐。
+- 安装位置区域移除小房子图标，并改为预览稿同款浅灰内嵌卡片与白底“更改”按钮。
+- 右上步骤条横条缩短，接近预览稿的一横两点样式。
+- 左侧背景横竖网格线条改稀疏，竖线约 9 条，横线按比例同步减少。
+- 优化安装器四角圆角：移除 Windows GDI 硬裁剪，改用透明窗口与 CSS 圆角裁切，圆角提高到 34px 以减少锯齿感。
+- 安装完成后的“仅关闭”改为“关闭”。
+
+### 验证
+- `npm run build`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.27 (2026-07-02)
 
 ### 优化

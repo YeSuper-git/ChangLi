@@ -19,18 +19,8 @@ use wry::WebViewBuilder;
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
-#[cfg(target_os = "windows")]
-use tao::platform::windows::WindowExtWindows;
-
-#[cfg(target_os = "windows")]
-use windows::Win32::{
-    Foundation::HWND,
-    Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn},
-};
-
 const W: i32 = 980;
 const H: i32 = 640;
-const RADIUS: i32 = 56;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -141,17 +131,6 @@ fn launch_installed_app(install_dir: &Path) {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn apply_round_window(hwnd: isize) {
-    unsafe {
-        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, RADIUS, RADIUS);
-        let _ = SetWindowRgn(HWND(hwnd as *mut _), region, true);
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn apply_round_window(_hwnd: isize) {}
-
 fn js_call(name: &str, value: &str) -> String {
     format!("window.{name}({});", serde_json::to_string(value).unwrap())
 }
@@ -178,7 +157,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:28px; box-shadow:0 28px 90px rgba(31,35,49,.20); clip-path:inset(0 round 28px); }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); clip-path:inset(0 round 34px); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -190,8 +169,8 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   }}
   .side::before {{ content:""; position:absolute; inset:0; opacity:.34;
     background-image:
-      repeating-linear-gradient(90deg, rgba(255,255,255,.30) 0 1px, transparent 1px 22px),
-      repeating-linear-gradient(0deg, rgba(255,255,255,.18) 0 1px, transparent 1px 22px);
+      repeating-linear-gradient(90deg, rgba(255,255,255,.24) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.15) 0 1px, transparent 1px 34px);
     mask-image:linear-gradient(180deg,#000 0, rgba(0,0,0,.72) 45%, transparent 82%);
   }}
   .side::after {{ content:""; position:absolute; inset:0; background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 28%,transparent 72%,rgba(255,255,255,.18)); pointer-events:none; }}
@@ -199,18 +178,18 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   .orb.a {{ left:38px; bottom:154px; width:154px; height:90px; border-radius:32px; }}
   .orb.b {{ left:-50px; bottom:20px; width:150px; height:150px; background:rgba(255,180,91,.38); }}
   .brand,.hero,.glass-pills,.stack {{ position:relative; z-index:1; }}
-  .brand {{ display:flex; gap:16px; align-items:center; }}
-  .brand img {{ width:64px; height:64px; border-radius:16px; display:block; object-fit:cover; background:rgba(255,255,255,.20); border:1px solid rgba(255,255,255,.34); box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 30px rgba(112,24,44,.22); }}
-  .wordmark {{ font-size:30px; font-weight:900; letter-spacing:-.03em; line-height:1; }}
-  .tag {{ margin-top:8px; font-size:11px; font-weight:850; letter-spacing:.07em; color:#fff2f6; }}
-  .hero {{ margin-top:54px; }}
-  .hero h1 {{ margin:0; font-size:42px; line-height:1.25; font-weight:950; letter-spacing:-.06em; }}
-  .hero p {{ display:none; }}
-  .glass-pills {{ margin-top:42px; display:flex; flex-wrap:wrap; gap:10px; }}
-  .pill {{ padding:8px 16px; border-radius:999px; color:#fff; font-size:13px; font-weight:850;
-    background:linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,.14));
-    border:1px solid rgba(255,255,255,.38); box-shadow:inset 0 1px 0 rgba(255,255,255,.36), 0 10px 24px rgba(159,38,55,.12);
-    backdrop-filter:blur(12px);
+  .brand {{ display:flex; gap:14px; align-items:center; }}
+  .brand img {{ width:58px; height:58px; border-radius:18px; display:block; object-fit:cover; background:rgba(255,255,255,.20); border:1px solid rgba(255,255,255,.34); box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 30px rgba(112,24,44,.22); }}
+  .wordmark {{ font-size:26px; font-weight:900; letter-spacing:-.04em; line-height:1; }}
+  .tag {{ margin-top:3px; font-size:13px; font-weight:500; letter-spacing:0; color:rgba(255,255,255,.78); }}
+  .hero {{ margin-top:74px; }}
+  .kicker {{ font-size:13px; font-weight:800; opacity:.78; letter-spacing:.18em; margin-bottom:14px; }}
+  .hero h1 {{ margin:0 0 12px; font-size:42px; line-height:1.05; font-weight:950; letter-spacing:-.07em; }}
+  .hero p {{ display:block; width:210px; margin:0; line-height:1.8; font-size:14px; color:rgba(255,255,255,.84); }}
+  .glass-pills {{ margin-top:36px; display:flex; flex-wrap:wrap; gap:10px; }}
+  .pill {{ padding:9px 12px; border-radius:999px; color:#fff; font-size:12px; font-weight:750;
+    background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.24);
+    box-shadow:none; backdrop-filter:none;
   }}
   .stack {{ position:absolute; z-index:1; left:48px; bottom:-74px; width:230px; height:210px; opacity:.74; }}
   .glass-card {{ position:absolute; width:92px; height:132px; border-radius:16px;
@@ -218,20 +197,20 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   }}
   .glass-card.one {{ left:0; top:24px; transform:rotate(-12deg); }} .glass-card.two {{ left:70px; top:0; transform:rotate(5deg); background:linear-gradient(150deg,rgba(255,255,255,.50),rgba(255,255,255,.24)); }} .glass-card.three {{ left:138px; top:32px; transform:rotate(13deg); }}
   .main {{ position:relative; overflow:hidden; padding:48px 34px 26px 38px; background:linear-gradient(180deg,#f8faff,#f4f7fc); }}
-  .main::before {{ content:""; position:absolute; inset:1px; border-radius:0 27px 27px 0; background:linear-gradient(115deg,rgba(255,255,255,.38),transparent 26%,transparent 78%,rgba(255,255,255,.24)); pointer-events:none; }}
+  .main::before {{ content:""; position:absolute; inset:1px; border-radius:0 33px 33px 0; background:linear-gradient(115deg,rgba(255,255,255,.38),transparent 26%,transparent 78%,rgba(255,255,255,.24)); pointer-events:none; }}
   .main > * {{ position:relative; z-index:1; }}
   .close {{ position:absolute; right:18px; top:17px; width:34px; height:34px; border:0; border-radius:12px; background:transparent; color:#858c9b; font-size:24px; cursor:pointer; display:grid; place-items:center; line-height:1; }}
   .close:hover {{ background:#e9edf5; color:#111421; }}
-  .topline {{ display:flex; align-items:center; justify-content:flex-start; margin-right:54px; }}
+  .topline {{ display:flex; align-items:center; justify-content:space-between; margin-right:54px; }}
   .steps {{ display:flex; gap:10px; align-items:center; }}
-  .stepbar {{ width:50px; height:8px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .stepbar {{ width:28px; height:8px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
   .stepdot {{ width:8px; height:8px; border-radius:50%; background:#d9dee8; }}
   .steps.install .stepbar {{ width:8px; background:#d9dee8; box-shadow:none; }}
-  .steps.install .stepdot.one {{ width:50px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .steps.install .stepdot.one {{ width:28px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
   .steps.done .stepbar,.steps.done .stepdot.one {{ width:8px; background:#b9f0d2; box-shadow:none; }}
-  .steps.done .stepdot.two {{ width:50px; border-radius:99px; background:linear-gradient(90deg,#34d399,#10b981); box-shadow:0 8px 18px rgba(16,185,129,.22); }}
+  .steps.done .stepdot.two {{ width:28px; border-radius:99px; background:linear-gradient(90deg,#34d399,#10b981); box-shadow:0 8px 18px rgba(16,185,129,.22); }}
   .steps.fail .stepbar {{ background:#ef4444; }}
-  .ver {{ position:absolute; left:0; right:0; bottom:38px; text-align:center; color:#a2aabc; font-size:13px; font-weight:800; pointer-events:none; }}
+  .ver {{ color:#717784; font-size:13px; font-weight:700; pointer-events:none; }}
   .title {{ margin-top:42px; transition:transform .52s cubic-bezier(.2,.9,.18,1), opacity .24s ease; }}
   .title.installing {{ transform:translateY(116px); }}
   .title.done {{ transform:translateY(128px); }}
@@ -246,19 +225,19 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   .dots i:nth-child(2){{ animation-delay:.15s; }} .dots i:nth-child(3){{ animation-delay:.3s; }}
   @keyframes dotBounce {{ 0%,80%,100%{{ transform:translateY(0); opacity:.45; }} 38%{{ transform:translateY(-7px); opacity:1; }} }}
   .title p {{ display:none; }}
-  .card {{ margin-top:28px; width:532px; border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.88)); border:1px solid rgba(232,235,242,.92); box-shadow:0 24px 64px rgba(41,48,70,.095); padding:22px; transition:border-color .24s ease, box-shadow .24s ease, transform .58s cubic-bezier(.22,1,.36,1), opacity .38s ease, filter .38s ease; }}
+  .card {{ margin-top:28px; width:532px; border-radius:24px; background:rgba(255,255,255,.82); border:1px solid rgba(228,231,238,.92); box-shadow:0 16px 40px rgba(35,40,50,.07); padding:18px; transition:border-color .24s ease, box-shadow .24s ease, transform .58s cubic-bezier(.22,1,.36,1), opacity .38s ease, filter .38s ease; }}
   .card.flyout {{ transform:translateX(610px) rotate(2.5deg) scale(.96); opacity:0; filter:blur(4px); pointer-events:none; }}
   .card.is-working {{ border-color:rgba(251,91,123,.24); box-shadow:0 24px 64px rgba(244,73,117,.12); }}
   .card.is-done {{ border-color:rgba(52,211,153,.24); box-shadow:0 24px 64px rgba(16,185,129,.10); }}
-  .path-row {{ display:flex; align-items:center; gap:14px; min-height:74px; padding:0 0 18px; border-bottom:1px solid #edf0f6; transition:border-color .24s ease; }}
+  .path-row {{ display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:0; padding:15px 16px; border-radius:18px; background:#f7f8fb; border:1px solid rgba(230,233,240,.92); transition:border-color .24s ease; }}
   .card.is-working .path-row {{ border-bottom-color:#ffd4dd; }}
   .card.is-done .path-row {{ border-bottom-color:#bbf7d0; }}
-  .home {{ width:36px; height:36px; border-radius:13px; display:grid; place-items:center; color:var(--rose); background:#fff0f4; font-weight:950; }}
+  .home {{ display:none; }}
   .path-copy {{ flex:1; min-width:0; }}
-  .path-copy small {{ display:block; color:#8b93a4; font-size:12px; font-weight:850; }}
-  .path-copy strong {{ display:block; margin-top:6px; color:var(--ink); font-size:16px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-  .change {{ border:0; border-radius:999px; padding:9px 16px; background:#ffedf2; color:#cf3d62; font-size:13px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; }}
-  .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:18px; }}
+  .path-copy small {{ display:block; color:#8b919c; font-size:12px; font-weight:800; }}
+  .path-copy strong {{ display:block; margin-top:4px; color:var(--ink); font-size:14px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .change {{ border:0; border-radius:999px; padding:10px 14px; background:white; color:#c72e55; font-size:13px; font-weight:850; cursor:pointer; display:inline-flex; align-items:center; box-shadow:0 8px 20px rgba(34,39,48,.08); }}
+  .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:0; margin-top:14px; }}
   .flow-item {{ min-height:104px; border-radius:18px; padding:14px; background:#fff; border:1px solid rgba(230,233,240,.86); transition:.2s ease; }}
   .flow-item.active {{ background:#fff; border-color:rgba(230,233,240,.86); box-shadow:none; }}
   .card.is-working .flow-item.active {{ border-color:#ffc3d0; background:#fff7fa; box-shadow:0 10px 24px rgba(244,73,117,.08); }}
@@ -290,13 +269,13 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     <aside class="side drag" data-drag="true">
       <div class="orb a"></div><div class="orb b"></div>
       <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">私人影音资料库</div></div></div>
-      <div class="hero"><h1>装好后<br>直接进入<br>收藏宇宙</h1><p>选择安装位置后，安装器会安静写入组件并创建桌面入口。</p></div>
-      <div class="glass-pills"><span class="pill">本地优先</span><span class="pill">路径识别</span><span class="pill">桌面入口</span></div>
+      <div class="hero"><div class="kicker">INSTALLER</div><h1>装好后<br>直接进入收藏宇宙</h1><p>本地优先，离线可用，海报、演员、标签和追番状态一起带进桌面。</p></div>
+      <div class="glass-pills"><span class="pill">本地数据库</span><span class="pill">内置播放器</span><span class="pill">自动建库</span></div>
       <div class="stack"><div class="glass-card three"></div><div class="glass-card two"></div><div class="glass-card one"></div></div>
     </aside>
     <main class="main">
       <a class="close" id="close" href="changli://close" data-close="true">×</a>
-      <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div></div><div class="ver">v{version}</div>
+      <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div><div class="ver">ChangLi {version}</div></div>
       <section class="title drag" id="title-block" data-drag="true"><h2 id="headline">准备安装长离</h2><p id="subtitle"></p></section>
       <section class="card" id="install-card">
         <div class="path-row" id="path-row"><div class="home">⌂</div><div class="path-copy"><small id="path-label">安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
@@ -394,7 +373,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   window.installDone = (ok, code) => {{
     if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
-      setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '关闭并打开'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
+      setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '关闭并打开'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       progress.classList.remove('active');
       setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
@@ -438,9 +417,6 @@ fn main() -> wry::Result<()> {
         builder = builder.with_position(pos);
     }
     let window = builder.build(&event_loop).expect("create installer window");
-
-    #[cfg(target_os = "windows")]
-    apply_round_window(window.hwnd());
 
     let nav_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
