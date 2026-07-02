@@ -30,7 +30,7 @@ use windows::Win32::{
 
 const W: i32 = 980;
 const H: i32 = 640;
-const RADIUS: i32 = 28;
+const RADIUS: i32 = 56;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -39,6 +39,7 @@ const ICON_BYTES: &[u8] = include_bytes!(concat!(
 
 #[derive(Debug)]
 enum InstallerEvent {
+    Ready,
     Drag,
     Close,
     ChooseDir,
@@ -101,14 +102,12 @@ fn find_existing_install_dir() -> Option<PathBuf> {
     None
 }
 
-fn default_install_dir() -> PathBuf {
-    find_existing_install_dir().unwrap_or_else(|| {
-        env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
-            .unwrap_or_else(env::temp_dir)
-            .join("ChangLi")
-    })
+fn fallback_install_dir() -> PathBuf {
+    env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
+        .unwrap_or_else(env::temp_dir)
+        .join("ChangLi")
 }
 
 fn path_label(path: &Path) -> String {
@@ -157,10 +156,11 @@ fn js_call(name: &str, value: &str) -> String {
     format!("window.{name}({});", serde_json::to_string(value).unwrap())
 }
 
-fn html(default_dir: &Path) -> String {
+fn html(default_dir: &Path, is_update: bool) -> String {
     let version = option_env!("CHANGLI_APP_VERSION").unwrap_or("dev");
     let icon = general_purpose::STANDARD.encode(ICON_BYTES);
     let default_label = path_label(default_dir);
+    let install_mode = if is_update { "update" } else { "fresh" };
     format!(
         r#"<!doctype html>
 <html lang="zh-CN">
@@ -178,9 +178,7 @@ fn html(default_dir: &Path) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  body.closing .shell {{ transform:scale(.985); opacity:0; filter:blur(6px); }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f4f6fb; border-radius:28px; outline:1px solid rgba(255,255,255,.78); box-shadow:0 28px 90px rgba(31,35,49,.20), 0 1px 0 rgba(255,255,255,.88) inset; transition:opacity .18s ease, transform .18s ease, filter .18s ease; animation:shellIn .32s cubic-bezier(.16,1,.3,1) both; }}
-  @keyframes shellIn {{ from{{ opacity:0; transform:translateY(10px) scale(.985); filter:blur(4px); }} to{{ opacity:1; transform:translateY(0) scale(1); filter:blur(0); }} }}
+  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:transparent; border-radius:28px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -235,10 +233,16 @@ fn html(default_dir: &Path) -> String {
   .steps.fail .stepbar {{ background:#ef4444; }}
   .ver {{ color:#9aa2b2; font-size:13px; font-weight:750; }}
   .title {{ margin-top:42px; }}
-  .title h2 {{ margin:0 0 14px; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; }}
+  .title h2 {{ margin:0 0 14px; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; transition:transform .28s cubic-bezier(.16,1,.3,1), opacity .18s ease; }}
+  .title h2.pulse {{ animation:titlePulse .42s cubic-bezier(.16,1,.3,1); }}
+  @keyframes titlePulse {{ 0%{{ opacity:.48; transform:translateY(10px); }} 100%{{ opacity:1; transform:translateY(0); }} }}
   .title p {{ margin:0; width:514px; color:#5f6879; font-size:15px; line-height:1.74; }}
-  .card {{ margin-top:28px; width:532px; border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.88)); border:1px solid rgba(255,255,255,.92); box-shadow:0 24px 64px rgba(41,48,70,.095), inset 0 1px 0 rgba(255,255,255,.92); padding:22px; }}
-  .path-row {{ display:flex; align-items:center; gap:14px; min-height:74px; padding:0 0 18px; border-bottom:1px solid #edf0f6; }}
+  .card {{ margin-top:28px; width:532px; border-radius:28px; background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.88)); border:1px solid rgba(232,235,242,.92); box-shadow:0 24px 64px rgba(41,48,70,.095); padding:22px; transition:border-color .24s ease, box-shadow .24s ease; }}
+  .card.is-working {{ border-color:rgba(251,91,123,.24); box-shadow:0 24px 64px rgba(244,73,117,.12); }}
+  .card.is-done {{ border-color:rgba(52,211,153,.24); box-shadow:0 24px 64px rgba(16,185,129,.10); }}
+  .path-row {{ display:flex; align-items:center; gap:14px; min-height:74px; padding:0 0 18px; border-bottom:1px solid #edf0f6; transition:border-color .24s ease; }}
+  .card.is-working .path-row {{ border-bottom-color:#ffd4dd; }}
+  .card.is-done .path-row {{ border-bottom-color:#bbf7d0; }}
   .home {{ width:36px; height:36px; border-radius:13px; display:grid; place-items:center; color:var(--rose); background:#fff0f4; font-weight:950; }}
   .path-copy {{ flex:1; min-width:0; }}
   .path-copy small {{ display:block; color:#8b93a4; font-size:12px; font-weight:850; }}
@@ -247,7 +251,9 @@ fn html(default_dir: &Path) -> String {
   .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:18px; }}
   .flow-item {{ min-height:104px; border-radius:18px; padding:14px; background:#fff; border:1px solid rgba(230,233,240,.86); transition:.2s ease; }}
   .flow-item.active {{ background:#fff; border-color:rgba(230,233,240,.86); box-shadow:none; }}
+  .card.is-working .flow-item.active {{ border-color:#ffc3d0; background:#fff7fa; box-shadow:0 10px 24px rgba(244,73,117,.08); }}
   .flow-item.done {{ background:#fff; border-color:rgba(230,233,240,.86); }}
+  .card.is-done .flow-item.done {{ border-color:#bbf7d0; background:#f0fdf6; }}
   .flow-item.fail {{ background:#fff1f2; border-color:#fecdd3; }}
   .num {{ width:28px; height:28px; border-radius:10px; display:grid; place-items:center; margin-bottom:12px; color:#c72e55; font-size:14px; font-weight:900; background:linear-gradient(135deg,rgba(251,91,123,.13),rgba(255,138,76,.15)); }}
   .flow-item b {{ display:block; margin-top:0; color:var(--ink); font-size:14px; line-height:1.25; }}
@@ -279,10 +285,10 @@ fn html(default_dir: &Path) -> String {
     <main class="main">
       <a class="close" id="close" href="changli://close" data-close="true">×</a>
       <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div><div class="ver">v{version}</div></div>
-      <section class="title drag" data-drag="true"><h2>准备安装长离</h2><p>选择安装位置后，安装器会自动写入运行组件并创建桌面入口。<br>过程清楚、安静、不打扰。</p></section>
-      <section class="card">
-        <div class="path-row"><div class="home">⌂</div><div class="path-copy"><small>安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
-        <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b>检测位置</b><span>优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
+      <section class="title drag" data-drag="true"><h2 id="headline">准备安装长离</h2><p id="subtitle">选择安装位置后，安装器会自动写入运行组件并创建桌面入口。<br>过程清楚、安静、不打扰。</p></section>
+      <section class="card" id="install-card">
+        <div class="path-row" id="path-row"><div class="home">⌂</div><div class="path-copy"><small id="path-label">安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
+        <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b id="flow-1-title">检测位置</b><span id="flow-1-desc">优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b id="flow-2-title">写入组件</b><span id="flow-2-desc">静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b id="flow-3-title">创建入口</b><span id="flow-3-desc">安装器创建桌面入口</span></div></div>
       </section>
       <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar" id="progress-bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close" data-close="true">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
     </main>
@@ -291,12 +297,29 @@ fn html(default_dir: &Path) -> String {
   const state = document.getElementById('state');
   const progress = document.getElementById('progress');
   const progressBar = document.getElementById('progress-bar');
+  const headline = document.getElementById('headline');
+  const subtitle = document.getElementById('subtitle');
+  const installCard = document.getElementById('install-card');
+  const flow1Title = document.getElementById('flow-1-title');
+  const flow1Desc = document.getElementById('flow-1-desc');
+  const flow2Title = document.getElementById('flow-2-title');
+  const flow2Desc = document.getElementById('flow-2-desc');
+  const flow3Title = document.getElementById('flow-3-title');
+  const flow3Desc = document.getElementById('flow-3-desc');
+  const installMode = '{install_mode}';
   let progressValue = 1;
   let progressTimer = null;
+  const processCopy = () => installMode === 'update' ? '检测到已有版本，正在覆盖更新安装中' : '检测到首次安装，请稍后';
+  const setHeadline = (text) => {{
+    headline.textContent = text;
+    headline.classList.remove('pulse');
+    void headline.offsetWidth;
+    headline.classList.add('pulse');
+  }};
   const setProgress = (value) => {{
     progressValue = Math.max(1, Math.min(100, value));
     progressBar.style.width = progressValue + '%';
-    state.textContent = progressValue >= 100 ? '安装完成 100%' : '正在安装 ChangLi，' + progressValue + '%';
+    state.textContent = progressValue >= 100 ? '安装完成 100%' : processCopy() + '，' + progressValue + '%';
   }};
   const install = document.getElementById('install');
   const cancel = document.getElementById('cancel');
@@ -325,12 +348,21 @@ fn html(default_dir: &Path) -> String {
     if (!el) return;
     const href = el.getAttribute('href') || '';
     if (el.dataset.close === 'true' || href === 'changli://launch-close') {{
-      e.preventDefault(); document.body.classList.add('closing');
-      setTimeout(() => {{ window.location.href = href; }}, 170);
+      e.preventDefault();
+      window.location.href = href;
     }}
   }});
   window.setInstalling = () => {{
     setPhase('install');
+    setHeadline('正在安装中');
+    subtitle.textContent = installMode === 'update' ? '检测到已有版本，正在写入新版文件并保留原有资料。' : '检测到首次安装，正在写入运行组件并创建桌面入口。';
+    installCard.className = 'card is-working';
+    flow1Title.textContent = installMode === 'update' ? '检测旧版' : '首次安装';
+    flow1Desc.textContent = installMode === 'update' ? '已找到原安装目录' : '准备创建应用目录';
+    flow2Title.textContent = installMode === 'update' ? '覆盖更新' : '写入组件';
+    flow2Desc.textContent = installMode === 'update' ? '保留资料并写入新版' : '静默执行安装后端';
+    flow3Title.textContent = '创建入口';
+    flow3Desc.textContent = '完成后可直接打开应用';
     if (progressTimer) clearInterval(progressTimer);
     install.classList.add('disabled'); cancel.classList.add('disabled'); closeBtn.classList.add('disabled'); choose.classList.add('disabled');
     install.textContent = '安装中'; progress.classList.add('active'); setProgress(1);
@@ -343,25 +375,29 @@ fn html(default_dir: &Path) -> String {
   window.installDone = (ok, code) => {{
     if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
-      setPhase('done'); setProgress(100); install.textContent = '关闭并打开长离'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
+      setPhase('done'); installCard.className = 'card is-done'; setHeadline('安装成功'); subtitle.textContent = '长离已经安装完成，可以关闭安装器或直接打开应用。'; setProgress(100); install.textContent = '关闭并打开长离'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       progress.classList.remove('active');
-      setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
+      setPhase('fail'); installCard.className = 'card'; setHeadline('安装失败'); subtitle.textContent = '安装后端返回错误，请检查权限或重试。'; state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
   }};
+  requestAnimationFrame(() => requestAnimationFrame(() => {{ window.location.href = 'changli://ready'; }}));
 </script>
 </body>
 </html>"#,
         icon = icon,
         version = version,
-        default_label = default_label
+        default_label = default_label,
+        install_mode = install_mode
     )
 }
 
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
-    let default_dir = default_install_dir();
+    let existing_dir = find_existing_install_dir();
+    let is_update = existing_dir.is_some();
+    let default_dir = existing_dir.unwrap_or_else(fallback_install_dir);
 
     let pos = event_loop.primary_monitor().map(|m| {
         let mp = m.position();
@@ -390,10 +426,11 @@ fn main() -> wry::Result<()> {
     let nav_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
         .with_transparent(true)
-        .with_html(html(&default_dir))
+        .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {
                 let event = match cmd.trim_end_matches('/') {
+                    "ready" => Some(InstallerEvent::Ready),
                     "drag" => Some(InstallerEvent::Drag),
                     "close" => Some(InstallerEvent::Close),
                     "choose-dir" => Some(InstallerEvent::ChooseDir),
@@ -410,8 +447,6 @@ fn main() -> wry::Result<()> {
         })
         .build(&window)?;
 
-    window.set_visible(true);
-
     let mut install_dir = default_dir;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -421,8 +456,15 @@ fn main() -> wry::Result<()> {
                 event: WindowEvent::CloseRequested,
                 ..
             }
-            | Event::UserEvent(InstallerEvent::Close) => *control_flow = ControlFlow::Exit,
+            | Event::UserEvent(InstallerEvent::Close) => {
+                window.set_visible(false);
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(InstallerEvent::Ready) => {
+                window.set_visible(true);
+            }
             Event::UserEvent(InstallerEvent::CloseAndLaunch) => {
+                window.set_visible(false);
                 launch_installed_app(&install_dir);
                 *control_flow = ControlFlow::Exit;
             }
