@@ -2425,10 +2425,26 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| title.clone());
     let folder_path_std = std::path::Path::new(source);
-    let poster = crate::scanner::find_folder_poster(folder_path_std);
+    let scan_result = if folder_path_std.is_dir() {
+        Some(crate::scanner::scan_directory(source).await?)
+    } else {
+        None
+    };
+    let poster = scan_result
+        .as_ref()
+        .and_then(|result| result.posters.values().next().cloned())
+        .or_else(|| crate::scanner::find_folder_poster(folder_path_std));
     let poster_base64 = poster
         .as_deref()
         .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+
+    let mut found_video_files = false;
+    if let Some(result) = scan_result {
+        found_video_files = !result.videos.is_empty();
+        if found_video_files {
+            add_videos_batch(pool, result.videos, Some(id)).await?;
+        }
+    }
 
     if display_type.as_deref() == Some("adult") {
         if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
@@ -2450,7 +2466,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
 
             Ok(true)
         } else {
-            Ok(false)
+            Ok(found_video_files)
         }
     } else {
         sqlx::query(

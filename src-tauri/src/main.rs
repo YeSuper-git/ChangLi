@@ -1681,6 +1681,58 @@ async fn play_video(
     Ok(())
 }
 
+
+#[tauri::command]
+async fn open_player_window(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    let video = db::get_video(&pool, id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "视频不存在".to_string())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis();
+    let label = format!("player-{}-{}", video.id, now);
+    let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
+    let window = tauri::WebviewWindowBuilder::new(&app, label, url)
+        .title(format!("ChangLi Player - {}", video.file_name))
+        .inner_size(1280.0, 760.0)
+        .min_inner_size(960.0, 540.0)
+        .resizable(true)
+        .decorations(false)
+        .visible(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    window.center().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_play_history(
+    state: State<'_, AppState>,
+    video_id: i64,
+    last_position: f64,
+    total_duration: Option<f64>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::record_play_history(&pool, video_id, last_position, total_duration)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn get_play_history(state: State<'_, AppState>) -> Result<Vec<db::PlayHistory>, String> {
     let pool = {
@@ -2133,6 +2185,8 @@ fn main() {
             remove_series_actor,
             update_actor_work_period,
             play_video,
+            open_player_window,
+            update_play_history,
             get_play_history,
             get_recent_watch_items,
             update_watch_progress,

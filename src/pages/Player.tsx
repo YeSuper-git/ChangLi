@@ -3,7 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { getVideo, playVideo } from '../utils/api';
+import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
+import type { Video, VideoSeries } from '../utils/api';
+import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
 
@@ -21,7 +23,9 @@ const Player: React.FC = () => {
   
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState('');
-  const [windowsNativeMode, setWindowsNativeMode] = useState(false);
+  const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+  const [series, setSeries] = useState<VideoSeries | null>(null);
+  const [episodes, setEpisodes] = useState<Video[]>([]);
   
   // 播放器状态
   const [isPlaying, setIsPlaying] = useState(false);
@@ -29,6 +33,7 @@ const Player: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
   const [speed, setSpeed] = useState(1);
+  const [subtitleLoaded, setSubtitleLoaded] = useState(false);
   
   // UI 状态
   const [showControls, setShowControls] = useState(true);
@@ -59,22 +64,24 @@ const Player: React.FC = () => {
         setLoading(true);
         setError('');
 
-        // Windows WebView + libmpv 渲染路径容易黑屏但有声音；Windows 统一走后端原生 mpv 窗口。
-        if (navigator.userAgent.includes('Windows')) {
-          await playVideo(parseInt(id));
-          setWindowsNativeMode(true);
-          setIsPlaying(true);
-          isPlayingRef.current = true;
-          setLoading(false);
-          return;
-        }
-
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
         if (!currentVideo) {
           setError('视频不存在');
           return;
         }
+        setCurrentVideo(currentVideo);
+        if (currentVideo.series_id) {
+          const [seriesData, seriesVideos] = await getVideoSeriesDetail(currentVideo.series_id);
+          setSeries(seriesData);
+          setEpisodes(seriesVideos);
+        } else {
+          setSeries(null);
+          setEpisodes([currentVideo]);
+        }
+
+        const history = await getPlayHistory();
+        const previousPosition = history.find((item) => item.video_id === currentVideo.id)?.last_position ?? 0;
 
         // 初始化 mpv
         await init({
@@ -118,6 +125,16 @@ const Player: React.FC = () => {
 
         // 加载视频
         await command('loadfile', [currentVideo.file_path, 'replace']);
+        if (currentVideo.subtitle) {
+          await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+          setSubtitleLoaded(true);
+        } else {
+          setSubtitleLoaded(false);
+        }
+        if (previousPosition > 5) {
+          await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
+          setCurrentTime(previousPosition);
+        }
         await setProperty('pause', false);
         isPlayingRef.current = true;
         setIsPlaying(true);
@@ -175,6 +192,21 @@ const Player: React.FC = () => {
       console.error('[Player] 设置倍速失败:', err);
     }
   }, []);
+
+  const toggleSubtitle = useCallback(async () => {
+    if (!currentVideo?.subtitle) return;
+    try {
+      if (subtitleLoaded) {
+        await setProperty('sid', 'no');
+        setSubtitleLoaded(false);
+      } else {
+        await command('sub-add', [currentVideo.subtitle, 'select']);
+        setSubtitleLoaded(true);
+      }
+    } catch (err) {
+      console.error('[Player] 切换字幕失败:', err);
+    }
+  }, [currentVideo?.subtitle, subtitleLoaded]);
 
   // 切换全屏
   const toggleFullscreen = useCallback(async () => {
@@ -346,6 +378,26 @@ const Player: React.FC = () => {
     };
   }, [isPlaying, currentTime]);
 
+  const savePlaybackProgress = useCallback(async () => {
+    if (!currentVideo || currentTime < 1) return;
+    try {
+      await updatePlayHistory(currentVideo.id, currentTime, duration || currentVideo.duration);
+    } catch (err) {
+      console.error('[Player] 保存播放进度失败:', err);
+    }
+  }, [currentVideo, currentTime, duration]);
+
+  useEffect(() => {
+    if (!currentVideo) return;
+    const timer = window.setInterval(() => {
+      void savePlaybackProgress();
+    }, 5000);
+    return () => {
+      window.clearInterval(timer);
+      void savePlaybackProgress();
+    };
+  }, [currentVideo, savePlaybackProgress]);
+
   // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -387,14 +439,44 @@ const Player: React.FC = () => {
   }, [isPlaying, currentTime, duration, volume, isFullscreen, togglePlay, seek, changeVolume, toggleFullscreen]);
 
   // 倍速选项
-  const speedOptions = [1, 1.5, 2, 3, 5, 8, 10];
+  const speedOptions = [1, 1.5, 2, 3];
+
+  const sortedEpisodes = [...episodes].sort((a, b) => {
+    const seasonA = a.season ?? 0;
+    const seasonB = b.season ?? 0;
+    if (seasonA !== seasonB) return seasonA - seasonB;
+    const episodeA = a.episode_number ?? Number.MAX_SAFE_INTEGER;
+    const episodeB = b.episode_number ?? Number.MAX_SAFE_INTEGER;
+    if (episodeA !== episodeB) return episodeA - episodeB;
+    return a.file_name.localeCompare(b.file_name);
+  });
+  const activeIndex = sortedEpisodes.findIndex((episode) => episode.id === currentVideo?.id);
+  const activeEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex] : currentVideo;
+  const displayTitle = series?.title || currentVideo?.series_title || currentVideo?.file_name || 'ChangLi Player';
+  const episodeWord = '话';
+  const activeEpisodeLabel = activeEpisode?.episode_number
+    ? `${activeEpisode.season && activeEpisode.season > 0 && activeEpisode.season !== 999 ? `第${activeEpisode.season}季 ` : ''}第${activeEpisode.episode_number}${episodeWord}`
+    : activeEpisode?.file_name || '正在播放';
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+  const currentTimeText = formatTime(currentTime);
+  const durationText = duration > 0 ? formatTime(duration) : '--:--';
+  const nextEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex + 1] : null;
+  const seasonSummary = activeEpisode?.season && activeEpisode.season > 0 && activeEpisode.season !== 999
+    ? `第${activeEpisode.season}季 · ${sortedEpisodes.length}${episodeWord} · 当前${activeEpisodeLabel.replace(/^第\d+季 /, '')}`
+    : `${sortedEpisodes.length || 1}${episodeWord} · 当前${activeEpisodeLabel}`;
+  const progressBadge = currentTime > 0 ? `继续观看 · 已看到${activeEpisodeLabel}` : `立即观看 · ${activeEpisodeLabel}`;
+
+  const playEpisode = (episode: Video | null) => {
+    if (!episode || episode.id === currentVideo?.id) return;
+    navigate(`/player/${episode.id}`, { replace: true });
+  };
 
   if (loading) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-[#050505]">
-        <div className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-white/5 px-8 py-7 text-white shadow-2xl backdrop-blur-xl">
-          <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/25 border-t-[#fb5b7b]"></div>
-          <span className="text-sm text-white/70">正在打开播放器</span>
+      <div className="changli-player-loading">
+        <div className="changli-player-loading-card">
+          <div className="changli-player-spinner" />
+          <span>正在打开播放器</span>
         </div>
       </div>
     );
@@ -402,205 +484,128 @@ const Player: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#050505] px-6 text-white">
-        <div className="mb-5 rounded-3xl border border-red-400/20 bg-red-500/10 px-6 py-4 text-center text-red-100 shadow-2xl backdrop-blur-xl">{error}</div>
-        <Link to="/library" className="action-btn action-btn-primary">
-          返回视频库
-        </Link>
-      </div>
-    );
-  }
-
-  if (windowsNativeMode) {
-    return (
-      <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#050505] px-6 text-white">
-        <div className="rounded-3xl border border-white/10 bg-white/5 px-8 py-7 text-center shadow-2xl backdrop-blur-xl">
-          <div className="mb-3 text-lg font-bold">已使用 Windows 原生 mpv 播放器打开</div>
-          <div className="mb-6 max-w-md text-sm text-white/55">为避免 Win11 WebView 黑屏问题，Windows 下自动切换到原生播放窗口。</div>
-          <button onClick={() => navigate(-1)} className="action-btn action-btn-primary">
-            返回
-          </button>
+      <div className="changli-player-loading">
+        <div className="changli-player-error-card">
+          <div>{error}</div>
+          <Link to="/library" className="changli-player-textbtn">返回视频库</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div 
-      className="relative h-[100dvh] w-full overflow-hidden bg-[#050505]"
+    <section
+      className="changli-player-window"
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      {/* 视频容器 */}
-      <div className="absolute inset-0" onClick={togglePlay}>
-        {/* mpv 渲染区域 */}
-      </div>
+      <header className="changli-player-titlebar" data-tauri-drag-region>
+        <div className="changli-player-brand">
+          <img src={appIcon} alt="长离" />
+          <span>ChangLi Player</span>
+        </div>
+        <div className="changli-player-meta">
+          <div className="changli-player-title">{displayTitle} - {activeEpisodeLabel}</div>
+          <div className="changli-player-sub">独立播放窗口 · 原资料库窗口可继续操作</div>
+        </div>
+        <div className="changli-player-actions">
+          <button type="button" className={`changli-player-pill ${isPinned ? 'active' : ''}`} onClick={togglePin}>置顶</button>
+          <button type="button" className="changli-player-winbtn" onClick={() => getCurrentWindow().minimize()}>-</button>
+          <button type="button" className="changli-player-winbtn" onClick={() => getCurrentWindow().toggleMaximize()}>□</button>
+          <button type="button" className="changli-player-winbtn close" onClick={() => getCurrentWindow().close()}>×</button>
+        </div>
+      </header>
 
-      {/* 控制栏 */}
-      <div 
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/72 to-transparent px-5 pb-5 pt-16 transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        {/* 进度条 */}
-        <div 
-          ref={progressBarRef}
-          className="group relative mb-5 h-2 w-full cursor-pointer rounded-full bg-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
-          onClick={handleProgressBarClick}
-          onMouseMove={handleProgressBarHover}
-          onMouseLeave={handleProgressBarLeave}
-        >
-          {/* 已播放进度 */}
-          <div 
-            className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] shadow-[0_0_18px_rgba(251,91,123,0.35)]"
-            style={{ width: `${(currentTime / duration) * 100}%` }}
-          />
-          
-          {/* 拖拽点 */}
-          <div 
-            className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_4px_rgba(251,91,123,0.42)] opacity-0 transition-opacity group-hover:opacity-100"
-            style={{ left: `${(currentTime / duration) * 100}%` }}
-          />
+      <main className="changli-player-main">
+        <div className="changli-player-stage" onClick={togglePlay}>
+          <div className="changli-player-video-art" />
+          <div className="changli-player-badge">{progressBadge}</div>
+          {!isPlaying && <div className="changli-player-center-play">▶</div>}
+        </div>
 
-          {/* 悬浮预览 */}
-          {hoverTime !== null && (
-            <div 
-              className="absolute bottom-7 -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#111217]/95 shadow-2xl backdrop-blur-xl"
-              style={{ left: `${hoverX}px` }}
-            >
-              {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt="预览" className="w-32 h-[72px] object-cover" />
-              ) : (
-                <div className="flex h-[72px] w-32 items-center justify-center bg-white/5">
-                  <span className="text-xs text-white">{formatTime(hoverTime)}</span>
-                </div>
-              )}
-              <div className="bg-black/40 py-1 text-center text-xs text-white">
-                {formatTime(hoverTime)}
+        <aside className="changli-player-side">
+          <div className="changli-player-side-head">
+            <strong>分集列表</strong>
+            <span>{seasonSummary}</span>
+          </div>
+          <div className="changli-player-episodes">
+            {sortedEpisodes.map((episode, index) => {
+              const active = episode.id === currentVideo?.id;
+              const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
+              return (
+                <button
+                  type="button"
+                  key={episode.id}
+                  onClick={() => playEpisode(episode)}
+                  className={`changli-player-episode ${active ? 'active' : ''}`}
+                >
+                  <div className="changli-player-thumb" />
+                  <div>
+                    <p>{label} {episode.subtitle || episode.file_name}</p>
+                    <small>{active ? `播放中 · ${currentTimeText}` : `第${index + 1}个视频`}</small>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+      </main>
+
+      <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
+        <div className="changli-player-progress">
+          <span>{currentTimeText}</span>
+          <div
+            ref={progressBarRef}
+            className="changli-player-bar"
+            onClick={handleProgressBarClick}
+            onMouseMove={handleProgressBarHover}
+            onMouseLeave={handleProgressBarLeave}
+          >
+            <span style={{ width: `${progressPercent}%` }} />
+            <i style={{ left: `${progressPercent}%` }} />
+            {hoverTime !== null && (
+              <div className="changli-player-preview" style={{ left: `${hoverX}px` }}>
+                {thumbnailUrl ? <img src={thumbnailUrl} alt="预览" /> : <div>{formatTime(hoverTime)}</div>}
+                <small>{formatTime(hoverTime)}</small>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <span>{durationText}</span>
         </div>
 
-        {/* 控制按钮 */}
-        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center gap-4">
-            {/* 播放/暂停 */}
-            <button 
-              onClick={togglePlay}
-              className="text-white transition-colors hover:text-[#fb5b7b]"
-            >
-              {isPlaying ? (
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-              ) : (
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
-
-            {/* 时间显示 */}
-            <span className="font-mono text-sm text-white/82">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
+        <div className="changli-player-bottom">
+          <div className="changli-player-left-controls">
+            <button type="button" className="changli-player-round primary" onClick={togglePlay}>{isPlaying ? 'Ⅱ' : '▶'}</button>
+            <button type="button" className="changli-player-round" onClick={() => seek(Math.max(0, currentTime - 10))}>↺</button>
+            <button type="button" className="changli-player-round" onClick={() => seek(Math.min(duration, currentTime + 10))}>↻</button>
+            <div className="changli-player-now">
+              <strong>{activeEpisodeLabel}</strong>
+              <span>正在记录观看进度</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* 音量控制 */}
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => changeVolume(volume === 0 ? 80 : 0)}
-                className="text-white transition-colors hover:text-[#fb5b7b]"
-              >
-                {volume === 0 ? (
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                  </svg>
-                )}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={(e) => changeVolume(parseInt(e.target.value))}
-                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/20 accent-[#fb5b7b] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_rgba(251,91,123,0.35)]"
-              />
-            </div>
-
-            {/* 倍速选择 */}
-            <select
-              value={speed}
-              onChange={(e) => changeSpeed(parseFloat(e.target.value))}
-              className="rounded-xl border border-white/10 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white outline-none transition focus:border-[#fb5b7b]"
-            >
-              {speedOptions.map((spd) => (
-                <option key={spd} value={spd}>
-                  {spd}x
-                </option>
-              ))}
+          <div className="changli-player-right-controls">
+            <button type="button" className="changli-player-textbtn" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}>下一集</button>
+            <select value={speed} onChange={(e) => changeSpeed(parseFloat(e.target.value))} className="changli-player-textbtn as-select">
+              {speedOptions.map((spd) => <option key={spd} value={spd}>{spd}x</option>)}
             </select>
-
-            {/* 画中画 */}
-            <button 
-              onClick={togglePiP}
-              className={`text-white transition-colors hover:text-[#fb5b7b] ${isPiP ? '!text-[#fb5b7b]' : ''}`}
-              title="画中画"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z" />
-              </svg>
-            </button>
-
-            {/* 置顶 */}
-            <button 
-              onClick={togglePin}
-              className={`text-white transition-colors hover:text-[#fb5b7b] ${isPinned ? '!text-[#fb5b7b]' : ''}`}
-              title="置顶"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17 4v7l2 3v2h-6v5l-1 1-1-1v-5H5v-2l2-3V4c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2z" />
-              </svg>
-            </button>
-
-            {/* 全屏 */}
-            <button 
-              onClick={toggleFullscreen}
-              className="text-white transition-colors hover:text-[#fb5b7b]"
-              title="全屏"
-            >
-              {isFullscreen ? (
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-                </svg>
-              )}
-            </button>
+            <button type="button" className={`changli-player-textbtn ${subtitleLoaded ? 'active' : ''}`} disabled={!currentVideo?.subtitle} onClick={toggleSubtitle}>{currentVideo?.subtitle ? (subtitleLoaded ? '字幕 开' : '字幕 关') : '无字幕'}</button>
+            <button type="button" className="changli-player-textbtn" onClick={() => changeVolume(volume === 0 ? 80 : 0)}>音量 {Math.round(volume)}%</button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => changeVolume(parseInt(e.target.value))}
+              className="changli-player-volume"
+              aria-label="音量"
+            />
+            <button type="button" className="changli-player-textbtn" onClick={togglePiP}>{isPiP ? '退出小窗' : '小窗'}</button>
+            <button type="button" className="changli-player-textbtn" onClick={toggleFullscreen}>全屏</button>
           </div>
         </div>
-      </div>
-
-      {/* 返回按钮 */}
-      <div className={`absolute left-4 top-4 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-        <button 
-          onClick={() => navigate(-1)}
-          className="rounded-full border border-white/10 bg-black/30 p-2 text-white shadow-2xl backdrop-blur-xl transition hover:border-[#fb5b7b]/40 hover:text-[#fb5b7b]"
-        >
-          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-          </svg>
-        </button>
-      </div>
-    </div>
+      </footer>
+    </section>
   );
 };
 

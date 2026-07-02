@@ -21,6 +21,7 @@ import {
   getSeriesSeasons,
   getSeriesTags,
   getSeriesPlaybackVideo,
+  openPlayerWindow,
   getTags,
   getVideoSeriesDetail,
   removeSeriesActor,
@@ -481,7 +482,7 @@ const SeriesDetail: React.FC = () => {
       const target = hasWatchProgress
         ? await getSeriesPlaybackVideo(series.id)
         : orderedVideos[0];
-      if (target) navigate(`/player/${target.id}`);
+      if (target) await openPlayerWindow(target.id);
     } catch (error) {
       console.error('[SeriesDetail] 播放入口失败:', error);
       notify({ message: '打开播放失败: ' + String(error), type: 'error' });
@@ -1031,10 +1032,11 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   const renderVideoCard = (video: Video) => {
     const poster = videoPosterDataUrl(video) || fallbackPoster;
     return (
-      <Link
+      <button
         key={video.id}
-        to={`/player/${video.id}`}
-        className="card block cursor-pointer overflow-hidden"
+        type="button"
+        className="card block w-full cursor-pointer overflow-hidden text-left"
+        onClick={() => openPlayerWindow(video.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
         onContextMenu={(e) => {
           if (onContextMenu) {
             e.preventDefault();
@@ -1058,7 +1060,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
             <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>
           )}
         </div>
-      </Link>
+      </button>
     );
   };
 

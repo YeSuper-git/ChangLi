@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, MemoryRouter, Routes, Route } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Layout from './components/Layout';
@@ -18,7 +18,9 @@ import { useLibraryStore } from './store/libraryStore';
 import ToastProvider from './components/ToastProvider';
 
 function App() {
-  const isPlayerWindow = getCurrentWindow().label === 'player';
+  const windowLabel = getCurrentWindow().label;
+  const isPlayerWindow = windowLabel === 'player' || windowLabel.startsWith('player-');
+  const playerVideoId = new URLSearchParams(window.location.search).get('videoId') || '0';
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadAll = useLibraryStore((s) => s.loadAll);
@@ -44,7 +46,13 @@ function App() {
   }, [isPlayerWindow, loadAll]);
 
   if (isPlayerWindow) {
-    return <Player />;
+    return (
+      <MemoryRouter initialEntries={[`/player/${playerVideoId}`]}>
+        <Routes>
+          <Route path="/player/:id" element={<Player />} />
+        </Routes>
+      </MemoryRouter>
+    );
   }
 
   if (error) {

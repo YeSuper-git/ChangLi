@@ -19,6 +19,7 @@ import {
   removeResourceActor,
   saveVideoThumbnail,
   getVideoSeriesDetail,
+  openPlayerWindow,
 } from '../utils/api';
 import type { Video, Tag, Actor, VideoSeries } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -467,12 +468,13 @@ const VideoDetail: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          <Link
-            to={`/player/${video.id}`}
+          <button
+            type="button"
+            onClick={() => openPlayerWindow(video.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
             className="block w-full rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-6 py-4 text-center font-semibold text-white shadow-lg shadow-gray-900/15 transition-transform duration-200 hover:-translate-y-0.5"
           >
             ▶️ 播放视频
-          </Link>
+          </button>
 
           {isSeriesEpisode ? (
             <div className="changli-panel p-6">
@@ -490,10 +492,11 @@ const VideoDetail: React.FC = () => {
               )}
               <div className="space-y-2">
                 {seriesVideos.map((episode) => (
-                  <Link
+                  <button
                     key={episode.id}
-                    to={`/player/${episode.id}`}
-                    className={`block p-2 rounded-lg text-sm ${episode.id === video.id ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white' : 'bg-gray-50 text-gray-700 hover:text-rose-600'}`}
+                    type="button"
+                    onClick={() => openPlayerWindow(episode.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
+                    className={`block w-full p-2 rounded-lg text-left text-sm ${episode.id === video.id ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white' : 'bg-gray-50 text-gray-700 hover:text-rose-600'}`}
                   >
                     <span>{episode.file_name}</span>
                     {episode.episode_number && (
@@ -501,7 +504,7 @@ const VideoDetail: React.FC = () => {
                         第 {episode.episode_number} 集
                       </span>
                     )}
-                  </Link>
+                  </button>
                 ))}
               </div>
             </div>

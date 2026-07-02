@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.7.34 (2026-07-03)
+
+### 修复
+- 修复 v1.7.33 大列表路由切换明显卡顿：视频库、视频集详情和演员页不再对所有卡片逐个跑 GSAP 入场动画，只保留轻量淡入。
+- 修复无边框主窗口右上角最小化、最大化、关闭按钮点击无效：改为 JS 控制窗口拖动区域，避免整条导航栏吞掉按钮点击。
+- 修复播放器多开窗口缺少 Tauri capability 导致窗口控制和播放器 API 失效：动态 `player-*` 窗口获得 core/libmpv 权限。
+- 安装器透明外壳增加 Windows 圆角区域裁剪兜底，配合透明父窗口和透明 WebView2 子窗口，防止 WebView2 白色底层继续从圆角外漏出。
+- 重新扫描元数据现在会重新扫描视频集文件夹并把新增视频文件补入当前视频集，适配连载作品更新集数。
+
+### 优化
+- 播放器第一版功能闭环：播放/暂停、下一集、1x/1.5x/2x/3x 倍速、音量、全屏、分集列表和选集播放。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+- `npm run tauri:build`
+
 ## v1.7.33 (2026-07-03)
 
 ### 修复
