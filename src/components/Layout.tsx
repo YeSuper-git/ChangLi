@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import PageMotion from './PageMotion';
 import settingsIcon from '../assets/icons/settings.svg';
 import searchIcon from '../assets/icons/search.svg';
@@ -29,12 +30,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate(`/search?q=${encodeURIComponent(keyword)}`);
   };
 
+  const appWindow = getCurrentWindow();
+  const handleMinimize = () => appWindow.minimize();
+  const handleToggleMaximize = () => appWindow.toggleMaximize();
+  const handleClose = () => appWindow.close();
+
   return (
     <div className="changli-app-shell">
       {/* 顶部导航 */}
-      <nav className="changli-topbar sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-center justify-between h-16">
+      <nav className="changli-topbar sticky top-0 z-50" data-tauri-drag-region>
+        <div className="max-w-7xl mx-auto px-8" data-tauri-drag-region>
+          <div className="flex items-center justify-between h-16" data-tauri-drag-region>
             <div className="flex items-center gap-8">
               <Link to="/" className="changli-wordmark flex items-center gap-3 text-xl font-bold text-gray-900 no-underline">
                 <img src={appIcon} alt="长离" className="h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5" />
@@ -54,7 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {!hideGlobalSearch && (
                 <form onSubmit={handleGlobalSearch} className="relative">
                   <input
@@ -81,6 +87,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <img src={settingsIcon} alt="设置" className="w-5 h-5" />
               </button>
+              <div className="changli-window-controls" aria-label="窗口控制">
+                <button type="button" onClick={handleMinimize} aria-label="最小化">−</button>
+                <button type="button" onClick={handleToggleMaximize} aria-label="最大化">□</button>
+                <button type="button" onClick={handleClose} aria-label="关闭" className="close">×</button>
+              </div>
             </div>
           </div>
         </div>

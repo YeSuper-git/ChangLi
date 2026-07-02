@@ -14,7 +14,7 @@ import {
   getTagsByCategory,
   getActorsByCategory,
 } from '../utils/api';
-import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures, Tag, Actor } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -22,6 +22,16 @@ import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
+
+
+const categoryFilterCache = new Map<string, { tags: Tag[]; actors: Actor[] }>();
+const tagSeriesCache = new Map<number, VideoSeries[]>();
+const actorSeriesCache = new Map<number, VideoSeries[]>();
+const clearLibraryFilterCaches = () => {
+  categoryFilterCache.clear();
+  tagSeriesCache.clear();
+  actorSeriesCache.clear();
+};
 
 const Library: React.FC = () => {
   const navigate = useNavigate();
@@ -68,16 +78,17 @@ const Library: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // 按大类加载标签和演员。一次性落状态，避免筛选栏分批抖动。
+  // 按大类加载标签和演员。缓存分类筛选数据，返回视频页时首帧直接复用，避免筛选栏卡顿。
   const loadCategoryFilters = useCallback(async () => {
-    if (scopeAll) {
+    if (scopeAll || !mainCategory) {
       setTags([]);
       setActors([]);
       return;
     }
-    if (!mainCategory) {
-      setTags([]);
-      setActors([]);
+    const cached = categoryFilterCache.get(mainCategory);
+    if (cached) {
+      setTags(cached.tags);
+      setActors(cached.actors);
       return;
     }
     try {
@@ -85,6 +96,7 @@ const Library: React.FC = () => {
         getTagsByCategory(mainCategory).catch(() => []),
         getActorsByCategory(mainCategory).catch(() => []),
       ]);
+      categoryFilterCache.set(mainCategory, { tags: nextTags, actors: nextActors });
       setTags(nextTags);
       setActors(nextActors);
     } catch (error) {
@@ -195,8 +207,15 @@ const Library: React.FC = () => {
       setTagFilteredSeries(null);
       return;
     }
+    const cached = tagSeriesCache.get(tagId);
+    if (cached) {
+      setTagFilteredSeries(cached);
+      setActiveTagId(tagId);
+      return;
+    }
     try {
       const series = await getVideoSeriesByTag(tagId);
+      tagSeriesCache.set(tagId, series);
       setTagFilteredSeries(series);
       setActiveTagId(tagId);
     } catch (error) {
@@ -210,8 +229,15 @@ const Library: React.FC = () => {
       setActorFilteredSeries(null);
       return;
     }
+    const cached = actorSeriesCache.get(actorId);
+    if (cached) {
+      setActorFilteredSeries(cached);
+      setActiveActorId(actorId);
+      return;
+    }
     try {
       const series = await getVideoSeriesByActor(actorId);
+      actorSeriesCache.set(actorId, series);
       setActorFilteredSeries(series);
       setActiveActorId(actorId);
     } catch (error) {
@@ -251,6 +277,7 @@ const Library: React.FC = () => {
       if (selected) {
         setScanning(true);
         try {
+          clearLibraryFilterCaches();
           const result = await scanVideos(selected as string);
           await refreshSeries();
           if (activeTagId !== null) {
@@ -285,6 +312,7 @@ const Library: React.FC = () => {
 
   const handleDeleteSeries = async (id: number) => {
     try {
+      clearLibraryFilterCaches();
       await deleteVideoSeries(id, true);
       setContextMenu(null);
       await refreshSeries();
@@ -317,6 +345,7 @@ const Library: React.FC = () => {
 
   const handleRescanMetadata = async (seriesId: number) => {
     try {
+      clearLibraryFilterCaches();
       const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
       clearPending();
@@ -344,6 +373,7 @@ const Library: React.FC = () => {
   const doSwitchType = async () => {
     if (!typeSwitchConfirm) return;
     try {
+      clearLibraryFilterCaches();
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
       setTypeSwitchConfirm(null);
       await refreshSeries();
@@ -361,6 +391,7 @@ const Library: React.FC = () => {
     setScanConfirm(false);
     setCategoryScanning(true);
     try {
+      clearLibraryFilterCaches();
       const result = await scanCategory(mainCategory);
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
@@ -464,6 +495,7 @@ const Library: React.FC = () => {
       const [type, idStr] = key.split('-');
       const id = parseInt(idStr);
       if (type === 's') {
+        clearLibraryFilterCaches();
         await deleteVideoSeries(id, true);
       }
     }

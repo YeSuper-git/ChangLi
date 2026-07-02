@@ -455,16 +455,9 @@ const SeriesDetail: React.FC = () => {
   const epWord = features.episode || '部';
   const lastWatchedEpisode = series.last_watched_episode || 0;
   const watchProgressLabel = formatSeriesWatchLabel(series, epWord);
-  const watchProgressHint = isWatched
-    ? `${series.video_count}${epWord}全部完成`
-    : lastWatchedEpisode > 0
-      ? `共${series.video_count}${epWord}，下次可从${watchProgressLabel.replace(/^看到/, '')}继续`
-      : `共${series.video_count}${epWord}，还没有观看记录`;
-  const watchProgressPercent = isWatched
-    ? 100
-    : series.video_count > 0 && lastWatchedEpisode > 0
-      ? Math.min(100, Math.round((lastWatchedEpisode / series.video_count) * 100))
-      : 0;
+  const progressReminder = lastWatchedEpisode > 0
+    ? `上次观看到${watchProgressLabel.replace(/^看到/, '')}`
+    : '';
   const orderedVideos = [...videos].sort((a, b) => {
     const seasonA = a.season ?? 0;
     const seasonB = b.season ?? 0;
@@ -477,7 +470,7 @@ const SeriesDetail: React.FC = () => {
   const hasWatchProgress = !isWatched && lastWatchedEpisode > 0;
   const playButtonLabel = hasWatchProgress ? '继续观看' : '立即观看';
   const playButtonHint = hasWatchProgress
-    ? `上次观看到${watchProgressLabel.replace(/^看到/, '')}`
+    ? progressReminder
     : orderedVideos.length > 0
       ? `从第1${epWord}开始`
       : '暂无可播放分集';
@@ -609,16 +602,18 @@ const SeriesDetail: React.FC = () => {
                 ) : (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">追番状态</div>
-                    <label className="changli-select-wrap">
-                      <select
-                        value={editData.status}
-                        onChange={(e) => setEditData({ ...editData, status: e.target.value as 'ongoing' | 'completed' })}
-                        className="changli-select changli-select-lg"
-                      >
-                        <option value="ongoing">连载中</option>
-                        <option value="completed">已完结</option>
-                      </select>
-                    </label>
+                    <div className="changli-status-switch" role="group" aria-label="追番状态">
+                      <button
+                        type="button"
+                        onClick={() => setEditData({ ...editData, status: 'ongoing' })}
+                        className={editData.status !== 'completed' ? 'active' : ''}
+                      >连载中</button>
+                      <button
+                        type="button"
+                        onClick={() => setEditData({ ...editData, status: 'completed' })}
+                        className={editData.status === 'completed' ? 'active' : ''}
+                      >已完结</button>
+                    </div>
                   </div>
                 )}
                 {features.tags && (
@@ -690,125 +685,59 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                {features.chinese_sub ? (
-                  <>
+                <div className="mb-3 flex items-start justify-between gap-5">
+                  <div className="min-w-0 flex-1">
                     <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        onClick={handleToggleChineseSub}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={translateIcon}
-                          alt="中文字幕"
-                          className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-red' : 'text-gray-400'}`}
-                          style={series.has_chinese_sub === 1 ? { filter: 'invert(42%) sepia(88%) saturate(1621%) hue-rotate(315deg) brightness(98%) contrast(98%)' } : {}}
-                        />
-                        <span className={series.has_chinese_sub === 1 ? 'text-rose-500' : 'text-gray-400'}>
-                          中字
-                        </span>
-                      </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {features.chinese_sub && (
+                        <button
+                          onClick={handleToggleChineseSub}
+                          className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                        >
+                          <img
+                            src={translateIcon}
+                            alt="中文字幕"
+                            className={`w-5 h-5 ${series.has_chinese_sub === 1 ? 'filter-red' : 'text-gray-400'}`}
+                            style={series.has_chinese_sub === 1 ? { filter: 'invert(42%) sepia(88%) saturate(1621%) hue-rotate(315deg) brightness(98%) contrast(98%)' } : {}}
+                          />
+                          <span className={series.has_chinese_sub === 1 ? 'text-rose-500' : 'text-gray-400'}>中字</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => toggleFavorite(series.id, 'series')}
                         className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
                       >
-                        <img
-                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
-                          alt="追番"
-                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
-                        />
-                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
-                          {isFavorite ? '已追番' : '追番'}
-                        </span>
+                        <img src={isFavorite ? favoriteIcon : notFavoriteIcon} alt="追番" className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`} />
+                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>{isFavorite ? '已追番' : '追番'}</span>
                       </button>
                       <button
                         onClick={handleToggleWatched}
                         className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
                       >
-                        <img
-                          src={watchedIcon}
-                          alt="已看完"
-                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
-                        />
-                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
-                          {isWatched ? '已看完' : '看完'}
-                        </span>
+                        <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
+                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
                       </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        onClick={() => toggleFavorite(series.id, 'series')}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={isFavorite ? favoriteIcon : notFavoriteIcon}
-                          alt="追番"
-                          className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`}
-                        />
-                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>
-                          {isFavorite ? '已追番' : '追番'}
+                      {!features.chinese_sub && (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {series.status === 'completed' ? '已完结' : '连载中'}
                         </span>
-                      </button>
-                      <button
-                        onClick={handleToggleWatched}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img
-                          src={watchedIcon}
-                          alt="已看完"
-                          className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`}
-                        />
-                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>
-                          {isWatched ? '已看完' : '看完'}
-                        </span>
-                      </button>
+                      )}
+                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">全 {series.video_count} {epWord}</span>
                     </div>
-                    <div className="mb-2">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                        {series.status === 'completed' ? '已完结' : '连载中'}
-                      </span>
-                    </div>
-                  </>
-                )}
-                <div className="mb-4 flex justify-end">
+                    {progressReminder && <div className="mt-2 text-xs font-medium text-rose-500">{progressReminder}</div>}
+                  </div>
                   <button
                     type="button"
                     onClick={handlePrimaryPlay}
                     disabled={orderedVideos.length === 0}
-                    className="group flex min-w-[232px] items-center justify-between gap-4 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-5 py-4 text-left text-white shadow-[0_18px_38px_rgba(251,91,123,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(251,91,123,0.28)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
+                    className="group flex min-w-[184px] items-center justify-between gap-3 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 py-3 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
                   >
                     <span>
-                      <span className="block text-base font-extrabold leading-none">{playButtonLabel}</span>
-                      <span className="mt-1 block text-xs font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
+                      <span className="block text-sm font-extrabold leading-none">{playButtonLabel}</span>
+                      <span className="mt-1 block max-w-[116px] truncate text-[11px] font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
                     </span>
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-lg font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
                   </button>
-                </div>
-                <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
-                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-3">
-                    <div className="text-xs font-medium text-gray-400">总集数</div>
-                    <div className="mt-1 text-lg font-semibold text-gray-900">{series.video_count} {epWord}</div>
-                  </div>
-                  <div className={`rounded-2xl border px-4 py-3 ${isWatched ? 'border-yellow-200 bg-yellow-50/70' : lastWatchedEpisode > 0 ? 'border-rose-100 bg-rose-50/70' : 'border-gray-100 bg-gray-50/80'}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-medium text-gray-400">观看进度</div>
-                        <div className={`mt-1 text-lg font-semibold ${isWatched ? 'text-yellow-700' : lastWatchedEpisode > 0 ? 'text-rose-600' : 'text-gray-900'}`}>{watchProgressLabel}</div>
-                      </div>
-                      <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-gray-500 shadow-sm">{watchProgressPercent}%</span>
-                    </div>
-                    <div className="mt-3 h-1.5 rounded-full bg-white/80 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${isWatched ? 'bg-yellow-400' : 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c]'}`}
-                        style={{ width: `${watchProgressPercent}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 text-xs text-gray-400">{watchProgressHint}</div>
-                  </div>
                 </div>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
