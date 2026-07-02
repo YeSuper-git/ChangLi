@@ -8,7 +8,6 @@ use std::{
 };
 
 use base64::{engine::general_purpose, Engine as _};
-use serde_json::Value;
 use tao::{
     dpi::{LogicalSize, PhysicalPosition},
     event::{Event, StartCause, WindowEvent},
@@ -274,7 +273,7 @@ fn html(default_dir: &Path) -> String {
     </main>
   </div>
 <script>
-  const ipc = (value) => window.ipc.postMessage(JSON.stringify(value));
+  const ipc = (cmd) => window.ipc.postMessage(cmd);
   const state = document.getElementById('state');
   const progress = document.getElementById('progress');
   const install = document.getElementById('install');
@@ -287,7 +286,6 @@ fn html(default_dir: &Path) -> String {
   const flow2 = document.getElementById('flow-2');
   const flow3 = document.getElementById('flow-3');
   let installing = false;
-  let mouseDown = false;
   const setPhase = (phase) => {{
     steps.className = 'steps ' + (phase === 'ready' ? '' : phase);
     [flow1, flow2, flow3].forEach(el => el.classList.remove('active', 'done', 'fail'));
@@ -297,28 +295,27 @@ fn html(default_dir: &Path) -> String {
     if (phase === 'fail') flow2.classList.add('fail');
   }};
   setPhase('ready');
-  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('pointerdown', e => {{
+  document.querySelectorAll('[data-drag="true"]').forEach(el => el.addEventListener('mousedown', e => {{
     if (e.button !== 0 || e.target.closest('button,input,label')) return;
-    mouseDown = true;
-    ipc({{ cmd:'drag' }});
+    ipc('drag');
   }}));
-  window.addEventListener('pointerup', () => {{ mouseDown = false; }});
-  const close = () => {{ if (!installing) ipc({{ cmd:'close' }}); }};
-  closeBtn.onclick = close; cancel.onclick = close;
-  choose.onclick = () => {{ if (!installing) ipc({{ cmd:'choose-dir' }}); }};
-  install.onclick = () => {{
+  const close = () => {{ if (!installing) ipc('close'); }};
+  closeBtn.addEventListener('click', close);
+  cancel.addEventListener('click', close);
+  choose.addEventListener('click', () => {{ if (!installing) ipc('choose-dir'); }});
+  install.addEventListener('click', () => {{
     if (installing) return;
     installing = true;
     setPhase('install');
     install.disabled = true; cancel.disabled = true; closeBtn.disabled = true; choose.disabled = true;
     install.textContent = '安装中'; state.textContent = '正在安装 ChangLi，请稍候'; progress.classList.add('active');
-    ipc({{ cmd:'install' }});
-  }};
+    ipc('install');
+  }});
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{
     progress.classList.remove('active');
     if (ok) {{
-      setPhase('done'); state.textContent = '安装完成'; install.textContent = '完成'; install.disabled = false; install.onclick = () => ipc({{ cmd:'close' }});
+      setPhase('done'); state.textContent = '安装完成'; install.textContent = '完成'; install.disabled = false; install.onclick = () => ipc('close');
     }} else {{
       setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.disabled = false; installing = false; cancel.disabled = false; closeBtn.disabled = false; choose.disabled = false;
     }}
@@ -364,16 +361,14 @@ fn main() -> wry::Result<()> {
     let webview = WebViewBuilder::new()
         .with_html(html(&default_dir))
         .with_ipc_handler(move |request| {
-            let body = request.body();
-            let event = serde_json::from_str::<Value>(body).ok().and_then(|value| {
-                match value.get("cmd").and_then(Value::as_str) {
-                    Some("drag") => Some(InstallerEvent::Drag),
-                    Some("close") => Some(InstallerEvent::Close),
-                    Some("choose-dir") => Some(InstallerEvent::ChooseDir),
-                    Some("install") => Some(InstallerEvent::Install),
-                    _ => None,
-                }
-            });
+            let body = request.body().trim().trim_matches('"');
+            let event = match body {
+                "drag" => Some(InstallerEvent::Drag),
+                "close" => Some(InstallerEvent::Close),
+                "choose-dir" => Some(InstallerEvent::ChooseDir),
+                "install" => Some(InstallerEvent::Install),
+                _ => None,
+            };
             if let Some(event) = event {
                 let _ = ipc_proxy.send_event(event);
             }

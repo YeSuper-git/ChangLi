@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.7.22 (2026-07-02)
+
+### 修复
+- 修复 v1.7.21 安装器按钮点击后 Rust 侧无响应的问题：IPC 从 JSON 对象协议改为 Wry 官方示例同款纯字符串命令。
+- 取消、关闭、更改安装位置、开始安装、完成后关闭全部改为 `window.ipc.postMessage('command')`。
+- Rust 侧直接按 `drag` / `close` / `choose-dir` / `install` 字符串分发事件，避免 JSON stringify/parse 兼容问题。
+
+### 验证
+- 本地 HTML 预览中按钮点击会改变前端状态。
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.21 (2026-07-02)
 
 ### 修复
