@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.25 (2026-07-02)
+
+### 优化
+- 安装器左侧品牌图标区域按旧预览稿补回白色渐变高光、半透明玻璃底、描边和柔和阴影，同时保持原图标视觉尺寸不缩小。
+- 安装器左下装饰卡片按旧预览稿恢复为三张半透明竖向海报卡，从底部裁切露出，重叠处可见后层轮廓。
+- 安装器右侧 1/2/3 步骤卡按旧预览稿改为白底细边框卡片与淡粉小圆角编号，不再使用重高亮样式。
+- 安装中进度条改为 1% 到 100% 递增显示，取消原来的充能式循环动画。
+
+### 验证
+- `npm run build`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.24 (2026-07-02)
 
 ### 优化

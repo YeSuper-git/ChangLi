@@ -184,7 +184,9 @@ fn html(default_dir: &Path) -> String {
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
+      radial-gradient(circle at 25% 12%, rgba(255,255,255,.38), transparent 25%),
       radial-gradient(circle at -18% 74%, rgba(255,164,92,.70) 0 24%, transparent 25%),
+      radial-gradient(circle at 74% 86%, rgba(255,187,123,.42), transparent 30%),
       radial-gradient(circle at 82% -9%, rgba(255,152,103,.82) 0 25%, transparent 26%),
       linear-gradient(154deg,#f14170 0%,#fb566a 47%,#ff8050 100%);
   }}
@@ -200,7 +202,7 @@ fn html(default_dir: &Path) -> String {
   .orb.b {{ left:-50px; bottom:20px; width:150px; height:150px; background:rgba(255,180,91,.38); }}
   .brand,.hero,.glass-pills,.stack {{ position:relative; z-index:1; }}
   .brand {{ display:flex; gap:16px; align-items:center; }}
-  .brand img {{ width:64px; height:64px; border-radius:16px; display:block; object-fit:cover; box-shadow:0 8px 22px rgba(142,34,60,.24); }}
+  .brand img {{ width:64px; height:64px; border-radius:16px; display:block; object-fit:cover; background:rgba(255,255,255,.20); border:1px solid rgba(255,255,255,.34); box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 30px rgba(112,24,44,.22); }}
   .wordmark {{ font-size:30px; font-weight:900; letter-spacing:-.03em; line-height:1; }}
   .tag {{ margin-top:8px; font-size:11px; font-weight:850; letter-spacing:.07em; color:#fff2f6; }}
   .hero {{ margin-top:54px; }}
@@ -212,12 +214,11 @@ fn html(default_dir: &Path) -> String {
     border:1px solid rgba(255,255,255,.38); box-shadow:inset 0 1px 0 rgba(255,255,255,.36), 0 10px 24px rgba(159,38,55,.12);
     backdrop-filter:blur(12px);
   }}
-  .stack {{ position:absolute; left:43px; bottom:32px; width:230px; height:130px; }}
-  .glass-card {{ position:absolute; width:130px; height:72px; border-radius:24px; transform-origin:50% 100%;
-    background:linear-gradient(140deg,rgba(255,255,255,.36),rgba(255,255,255,.12));
-    border:1px solid rgba(255,255,255,.38); box-shadow:0 18px 42px rgba(154,46,58,.16), inset 0 1px 0 rgba(255,255,255,.45); backdrop-filter:blur(16px) saturate(150%);
+  .stack {{ position:absolute; z-index:1; left:48px; bottom:-74px; width:230px; height:210px; opacity:.74; }}
+  .glass-card {{ position:absolute; width:92px; height:132px; border-radius:16px;
+    background:linear-gradient(150deg,rgba(255,255,255,.42),rgba(255,255,255,.20)); border:1px solid rgba(255,255,255,.58); box-shadow:0 18px 50px rgba(94,22,31,.22), inset 0 1px 0 rgba(255,255,255,.42); backdrop-filter:blur(10px) saturate(150%);
   }}
-  .glass-card.one {{ left:14px; top:44px; transform:rotate(-45deg); z-index:1; }} .glass-card.two {{ left:50px; top:20px; transform:rotate(0deg); opacity:.84; z-index:2; }} .glass-card.three {{ left:88px; top:44px; transform:rotate(45deg); opacity:.70; z-index:1; }}
+  .glass-card.one {{ left:0; top:24px; transform:rotate(-12deg); }} .glass-card.two {{ left:70px; top:0; transform:rotate(5deg); background:linear-gradient(150deg,rgba(255,255,255,.50),rgba(255,255,255,.24)); }} .glass-card.three {{ left:138px; top:32px; transform:rotate(13deg); }}
   .main {{ position:relative; padding:48px 34px 26px 38px; background:radial-gradient(circle at 88% 12%,rgba(255,255,255,.92),transparent 28%), linear-gradient(180deg,#fbfcff,#f6f8fc); }}
   .main::before {{ content:""; position:absolute; inset:0; background:linear-gradient(115deg,rgba(255,255,255,.64),transparent 26%,transparent 78%,rgba(255,255,255,.52)); pointer-events:none; }}
   .main > * {{ position:relative; z-index:1; }}
@@ -244,12 +245,12 @@ fn html(default_dir: &Path) -> String {
   .path-copy strong {{ display:block; margin-top:6px; color:var(--ink); font-size:16px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
   .change {{ border:0; border-radius:999px; padding:9px 16px; background:#ffedf2; color:#cf3d62; font-size:13px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; }}
   .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:18px; }}
-  .flow-item {{ min-height:94px; border-radius:20px; padding:14px 13px; background:#fafbfe; border:1px solid #edf0f6; transition:.2s ease; }}
-  .flow-item.active {{ background:#fff4f7; border-color:#ffc3d0; box-shadow:0 12px 28px rgba(244,73,117,.12); }}
-  .flow-item.done {{ background:#f0fdf6; border-color:#bbf7d0; }}
+  .flow-item {{ min-height:104px; border-radius:18px; padding:14px; background:#fff; border:1px solid rgba(230,233,240,.86); transition:.2s ease; }}
+  .flow-item.active {{ background:#fff; border-color:rgba(230,233,240,.86); box-shadow:none; }}
+  .flow-item.done {{ background:#fff; border-color:rgba(230,233,240,.86); }}
   .flow-item.fail {{ background:#fff1f2; border-color:#fecdd3; }}
-  .num {{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:13px; font-weight:950; background:linear-gradient(180deg,var(--rose2),var(--rose)); }}
-  .flow-item b {{ display:block; margin-top:10px; color:var(--ink); font-size:14px; line-height:1.25; }}
+  .num {{ width:28px; height:28px; border-radius:10px; display:grid; place-items:center; margin-bottom:12px; color:#c72e55; font-size:14px; font-weight:900; background:linear-gradient(135deg,rgba(251,91,123,.13),rgba(255,138,76,.15)); }}
+  .flow-item b {{ display:block; margin-top:0; color:var(--ink); font-size:14px; line-height:1.25; }}
   .flow-item span {{ display:block; margin-top:5px; color:#6b7382; font-size:12px; line-height:1.35; }}
   .options {{ display:flex; gap:18px; margin-top:18px; padding-top:16px; border-top:1px solid #edf0f6; }}
   .check {{ display:flex; align-items:center; gap:8px; color:#384050; font-size:13px; font-weight:800; }}
@@ -258,8 +259,7 @@ fn html(default_dir: &Path) -> String {
   .state {{ color:#687184; font-size:13px; font-weight:700; }}
   .progress {{ display:none; margin-top:10px; width:238px; height:8px; border-radius:999px; overflow:hidden; background:#e8ecf3; }}
   .progress.active {{ display:block; }}
-  .bar {{ width:38%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--orange)); animation:slide 1.2s ease-in-out infinite; }}
-  @keyframes slide {{ 0%{{ transform:translateX(-95%); }} 100%{{ transform:translateX(270%); }} }}
+  .bar {{ width:1%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 0 18px rgba(251,91,123,.38); transition:width .24s ease; }}
   .actions {{ display:flex; gap:12px; }}
   .btn {{ height:46px; border-radius:16px; border:1px solid #d9dee8; background:linear-gradient(180deg,#fff,#f8f9fd); padding:0 24px; color:#3f4654; font-size:15px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; box-shadow:inset 0 1px 0 rgba(255,255,255,.92); }}
   .btn.disabled,.change.disabled,.close.disabled {{ opacity:.55; pointer-events:none; cursor:not-allowed; }}
@@ -284,12 +284,20 @@ fn html(default_dir: &Path) -> String {
         <div class="path-row"><div class="home">⌂</div><div class="path-copy"><small>安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
         <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b>检测位置</b><span>优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b>写入组件</b><span>静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b>创建入口</b><span>安装器创建桌面入口</span></div></div>
       </section>
-      <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close" data-close="true">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
+      <div class="bottom"><div><div class="state" id="state">准备就绪</div><div class="progress" id="progress"><div class="bar" id="progress-bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close" data-close="true">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
     </main>
   </div>
 <script>
   const state = document.getElementById('state');
   const progress = document.getElementById('progress');
+  const progressBar = document.getElementById('progress-bar');
+  let progressValue = 1;
+  let progressTimer = null;
+  const setProgress = (value) => {{
+    progressValue = Math.max(1, Math.min(100, value));
+    progressBar.style.width = progressValue + '%';
+    state.textContent = progressValue >= 100 ? '安装完成 100%' : '正在安装 ChangLi，' + progressValue + '%';
+  }};
   const install = document.getElementById('install');
   const cancel = document.getElementById('cancel');
   const closeBtn = document.getElementById('close');
@@ -323,16 +331,22 @@ fn html(default_dir: &Path) -> String {
   }});
   window.setInstalling = () => {{
     setPhase('install');
+    if (progressTimer) clearInterval(progressTimer);
     install.classList.add('disabled'); cancel.classList.add('disabled'); closeBtn.classList.add('disabled'); choose.classList.add('disabled');
-    install.textContent = '安装中'; state.textContent = '正在安装 ChangLi，请稍候'; progress.classList.add('active');
+    install.textContent = '安装中'; progress.classList.add('active'); setProgress(1);
+    progressTimer = setInterval(() => {{
+      if (progressValue < 92) setProgress(progressValue + 1);
+      else if (progressValue < 99 && Math.random() > .55) setProgress(progressValue + 1);
+    }}, 180);
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{
-    progress.classList.remove('active');
+    if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
-      setPhase('done'); state.textContent = '安装完成，可以直接打开长离'; install.textContent = '关闭并打开长离'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
+      setPhase('done'); setProgress(100); install.textContent = '关闭并打开长离'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '仅关闭'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
-      setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
+      progress.classList.remove('active');
+      setPhase('fail'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
   }};
 </script>
