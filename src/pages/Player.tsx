@@ -74,12 +74,22 @@ const Player: React.FC = () => {
 
   // 初始化 mpv
   useEffect(() => {
-    if (!id || mpvInitialized.current) return;
+    if (!id) return;
 
     const initMpv = async () => {
       try {
         setLoading(true);
         setError('');
+
+        // 先销毁旧实例（如果有），确保完全清理
+        if (mpvInitialized.current) {
+          try {
+            await destroy();
+          } catch { /* ignore destroy errors */ }
+          mpvInitialized.current = false;
+          // 等待 mpv 释放资源
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -127,31 +137,40 @@ const Player: React.FC = () => {
 
         // 监听属性变化
         await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
-          switch (name) {
-            case 'pause':
-              {
-                const playing = !data;
-                isPlayingRef.current = playing;
-                setIsPlaying(playing);
-              }
-              break;
-            case 'time-pos':
-              setCurrentTime(data ?? 0);
-              break;
-            case 'duration':
-              setDuration(data ?? 0);
-              break;
-            case 'volume':
-              setVolume(data ?? 80);
-              break;
-            case 'speed':
-              setSpeed(data ?? 1);
-              break;
-          }
+          try {
+            switch (name) {
+              case 'pause':
+                {
+                  const playing = !data;
+                  isPlayingRef.current = playing;
+                  setIsPlaying(playing);
+                }
+                break;
+              case 'time-pos':
+                setCurrentTime(data ?? 0);
+                break;
+              case 'duration':
+                setDuration(data ?? 0);
+                break;
+              case 'volume':
+                setVolume(data ?? 80);
+                break;
+              case 'speed':
+                setSpeed(data ?? 1);
+                break;
+            }
+          } catch { /* ignore observer errors */ }
         });
 
         // 加载视频
-        await command('loadfile', [currentVideo.file_path, 'replace']);
+        try {
+          await command('loadfile', [currentVideo.file_path, 'replace']);
+        } catch (loadErr) {
+          console.error('[Player] loadfile 失败:', loadErr);
+          setError('加载视频失败: ' + String(loadErr));
+          setLoading(false);
+          return;
+        }
         if (currentVideo.subtitle) {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
         }
@@ -161,7 +180,7 @@ const Player: React.FC = () => {
           await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
-        await setProperty('pause', false);
+        await setProperty('pause', false).catch(() => undefined);
         isPlayingRef.current = true;
         setIsPlaying(true);
         
@@ -176,12 +195,20 @@ const Player: React.FC = () => {
     initMpv();
 
     return () => {
+      // 不在这里 destroy — 由下次 init 或组件卸载时处理
+      // 避免 destroy/init 竞态导致闪退
+    };
+  }, [id]);
+
+  // 组件卸载时清理 mpv（仅在真正关闭播放器时）
+  useEffect(() => {
+    return () => {
       if (mpvInitialized.current) {
-        destroy().catch(console.error);
+        destroy().catch(() => {});
         mpvInitialized.current = false;
       }
     };
-  }, [id]);
+  }, []);
 
   // 保存音量到本地
   useEffect(() => {
