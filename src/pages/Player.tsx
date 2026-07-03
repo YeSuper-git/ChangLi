@@ -534,17 +534,7 @@ const Player: React.FC = () => {
     }
   }, []);
 
-  // 控制栏自动隐藏：暂停时一直展示；播放时鼠标离开立即隐藏。
-  useEffect(() => {
-    if (!isPlaying) {
-      setShowHeader(true);
-      setShowFooter(true);
-      return;
-    }
-    // 播放中初始隐藏
-    setShowHeader(false);
-    setShowFooter(false);
-  }, [isPlaying]);
+  // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
 
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;
@@ -694,7 +684,6 @@ const Player: React.FC = () => {
           {showResumeNotice && (
             <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>
           )}
-          {!isPlaying && <div className="changli-player-center-play"><span className="play-icon" /></div>}
         </div>
 
         {/* 选集侧边栏：鼠标靠近右侧展开，离开收起 */}
