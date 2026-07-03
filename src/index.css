@@ -2173,8 +2173,7 @@ body.changli-player-body #root {
 
 .changli-player-window.is-pip .changli-player-titlebar,
 .changli-player-window.is-pip .changli-player-side,
-.changli-player-window.is-pip .advanced,
-.changli-player-window.is-fullscreen .changli-player-side {
+.changli-player-window.is-pip .advanced {
   display: none;
 }
 
@@ -2183,6 +2182,14 @@ body.changli-player-body #root {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.changli-player-window.cursor-hidden {
+  cursor: none;
+}
+
+.changli-player-window.cursor-hidden * {
+  cursor: none;
 }
 
 .changli-player-window.is-pip .changli-player-main,

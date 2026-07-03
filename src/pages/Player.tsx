@@ -49,6 +49,8 @@ const Player: React.FC = () => {
   const [showResumeNotice, setShowResumeNotice] = useState(false);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // 悬浮预览
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -314,11 +316,20 @@ const Player: React.FC = () => {
     try {
       const newFullscreen = !isFullscreen;
       const win = getCurrentWindow();
-      if (newFullscreen && await win.isMaximized().catch(() => false)) {
-        await win.unmaximize().catch(() => undefined);
+      // 先退出最大化再进全屏，避免状态冲突
+      if (newFullscreen) {
+        const maximized = await win.isMaximized().catch(() => false);
+        if (maximized) {
+          await win.unmaximize().catch(() => undefined);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
       await win.setFullscreen(newFullscreen);
       setIsFullscreen(newFullscreen);
+      if (!newFullscreen) {
+        // 退出全屏后同步最大化状态
+        setIsWindowMaximized(await win.isMaximized().catch(() => false));
+      }
     } catch (err) {
       console.error('[Player] 切换全屏失败:', err);
     }
@@ -561,6 +572,10 @@ const Player: React.FC = () => {
       setShowHeader(false);
       setShowFooter(false);
     }
+    // 全屏时鼠标 2s 无操作隐藏光标
+    setCursorVisible(true);
+    if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+    cursorTimerRef.current = setTimeout(() => setCursorVisible(false), 2000);
   }, []);
 
   // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
@@ -680,7 +695,7 @@ const Player: React.FC = () => {
 
   return (
     <section
-      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''}`}
+      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${isFullscreen && !cursorVisible ? 'cursor-hidden' : ''}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={handlePlayerMouseMove}
       onMouseLeave={() => { if (isPlaying) { setShowHeader(false); setShowFooter(false); } }}
