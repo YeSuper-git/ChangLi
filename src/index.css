@@ -551,6 +551,88 @@ body {
   box-shadow: 0 10px 22px rgba(251, 91, 123, 0.22);
 }
 
+/* 气泡下拉选择框 */
+.changli-bubble-select {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.changli-bubble-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--changli-line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.changli-bubble-select:hover .changli-bubble-select-trigger {
+  border-color: rgba(251, 91, 123, 0.3);
+}
+
+.changli-bubble-select-trigger svg {
+  opacity: 0.4;
+  transition: transform 0.2s ease;
+}
+
+.changli-bubble-select .changli-bubble-select-dropdown ~ .changli-bubble-select-trigger svg,
+.changli-bubble-select:has(.changli-bubble-select-dropdown) .changli-bubble-select-trigger svg {
+  transform: rotate(180deg);
+}
+
+.changli-bubble-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  animation: bubbleSelectIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bubbleSelectIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.changli-bubble-select-option {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.changli-bubble-select-option:hover {
+  background: rgba(251, 91, 123, 0.08);
+  color: #1a1a1a;
+}
+
+.changli-bubble-select-option.active {
+  background: rgba(251, 91, 123, 0.12);
+  color: #fb5b7b;
+  font-weight: 700;
+}
+
 .changli-tooltip {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;
@@ -703,6 +785,73 @@ body {
   width: 15px;
   height: 15px;
   color: currentColor;
+}
+
+/* 搜索图标：圆 + 斜线 */
+.changli-window-controls .search-icon::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  border: 1.8px solid currentColor;
+  border-radius: 50%;
+}
+
+.changli-window-controls .search-icon::after {
+  content: '';
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  width: 5px;
+  height: 1.8px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(45deg);
+  transform-origin: right center;
+}
+
+/* 搜索栏展开/收起动画 */
+.changli-search-bar {
+  display: flex;
+  align-items: center;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.changli-search-bar.expanded {
+  width: 220px;
+  opacity: 1;
+}
+
+.changli-search-form {
+  width: 100%;
+}
+
+.changli-search-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  color: #1a1a1a;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.changli-search-input:focus {
+  border-color: rgba(251, 91, 123, 0.4);
+  box-shadow: 0 0 0 3px rgba(251, 91, 123, 0.1);
+  background: #fff;
+}
+
+.changli-search-input::placeholder {
+  color: #9ca3af;
 }
 
 .changli-window-controls .settings-icon {
@@ -1464,11 +1613,11 @@ body.changli-player-body #root {
   top: 0;
   left: 0;
   right: 0;
-  height: 58px;
+  height: 42px;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 210px;
   align-items: center;
-  padding: 0 18px 0 20px;
+  padding: 0 14px 0 16px;
   border-bottom: 1px solid var(--player-line);
   background: rgba(12, 13, 18, 0.96);
   backdrop-filter: blur(22px);
@@ -1844,7 +1993,7 @@ body.changli-player-body #root {
   bottom: 0;
   z-index: 5;
   border-top: 1px solid var(--player-line);
-  padding: 14px 20px 18px;
+  padding: 8px 16px 10px;
   background: rgba(17, 18, 23, 0.94);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -2173,8 +2322,7 @@ body.changli-player-body #root {
 
 .changli-player-window.is-pip .changli-player-titlebar,
 .changli-player-window.is-pip .changli-player-side,
-.changli-player-window.is-pip .advanced,
-.changli-player-window.is-fullscreen .changli-player-side {
+.changli-player-window.is-pip .advanced {
   display: none;
 }
 
@@ -2183,6 +2331,14 @@ body.changli-player-body #root {
   margin: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.changli-player-window.cursor-hidden {
+  cursor: none;
+}
+
+.changli-player-window.cursor-hidden * {
+  cursor: none;
 }
 
 .changli-player-window.is-pip .changli-player-main,

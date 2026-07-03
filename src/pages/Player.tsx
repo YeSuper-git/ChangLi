@@ -15,6 +15,8 @@ const OBSERVED_PROPERTIES = [
   ['duration', 'double', 'none'],
   ['volume', 'double', 'none'],
   ['speed', 'double', 'none'],
+  ['dwidth', 'int64', 'none'],
+  ['dheight', 'int64', 'none'],
 ] as const satisfies MpvObservableProperty[];
 
 const Player: React.FC = () => {
@@ -47,6 +49,8 @@ const Player: React.FC = () => {
   const [showResumeNotice, setShowResumeNotice] = useState(false);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // 悬浮预览
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -56,7 +60,9 @@ const Player: React.FC = () => {
   // Refs
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
+  const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
+  const isMountedRef = useRef(true);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
@@ -77,19 +83,20 @@ const Player: React.FC = () => {
     if (!id) return;
 
     const initMpv = async () => {
-      try {
-        setLoading(true);
-        setError('');
+      // 通过锁串行化所有 mpv 操作，避免 destroy/init 竞态
+      mpvOperationLock.current = mpvOperationLock.current.then(async () => {
+        try {
+          setLoading(true);
+          setError('');
 
-        // 先销毁旧实例（如果有），确保完全清理
-        if (mpvInitialized.current) {
-          try {
-            await destroy();
-          } catch { /* ignore destroy errors */ }
-          mpvInitialized.current = false;
-          // 等待 mpv 释放资源
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        }
+          // 先销毁旧实例（如果有），确保完全清理
+          if (mpvInitialized.current) {
+            try {
+              await destroy();
+            } catch { /* ignore destroy errors */ }
+            mpvInitialized.current = false;
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -120,16 +127,20 @@ const Player: React.FC = () => {
         await init({
           initialOptions: {
             'vo': 'gpu',
-            'hwdec': 'd3d11va',
+            'hwdec': 'd3d11va-copy',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
             'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
+            'no-config': 'yes',
             // 避免被 NVIDIA 驱动识别为游戏
             'd3d11-sync-interval': '0',
             'video-sync': 'audio',
+            'dither-depth': 'no',
+            'vd-lavc-dr': 'no',
+            'gpu-dumb-mode': 'yes',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -140,6 +151,7 @@ const Player: React.FC = () => {
 
         // 监听属性变化
         await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
+          if (!isMountedRef.current) return;
           try {
             switch (name) {
               case 'pause':
@@ -160,6 +172,26 @@ const Player: React.FC = () => {
                 break;
               case 'speed':
                 setSpeed(data ?? 1);
+                break;
+              case 'dwidth':
+              case 'dheight':
+                // 视频尺寸变化时，按比例调整播放器窗口大小
+                if (name === 'dwidth' && data && data > 0 && isMountedRef.current) {
+                  const win = getCurrentWindow();
+                  const videoW = data as number;
+                  // dheight 可能还没到，先用当前窗口比例估算
+                  win.outerSize().then((size) => {
+                    const scale = window.devicePixelRatio || 1;
+                    const currentW = size.width / scale;
+                    const currentH = size.height / scale;
+                    const targetH = Math.round(videoW * (currentH / currentW));
+                    if (targetH > 200 && targetH < 2000) {
+                      const newW = Math.round(Math.min(videoW, 1600));
+                      const newH = Math.round(newW * (targetH / videoW));
+                      win.setSize(new LogicalSize(newW, Math.max(360, newH))).catch(() => {});
+                    }
+                  }).catch(() => {});
+                }
                 break;
             }
           } catch { /* ignore observer errors */ }
@@ -193,6 +225,7 @@ const Player: React.FC = () => {
         setError(String(err));
         setLoading(false);
       }
+      }); // end mpvOperationLock.then
     };
 
     initMpv();
@@ -203,13 +236,19 @@ const Player: React.FC = () => {
     };
   }, [id]);
 
-  // 组件卸载时清理 mpv（仅在真正关闭播放器时）
+  // 组件卸载时清理 mpv — 通过锁串行化，避免和 init 竞态
   useEffect(() => {
     return () => {
-      if (mpvInitialized.current) {
-        destroy().catch(() => {});
-        mpvInitialized.current = false;
-      }
+      isMountedRef.current = false;
+      // 通过锁确保 init 完成后再 destroy
+      mpvOperationLock.current = mpvOperationLock.current.then(async () => {
+        if (mpvInitialized.current) {
+          try {
+            await destroy();
+          } catch { /* ignore */ }
+          mpvInitialized.current = false;
+        }
+      }).catch(() => {});
     };
   }, []);
 
@@ -218,14 +257,18 @@ const Player: React.FC = () => {
     if (!mpvInitialized.current) return;
     let failCount = 0;
     const timer = window.setInterval(async () => {
+      if (!isMountedRef.current || !mpvInitialized.current) return;
       try {
         await command('get_property', ['time-pos']);
         failCount = 0;
       } catch {
+        if (!isMountedRef.current) return;
         failCount++;
         if (failCount >= 3) {
           console.error('[Player] mpv 连续无响应，可能已崩溃');
-          setError('播放器异常退出，请重新打开');
+          if (isMountedRef.current) {
+            setError('播放器异常退出，请重新打开');
+          }
           mpvInitialized.current = false;
           window.clearInterval(timer);
         }
@@ -241,20 +284,24 @@ const Player: React.FC = () => {
 
   // 播放/暂停
   const togglePlay = useCallback(async () => {
+    if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
       const nextPaused = isPlayingRef.current;
       isPlayingRef.current = !nextPaused;
       setIsPlaying(!nextPaused);
       await setProperty('pause', nextPaused);
     } catch (err) {
-      isPlayingRef.current = !isPlayingRef.current;
-      setIsPlaying(isPlayingRef.current);
+      if (isMountedRef.current) {
+        isPlayingRef.current = !isPlayingRef.current;
+        setIsPlaying(isPlayingRef.current);
+      }
       console.error('[Player] 切换播放状态失败:', err);
     }
   }, []);
 
   // 跳转
   const seek = useCallback(async (time: number) => {
+    if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
       await command('seek', [time, 'absolute']);
     } catch (err) {
@@ -285,11 +332,29 @@ const Player: React.FC = () => {
     try {
       const newFullscreen = !isFullscreen;
       const win = getCurrentWindow();
-      if (newFullscreen && await win.isMaximized().catch(() => false)) {
-        await win.unmaximize().catch(() => undefined);
+      if (newFullscreen) {
+        // 进入全屏：记住当前是否最大化，直接设全屏
+        const wasMaximized = await win.isMaximized().catch(() => false);
+        await win.setFullscreen(true);
+        setIsFullscreen(true);
+        // 保存最大化状态以便退出时恢复
+        if (wasMaximized) {
+          (window as any).__changli_wasMaximized = true;
+        }
+      } else {
+        // 退出全屏
+        await win.setFullscreen(false);
+        setIsFullscreen(false);
+        // 恢复最大化
+        if ((window as any).__changli_wasMaximized) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          await win.maximize().catch(() => undefined);
+          setIsWindowMaximized(true);
+          (window as any).__changli_wasMaximized = false;
+        } else {
+          setIsWindowMaximized(false);
+        }
       }
-      await win.setFullscreen(newFullscreen);
-      setIsFullscreen(newFullscreen);
     } catch (err) {
       console.error('[Player] 切换全屏失败:', err);
     }
@@ -340,14 +405,16 @@ const Player: React.FC = () => {
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
-      const mainWindow = await Window.getByLabel('main');
-      if (mainWindow) {
-        await mainWindow.unminimize().catch(() => undefined);
-        await mainWindow.setAlwaysOnTop(true).catch(() => undefined);
-        await mainWindow.setFocus().catch(() => undefined);
-        await new Promise((resolve) => window.setTimeout(resolve, 120));
-        await mainWindow.setAlwaysOnTop(false).catch((error) => console.error('[Player] 取消主窗口置顶失败:', error));
-      }
+      try {
+        const mainWindow = await Window.getByLabel('main').catch(() => null);
+        if (mainWindow) {
+          await mainWindow.unminimize().catch(() => undefined);
+          await mainWindow.setAlwaysOnTop(true).catch(() => undefined);
+          await mainWindow.setFocus().catch(() => undefined);
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          await mainWindow.setAlwaysOnTop(false).catch(() => undefined);
+        }
+      } catch { /* 主窗口操作失败不影响关闭 */ }
       await playerWindow.close();
     }, '关闭');
   }, [playerWindow, runPlayerWindowAction]);
@@ -437,8 +504,8 @@ const Player: React.FC = () => {
           video.dataset.src = currentVideo.file_path;
           video.src = convertFileSrc(currentVideo.file_path);
           video.muted = true;
-          video.preload = 'metadata';
-          video.crossOrigin = 'anonymous';
+          video.preload = 'auto';
+          // 不设 crossOrigin — 本地文件用 Tauri asset protocol 不支持 CORS
           previewVideoRef.current = video;
         }
         if (video.readyState < 1) {
@@ -520,8 +587,8 @@ const Player: React.FC = () => {
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
-    const nearTop = y <= 82;
-    const nearBottom = y >= rect.height - 132;
+    const nearTop = y <= 60;
+    const nearBottom = y >= rect.height - 100;
     if (nearTop) {
       setShowHeader(true);
       setShowFooter(false);
@@ -532,6 +599,10 @@ const Player: React.FC = () => {
       setShowHeader(false);
       setShowFooter(false);
     }
+    // 全屏时鼠标 2s 无操作隐藏光标
+    setCursorVisible(true);
+    if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+    cursorTimerRef.current = setTimeout(() => setCursorVisible(false), 2000);
   }, []);
 
   // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
@@ -651,7 +722,7 @@ const Player: React.FC = () => {
 
   return (
     <section
-      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''}`}
+      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${isFullscreen && !cursorVisible ? 'cursor-hidden' : ''}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={handlePlayerMouseMove}
       onMouseLeave={() => { if (isPlaying) { setShowHeader(false); setShowFooter(false); } }}
