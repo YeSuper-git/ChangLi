@@ -25,8 +25,8 @@ use tao::platform::windows::WindowExtWindows;
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
-const W: i32 = 980;
-const H: i32 = 640;
+const W: i32 = 1000;
+const H: i32 = 660;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -382,7 +382,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     progressTimer = setInterval(() => {{
       if (progressValue < 92) setProgress(progressValue + 1);
       else if (progressValue < 99 && Math.random() > .55) setProgress(progressValue + 1);
-    }}, 100);
+    }}, 90);
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{
@@ -421,7 +421,9 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
 
     let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
     unsafe {
-        // 第一层：让宿主 HWND 支持 per-pixel alpha，避免 Tao 父窗口回退成白底。
+        // 纯透明链路：只处理宿主 HWND 的透明合成，不使用 Region/GDI 硬裁像素。
+        // 圆角和阴影由 WebView2 内部 CSS shell 自然抗锯齿渲染；外层 10px buffer
+        // 必须是真透明，而不是被父窗口或 WebView2 回退成白底。
         let margins = MARGINS {
             cxLeftWidth: -1,
             cxRightWidth: -1,
@@ -432,16 +434,6 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
         let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
         let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
-
-        // 第二层兜底：真实 Windows artifact 已证明 transparent parent/WebView2 仍可能露出
-        // 白色矩形底。把外层 HWND 裁成与 HTML shell 同尺寸的圆角区域，避免任何
-        // 父窗口/截图背景在四角或 10px 透明缓冲区里变成白色矩形。
-        // 这里不再保留外扩透明 buffer；WebView2 与 shell 同尺寸，region 只负责裁掉外框。
-        use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
-        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, 68, 68);
-        if !region.is_invalid() {
-            let _ = SetWindowRgn(hwnd, region, true);
-        }
     }
 }
 
@@ -481,8 +473,8 @@ fn main() -> wry::Result<()> {
     let mut web_context = WebContext::new(Some(webview_data_dir()));
     let webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_bounds(Rect {
-            position: WebLogicalPosition::new(0, 0).into(),
-            size: WebLogicalSize::new(W, H).into(),
+            position: WebLogicalPosition::new(10, 10).into(),
+            size: WebLogicalSize::new(980, 640).into(),
         })
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
