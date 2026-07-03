@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v1.7.38 - 2026-07-03
+
+### 修复
+- 播放器窗口改回实底播放器界面，避免透明 WebView 遮罩导致有声音无画面或边缘发白。
+- 播放器顶部窗口按钮改为稳定图标绘制，并修复最大化/全屏/小窗状态切换冲突。
+- 播放器分集列表默认收起，改为手动展开侧栏，底部控制区保留播放、快退、快进、下一集、倍速、音量、分集、小窗、全屏。
+- 视频库大屏布局扩展到 1800px，并使用自适应网格，避免 4K 屏只显示少量卡片。
+- 视频库切换动效降级为轻量动画，减少大列表卡顿与标题跳动。
+- 视频集详情页隐藏无演员配置的演员区，状态与集数气泡独立显示，并优化品牌播放按钮提示。
+- 安装器窗口透明层改为 Windows layered + DWM full-client frame，继续压掉圆角外白底。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `CHANGLI_NSIS_SETUP="$PWD/package.json" cargo check --manifest-path installer-shell/Cargo.toml`
+
 ## v1.7.37 - 2026-07-03
 
 ### 修复

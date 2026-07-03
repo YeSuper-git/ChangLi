@@ -457,8 +457,11 @@ const SeriesDetail: React.FC = () => {
   const playButtonHint = hasWatchProgress
     ? progressReminder
     : orderedVideos.length > 0
-      ? `从第1${epWord}开始`
+      ? '尚未观看'
       : '暂无可播放分集';
+  const episodeCountLabel = series.status === 'completed' || !features.tracking
+    ? `全 ${series.video_count} ${epWord}`
+    : `更新至第 ${series.video_count} ${epWord}`;
 
   const handlePrimaryPlay = async () => {
     if (!series || orderedVideos.length === 0) return;
@@ -739,12 +742,12 @@ const SeriesDetail: React.FC = () => {
                         <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
                         <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
                       </button>
-                      {!features.chinese_sub && (
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                          {series.status === 'completed' ? '已完结' : '连载中'}
-                        </span>
-                      )}
-                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">全 {series.video_count} {epWord}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                        {series.status === 'completed' ? '已完结' : '连载中'}
+                      </span>
+                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">{episodeCountLabel}</span>
                     </div>
                   </div>
                 </div>
@@ -758,19 +761,21 @@ const SeriesDetail: React.FC = () => {
                       )) : <span className="text-sm text-gray-400">暂无</span>}
                     </div>
                   )}
-                  <div>
-                    <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
-                    {seriesActors.length > 0 ? seriesActors.map((actor) => (
-                      <Link
-                        key={actor.id}
-                        to={`/actors/${actor.id}`}
-                        state={{ from: `/series/${series.id}`, backLabel: '返回视频集详情' }}
-                        className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-rose-600"
-                      >
-                        {actor.name}
-                      </Link>
-                    )) : <span className="text-sm text-gray-400">暂无</span>}
-                  </div>
+                  {features.actors && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
+                      {seriesActors.length > 0 ? seriesActors.map((actor) => (
+                        <Link
+                          key={actor.id}
+                          to={`/actors/${actor.id}`}
+                          state={{ from: `/series/${series.id}`, backLabel: '返回视频集详情' }}
+                          className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:text-rose-600"
+                        >
+                          {actor.name}
+                        </Link>
+                      )) : <span className="text-sm text-gray-400">暂无</span>}
+                    </div>
+                  )}
                   {features.actors && series.code && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">车牌：</span>
@@ -783,9 +788,15 @@ const SeriesDetail: React.FC = () => {
                     type="button"
                     onClick={handlePrimaryPlay}
                     disabled={orderedVideos.length === 0}
-                    className="action-btn action-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    className="group flex min-w-[184px] items-center justify-between gap-3 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 py-3 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
                     title={playButtonHint}
-                  >{playButtonLabel}</button>
+                  >
+                    <span>
+                      <span className="block text-sm font-extrabold leading-none">{playButtonLabel}</span>
+                      <span className="mt-1 block max-w-[116px] truncate text-[11px] font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
+                    </span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                  </button>
                   <button onClick={() => setEditing(true)} className="action-btn">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
                   <button onClick={handleCheckUpdates} className="action-btn">检查更新</button>

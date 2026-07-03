@@ -361,6 +361,7 @@ body {
   color: #7a808d;
   font-size: 12px;
   font-weight: 850;
+  white-space: nowrap;
   letter-spacing: 0.02em;
   padding-left: 4px;
 }
@@ -1133,9 +1134,35 @@ body.player-window-document,
 }
 
 /* ChangLi Player */
-body.changli-player-body,
-body.changli-player-body #root {
-  background: transparent !important;
+.changli-category-title {
+  cursor: pointer;
+  color: #a1a7b3;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  transition: color 0.18s ease;
+}
+
+.changli-category-title.active {
+  color: var(--changli-ink);
+}
+
+.changli-category-title:hover {
+  color: #4b5563;
+}
+
+.changli-library-grid-portrait {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.changli-library-grid-landscape {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+@media (min-width: 1600px) {
+  .changli-library-grid-portrait { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .changli-library-grid-landscape { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
 }
 
 .changli-player-window {
@@ -1149,7 +1176,7 @@ body.changli-player-body #root {
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
-  background: transparent;
+  background: #08090d;
   color: #f7f7fb;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
@@ -1158,7 +1185,10 @@ body.changli-player-body #root {
   content: "";
   position: absolute;
   inset: 0;
-  background: transparent;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(251, 91, 123, 0.12), transparent 28%),
+    radial-gradient(circle at 88% 0%, rgba(255, 138, 76, 0.08), transparent 30%),
+    #08090d;
   pointer-events: none;
 }
 
@@ -1170,7 +1200,7 @@ body.changli-player-body #root {
   align-items: center;
   padding: 0 18px 0 20px;
   border-bottom: 1px solid var(--player-line);
-  background: rgba(20, 21, 28, 0.88);
+  background: rgba(12, 13, 18, 0.96);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
@@ -1250,13 +1280,57 @@ body.changli-player-body #root {
 }
 
 .changli-player-winbtn {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #b8becb;
-  font-weight: 900;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #c8ceda;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
+
+.changli-player-winbtn span {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.changli-player-winbtn[aria-label="最小化"] span::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 6px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.changli-player-winbtn[aria-label="最大化"] span::before {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  border: 1.6px solid currentColor;
+  border-radius: 3px;
+}
+
+.changli-player-winbtn[aria-label="关闭"] span::before,
+.changli-player-winbtn[aria-label="关闭"] span::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 5.5px;
+  height: 1.7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.changli-player-winbtn[aria-label="关闭"] span::before { transform: rotate(45deg); }
+.changli-player-winbtn[aria-label="关闭"] span::after { transform: rotate(-45deg); }
 
 .changli-player-winbtn:hover {
   color: #fff;
@@ -1271,7 +1345,7 @@ body.changli-player-body #root {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 286px;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
 }
 
@@ -1280,8 +1354,8 @@ body.changli-player-body #root {
   margin: 18px 0 0 18px;
   overflow: hidden;
   border-radius: 22px;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 22px 60px rgba(0, 0, 0, 0.28);
+  background: rgba(0, 0, 0, 0.02);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), 0 22px 60px rgba(0, 0, 0, 0.28);
 }
 
 .changli-player-video-art {
@@ -1349,7 +1423,7 @@ body.changli-player-body #root {
   overflow: hidden;
   border: 1px solid var(--player-line);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(18, 20, 28, 0.96);
 }
 
 .changli-player-side-head {
@@ -1561,14 +1635,112 @@ body.changli-player-body #root {
 }
 
 .changli-player-round {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.065);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
   color: #fff;
-  font-size: 16px;
+  font-size: 0;
   font-weight: 900;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+
+.changli-player-round:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
+}
+
+.changli-player-round span {
+  position: relative;
+  display: block;
+}
+
+.play-icon {
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 13px solid currentColor;
+}
+
+.pause-icon {
+  width: 14px;
+  height: 16px;
+}
+
+.pause-icon::before,
+.pause-icon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 16px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.pause-icon::before { left: 1px; }
+.pause-icon::after { right: 1px; }
+
+.back-icon, .forward-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.back-icon::before, .forward-icon::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid currentColor;
+  border-left-color: transparent;
+  border-radius: 50%;
+}
+
+.back-icon::after, .forward-icon::after {
+  content: "10";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.back-icon { transform: scaleX(-1); }
+.back-icon::after { transform: scaleX(-1); }
+
+.next-icon {
+  width: 18px;
+  height: 16px;
+}
+
+.next-icon::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 10px solid currentColor;
+}
+
+.next-icon::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 2px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .changli-player-round.primary {
@@ -1641,6 +1813,94 @@ body.changli-player-body #root {
   height: 4px;
   cursor: pointer;
   accent-color: var(--player-rose);
+}
+
+
+.changli-speed-menu {
+  position: relative;
+}
+
+.changli-speed-options {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  display: grid;
+  min-width: 74px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(18, 19, 26, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36);
+  transform: translateX(-50%);
+  padding: 6px;
+}
+
+.changli-speed-options button {
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #cbd1dd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  height: 32px;
+  line-height: 32px;
+  text-align: center;
+}
+
+.changli-speed-options button:hover,
+.changli-speed-options button.active {
+  background: linear-gradient(135deg, rgba(251, 91, 123, 0.24), rgba(255, 138, 76, 0.16));
+  color: #fff;
+}
+
+.changli-player-window.episodes-open .changli-player-main {
+  grid-template-columns: minmax(0, 1fr) 286px;
+}
+
+.changli-player-window.is-pip {
+  grid-template-rows: minmax(0, 1fr) 64px;
+}
+
+.changli-player-window.is-pip .changli-player-titlebar,
+.changli-player-window.is-pip .changli-player-side,
+.changli-player-window.is-pip .advanced,
+.changli-player-window.is-fullscreen .changli-player-titlebar,
+.changli-player-window.is-fullscreen .changli-player-controls,
+.changli-player-window.is-fullscreen .changli-player-side {
+  display: none;
+}
+
+.changli-player-window.is-pip .changli-player-stage,
+.changli-player-window.is-fullscreen .changli-player-stage {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.changli-player-window.is-pip .changli-player-main,
+.changli-player-window.is-fullscreen .changli-player-main {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.changli-player-window.is-pip .changli-player-controls {
+  padding: 8px 12px;
+}
+
+.changli-player-window.is-pip .changli-player-progress,
+.changli-player-window.is-pip .changli-player-right-controls {
+  display: none;
+}
+
+.changli-player-window.is-pip .changli-player-bottom {
+  justify-content: center;
+  margin-top: 0;
+}
+
+.changli-player-window.is-pip .changli-player-round {
+  width: 36px;
+  height: 36px;
 }
 
 .changli-player-loading {

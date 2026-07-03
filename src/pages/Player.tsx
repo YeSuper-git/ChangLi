@@ -41,6 +41,7 @@ const Player: React.FC = () => {
   const [isPiP, setIsPiP] = useState(false);
   const [episodeListExpanded, setEpisodeListExpanded] = useState(false);
   const [showResumeNotice, setShowResumeNotice] = useState(false);
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   
   // 悬浮预览
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -55,12 +56,6 @@ const Player: React.FC = () => {
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
-
-  // 透明 WebView 让 libmpv 视频层可见
-  useEffect(() => {
-    document.body.classList.add('changli-player-body');
-    return () => document.body.classList.remove('changli-player-body');
-  }, []);
 
   // 初始化 mpv
   useEffect(() => {
@@ -98,12 +93,12 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu-next',
-            'hwdec': 'auto-safe',
+            'vo': 'gpu',
+            'hwdec': 'no',
             'keep-open': 'yes',
-            'force-window': 'yes',
-            'hwdec-codecs': 'all',
-            'gpu-api': 'auto',
+            'force-window': 'immediate',
+            'gpu-api': 'd3d11',
+            'opengl-pbo': 'no',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -240,8 +235,14 @@ const Player: React.FC = () => {
   }, [playerWindow, runPlayerWindowAction]);
 
   const handlePlayerToggleMaximize = useCallback(() => {
-    runPlayerWindowAction(() => playerWindow.toggleMaximize(), '最大化');
-  }, [playerWindow, runPlayerWindowAction]);
+    runPlayerWindowAction(async () => {
+      if (isFullscreen) {
+        await playerWindow.setFullscreen(false);
+        setIsFullscreen(false);
+      }
+      await playerWindow.toggleMaximize();
+    }, '最大化');
+  }, [isFullscreen, playerWindow, runPlayerWindowAction]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(() => playerWindow.close(), '关闭');
@@ -253,6 +254,10 @@ const Player: React.FC = () => {
       const win = getCurrentWindow();
       const newPiP = !isPiP;
       if (newPiP) {
+        if (isFullscreen) {
+          await win.setFullscreen(false);
+          setIsFullscreen(false);
+        }
         // 保存当前窗口大小和位置
         const currentSize = await win.outerSize();
         const currentPos = await win.outerPosition();
@@ -295,7 +300,7 @@ const Player: React.FC = () => {
     } catch (err) {
       console.error('[Player] 切换画中画失败:', err);
     }
-  }, [isPiP]);
+  }, [isFullscreen, isPiP]);
 
   // 进度条鼠标悬浮
   const handleProgressBarHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -466,9 +471,7 @@ const Player: React.FC = () => {
     return a.file_name.localeCompare(b.file_name);
   });
   const activeIndex = sortedEpisodes.findIndex((episode) => episode.id === currentVideo?.id);
-  const visibleEpisodes = episodeListExpanded || activeIndex < 0
-    ? sortedEpisodes
-    : sortedEpisodes.slice(Math.max(0, activeIndex - 2), Math.min(sortedEpisodes.length, activeIndex + 3));
+  const visibleEpisodes = episodeListExpanded ? sortedEpisodes : [];
   const activeEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex] : currentVideo;
   const displayTitle = series?.title || currentVideo?.series_title || currentVideo?.file_name || 'ChangLi Player';
   const episodeWord = '话';
@@ -520,7 +523,7 @@ const Player: React.FC = () => {
 
   return (
     <section
-      className="changli-player-window"
+      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${episodeListExpanded ? 'episodes-open' : 'episodes-closed'}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
@@ -534,9 +537,9 @@ const Player: React.FC = () => {
           <div className="changli-player-title">{displayTitle} - {activeEpisodeLabel}</div>
         </div>
         <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
-          <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}>-</button>
-          <button type="button" className="changli-player-winbtn" aria-label="最大化" onClick={handlePlayerToggleMaximize}>□</button>
-          <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}>×</button>
+          <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}><span /></button>
+          <button type="button" className="changli-player-winbtn" aria-label="最大化" onClick={handlePlayerToggleMaximize}><span /></button>
+          <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}><span /></button>
         </div>
       </header>
 
@@ -549,20 +552,17 @@ const Player: React.FC = () => {
           {!isPlaying && <div className="changli-player-center-play">▶</div>}
         </div>
 
-        <aside className="changli-player-side">
-          <div className="changli-player-side-head">
-            <div className="changli-player-side-title-row">
-              <strong>分集列表</strong>
-              {sortedEpisodes.length > 5 && (
-                <button type="button" onClick={() => setEpisodeListExpanded((value) => !value)}>
-                  {episodeListExpanded ? '收起' : '展开'}
-                </button>
-              )}
+        {episodeListExpanded && (
+          <aside className="changli-player-side">
+            <div className="changli-player-side-head">
+              <div className="changli-player-side-title-row">
+                <strong>分集列表</strong>
+                <button type="button" onClick={() => setEpisodeListExpanded(false)}>收起</button>
+              </div>
+              <span>{seasonSummary}</span>
             </div>
-            <span>{episodeListExpanded ? seasonSummary : `当前附近 · ${activeEpisodeLabel}`}</span>
-          </div>
-          <div className="changli-player-episodes">
-            {visibleEpisodes.map((episode) => {
+            <div className="changli-player-episodes">
+              {visibleEpisodes.map((episode) => {
               const active = episode.id === currentVideo?.id;
               const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
               return (
@@ -579,9 +579,10 @@ const Player: React.FC = () => {
                   </div>
                 </button>
               );
-            })}
-          </div>
-        </aside>
+              })}
+            </div>
+          </aside>
+        )}
       </main>
 
       <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
@@ -608,19 +609,24 @@ const Player: React.FC = () => {
 
         <div className="changli-player-bottom">
           <div className="changli-player-left-controls">
-            <button type="button" className="changli-player-round primary" onClick={togglePlay}>{isPlaying ? 'Ⅱ' : '▶'}</button>
-            <button type="button" className="changli-player-round" onClick={() => seek(Math.max(0, currentTime - 10))}>↺</button>
-            <button type="button" className="changli-player-round" onClick={() => seek(Math.min(duration, currentTime + 10))}>↻</button>
-            <div className="changli-player-now">
-              <strong>{activeEpisodeLabel}</strong>
-            </div>
+            <button type="button" className="changli-player-round primary" aria-label={isPlaying ? '暂停' : '播放'} onClick={togglePlay}><span className={isPlaying ? 'pause-icon' : 'play-icon'} /></button>
+            <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seek(Math.max(0, currentTime - 10))}><span className="back-icon" /></button>
+            <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
+            <button type="button" className="changli-player-round next" aria-label="下一集" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}><span className="next-icon" /></button>
           </div>
 
           <div className="changli-player-right-controls">
-            <button type="button" className="changli-player-textbtn" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}>下一集</button>
-            <select value={speed} onChange={(e) => changeSpeed(parseFloat(e.target.value))} className="changli-player-textbtn as-select">
-              {speedOptions.map((spd) => <option key={spd} value={spd}>{spd}x</option>)}
-            </select>
+            <button type="button" className="changli-player-textbtn advanced" onClick={() => setEpisodeListExpanded((open) => !open)}>{episodeListExpanded ? '收起分集' : '分集'}</button>
+            <div className="changli-speed-menu">
+              <button type="button" className="changli-player-textbtn speed-trigger" onClick={() => setSpeedMenuOpen((open) => !open)}>{speed}x</button>
+              {speedMenuOpen && (
+                <div className="changli-speed-options">
+                  {speedOptions.map((spd) => (
+                    <button key={spd} type="button" className={speed === spd ? 'active' : ''} onClick={() => { changeSpeed(spd); setSpeedMenuOpen(false); }}>{spd}x</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button type="button" className="changli-player-textbtn" onClick={() => changeVolume(volume === 0 ? 80 : 0)}>音量 {Math.round(volume)}%</button>
             <input
               type="range"
@@ -631,8 +637,8 @@ const Player: React.FC = () => {
               className="changli-player-volume"
               aria-label="音量"
             />
-            <button type="button" className="changli-player-textbtn" onClick={togglePiP}>{isPiP ? '退出小窗' : '小窗'}</button>
-            <button type="button" className="changli-player-textbtn" onClick={toggleFullscreen}>全屏</button>
+            <button type="button" className="changli-player-textbtn advanced" onClick={togglePiP}>{isPiP ? '退出小窗' : '小窗'}</button>
+            <button type="button" className="changli-player-textbtn advanced" onClick={toggleFullscreen}>{isFullscreen ? '退出全屏' : '全屏'}</button>
           </div>
         </div>
       </footer>

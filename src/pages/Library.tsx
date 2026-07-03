@@ -534,7 +534,7 @@ const Library: React.FC = () => {
           {[...categories].sort((a, b) => a.sort_order - b.sort_order).map((cat) => (
             <h1
               key={cat.key}
-              className={`cursor-pointer transition-all ${!scopeAll && mainCategory === cat.key ? 'changli-heading-xl' : 'text-2xl font-bold text-gray-400 hover:text-gray-600'}`}
+              className={`changli-category-title ${!scopeAll && mainCategory === cat.key ? 'active' : ''}`}
               onClick={() => {
                 setScopeAll(false);
                 setMainCategory(cat.key);
@@ -549,8 +549,8 @@ const Library: React.FC = () => {
           ))}
           {categories.length === 0 && (
             <>
-              <h1 className="changli-heading-xl cursor-pointer transition-all">动漫</h1>
-              <h1 className="text-2xl font-bold cursor-pointer transition-all text-gray-400">影视</h1>
+              <h1 className="changli-category-title active cursor-pointer">动漫</h1>
+              <h1 className="changli-category-title cursor-pointer">影视</h1>
             </>
           )}
         </div>
@@ -711,7 +711,7 @@ const Library: React.FC = () => {
 
       {filteredSeries.length > 0 && (
         <div className="mb-12">
-          <div className={`grid gap-5 auto-rows-max ${scopeAll ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : isPortrait ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-3 md:grid-cols-4'}`}>
+          <div className={`grid gap-5 auto-rows-max ${scopeAll ? 'changli-library-grid-portrait' : isPortrait ? 'changli-library-grid-portrait' : 'changli-library-grid-landscape'}`}>
             {filteredSeries.map((series) => {
               const itemCategory = getSeriesCategory(series);
               const itemFeatures = getSeriesFeatures(series) || features;

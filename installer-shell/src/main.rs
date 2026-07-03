@@ -21,6 +21,8 @@ use wry::{
 };
 
 #[cfg(target_os = "windows")]
+use tao::platform::windows::WindowExtWindows;
+#[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
 const W: i32 = 1000;
@@ -403,6 +405,41 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     )
 }
 
+#[cfg(target_os = "windows")]
+fn apply_true_transparent_window(window: &tao::window::Window) {
+    use windows::Win32::{
+        Foundation::{COLORREF, HWND},
+        Graphics::Dwm::DwmExtendFrameIntoClientArea,
+        UI::{
+            Controls::MARGINS,
+            WindowsAndMessaging::{
+                GetWindowLongW, SetLayeredWindowAttributes, SetWindowLongW, GWL_EXSTYLE, LWA_ALPHA,
+                WS_EX_LAYERED,
+            },
+        },
+    };
+
+    let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
+    unsafe {
+        // 不再用 GDI region / DWM 圆角裁窗口：那会带来锯齿或白线。
+        // 这里只把宿主 HWND 变成真正透明的 layered + full-client DWM frame，
+        // 让 WebView2 的透明像素落到桌面，而不是回退成白色矩形边框。
+        let margins = MARGINS {
+            cxLeftWidth: -1,
+            cxRightWidth: -1,
+            cyTopHeight: -1,
+            cyBottomHeight: -1,
+        };
+        let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+        let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
+        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_true_transparent_window(_window: &tao::window::Window) {}
+
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -430,6 +467,7 @@ fn main() -> wry::Result<()> {
         builder = builder.with_position(pos);
     }
     let window = builder.build(&event_loop).expect("create installer window");
+    apply_true_transparent_window(&window);
 
     let nav_proxy = proxy.clone();
     let mut web_context = WebContext::new(Some(webview_data_dir()));

@@ -53,14 +53,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="changli-app-shell">
       {/* 顶部导航 */}
       <nav className="changli-topbar sticky top-0 z-50" onMouseDown={handleChromeDrag}>
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
+        <div className="w-full max-w-[1800px] mx-auto px-6 2xl:px-10">
+          <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6">
+            <div className="flex items-center gap-8 min-w-0">
               <Link to="/" className="changli-wordmark flex items-center gap-3 text-xl font-bold text-gray-900 no-underline">
                 <img src={appIcon} alt="长离" className="h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5" />
                 <span>长离</span>
               </Link>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
@@ -74,7 +74,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-end gap-3 min-w-0">
               {!hideGlobalSearch && (
                 <form onSubmit={handleGlobalSearch} className="relative">
                   <input
@@ -112,7 +112,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       {/* 主内容区 */}
-      <main className="changli-main max-w-7xl mx-auto px-8 py-12">
+      <main className="changli-main w-full max-w-[1800px] mx-auto px-6 2xl:px-10 py-12">
         <PageMotion motionKey={location.pathname}>
           {children}
         </PageMotion>

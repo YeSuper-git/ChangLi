@@ -25,7 +25,10 @@ const PageMotion: React.FC<PageMotionProps> = ({ children, motionKey }) => {
       return;
     }
 
-    const sections = scopeRef.current.querySelectorAll('section, .card, h1, h2, .category-btn, .search-input');
+    const isLibrary = motionKey.startsWith('/library');
+    const sections = isLibrary
+      ? scopeRef.current.querySelectorAll('.changli-page-header, .changli-toolbar, .card')
+      : scopeRef.current.querySelectorAll('section, .card, h1, h2, .category-btn, .search-input');
     const cards = scopeRef.current.querySelectorAll('.card');
 
     gsap.fromTo(
@@ -34,8 +37,8 @@ const PageMotion: React.FC<PageMotionProps> = ({ children, motionKey }) => {
       {
         autoAlpha: 1,
         y: 0,
-        duration: 0.46,
-        stagger: 0.025,
+        duration: isLibrary ? 0.26 : 0.46,
+        stagger: isLibrary ? 0.006 : 0.025,
         ease: 'power3.out',
         overwrite: 'auto',
       }
@@ -46,8 +49,8 @@ const PageMotion: React.FC<PageMotionProps> = ({ children, motionKey }) => {
       { scale: 0.985 },
       {
         scale: 1,
-        duration: 0.42,
-        stagger: 0.018,
+        duration: isLibrary ? 0.22 : 0.42,
+        stagger: isLibrary ? 0.004 : 0.018,
         ease: 'power2.out',
         overwrite: 'auto',
       }
