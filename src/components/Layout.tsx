@@ -114,7 +114,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* 主内容区 */}
       <main className="changli-main w-full px-4 py-10 sm:px-5 xl:px-6 2xl:px-8">
-        <PageMotion motionKey={location.pathname}>
+        <PageMotion motionKey={`${location.pathname}${location.search}`}>
           {children}
         </PageMotion>
       </main>

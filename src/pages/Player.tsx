@@ -116,7 +116,7 @@ const Player: React.FC = () => {
           observedProperties: OBSERVED_PROPERTIES,
         });
 
-        await setVideoMarginRatio({ top: 0.072, right: 0, bottom: 0.15, left: 0 }).catch(() => undefined);
+        await setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 }).catch(() => undefined);
 
         mpvInitialized.current = true;
 
@@ -221,7 +221,11 @@ const Player: React.FC = () => {
   const toggleFullscreen = useCallback(async () => {
     try {
       const newFullscreen = !isFullscreen;
-      await getCurrentWindow().setFullscreen(newFullscreen);
+      const win = getCurrentWindow();
+      if (newFullscreen && await win.isMaximized().catch(() => false)) {
+        await win.unmaximize().catch(() => undefined);
+      }
+      await win.setFullscreen(newFullscreen);
       setIsFullscreen(newFullscreen);
     } catch (err) {
       console.error('[Player] 切换全屏失败:', err);
@@ -319,11 +323,9 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     if (!mpvInitialized.current) return;
-    const margins = isFullscreen
-      ? { top: 0, right: 0, bottom: 0, left: 0 }
-      : isPiP
-        ? { top: 0.12, right: 0, bottom: 0.24, left: 0 }
-        : { top: 0.072, right: episodeListExpanded ? 0.235 : 0, bottom: 0.15, left: 0 };
+    const margins = episodeListExpanded && !isFullscreen && !isPiP
+      ? { top: 0, right: 0.235, bottom: 0, left: 0 }
+      : { top: 0, right: 0, bottom: 0, left: 0 };
     setVideoMarginRatio(margins).catch((err) => console.error('[Player] 设置视频边距失败:', err));
   }, [episodeListExpanded, isFullscreen, isPiP]);
 
@@ -404,27 +406,38 @@ const Player: React.FC = () => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // 控制栏自动隐藏
-  useEffect(() => {
-    if (!isPlaying) {
-      setShowControls(true);
-      return;
-    }
-
+  const revealControls = useCallback((autoHide = true) => {
     if (controlsTimerRef.current) {
       clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
     }
+    setShowControls(true);
+    if (autoHide && isPlaying) {
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+    }
+  }, [isPlaying]);
 
-    controlsTimerRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
+  const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const y = event.clientY - rect.top;
+    const nearTop = y <= 82;
+    const nearBottom = y >= rect.height - 132;
+    revealControls(!(nearTop || nearBottom));
+  }, [revealControls]);
 
+  // 控制栏自动隐藏：鼠标靠近顶部/底部一直展示；离开热区后 3s 淡出。
+  useEffect(() => {
+    if (!isPlaying) {
+      revealControls(false);
+      return;
+    }
+    revealControls(true);
     return () => {
       if (controlsTimerRef.current) {
         clearTimeout(controlsTimerRef.current);
       }
     };
-  }, [isPlaying, currentTime]);
+  }, [isPlaying, revealControls]);
 
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;
@@ -553,10 +566,10 @@ const Player: React.FC = () => {
     <section
       className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${episodeListExpanded ? 'episodes-open' : 'episodes-closed'}`}
       onMouseDown={handlePlayerWindowDrag}
-      onMouseMove={() => setShowControls(true)}
-      onMouseLeave={() => isPlaying && setShowControls(false)}
+      onMouseMove={handlePlayerMouseMove}
+      onMouseLeave={() => isPlaying && revealControls(true)}
     >
-      <header className="changli-player-titlebar">
+      <header className={`changli-player-titlebar ${showControls ? 'show' : 'hide'}`}>
         <div className="changli-player-brand">
           <img src={appIcon} alt="长离" />
           <span>ChangLi Player</span>

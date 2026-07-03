@@ -465,6 +465,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', searchTerm.trim()].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
@@ -709,6 +710,7 @@ const Library: React.FC = () => {
         </div>
       )}
 
+      <div key={contentMotionKey} className="changli-library-content-motion">
       {filteredSeries.length > 0 && (
         <div className="mb-12">
           <div className={`auto-rows-max ${scopeAll ? 'changli-auto-grid-mixed' : isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video'}`}>
@@ -782,6 +784,8 @@ const Library: React.FC = () => {
           {!searchTerm && <p className="text-gray-400 text-sm">点击"添加"选择文件夹添加视频</p>}
         </div>
       )}
+
+      </div>
 
       {contextMenu && (
         <div

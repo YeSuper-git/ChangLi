@@ -1710,10 +1710,25 @@ async fn open_player_window(
         .resizable(true)
         .decorations(false)
         .transparent(true)
-        .visible(true)
+        .visible(false)
         .build()
         .map_err(|e| e.to_string())?;
-    window.center().map_err(|e| e.to_string())?;
+
+    if let Some(main) = app.get_webview_window("main") {
+        let main_pos = main.outer_position().map_err(|e| e.to_string())?;
+        let main_size = main.outer_size().map_err(|e| e.to_string())?;
+        let scale = main.scale_factor().unwrap_or(1.0);
+        let player_w = 1280.0;
+        let player_h = 760.0;
+        let x = main_pos.x as f64 / scale + (main_size.width as f64 / scale - player_w) / 2.0;
+        let y = main_pos.y as f64 / scale + (main_size.height as f64 / scale - player_h) / 2.0;
+        window
+            .set_position(tauri::LogicalPosition::new(x, y))
+            .map_err(|e| e.to_string())?;
+    } else {
+        window.center().map_err(|e| e.to_string())?;
+    }
+    window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -2132,7 +2147,12 @@ fn main() {
         .manage(AppState {
             db: Mutex::new(None),
         })
-        .setup(|_app| {
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                window.center()?;
+                window.set_always_on_top(true)?;
+                window.set_focus()?;
+            }
             // 播放器主路径已切到前端 /player/:id + tauri-plugin-libmpv。
             // 旧的外部 mpv 播放窗口只保留给历史 play_video 命令兜底，不再注册全局快捷键，
             // 避免快捷键误创建旧架构的 player WebView 窗口。

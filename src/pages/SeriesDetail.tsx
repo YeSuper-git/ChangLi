@@ -800,13 +800,13 @@ const SeriesDetail: React.FC = () => {
                     type="button"
                     onClick={handlePrimaryPlay}
                     disabled={orderedVideos.length === 0}
-                    className="group inline-flex min-h-[54px] min-w-[188px] items-center justify-center gap-3 rounded-full border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-6 text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
+                    className="group inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 text-white shadow-[0_10px_22px_rgba(251,91,123,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(251,91,123,0.24)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
                     title={playButtonHint}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:scale-105 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
-                    <span className="text-base font-extrabold leading-none">{playButtonLabel}</span>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/18 text-xs font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] transition-transform duration-200 group-hover:scale-105 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                    <span className="text-sm font-extrabold leading-none">{playButtonLabel}</span>
                   </button>
-                  <div className="min-w-[180px] text-sm font-semibold text-gray-500">
+                  <div className="min-w-[150px] max-w-[260px] text-sm font-semibold text-gray-500">
                     {playButtonHint}
                   </div>
                 </div>

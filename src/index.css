@@ -184,6 +184,11 @@ body {
   justify-content: center;
 }
 
+.changli-actor-info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  justify-content: stretch;
+}
+
 .changli-home-one-row {
   overflow: hidden;
 }
@@ -641,12 +646,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
-  padding: 3px;
-  border: 1px solid rgba(232, 235, 242, 0.72);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.54);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .changli-window-controls button {
@@ -672,29 +677,29 @@ body {
 }
 
 .changli-window-controls .settings-icon {
-  border: 2px solid currentColor;
-  border-radius: 999px;
+  width: 17px;
+  height: 17px;
 }
 
-.changli-window-controls .settings-icon::before {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: inherit;
-  background: currentColor;
-}
-
+.changli-window-controls .settings-icon::before,
 .changli-window-controls .settings-icon::after {
   content: '';
   position: absolute;
   left: 50%;
-  top: -4px;
-  width: 3px;
-  height: 23px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.54);
-  transform: translateX(-50%) rotate(45deg);
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+}
+
+.changli-window-controls .settings-icon::after {
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  border-style: dashed;
+  transform: translate(-50%, -50%) rotate(22.5deg);
 }
 
 .changli-window-controls .minimize-icon::before {
@@ -752,9 +757,8 @@ body {
 }
 
 .changli-window-controls button:hover {
-  background: linear-gradient(135deg, rgba(251, 91, 123, 0.11), rgba(255, 138, 76, 0.11));
+  background: rgba(244, 246, 250, 0.86);
   color: #fb5b7b;
-  box-shadow: inset 0 0 0 1px rgba(251, 91, 123, 0.12);
 }
 
 .changli-window-controls button:active {
@@ -762,9 +766,8 @@ body {
 }
 
 .changli-window-controls button.close:hover {
-  background: linear-gradient(135deg, #fb5b7b, #ff8a4c);
+  background: #fb5b7b;
   color: #fff;
-  box-shadow: 0 10px 22px rgba(251, 91, 123, 0.24);
 }
 
 .changli-textarea {
@@ -1193,6 +1196,30 @@ body.player-window-document,
   transition: width 0.3s;
 }
 
+.changli-library-content-motion {
+  animation: changliContentFlow 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: 50% 0;
+}
+
+@keyframes changliContentFlow {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changli-library-content-motion {
+    animation: none;
+  }
+}
+
 /* 搜索输入框 */
 .search-input {
   padding: 12px 20px;
@@ -1371,8 +1398,7 @@ body.changli-player-body #root {
   --player-line: rgba(255, 255, 255, 0.09);
   --player-muted: #9ca3af;
   position: relative;
-  display: grid;
-  grid-template-rows: 58px minmax(0, 1fr) 118px;
+  display: block;
   width: 100vw;
   height: 100dvh;
   overflow: hidden;
@@ -1390,8 +1416,12 @@ body.changli-player-body #root {
 }
 
 .changli-player-titlebar {
-  position: relative;
-  z-index: 3;
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 58px;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 210px;
   align-items: center;
@@ -1400,6 +1430,18 @@ body.changli-player-body #root {
   background: rgba(12, 13, 18, 0.96);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.changli-player-titlebar.hide {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px);
+}
+
+.changli-player-titlebar.show {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .changli-player-titlebar button,
@@ -1539,7 +1581,8 @@ body.changli-player-body #root {
 }
 
 .changli-player-main {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1548,11 +1591,11 @@ body.changli-player-body #root {
 
 .changli-player-stage {
   position: relative;
-  margin: 18px 0 0 18px;
+  margin: 0;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 0;
   background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), 0 22px 60px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .changli-player-video-art {
@@ -1615,7 +1658,7 @@ body.changli-player-body #root {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: 18px 18px 0 14px;
+  margin: 68px 18px 128px 14px;
   overflow: hidden;
   border: 1px solid var(--player-line);
   border-radius: 22px;
@@ -1727,23 +1770,28 @@ body.changli-player-body #root {
 }
 
 .changli-player-controls {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
   border-top: 1px solid var(--player-line);
   padding: 14px 20px 18px;
   background: rgba(17, 18, 23, 0.94);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
-  transition: opacity 0.24s ease;
+  transition: opacity 0.32s ease, transform 0.32s ease;
 }
 
 .changli-player-controls.hide {
   opacity: 0;
   pointer-events: none;
+  transform: translateY(12px);
 }
 
 .changli-player-controls.show {
   opacity: 1;
+  transform: translateY(0);
 }
 
 .changli-player-progress {
@@ -2062,8 +2110,6 @@ body.changli-player-body #root {
 .changli-player-window.is-pip .changli-player-titlebar,
 .changli-player-window.is-pip .changli-player-side,
 .changli-player-window.is-pip .advanced,
-.changli-player-window.is-fullscreen .changli-player-titlebar,
-.changli-player-window.is-fullscreen .changli-player-controls,
 .changli-player-window.is-fullscreen .changli-player-side {
   display: none;
 }
@@ -2081,17 +2127,17 @@ body.changli-player-body #root {
 }
 
 .changli-player-window.is-pip .changli-player-controls {
-  left: 50%;
-  right: auto;
-  bottom: 10px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: auto;
   min-width: 0;
-  padding: 8px 12px;
+  padding: 6px 10px 8px;
   border: 0;
-  border-radius: 999px;
-  background: rgba(8, 9, 13, 0.62);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
-  transform: translateX(-50%);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .changli-player-window.is-pip .changli-player-progress,
@@ -2279,11 +2325,11 @@ body.changli-player-body {
 }
 
 .changli-player-window.is-pip .changli-player-controls {
-  bottom: 8px;
-  padding: 6px 10px;
-  background: rgba(8, 9, 13, 0.46);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  bottom: 0;
+  padding: 6px 10px 8px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .changli-player-window.is-pip .changli-player-round {

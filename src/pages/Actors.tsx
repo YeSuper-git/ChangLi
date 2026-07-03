@@ -110,7 +110,7 @@ const Actors: React.FC = () => {
             <Link
               key={actor.id}
               to={`/actors/${actor.id}`}
-              state={{ from: '/actors', backLabel: '返回演员列表' }}
+              state={{ from: '/actors', backLabel: '返回演员列表', actorSnapshot: actor }}
               onContextMenu={(event) => openContextMenu(event, actor)}
               className="card block overflow-hidden"
             >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { getActor, getActorResources, updateActor, saveActorPhoto, scanVideosForActor, deleteVideo, deleteVideoSeries, getActorPeriods, addActorPeriod, updateActorPeriod, deleteActorPeriod, reorderActorPeriods, getActorWorkPeriodMap, updateActorWorkPeriod, rescanSingleSeriesMetadata, getActorPhotos, addActorPhoto, deleteActorPhoto, setPrimaryPhoto, reorderActorPhotos, getAllActorFields, incrementActorView } from '../utils/api';
 import type { Actor, Video, ActorPeriod, ActorPhoto, ActorField } from '../utils/api';
@@ -10,6 +10,17 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 import { notify } from '../utils/notify';
+
+interface ActorDetailCacheEntry {
+  actor: Actor | null;
+  resources: Video[];
+  periods: ActorPeriod[];
+  workPeriodMap: Record<string, number>;
+  photos: ActorPhoto[];
+  actorFields: ActorField[];
+}
+
+const actorDetailCache = new Map<number, ActorDetailCacheEntry>();
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,11 +34,15 @@ const ActorDetail: React.FC = () => {
       navigate(location.pathname, { replace: true, state: location.state });
     }
   };
-  const [actor, setActor] = useState<Actor | null>(null);
+  const routeState = location.state as { from?: string; backLabel?: string; actorSnapshot?: Actor } | null;
+  const actorId = Number(id);
+  const cachedDetail = Number.isFinite(actorId) ? actorDetailCache.get(actorId) : undefined;
+  const initialActor = cachedDetail?.actor || routeState?.actorSnapshot || null;
+  const [actor, setActor] = useState<Actor | null>(initialActor);
   const { refreshActors } = useLibraryStore();
   const viewCountedRef = useRef(false);
-  const [resources, setResources] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [resources, setResources] = useState<Video[]>(cachedDetail?.resources || []);
+  const [loading, setLoading] = useState(!initialActor);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -41,12 +56,12 @@ const ActorDetail: React.FC = () => {
     weight: '',
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photos, setPhotos] = useState<ActorPhoto[]>([]);
+  const [photos, setPhotos] = useState<ActorPhoto[]>(cachedDetail?.photos || []);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoContextMenu, setPhotoContextMenu] = useState<{ photoId: number; x: number; y: number } | null>(null);
   const [addingWork, setAddingWork] = useState(false);
-  const [periods, setPeriods] = useState<ActorPeriod[]>([]);
-  const [workPeriodMap, setWorkPeriodMap] = useState<Record<string, number>>({});
+  const [periods, setPeriods] = useState<ActorPeriod[]>(cachedDetail?.periods || []);
+  const [workPeriodMap, setWorkPeriodMap] = useState<Record<string, number>>(cachedDetail?.workPeriodMap || {});
   // 时期右键菜单
   const [periodContextMenu, setPeriodContextMenu] = useState<{ periodId: number; x: number; y: number } | null>(null);
   // 时期编辑
@@ -66,14 +81,24 @@ const ActorDetail: React.FC = () => {
   // 添加作品时选择时期弹窗
   const [periodSelectVisible, setPeriodSelectVisible] = useState(false);
   // 演员字段配置
-  const [actorFields, setActorFields] = useState<ActorField[]>([]);
+  const [actorFields, setActorFields] = useState<ActorField[]>(cachedDetail?.actorFields || []);
 
   const measureRefs = useRef<(HTMLInputElement | null)[]>([null, null, null]);
 
   useEffect(() => {
     if (id) {
+      const nextActorId = parseInt(id);
+      const nextCached = actorDetailCache.get(nextActorId);
+      const nextActor = nextCached?.actor || ((location.state as { actorSnapshot?: Actor } | null)?.actorSnapshot ?? null);
       viewCountedRef.current = false;
-      loadActor(parseInt(id), { scrollToTop: true, resetPhoto: true });
+      setActor(nextActor);
+      setResources(nextCached?.resources || []);
+      setPeriods(nextCached?.periods || []);
+      setWorkPeriodMap(nextCached?.workPeriodMap || {});
+      setPhotos(nextCached?.photos || []);
+      setActorFields(nextCached?.actorFields || []);
+      setLoading(!nextActor);
+      loadActor(nextActorId, { scrollToTop: true, resetPhoto: true, silent: Boolean(nextActor) });
     }
   }, [id]);
 
@@ -95,9 +120,10 @@ const ActorDetail: React.FC = () => {
   }, []);
 
 
-  const loadActor = async (actorId: number, options: { scrollToTop?: boolean; resetPhoto?: boolean } = {}) => {
+  const loadActor = async (actorId: number, options: { scrollToTop?: boolean; resetPhoto?: boolean; silent?: boolean } = {}) => {
     try {
       if (options.scrollToTop) window.scrollTo(0, 0);
+      if (!options.silent) setLoading(true);
       console.log('[Actor] 开始加载演员详情, actorId:', actorId);
       const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),
@@ -115,6 +141,7 @@ const ActorDetail: React.FC = () => {
       setWorkPeriodMap(periodMap);
       setPhotos(photosData);
       setActorFields(actorFieldsData);
+      actorDetailCache.set(actorId, { actor: actorData, resources: resourcesData, periods: periodsData, workPeriodMap: periodMap, photos: photosData, actorFields: actorFieldsData });
       if (options.resetPhoto) setCurrentPhotoIndex(0);
       if (actorData) {
         setEditForm({
@@ -803,7 +830,7 @@ const ActorDetail: React.FC = () => {
   };
 
   // 按时期分组作品（去重：同一 series 只显示一次）
-  const workItems = Array.from(
+  const workItems = useMemo(() => Array.from(
     resources.reduce((map, resource) => {
       const key = resource.series_id ? `series-${resource.series_id}` : `video-${resource.id}`;
       if (!map.has(key)) {
@@ -811,11 +838,22 @@ const ActorDetail: React.FC = () => {
       }
       return map;
     }, new Map<string, Video>()).values()
-  );
+  ), [resources]);
+
+  const workItemsByPeriod = useMemo(() => {
+    const grouped = new Map<number | null, Video[]>();
+    for (const item of workItems) {
+      const periodId = getWorkPeriodId(item);
+      const list = grouped.get(periodId) || [];
+      list.push(item);
+      grouped.set(periodId, list);
+    }
+    return grouped;
+  }, [workItems, workPeriodMap]);
 
   // 分组：演员名时期（period_id = null）在最上，其他时期按 sort_order 排序
-  const actorNamePeriodItems = workItems.filter(item => getWorkPeriodId(item) === null);
-  const sortedPeriods = [...periods].sort((a, b) => a.sort_order - b.sort_order);
+  const actorNamePeriodItems = workItemsByPeriod.get(null) || [];
+  const sortedPeriods = useMemo(() => [...periods].sort((a, b) => a.sort_order - b.sort_order), [periods]);
 
   if (loading) {
     return (
@@ -1219,7 +1257,7 @@ const ActorDetail: React.FC = () => {
                 <p className="text-sm text-gray-400 mb-4">曾用名: {actor.alias}</p>
               )}
               
-              <div className="changli-auto-grid-info mb-8 text-sm">
+              <div className="changli-auto-grid-info changli-actor-info-grid mb-8 text-sm">
                 {shouldShowBirthday(actor.birthday) && isFieldEnabled('birthday') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">出生日期</span>
@@ -1313,7 +1351,7 @@ const ActorDetail: React.FC = () => {
 
             {/* 其他时期，按 sort_order 排序 */}
             {sortedPeriods.map(period => {
-              const periodItems = workItems.filter(item => getWorkPeriodId(item) === period.id);
+              const periodItems = workItemsByPeriod.get(period.id) || [];
               return (
                 <div key={period.id} className="changli-panel mb-8 p-5">
                   {editingPeriodId === period.id ? (
