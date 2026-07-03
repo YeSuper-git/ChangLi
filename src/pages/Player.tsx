@@ -57,6 +57,12 @@ const Player: React.FC = () => {
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
 
+  // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
+  useEffect(() => {
+    document.body.classList.add('changli-player-body');
+    return () => document.body.classList.remove('changli-player-body');
+  }, []);
+
   // 初始化 mpv
   useEffect(() => {
     if (!id || mpvInitialized.current) return;
@@ -93,12 +99,12 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu',
-            'hwdec': 'no',
+            'vo': 'gpu-next',
+            'hwdec': 'auto-safe',
             'keep-open': 'yes',
-            'force-window': 'immediate',
-            'gpu-api': 'd3d11',
-            'opengl-pbo': 'no',
+            'force-window': 'yes',
+            'hwdec-codecs': 'all',
+            'gpu-api': 'auto',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -549,7 +555,7 @@ const Player: React.FC = () => {
           {showResumeNotice && (
             <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>
           )}
-          {!isPlaying && <div className="changli-player-center-play">▶</div>}
+          {!isPlaying && <div className="changli-player-center-play"><span className="play-icon" /></div>}
         </div>
 
         {episodeListExpanded && (
@@ -611,8 +617,8 @@ const Player: React.FC = () => {
           <div className="changli-player-left-controls">
             <button type="button" className="changli-player-round primary" aria-label={isPlaying ? '暂停' : '播放'} onClick={togglePlay}><span className={isPlaying ? 'pause-icon' : 'play-icon'} /></button>
             <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seek(Math.max(0, currentTime - 10))}><span className="back-icon" /></button>
-            <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
             <button type="button" className="changli-player-round next" aria-label="下一集" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}><span className="next-icon" /></button>
+            <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
           </div>
 
           <div className="changli-player-right-controls">

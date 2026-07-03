@@ -783,20 +783,20 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePrimaryPlay}
-                    disabled={orderedVideos.length === 0}
-                    className="group flex min-w-[184px] items-center justify-between gap-3 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 py-3 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
-                    title={playButtonHint}
-                  >
-                    <span>
-                      <span className="block text-sm font-extrabold leading-none">{playButtonLabel}</span>
-                      <span className="mt-1 block max-w-[116px] truncate text-[11px] font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
-                    </span>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
-                  </button>
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="flex flex-col items-start">
+                    <button
+                      type="button"
+                      onClick={handlePrimaryPlay}
+                      disabled={orderedVideos.length === 0}
+                      className="group flex min-h-[58px] min-w-[246px] items-center justify-between gap-4 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-5 py-4 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
+                      title={playButtonHint}
+                    >
+                      <span className="block text-base font-extrabold leading-none">{playButtonLabel}</span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                    </button>
+                    <span className="mt-2 max-w-[246px] text-xs font-semibold text-gray-500">{playButtonHint}</span>
+                  </div>
                   <button onClick={() => setEditing(true)} className="action-btn">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
                   <button onClick={handleCheckUpdates} className="action-btn">检查更新</button>
