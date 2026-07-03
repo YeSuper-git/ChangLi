@@ -2721,7 +2721,7 @@ pub struct Category {
 }
 
 pub async fn get_all_categories(pool: &SqlitePool) -> Result<Vec<Category>> {
-    let rows = sqlx::query("SELECT * FROM categories ORDER BY sort_order")
+    let rows = sqlx::query("SELECT * FROM categories ORDER BY sort_order ASC, id ASC")
         .fetch_all(pool)
         .await?;
 
@@ -2752,7 +2752,7 @@ pub async fn create_category(
     scan_path: Option<&str>,
 ) -> Result<Category> {
     let row = sqlx::query(
-        "INSERT INTO categories (key, name, card_layout, features, scan_path) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        "INSERT INTO categories (key, name, card_layout, features, scan_path, sort_order) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM categories)) RETURNING *",
     )
     .bind(key)
     .bind(name)

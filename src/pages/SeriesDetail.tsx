@@ -32,7 +32,6 @@ import {
   toggleWatched,
   toggleChineseSub,
   getAllCategories,
-  formatSeriesWatchLabel,
   rescanSingleSeriesMetadata,
   parseCategoryFeatures,
 } from '../utils/api';
@@ -449,9 +448,9 @@ const SeriesDetail: React.FC = () => {
   const isWatched = series?.is_watched === 1;
   const epWord = features.episode || '部';
   const lastWatchedEpisode = series.last_watched_episode || 0;
-  const watchProgressLabel = formatSeriesWatchLabel(series, epWord);
+  const lastWatchedSeason = series.last_watched_season || 0;
   const progressReminder = lastWatchedEpisode > 0
-    ? `上次观看到${watchProgressLabel.replace(/^看到/, '')}`
+    ? `上次观看到${formatLastWatchedEpisodeLabel(lastWatchedEpisode, lastWatchedSeason, epWord)}`
     : '';
   const orderedVideos = [...videos].sort((a, b) => {
     const seasonA = a.season ?? 0;
@@ -810,7 +809,6 @@ const SeriesDetail: React.FC = () => {
                   <div className="min-w-[180px] text-sm font-semibold text-gray-500">
                     {playButtonHint}
                   </div>
-                  <div className="text-xs text-gray-400">右键海报可编辑信息、管理季或检查更新</div>
                 </div>
               </>
             )}
@@ -1076,6 +1074,12 @@ function getSeasonLabel(season: number, subtitle?: string): string {
   return `第${season}季`;
 }
 
+function formatLastWatchedEpisodeLabel(episode: number, season: number, epWord: string): string {
+  if (season > 0 && season !== 999) return `第${season}季第${episode}${epWord}`;
+  if (season === 999) return `剧场版第${episode}${epWord}`;
+  return `第${episode}${epWord}`;
+}
+
 interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
@@ -1126,7 +1130,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   }, [videos, hasSeason]);
 
   
-  const gridClass = 'grid grid-cols-4 md:grid-cols-5 gap-5 auto-rows-max';
+  const gridClass = 'changli-auto-grid-episode auto-rows-max';
 
   /** 渲染单个视频卡片 */
   const renderVideoCard = (video: Video) => {

@@ -380,8 +380,8 @@ const VideoDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-8">
-        <div className="col-span-2 space-y-6">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div className="space-y-6">
           <div className="card overflow-hidden transition-shadow duration-200 hover:shadow-xl">
             <div
               className={`aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative group ${editing ? 'cursor-pointer' : ''}`}

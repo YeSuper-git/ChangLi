@@ -52,9 +52,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="changli-app-shell">
       {/* 顶部导航 */}
-      <nav className="changli-topbar sticky top-0 z-50" onMouseDown={handleChromeDrag}>
-        <div className="w-full max-w-[1800px] mx-auto px-6 2xl:px-10">
-          <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6">
+      <nav className="changli-topbar z-50" onMouseDown={handleChromeDrag}>
+        <div className="w-full px-4 sm:px-5">
+          <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
             <div className="flex items-center gap-8 min-w-0">
               <Link to="/" className="changli-wordmark flex items-center gap-3 text-xl font-bold text-gray-900 no-underline">
                 <img src={appIcon} alt="长离" className="h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5" />
@@ -74,7 +74,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 min-w-0">
+            <div className="flex min-w-0 items-center justify-end gap-2">
               {!hideGlobalSearch && (
                 <form onSubmit={handleGlobalSearch} className="relative">
                   <input
@@ -94,14 +94,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 </form>
               )}
-              <button 
-                onClick={() => navigate('/settings')}
-                className="w-10 h-10 bg-white/85 border border-gray-200 rounded-full flex items-center justify-center hover:bg-white hover:shadow-md transition-all"
-                aria-label="打开设置"
-              >
-                <img src={settingsIcon} alt="设置" className="w-5 h-5" />
-              </button>
               <div className="changli-window-controls" aria-label="窗口控制" onMouseDown={stopWindowControlDrag}>
+                <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" className="settings">
+                  <img src={settingsIcon} alt="设置" className="w-4 h-4" />
+                </button>
                 <button type="button" onClick={handleMinimize} aria-label="最小化">−</button>
                 <button type="button" onClick={handleToggleMaximize} aria-label="最大化">□</button>
                 <button type="button" onClick={handleClose} aria-label="关闭" className="close">×</button>
@@ -112,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       {/* 主内容区 */}
-      <main className="changli-main w-full max-w-[1800px] mx-auto px-6 2xl:px-10 py-12">
+      <main className="changli-main w-full px-4 py-10 sm:px-5 xl:px-6 2xl:px-8">
         <PageMotion motionKey={location.pathname}>
           {children}
         </PageMotion>

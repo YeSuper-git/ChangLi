@@ -103,7 +103,7 @@ const Actors: React.FC = () => {
 
       {/* 演员列表 */}
       {filteredActors.length > 0 ? (
-        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 xl:grid-cols-4">
+        <div className="changli-auto-grid-actor">
           {filteredActors.map((actor) => {
             const photoDataUrl = actorPhotoDataUrl(actor);
             return (

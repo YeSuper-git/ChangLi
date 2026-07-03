@@ -998,7 +998,7 @@ const ActorDetail: React.FC = () => {
 
               {/* Dynamic fields based on actorFields config, or fallback to hardcoded */}
               {actorFields.length > 0 ? (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="changli-auto-grid-compact">
                   {actorFields.filter(f => f.enabled && f.field_key !== 'name').map(field => (
                     <div key={field.field_key}>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{field.field_label}</label>
@@ -1008,7 +1008,7 @@ const ActorDetail: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="changli-auto-grid-compact">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">日本名</label>
                       <input
@@ -1030,7 +1030,7 @@ const ActorDetail: React.FC = () => {
                   </div>
 
               {/* 出生日期 + 身高 */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="changli-auto-grid-info">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">出生日期</label>
                   <div className="flex gap-1 items-center">
@@ -1124,7 +1124,7 @@ const ActorDetail: React.FC = () => {
               </div>
 
               {/* 数值 + 车灯 */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="changli-auto-grid-info">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">数值</label>
                   <div className="flex gap-1 items-center">
@@ -1219,7 +1219,7 @@ const ActorDetail: React.FC = () => {
                 <p className="text-sm text-gray-400 mb-4">曾用名: {actor.alias}</p>
               )}
               
-              <div className="grid grid-cols-2 gap-6 mb-8 text-sm">
+              <div className="changli-auto-grid-info mb-8 text-sm">
                 {shouldShowBirthday(actor.birthday) && isFieldEnabled('birthday') && (
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500 w-20">出生日期</span>
@@ -1305,7 +1305,7 @@ const ActorDetail: React.FC = () => {
             {actorNamePeriodItems.length > 0 && (
               <div className="changli-panel mb-8 p-5">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{actor.name}</h3>
-                <div className="grid grid-cols-4 gap-6">
+                <div className="changli-auto-grid-work">
                   {actorNamePeriodItems.map(resource => renderWorkCard(resource))}
                 </div>
               </div>
@@ -1341,7 +1341,7 @@ const ActorDetail: React.FC = () => {
                     </h3>
                   )}
                   {periodItems.length > 0 ? (
-                    <div className="grid grid-cols-4 gap-6">
+                    <div className="changli-auto-grid-work">
                       {periodItems.map(resource => renderWorkCard(resource))}
                     </div>
                   ) : (

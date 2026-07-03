@@ -711,7 +711,7 @@ const Library: React.FC = () => {
 
       {filteredSeries.length > 0 && (
         <div className="mb-12">
-          <div className={`grid gap-5 auto-rows-max ${scopeAll ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6 min-[1900px]:grid-cols-7' : isPortrait ? 'grid-cols-4 md:grid-cols-5 2xl:grid-cols-6 min-[1900px]:grid-cols-7' : 'grid-cols-3 md:grid-cols-4 2xl:grid-cols-5 min-[1900px]:grid-cols-6'}`}>
+          <div className={`auto-rows-max ${scopeAll ? 'changli-auto-grid-mixed' : isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video'}`}>
             {filteredSeries.map((series) => {
               const itemCategory = getSeriesCategory(series);
               const itemFeatures = getSeriesFeatures(series) || features;

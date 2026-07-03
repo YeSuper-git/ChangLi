@@ -128,7 +128,7 @@ const Home: React.FC = () => {
           const features = parseCategoryFeatures(cat.features);
           const catSeries = seriesList.filter(s => s.display_type === cat.key || (!s.display_type && !s.has_actor && cat.key === 'anime') || (s.has_actor && cat.key === 'adult'));
           const isPortrait = cat.card_layout === 'portrait';
-          const gridCols = isPortrait ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+          const gridCols = isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video';
           const aspectClass = isPortrait ? 'aspect-[3/4]' : 'aspect-video';
           const epWord = features.episode || '部';
 
@@ -139,7 +139,7 @@ const Home: React.FC = () => {
                 <Link to={`/library?cat=${cat.key}`} className="changli-section-link">查看全部 ›</Link>
               </div>
               {catSeries.length > 0 ? (
-                <div className={`grid ${gridCols} gap-5 auto-rows-max`}>
+                <div className={`${gridCols} auto-rows-max`}>
                   {catSeries.slice(0, 8).map((series) => renderSeriesCard(series, { aspectClass, epWord, showSubBadge: features.chinese_sub }))}
                 </div>
               ) : (

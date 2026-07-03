@@ -148,6 +148,14 @@ const Settings: React.FC = () => {
   const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
   const [rescanConfirm, setRescanConfirm] = useState<string | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
+  const refreshCategories = useLibraryStore((s) => s.refreshCategories);
+
+  const reloadCategoriesEverywhere = async () => {
+    const list = await getAllCategories();
+    setCategories(list);
+    await refreshCategories();
+    return list;
+  };
 
   const doDeleteCategory = async (key: string) => {
     try {
@@ -189,8 +197,7 @@ const Settings: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      const list = await getAllCategories();
-      setCategories(list);
+      await reloadCategoriesEverywhere();
     } catch (error) {
       console.error('加载大类失败:', error);
     }
@@ -224,7 +231,7 @@ const Settings: React.FC = () => {
         }
       }
       setShowCategoryModal(false);
-      loadCategories();
+      await loadCategories();
     } catch (error) {
       console.error('保存大类失败:', error);
     }
@@ -255,7 +262,7 @@ const Settings: React.FC = () => {
   const handleDeleteCategory = async (key: string) => {
     try {
       await deleteCategory(key);
-      loadCategories();
+      await loadCategories();
     } catch (error) {
       console.error('删除大类失败:', error);
     }
@@ -271,7 +278,7 @@ const Settings: React.FC = () => {
     [newCategories[idx], newCategories[swapIdx]] = [newCategories[swapIdx], newCategories[idx]];
     try {
       await reorderCategories(newCategories.map(c => c.key));
-      setCategories(newCategories);
+      await reloadCategoriesEverywhere();
     } catch (error) {
       console.error('大类排序失败:', error);
     }
