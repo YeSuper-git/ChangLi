@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v1.7.41 - 2026-07-03
+
+### 修复
+- 撤回安装器 v1.7.40 的 Region/GDI 硬裁兜底，恢复纯透明链路。
+- 移除 `CreateRoundRectRgn` / `SetWindowRgn` 和 `Win32_Graphics_Gdi` 依赖，避免切割像素导致锯齿硬边。
+- 恢复外层 Tao 透明窗口 `1000x660` + WebView2 子窗口 `(10,10) 980x640` 架构，让圆角和阴影由 CSS/WebView2 自然抗锯齿渲染。
+- 保留 layered + DWM full-client 透明处理，只用于宿主窗口透明合成。
+- 安装进度动画从原速度 1.8 倍调整为 2 倍。
+
+### 验证
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `CHANGLI_NSIS_SETUP="$PWD/package.json" cargo check --manifest-path installer-shell/Cargo.toml`
+- `CHANGLI_NSIS_SETUP="$PWD/package.json" cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.40 - 2026-07-03
 
 ### 修复
