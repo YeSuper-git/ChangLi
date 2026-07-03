@@ -38,7 +38,8 @@ const Player: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   
   // UI 状态
-  const [showControls, setShowControls] = useState(true);
+  const [showHeader, setShowHeader] = useState(true);
+  const [showFooter, setShowFooter] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
   const [episodeListExpanded, setEpisodeListExpanded] = useState(false);
@@ -53,7 +54,6 @@ const Player: React.FC = () => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   
   // Refs
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
   const isPlayingRef = useRef(false);
@@ -517,38 +517,34 @@ const Player: React.FC = () => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const revealControls = useCallback((autoHide = true) => {
-    if (controlsTimerRef.current) {
-      clearTimeout(controlsTimerRef.current);
-      controlsTimerRef.current = null;
-    }
-    setShowControls(true);
-    if (autoHide && isPlaying) {
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 1000);
-    }
-  }, [isPlaying]);
-
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
     const nearTop = y <= 82;
     const nearBottom = y >= rect.height - 132;
-    revealControls(!(nearTop || nearBottom));
-  }, [revealControls]);
+    if (nearTop) {
+      setShowHeader(true);
+      setShowFooter(false);
+    } else if (nearBottom) {
+      setShowHeader(false);
+      setShowFooter(true);
+    } else {
+      setShowHeader(false);
+      setShowFooter(false);
+    }
+  }, []);
 
-  // 控制栏自动隐藏：鼠标靠近顶部/底部一直展示；离开热区后 1s 淡出。
+  // 控制栏自动隐藏：暂停时一直展示；播放时鼠标离开立即隐藏。
   useEffect(() => {
     if (!isPlaying) {
-      revealControls(false);
+      setShowHeader(true);
+      setShowFooter(true);
       return;
     }
-    revealControls(true);
-    return () => {
-      if (controlsTimerRef.current) {
-        clearTimeout(controlsTimerRef.current);
-      }
-    };
-  }, [isPlaying, revealControls]);
+    // 播放中初始隐藏
+    setShowHeader(false);
+    setShowFooter(false);
+  }, [isPlaying]);
 
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;
@@ -668,9 +664,9 @@ const Player: React.FC = () => {
       className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={handlePlayerMouseMove}
-      onMouseLeave={() => isPlaying && revealControls(true)}
+      onMouseLeave={() => { if (isPlaying) { setShowHeader(false); setShowFooter(false); } }}
     >
-      <header className={`changli-player-titlebar ${showControls ? 'show' : 'hide'}`}>
+      <header className={`changli-player-titlebar ${showHeader ? 'show' : 'hide'}`}>
         <div className="changli-player-brand">
           <img src={appIcon} alt="长离" />
           <span>ChangLi Player</span>
@@ -771,7 +767,7 @@ const Player: React.FC = () => {
         </aside>
       </main>
 
-      <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
+      <footer className={`changli-player-controls ${showFooter ? 'show' : 'hide'}`}>
         <div className="changli-player-progress">
           <span>{currentTimeText}</span>
           <div
