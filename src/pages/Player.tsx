@@ -486,8 +486,8 @@ const Player: React.FC = () => {
           video.dataset.src = currentVideo.file_path;
           video.src = convertFileSrc(currentVideo.file_path);
           video.muted = true;
-          video.preload = 'metadata';
-          video.crossOrigin = 'anonymous';
+          video.preload = 'auto';
+          // 不设 crossOrigin — 本地文件用 Tauri asset protocol 不支持 CORS
           previewVideoRef.current = video;
         }
         if (video.readyState < 1) {
