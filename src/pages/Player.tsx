@@ -316,19 +316,28 @@ const Player: React.FC = () => {
     try {
       const newFullscreen = !isFullscreen;
       const win = getCurrentWindow();
-      // 先退出最大化再进全屏，避免状态冲突
       if (newFullscreen) {
-        const maximized = await win.isMaximized().catch(() => false);
-        if (maximized) {
-          await win.unmaximize().catch(() => undefined);
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        // 进入全屏：记住当前是否最大化，直接设全屏
+        const wasMaximized = await win.isMaximized().catch(() => false);
+        await win.setFullscreen(true);
+        setIsFullscreen(true);
+        // 保存最大化状态以便退出时恢复
+        if (wasMaximized) {
+          (window as any).__changli_wasMaximized = true;
         }
-      }
-      await win.setFullscreen(newFullscreen);
-      setIsFullscreen(newFullscreen);
-      if (!newFullscreen) {
-        // 退出全屏后同步最大化状态
-        setIsWindowMaximized(await win.isMaximized().catch(() => false));
+      } else {
+        // 退出全屏
+        await win.setFullscreen(false);
+        setIsFullscreen(false);
+        // 恢复最大化
+        if ((window as any).__changli_wasMaximized) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          await win.maximize().catch(() => undefined);
+          setIsWindowMaximized(true);
+          (window as any).__changli_wasMaximized = false;
+        } else {
+          setIsWindowMaximized(false);
+        }
       }
     } catch (err) {
       console.error('[Player] 切换全屏失败:', err);
