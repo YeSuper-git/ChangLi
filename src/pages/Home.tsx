@@ -5,7 +5,6 @@ import { formatSeriesWatchLabel, getAllCategories, parseCategoryFeatures } from 
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
-import { HorizontalScroll } from '../components/HorizontalScroll';
 import FloatingActions from '../components/FloatingActions';
 
 const Home: React.FC = () => {
@@ -115,10 +114,9 @@ const Home: React.FC = () => {
             <Link to="/library?favorite=1&scope=all" className="changli-section-link">查看全部 ›</Link>
           </div>
           {favorites.length > 0 ? (
-            <HorizontalScroll
-              items={favorites}
-              renderItem={(item) => renderSeriesCard(item as VideoSeries, { aspectClass: 'aspect-[3/4]' })}
-            />
+            <div className="changli-auto-grid-series auto-rows-max">
+              {favorites.slice(0, 10).map((item) => renderSeriesCard(item as VideoSeries, { aspectClass: 'aspect-[3/4]' }))}
+            </div>
           ) : (
             <div className="changli-empty-state text-gray-500">暂无追番</div>
           )}
@@ -166,11 +164,11 @@ const Home: React.FC = () => {
 
           {actors.length > 0 ? (
             <div className="changli-scroll-wrap group">
-              <div ref={hotActorsRef} className="changli-scroll-track scrollbar-hide flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-4 scroll-smooth">
+              <div ref={hotActorsRef} className="changli-scroll-track changli-hot-actors-track scrollbar-hide snap-x snap-mandatory overflow-x-auto px-1 pb-4 scroll-smooth">
                 {actors.slice(0, 10).map((actor) => {
                   const photoDataUrl = actorPhotoDataUrl(actor);
                   return (
-                    <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block w-[260px] flex-shrink-0 snap-start">
+                    <Link key={actor.id} to={`/actors/${actor.id}`} state={{ from: '/', backLabel: '返回首页' }} className="card block w-[250px] flex-shrink-0 snap-start">
                       <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-gradient-to-br from-pink-100 to-rose-200">
                         {photoDataUrl ? (
                           <img src={photoDataUrl} alt={actor.name} className="h-full w-full object-cover" />
@@ -186,7 +184,7 @@ const Home: React.FC = () => {
                   );
                 })}
 
-                <Link to="/actors" className="card block w-[260px] flex-shrink-0 snap-start">
+                <Link to="/actors" className="card block w-[250px] flex-shrink-0 snap-start">
                   <div className="aspect-[3/4] rounded-2xl border-2 border-dashed border-gray-300 bg-white/58 flex items-center justify-center text-gray-500 transition-colors hover:border-rose-300 hover:text-rose-500">
                     <div className="text-center">
                       <div className="mb-1 text-2xl">›</div>

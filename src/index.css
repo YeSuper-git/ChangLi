@@ -122,50 +122,58 @@ body {
 
 .changli-auto-grid-series {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, 210px);
   gap: 20px;
+  justify-content: start;
 }
 
 .changli-auto-grid-video {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fill, 270px);
   gap: 20px;
+  justify-content: start;
 }
 
 .changli-auto-grid-mixed {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, 220px);
   gap: 20px;
+  justify-content: start;
 }
 
 .changli-auto-grid-actor {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, 250px);
   gap: 24px;
+  justify-content: start;
 }
 
 .changli-auto-grid-work {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, 210px);
   gap: 24px;
+  justify-content: start;
 }
 
 .changli-auto-grid-episode {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, 190px);
   gap: 20px;
+  justify-content: start;
 }
 
 .changli-auto-grid-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, 160px);
   gap: 16px;
+  justify-content: start;
 }
 
 .changli-auto-grid-info {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, 220px);
   gap: 16px;
+  justify-content: start;
 }
 
 @media (max-width: 720px) {
@@ -173,12 +181,12 @@ body {
   .changli-auto-grid-mixed,
   .changli-auto-grid-work,
   .changli-auto-grid-episode {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, 160px);
   }
 
   .changli-auto-grid-video,
   .changli-auto-grid-actor {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, 220px);
   }
 }
 
@@ -395,6 +403,15 @@ body {
 
 .changli-scroll-track {
   scroll-padding: 20px;
+}
+
+.changli-hot-actors-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 250px;
+  grid-template-rows: 1fr;
+  gap: 20px;
+  justify-content: start;
 }
 
 .changli-scroll-arrow,
@@ -2054,4 +2071,161 @@ body.changli-player-body #root {
 
 @keyframes changli-spin {
   to { transform: rotate(360deg); }
+}
+
+/* Player quality and visibility fixes */
+
+body.changli-player-body,
+body.changli-player-body html,
+body.changli-player-body #root,
+body.changli-player-body .changli-player-window,
+body.changli-player-body .changli-player-main,
+body.changli-player-body .changli-player-stage {
+  background: transparent !important;
+}
+
+body.changli-player-body {
+  background: transparent !important;
+}
+
+.changli-player-titlebar {
+  background:
+    linear-gradient(180deg, rgba(20, 21, 28, 0.64), rgba(11, 12, 17, 0.38)),
+    rgba(14, 15, 21, 0.42);
+  border-bottom-color: rgba(255, 255, 255, 0.13);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(26px) saturate(150%);
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+}
+
+.changli-player-controls {
+  background:
+    linear-gradient(180deg, rgba(16, 17, 24, 0.38), rgba(10, 11, 16, 0.66)),
+    rgba(12, 13, 18, 0.48);
+  border-top-color: rgba(255, 255, 255, 0.13);
+  box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(28px) saturate(155%);
+  -webkit-backdrop-filter: blur(28px) saturate(155%);
+}
+
+.changli-player-winbtn {
+  background: transparent;
+  border-radius: 11px;
+  box-shadow: none;
+}
+
+.changli-player-winbtn:hover {
+  background: linear-gradient(135deg, rgba(251, 91, 123, 0.16), rgba(255, 138, 76, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(251, 91, 123, 0.16);
+}
+
+.changli-player-stage {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.changli-player-pip-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(10, 11, 16, 0.42);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.changli-player-pip-actions button {
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f2f4fb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.changli-player-pip-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.changli-player-pip-actions button.close {
+  width: 26px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.changli-player-pip-actions button.close:hover {
+  background: linear-gradient(135deg, var(--player-rose), var(--player-orange));
+}
+
+.changli-player-window.is-pip {
+  grid-template-rows: minmax(0, 1fr) 52px;
+}
+
+.changli-player-window.is-pip .changli-player-controls {
+  bottom: 8px;
+  padding: 6px 10px;
+  background: rgba(8, 9, 13, 0.46);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.changli-player-window.is-pip .changli-player-round {
+  width: 30px;
+  height: 30px;
+}
+
+.changli-player-window.is-pip .changli-player-left-controls {
+  gap: 6px;
+}
+
+.changli-player-window.is-fullscreen .changli-player-center-play {
+  position: fixed;
+  left: 50vw;
+  top: 50vh;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.changli-player-window.is-fullscreen .changli-player-stage {
+  position: fixed;
+  inset: 0;
+}
+
+
+/* Player libmpv visibility hard guard: keep every root layer transparent so native video is not covered. */
+html.changli-player-html,
+html.changli-player-html body,
+html.changli-player-html body #root,
+html.changli-player-html .changli-player-window,
+html.changli-player-html .changli-player-main,
+html.changli-player-html .changli-player-stage,
+html.changli-player-html .changli-player-window::before {
+  background: transparent !important;
+}
+
+html.changli-player-html .changli-player-window::before {
+  display: none !important;
+}
+
+html.changli-player-html .changli-player-stage {
+  overflow: visible;
+}
+
+html.changli-player-html .changli-player-titlebar,
+html.changli-player-html .changli-player-controls,
+html.changli-player-html .changli-player-side,
+html.changli-player-html .changli-player-pip-actions,
+html.changli-player-html .changli-speed-options {
+  isolation: isolate;
 }
