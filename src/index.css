@@ -551,6 +551,88 @@ body {
   box-shadow: 0 10px 22px rgba(251, 91, 123, 0.22);
 }
 
+/* 气泡下拉选择框 */
+.changli-bubble-select {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.changli-bubble-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--changli-line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.changli-bubble-select:hover .changli-bubble-select-trigger {
+  border-color: rgba(251, 91, 123, 0.3);
+}
+
+.changli-bubble-select-trigger svg {
+  opacity: 0.4;
+  transition: transform 0.2s ease;
+}
+
+.changli-bubble-select .changli-bubble-select-dropdown ~ .changli-bubble-select-trigger svg,
+.changli-bubble-select:has(.changli-bubble-select-dropdown) .changli-bubble-select-trigger svg {
+  transform: rotate(180deg);
+}
+
+.changli-bubble-select-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04);
+  z-index: 100;
+  animation: bubbleSelectIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bubbleSelectIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.changli-bubble-select-option {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.changli-bubble-select-option:hover {
+  background: rgba(251, 91, 123, 0.08);
+  color: #1a1a1a;
+}
+
+.changli-bubble-select-option.active {
+  background: rgba(251, 91, 123, 0.12);
+  color: #fb5b7b;
+  font-weight: 700;
+}
+
 .changli-tooltip {
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 999px;

@@ -7,6 +7,7 @@ import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 import Switch from '../components/Switch';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BubbleSelect from '../components/BubbleSelect';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { notify } from '../utils/notify';
@@ -867,20 +868,14 @@ const Settings: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-700">剧集单位</span>
                     <div className="flex items-center gap-2">
-                      <span className="changli-select-wrap changli-category-unit-select-wrap">
-                        <select
-                          value={categoryForm.features.episode || '部'}
-                          onChange={(e) => setCategoryForm({
-                            ...categoryForm,
-                            features: { ...categoryForm.features, episode: e.target.value }
-                          })}
-                          className="changli-select changli-category-unit-select"
-                        >
-                          <option value="话">话</option>
-                          <option value="部">部</option>
-                          <option value="集">集</option>
-                        </select>
-                      </span>
+                      <BubbleSelect
+                        value={categoryForm.features.episode || '部'}
+                        options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
+                        onChange={(v) => setCategoryForm({
+                          ...categoryForm,
+                          features: { ...categoryForm.features, episode: v }
+                        })}
+                      />
                       <span className="group relative">
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
                         <span className="changli-tooltip absolute bottom-full right-0 mb-2 px-3 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>
@@ -954,16 +949,16 @@ const Settings: React.FC = () => {
                 <>
               <div>
                 <label className="changli-form-label">字段类型</label>
-                <select
+                <BubbleSelect
                   value={fieldForm.field_type}
-                  onChange={(e) => setFieldForm({ ...fieldForm, field_type: e.target.value })}
-                  className="changli-input"
-                >
-                  <option value="text">文本</option>
-                  <option value="number">数字</option>
-                  <option value="date">日期</option>
-                  <option value="select">选择</option>
-                </select>
+                  options={[
+                    { value: 'text', label: '文本' },
+                    { value: 'number', label: '数字' },
+                    { value: 'date', label: '日期' },
+                    { value: 'select', label: '选择' },
+                  ]}
+                  onChange={(v) => setFieldForm({ ...fieldForm, field_type: v })}
+                />
               </div>
 
               {editingField && (
