@@ -288,10 +288,21 @@ export interface VideoSeries {
   is_favorite?: number;
   is_watched?: number;
   last_watched_episode?: number;
+  last_watched_season?: number;
   has_actor?: boolean;
   code?: string;
   has_chinese_sub?: number;
   display_type?: string;
+}
+
+export function formatSeriesWatchLabel(series: Pick<VideoSeries, 'is_watched' | 'last_watched_episode' | 'last_watched_season'>, epWord: string): string {
+  if (series.is_watched) return '已看完';
+  const episode = series.last_watched_episode;
+  if (!episode) return '尚未观看';
+  const season = series.last_watched_season;
+  if (season && season > 0 && season !== 999) return `看到第${season}季第${episode}${epWord}`;
+  if (season === 999) return `看到剧场版第${episode}${epWord}`;
+  return `看到第${episode}${epWord}`;
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
@@ -755,6 +766,21 @@ export async function updateActorWorkPeriod(actorId: number, workType: 'video' |
 }
 
 // 播放器相关
+export async function openPlayerWindow(id: number): Promise<void> {
+  console.log('[API] 调用 openPlayerWindow, id:', id);
+  try {
+    await invoke('open_player_window', { id });
+    console.log('[API] openPlayerWindow 成功');
+  } catch (err) {
+    console.error('[API] openPlayerWindow 失败:', err);
+    throw err;
+  }
+}
+
+export async function updatePlayHistory(videoId: number, lastPosition: number, totalDuration?: number): Promise<void> {
+  return invoke('update_play_history', { videoId, lastPosition, totalDuration });
+}
+
 export async function playVideo(id: number): Promise<void> {
   console.log('[API] 调用 playVideo, id:', id);
   try {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import PageMotion from './PageMotion';
 import settingsIcon from '../assets/icons/settings.svg';
 import searchIcon from '../assets/icons/search.svg';
@@ -29,10 +30,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate(`/search?q=${encodeURIComponent(keyword)}`);
   };
 
+  const appWindow = getCurrentWindow();
+
+  const runWindowAction = (action: () => Promise<void>, name: string) => {
+    action().catch((error) => console.error(`[Layout] ${name} 失败:`, error));
+  };
+
+  const handleChromeDrag = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('a,button,input,form,.changli-window-controls')) return;
+    appWindow.startDragging().catch((error) => console.error('[Layout] 拖动窗口失败:', error));
+  };
+
+  const handleMinimize = () => runWindowAction(() => appWindow.minimize(), '最小化');
+  const handleToggleMaximize = () => runWindowAction(() => appWindow.toggleMaximize(), '最大化');
+  const handleClose = () => runWindowAction(() => appWindow.close(), '关闭');
+  const stopWindowControlDrag = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
+
   return (
     <div className="changli-app-shell">
       {/* 顶部导航 */}
-      <nav className="changli-topbar sticky top-0 z-50">
+      <nav className="changli-topbar sticky top-0 z-50" onMouseDown={handleChromeDrag}>
         <div className="max-w-7xl mx-auto px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
@@ -54,7 +74,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {!hideGlobalSearch && (
                 <form onSubmit={handleGlobalSearch} className="relative">
                   <input
@@ -81,6 +101,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <img src={settingsIcon} alt="设置" className="w-5 h-5" />
               </button>
+              <div className="changli-window-controls" aria-label="窗口控制" onMouseDown={stopWindowControlDrag}>
+                <button type="button" onClick={handleMinimize} aria-label="最小化">−</button>
+                <button type="button" onClick={handleToggleMaximize} aria-label="最大化">□</button>
+                <button type="button" onClick={handleClose} aria-label="关闭" className="close">×</button>
+              </div>
             </div>
           </div>
         </div>

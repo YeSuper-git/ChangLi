@@ -1,5 +1,76 @@
 # Changelog
 
+## v1.7.35 (2026-07-03)
+
+### 修复
+- 恢复 PageMotion 到 v1.7.32 原有页面入场动效，撤回 v1.7.34 对视频库/演员页动效范围的降级，避免改没原来效果。
+
+### 优化
+- 安装器安装进度条速度调整为原来的 1.8 倍：进度刷新间隔从 180ms 改为 100ms。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
+## v1.7.34 (2026-07-03)
+
+### 修复
+- 修复 v1.7.33 大列表路由切换明显卡顿：视频库、视频集详情和演员页不再对所有卡片逐个跑 GSAP 入场动画，只保留轻量淡入。
+- 修复无边框主窗口右上角最小化、最大化、关闭按钮点击无效：改为 JS 控制窗口拖动区域，避免整条导航栏吞掉按钮点击。
+- 修复播放器多开窗口缺少 Tauri capability 导致窗口控制和播放器 API 失效：动态 `player-*` 窗口获得 core/libmpv 权限。
+- 安装器透明外壳增加 Windows 圆角区域裁剪兜底，配合透明父窗口和透明 WebView2 子窗口，防止 WebView2 白色底层继续从圆角外漏出。
+- 重新扫描元数据现在会重新扫描视频集文件夹并把新增视频文件补入当前视频集，适配连载作品更新集数。
+
+### 优化
+- 播放器第一版功能闭环：播放/暂停、下一集、1x/1.5x/2x/3x 倍速、音量、全屏、分集列表和选集播放。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+- `npm run tauri:build`
+
+## v1.7.33 (2026-07-03)
+
+### 修复
+- 安装器透明外壳继续去白底白边：父窗口保持透明，WebView2 子窗口显式透明背景，并移除 DWM 圆角偏好，避免系统圆角与透明窗口叠加补白。
+- 视频页从视频集详情返回时缓存分类标签、演员和筛选结果，减少演员/标签筛选栏重新加载导致的卡顿。
+
+### 优化
+- 视频集详情页移除观看进度大卡片，恢复总集数小气泡，观看进度改成“上次观看到第几季第几话/集/部”的小字提示。
+- 视频集详情页“立即观看/继续观看”调整到标题信息区右侧，避免挤占详情信息布局。
+- 视频集编辑态追番状态改为“连载中 / 已完结”品牌分段开关，不再使用原生下拉框。
+- 主程序窗口去除系统默认标题栏，把最小化、最大化、关闭集成到 ChangLi 导航栏右侧，并支持导航栏拖动窗口。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+- `npm run tauri:build`
+
+## v1.7.32 (2026-07-02)
+
+### 修复
+- 视频页进入视频集后返回时保留当前大类、筛选条件和搜索关键词，避免从动漫返回时跳回默认影视大类。
+- 动漫等非成人向视频集右键“重新扫描元数据”不再要求番号格式，可按文件夹名和海报正常刷新。
+- 修复标签、演员、状态筛选胶囊 hover 上移时被筛选行顶部裁切的问题。
+
+### 优化
+- 视频集详情页新增观看进度卡片，展示尚未观看、看到第几话/集/部、已看完等状态。
+- 多季视频集的观看进度精确到第几季第几话/集/部，并同步到首页、视频页和视频集详情页。
+- 视频集详情页右侧新增品牌主按钮：尚未观看显示“立即观看”，有观看记录显示“继续观看”，并从第一集或最近播放集打开播放器。
+- 视频集编辑态的追番状态下拉框改为 ChangLi 标准表单下拉样式。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `npm run tauri:build`
+
+
 ## v1.7.31 (2026-07-02)
 
 ### 优化

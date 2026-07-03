@@ -3,7 +3,9 @@
   "identifier": "main-capability",
   "description": "Main window capability",
   "windows": [
-    "main"
+    "main",
+    "player",
+    "player-*"
   ],
   "permissions": [
     "core:default",

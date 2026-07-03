@@ -8,6 +8,9 @@ use std::{
 };
 
 use base64::{engine::general_purpose, Engine as _};
+#[cfg(target_os = "windows")]
+use tao::platform::windows::WindowExtWindows;
+
 use tao::{
     dpi::{LogicalSize, PhysicalPosition},
     event::{Event, StartCause, WindowEvent},
@@ -17,18 +20,6 @@ use tao::{
 use wry::{
     dpi::{LogicalPosition as WebLogicalPosition, LogicalSize as WebLogicalSize},
     Rect, WebContext, WebViewBuilder,
-};
-
-#[cfg(target_os = "windows")]
-use tao::platform::windows::WindowExtWindows;
-
-#[cfg(target_os = "windows")]
-use windows::Win32::{
-    Foundation::HWND,
-    Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
-        DWM_WINDOW_CORNER_PREFERENCE,
-    },
 };
 
 #[cfg(target_os = "windows")]
@@ -154,22 +145,6 @@ fn launch_installed_app(install_dir: &Path) {
         let _ = Command::new(exe).current_dir(install_dir).spawn();
     }
 }
-
-#[cfg(target_os = "windows")]
-fn apply_smooth_corners(hwnd: isize) {
-    unsafe {
-        let preference = DWMWCP_ROUND;
-        let _ = DwmSetWindowAttribute(
-            HWND(hwnd as *mut _),
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &preference as *const DWM_WINDOW_CORNER_PREFERENCE as *const _,
-            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
-        );
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn apply_smooth_corners(_hwnd: isize) {}
 
 fn js_call(name: &str, value: &str) -> String {
     format!("window.{name}({});", serde_json::to_string(value).unwrap())
@@ -407,7 +382,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     progressTimer = setInterval(() => {{
       if (progressValue < 92) setProgress(progressValue + 1);
       else if (progressValue < 99 && Math.random() > .55) setProgress(progressValue + 1);
-    }}, 180);
+    }}, 100);
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{
@@ -429,6 +404,25 @@ fn html(default_dir: &Path, is_update: bool) -> String {
         install_mode = install_mode
     )
 }
+
+#[cfg(target_os = "windows")]
+fn apply_transparent_shell_region(window: &tao::window::Window) {
+    use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+
+    let hwnd = windows::Win32::Foundation::HWND(window.hwnd() as *mut core::ffi::c_void);
+    unsafe {
+        // Clip to the actual 980x640 shell placed at (10,10). This is a defensive layer:
+        // even if WebView2 paints its transparent pixels white on a user's machine, the
+        // rectangular child backing cannot leak outside the rounded shell.
+        let region = CreateRoundRectRgn(10, 10, 990, 650, 68, 68);
+        if !region.is_invalid() {
+            let _ = SetWindowRgn(hwnd, region, true);
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_transparent_shell_region(_window: &tao::window::Window) {}
 
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
@@ -457,8 +451,7 @@ fn main() -> wry::Result<()> {
         builder = builder.with_position(pos);
     }
     let window = builder.build(&event_loop).expect("create installer window");
-    #[cfg(target_os = "windows")]
-    apply_smooth_corners(window.hwnd());
+    apply_transparent_shell_region(&window);
 
     let nav_proxy = proxy.clone();
     let mut web_context = WebContext::new(Some(webview_data_dir()));
@@ -468,6 +461,7 @@ fn main() -> wry::Result<()> {
             size: WebLogicalSize::new(980, 640).into(),
         })
         .with_transparent(true)
+        .with_background_color((0, 0, 0, 0))
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {

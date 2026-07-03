@@ -8,12 +8,13 @@ import {
   rescanSingleSeriesMetadata,
   switchSeriesTypeTo,
   getAllCategories,
+  formatSeriesWatchLabel,
   parseCategoryFeatures,
   scanCategory,
   getTagsByCategory,
   getActorsByCategory,
 } from '../utils/api';
-import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures, Tag, Actor } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -22,6 +23,16 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
 
+
+const categoryFilterCache = new Map<string, { tags: Tag[]; actors: Actor[] }>();
+const tagSeriesCache = new Map<number, VideoSeries[]>();
+const actorSeriesCache = new Map<number, VideoSeries[]>();
+const clearLibraryFilterCaches = () => {
+  categoryFilterCache.clear();
+  tagSeriesCache.clear();
+  actorSeriesCache.clear();
+};
+
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,7 +40,7 @@ const Library: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTagId, setActiveTagId] = useState<number | null>(() => {
@@ -46,6 +57,9 @@ const Library: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
   const [actors, setActors] = useState<{ id: number; name: string; work_count: number; [k: string]: any }[]>([]);
+  const defaultCategoryKey = useMemo(() => {
+    return [...categories].sort((a, b) => a.sort_order - b.sort_order)[0]?.key || 'anime';
+  }, [categories]);
 
   // 加载大类配置。未准备好前先不渲染真实页面，避免跳转后标题/筛选/卡片分批冒出来。
   useEffect(() => {
@@ -64,16 +78,17 @@ const Library: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // 按大类加载标签和演员。一次性落状态，避免筛选栏分批抖动。
+  // 按大类加载标签和演员。缓存分类筛选数据，返回视频页时首帧直接复用，避免筛选栏卡顿。
   const loadCategoryFilters = useCallback(async () => {
-    if (scopeAll) {
+    if (scopeAll || !mainCategory) {
       setTags([]);
       setActors([]);
       return;
     }
-    if (!mainCategory) {
-      setTags([]);
-      setActors([]);
+    const cached = categoryFilterCache.get(mainCategory);
+    if (cached) {
+      setTags(cached.tags);
+      setActors(cached.actors);
       return;
     }
     try {
@@ -81,6 +96,7 @@ const Library: React.FC = () => {
         getTagsByCategory(mainCategory).catch(() => []),
         getActorsByCategory(mainCategory).catch(() => []),
       ]);
+      categoryFilterCache.set(mainCategory, { tags: nextTags, actors: nextActors });
       setTags(nextTags);
       setActors(nextActors);
     } catch (error) {
@@ -139,9 +155,10 @@ const Library: React.FC = () => {
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
       scope: scopeAll ? 'all' : null,
-      cat: !scopeAll && mainCategory !== 'anime' ? mainCategory : null,
+      cat: !scopeAll && mainCategory && mainCategory !== defaultCategoryKey ? mainCategory : null,
+      q: searchTerm.trim() ? searchTerm.trim() : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, searchTerm, defaultCategoryKey, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -190,8 +207,15 @@ const Library: React.FC = () => {
       setTagFilteredSeries(null);
       return;
     }
+    const cached = tagSeriesCache.get(tagId);
+    if (cached) {
+      setTagFilteredSeries(cached);
+      setActiveTagId(tagId);
+      return;
+    }
     try {
       const series = await getVideoSeriesByTag(tagId);
+      tagSeriesCache.set(tagId, series);
       setTagFilteredSeries(series);
       setActiveTagId(tagId);
     } catch (error) {
@@ -205,8 +229,15 @@ const Library: React.FC = () => {
       setActorFilteredSeries(null);
       return;
     }
+    const cached = actorSeriesCache.get(actorId);
+    if (cached) {
+      setActorFilteredSeries(cached);
+      setActiveActorId(actorId);
+      return;
+    }
     try {
       const series = await getVideoSeriesByActor(actorId);
+      actorSeriesCache.set(actorId, series);
       setActorFilteredSeries(series);
       setActiveActorId(actorId);
     } catch (error) {
@@ -229,7 +260,8 @@ const Library: React.FC = () => {
     if (favoriteFilter) params.set('favorite', '1');
     if (watchedFilter) params.set('watched', '1');
     if (scopeAll) params.set('scope', 'all');
-    if (!scopeAll && mainCategory !== 'anime') params.set('cat', mainCategory);
+    if (!scopeAll && mainCategory && mainCategory !== defaultCategoryKey) params.set('cat', mainCategory);
+    if (searchTerm.trim()) params.set('q', searchTerm.trim());
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   };
@@ -245,6 +277,7 @@ const Library: React.FC = () => {
       if (selected) {
         setScanning(true);
         try {
+          clearLibraryFilterCaches();
           const result = await scanVideos(selected as string);
           await refreshSeries();
           if (activeTagId !== null) {
@@ -279,6 +312,7 @@ const Library: React.FC = () => {
 
   const handleDeleteSeries = async (id: number) => {
     try {
+      clearLibraryFilterCaches();
       await deleteVideoSeries(id, true);
       setContextMenu(null);
       await refreshSeries();
@@ -311,6 +345,7 @@ const Library: React.FC = () => {
 
   const handleRescanMetadata = async (seriesId: number) => {
     try {
+      clearLibraryFilterCaches();
       const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
       clearPending();
@@ -338,6 +373,7 @@ const Library: React.FC = () => {
   const doSwitchType = async () => {
     if (!typeSwitchConfirm) return;
     try {
+      clearLibraryFilterCaches();
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
       setTypeSwitchConfirm(null);
       await refreshSeries();
@@ -355,6 +391,7 @@ const Library: React.FC = () => {
     setScanConfirm(false);
     setCategoryScanning(true);
     try {
+      clearLibraryFilterCaches();
       const result = await scanCategory(mainCategory);
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
@@ -458,6 +495,7 @@ const Library: React.FC = () => {
       const [type, idStr] = key.split('-');
       const id = parseInt(idStr);
       if (type === 's') {
+        clearLibraryFilterCaches();
         await deleteVideoSeries(id, true);
       }
     }
@@ -718,7 +756,7 @@ const Library: React.FC = () => {
                       {series.code ? `[${series.code}] ${series.title}` : series.title}
                     </h3>
                     <div className="text-xs text-zinc-500 mt-0.5">
-                      {series.is_watched ? '已看完' : series.last_watched_episode ? `看到第${series.last_watched_episode}${itemEpWord}` : '尚未观看'}
+                      {formatSeriesWatchLabel(series, itemEpWord)}
                     </div>
                   </div>
                 </div>
