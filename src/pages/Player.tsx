@@ -5,6 +5,7 @@ import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
+import { videoPosterDataUrl } from '../utils/media';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -32,7 +33,9 @@ const Player: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(80);
+  const [volume, setVolume] = useState(() => {
+    try { return parseInt(localStorage.getItem('changli-player-volume') || '80', 10) || 80; } catch { return 80; }
+  });
   const [speed, setSpeed] = useState(1);
   
   // UI 状态
@@ -71,12 +74,22 @@ const Player: React.FC = () => {
 
   // 初始化 mpv
   useEffect(() => {
-    if (!id || mpvInitialized.current) return;
+    if (!id) return;
 
     const initMpv = async () => {
       try {
         setLoading(true);
         setError('');
+
+        // 先销毁旧实例（如果有），确保完全清理
+        if (mpvInitialized.current) {
+          try {
+            await destroy();
+          } catch { /* ignore destroy errors */ }
+          mpvInitialized.current = false;
+          // 等待 mpv 释放资源
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -106,14 +119,17 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu-next',
-            'hwdec': 'auto-safe',
+            'vo': 'gpu',
+            'hwdec': 'd3d11va',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
-            'gpu-api': 'auto',
+            'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
+            // 避免被 NVIDIA 驱动识别为游戏
+            'd3d11-sync-interval': '0',
+            'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -124,39 +140,50 @@ const Player: React.FC = () => {
 
         // 监听属性变化
         await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
-          switch (name) {
-            case 'pause':
-              {
-                const playing = !data;
-                isPlayingRef.current = playing;
-                setIsPlaying(playing);
-              }
-              break;
-            case 'time-pos':
-              setCurrentTime(data ?? 0);
-              break;
-            case 'duration':
-              setDuration(data ?? 0);
-              break;
-            case 'volume':
-              setVolume(data ?? 80);
-              break;
-            case 'speed':
-              setSpeed(data ?? 1);
-              break;
-          }
+          try {
+            switch (name) {
+              case 'pause':
+                {
+                  const playing = !data;
+                  isPlayingRef.current = playing;
+                  setIsPlaying(playing);
+                }
+                break;
+              case 'time-pos':
+                setCurrentTime(data ?? 0);
+                break;
+              case 'duration':
+                setDuration(data ?? 0);
+                break;
+              case 'volume':
+                setVolume(data ?? 80);
+                break;
+              case 'speed':
+                setSpeed(data ?? 1);
+                break;
+            }
+          } catch { /* ignore observer errors */ }
         });
 
         // 加载视频
-        await command('loadfile', [currentVideo.file_path, 'replace']);
+        try {
+          await command('loadfile', [currentVideo.file_path, 'replace']);
+        } catch (loadErr) {
+          console.error('[Player] loadfile 失败:', loadErr);
+          setError('加载视频失败: ' + String(loadErr));
+          setLoading(false);
+          return;
+        }
         if (currentVideo.subtitle) {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
         }
         if (previousPosition > 5) {
+          // 等待 mpv 加载文件后再 seek，避免 seek 被忽略
+          await new Promise((resolve) => setTimeout(resolve, 800));
           await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
-        await setProperty('pause', false);
+        await setProperty('pause', false).catch(() => undefined);
         isPlayingRef.current = true;
         setIsPlaying(true);
         
@@ -171,12 +198,46 @@ const Player: React.FC = () => {
     initMpv();
 
     return () => {
+      // 不在这里 destroy — 由下次 init 或组件卸载时处理
+      // 避免 destroy/init 竞态导致闪退
+    };
+  }, [id]);
+
+  // 组件卸载时清理 mpv（仅在真正关闭播放器时）
+  useEffect(() => {
+    return () => {
       if (mpvInitialized.current) {
-        destroy().catch(console.error);
+        destroy().catch(() => {});
         mpvInitialized.current = false;
       }
     };
-  }, [id]);
+  }, []);
+
+  // mpv 健康检查：检测播放中 mpv 是否崩溃
+  useEffect(() => {
+    if (!mpvInitialized.current) return;
+    let failCount = 0;
+    const timer = window.setInterval(async () => {
+      try {
+        await command('get_property', ['time-pos']);
+        failCount = 0;
+      } catch {
+        failCount++;
+        if (failCount >= 3) {
+          console.error('[Player] mpv 连续无响应，可能已崩溃');
+          setError('播放器异常退出，请重新打开');
+          mpvInitialized.current = false;
+          window.clearInterval(timer);
+        }
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [currentVideo]);
+
+  // 保存音量到本地
+  useEffect(() => {
+    try { localStorage.setItem('changli-player-volume', String(Math.round(volume))); } catch { /* ignore */ }
+  }, [volume]);
 
   // 播放/暂停
   const togglePlay = useCallback(async () => {
@@ -568,7 +629,6 @@ const Player: React.FC = () => {
     return a.file_name.localeCompare(b.file_name);
   });
   const activeIndex = sortedEpisodes.findIndex((episode) => episode.id === currentVideo?.id);
-  const visibleEpisodes = episodeListExpanded ? sortedEpisodes : [];
   const activeEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex] : currentVideo;
   const displayTitle = series?.title || currentVideo?.series_title || currentVideo?.file_name || 'ChangLi Player';
   const episodeWord = '话';
@@ -656,37 +716,71 @@ const Player: React.FC = () => {
           {!isPlaying && <div className="changli-player-center-play"><span className="play-icon" /></div>}
         </div>
 
-        {episodeListExpanded && (
-          <aside className="changli-player-side">
-            <div className="changli-player-side-head">
-              <div className="changli-player-side-title-row">
-                <strong>选集</strong>
-                <button type="button" onClick={() => setEpisodeListExpanded(false)}>收起</button>
-              </div>
-              <span>{seasonSummary}</span>
-            </div>
-            <div className="changli-player-episodes">
-              {visibleEpisodes.map((episode) => {
-              const active = episode.id === currentVideo?.id;
-              const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
-              return (
-                <button
-                  type="button"
-                  key={episode.id}
-                  onClick={() => playEpisode(episode)}
-                  className={`changli-player-episode ${active ? 'active' : ''}`}
-                >
-                  <div className="changli-player-thumb" />
-                  <div>
-                    <p>{label}</p>
-                    <small>{active ? `播放中 · ${currentTimeText}` : getEpisodeStatus(episode)}</small>
-                  </div>
-                </button>
-              );
-              })}
-            </div>
-          </aside>
+        {/* 选集边缘触发箭头 */}
+        {!episodeListExpanded && !isFullscreen && !isPiP && (
+          <button
+            type="button"
+            className="changli-player-edge-trigger"
+            onClick={() => setEpisodeListExpanded(true)}
+            aria-label="展开选集"
+          >
+            ‹
+          </button>
         )}
+
+        <aside className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}>
+          <div className="changli-player-side-head">
+            <div className="changli-player-side-title-row">
+              <strong>选集</strong>
+              <button type="button" onClick={() => setEpisodeListExpanded(false)}>×</button>
+            </div>
+            <span>{seasonSummary}</span>
+          </div>
+          <div className="changli-player-episodes">
+            {(() => {
+              // 按季分组
+              const seasons = new Map<number, Video[]>();
+              for (const ep of sortedEpisodes) {
+                const s = ep.season ?? 0;
+                if (!seasons.has(s)) seasons.set(s, []);
+                seasons.get(s)!.push(ep);
+              }
+              const hasMultipleSeasons = seasons.size > 1;
+              const entries = hasMultipleSeasons ? [...seasons.entries()].sort(([a], [b]) => a - b) : [[0, sortedEpisodes] as const];
+
+              return entries.map(([seasonNum, eps]) => (
+                <React.Fragment key={seasonNum}>
+                  {hasMultipleSeasons && (
+                    <div className="changli-player-season-header">
+                      {seasonNum > 0 && seasonNum !== 999 ? `第${seasonNum}季` : '未分季'}
+                    </div>
+                  )}
+                  {eps.map((episode) => {
+                    const active = episode.id === currentVideo?.id;
+                    const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
+                    const poster = videoPosterDataUrl(episode);
+                    return (
+                      <button
+                        type="button"
+                        key={episode.id}
+                        onClick={() => playEpisode(episode)}
+                        className={`changli-player-episode ${active ? 'active' : ''}`}
+                      >
+                        <div className="changli-player-thumb">
+                          {poster ? <img src={poster} alt="" /> : <span />}
+                        </div>
+                        <div>
+                          <p>{label}</p>
+                          <small>{getEpisodeStatus(episode)}</small>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </React.Fragment>
+              ));
+            })()}
+          </div>
+        </aside>
       </main>
 
       <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
