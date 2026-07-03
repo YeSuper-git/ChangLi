@@ -5,7 +5,6 @@ import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
-import { videoPosterDataUrl } from '../utils/media';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -39,10 +38,12 @@ const Player: React.FC = () => {
   const [speed, setSpeed] = useState(1);
   
   // UI 状态
-  const [showControls, setShowControls] = useState(true);
+  const [showHeader, setShowHeader] = useState(true);
+  const [showFooter, setShowFooter] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
   const [episodeListExpanded, setEpisodeListExpanded] = useState(false);
+  const episodeHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showResumeNotice, setShowResumeNotice] = useState(false);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
@@ -53,7 +54,6 @@ const Player: React.FC = () => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   
   // Refs
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
   const isPlayingRef = useRef(false);
@@ -406,13 +406,7 @@ const Player: React.FC = () => {
     }
   }, [isFullscreen, isPiP]);
 
-  useEffect(() => {
-    if (!mpvInitialized.current) return;
-    const margins = episodeListExpanded && !isFullscreen && !isPiP
-      ? { top: 0, right: 0.235, bottom: 0, left: 0 }
-      : { top: 0, right: 0, bottom: 0, left: 0 };
-    setVideoMarginRatio(margins).catch((err) => console.error('[Player] 设置视频边距失败:', err));
-  }, [episodeListExpanded, isFullscreen, isPiP]);
+  // 视频边距：选集面板现在是覆盖式，不再需要调整视频边距
 
   const closePiP = useCallback(() => {
     if (!isPiP) return;
@@ -523,38 +517,24 @@ const Player: React.FC = () => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const revealControls = useCallback((autoHide = true) => {
-    if (controlsTimerRef.current) {
-      clearTimeout(controlsTimerRef.current);
-      controlsTimerRef.current = null;
-    }
-    setShowControls(true);
-    if (autoHide && isPlaying) {
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 1000);
-    }
-  }, [isPlaying]);
-
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
     const nearTop = y <= 82;
     const nearBottom = y >= rect.height - 132;
-    revealControls(!(nearTop || nearBottom));
-  }, [revealControls]);
-
-  // 控制栏自动隐藏：鼠标靠近顶部/底部一直展示；离开热区后 1s 淡出。
-  useEffect(() => {
-    if (!isPlaying) {
-      revealControls(false);
-      return;
+    if (nearTop) {
+      setShowHeader(true);
+      setShowFooter(false);
+    } else if (nearBottom) {
+      setShowHeader(false);
+      setShowFooter(true);
+    } else {
+      setShowHeader(false);
+      setShowFooter(false);
     }
-    revealControls(true);
-    return () => {
-      if (controlsTimerRef.current) {
-        clearTimeout(controlsTimerRef.current);
-      }
-    };
-  }, [isPlaying, revealControls]);
+  }, []);
+
+  // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
 
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;
@@ -642,15 +622,6 @@ const Player: React.FC = () => {
   const seasonSummary = activeEpisode?.season && activeEpisode.season > 0 && activeEpisode.season !== 999
     ? `第${activeEpisode.season}季 · ${sortedEpisodes.length}${episodeWord} · 当前${activeEpisodeLabel.replace(/^第\d+季 /, '')}`
     : `${sortedEpisodes.length || 1}${episodeWord} · 当前${activeEpisodeLabel}`;
-  const getEpisodeStatus = (episode: Video) => {
-    if (episode.id === currentVideo?.id) return `播放中 · ${currentTimeText}`;
-    const history = playHistory.find((item) => item.video_id === episode.id);
-    if (!history || history.last_position < 1) return '尚未播放';
-    const total = history.total_duration || episode.duration || 0;
-    if (total > 0 && history.last_position >= total * 0.9) return '已看完';
-    return `上次看到${formatTime(history.last_position)}`;
-  };
-
   const playEpisode = (episode: Video | null) => {
     if (!episode || episode.id === currentVideo?.id) return;
     navigate(`/player/${episode.id}`, { replace: true });
@@ -680,12 +651,12 @@ const Player: React.FC = () => {
 
   return (
     <section
-      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${episodeListExpanded ? 'episodes-open' : 'episodes-closed'}`}
+      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={handlePlayerMouseMove}
-      onMouseLeave={() => isPlaying && revealControls(true)}
+      onMouseLeave={() => { if (isPlaying) { setShowHeader(false); setShowFooter(false); } }}
     >
-      <header className={`changli-player-titlebar ${showControls ? 'show' : 'hide'}`}>
+      <header className={`changli-player-titlebar ${showHeader ? 'show' : 'hide'}`}>
         <div className="changli-player-brand">
           <img src={appIcon} alt="长离" />
           <span>ChangLi Player</span>
@@ -713,32 +684,32 @@ const Player: React.FC = () => {
           {showResumeNotice && (
             <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>
           )}
-          {!isPlaying && <div className="changli-player-center-play"><span className="play-icon" /></div>}
         </div>
 
-        {/* 选集边缘触发箭头 */}
-        {!episodeListExpanded && !isFullscreen && !isPiP && (
-          <button
-            type="button"
-            className="changli-player-edge-trigger"
-            onClick={() => setEpisodeListExpanded(true)}
-            aria-label="展开选集"
-          >
-            ‹
-          </button>
-        )}
-
-        <aside className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}>
+        {/* 选集侧边栏：鼠标靠近右侧展开，离开收起 */}
+        <div
+          className="changli-player-hover-zone"
+          onMouseEnter={() => {
+            if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
+            setEpisodeListExpanded(true);
+          }}
+        />
+        <aside
+          className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}
+          onMouseEnter={() => {
+            if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
+            setEpisodeListExpanded(true);
+          }}
+          onMouseLeave={() => {
+            episodeHoverTimerRef.current = setTimeout(() => setEpisodeListExpanded(false), 300);
+          }}
+        >
           <div className="changli-player-side-head">
-            <div className="changli-player-side-title-row">
-              <strong>选集</strong>
-              <button type="button" onClick={() => setEpisodeListExpanded(false)}>×</button>
-            </div>
+            <strong>选集</strong>
             <span>{seasonSummary}</span>
           </div>
           <div className="changli-player-episodes">
             {(() => {
-              // 按季分组
               const seasons = new Map<number, Video[]>();
               for (const ep of sortedEpisodes) {
                 const s = ep.season ?? 0;
@@ -758,7 +729,9 @@ const Player: React.FC = () => {
                   {eps.map((episode) => {
                     const active = episode.id === currentVideo?.id;
                     const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
-                    const poster = videoPosterDataUrl(episode);
+                    const history = playHistory.find((item) => item.video_id === episode.id);
+                    const lastPos = history?.last_position ?? 0;
+                    const hasProgress = lastPos > 5;
                     return (
                       <button
                         type="button"
@@ -766,13 +739,13 @@ const Player: React.FC = () => {
                         onClick={() => playEpisode(episode)}
                         className={`changli-player-episode ${active ? 'active' : ''}`}
                       >
-                        <div className="changli-player-thumb">
-                          {poster ? <img src={poster} alt="" /> : <span />}
-                        </div>
-                        <div>
-                          <p>{label}</p>
-                          <small>{getEpisodeStatus(episode)}</small>
-                        </div>
+                        <span className="changli-player-episode-label">{label}</span>
+                        {hasProgress && !active && (
+                          <span className="changli-player-episode-time">{formatTime(lastPos)}</span>
+                        )}
+                        {active && (
+                          <span className="changli-player-episode-time active">{currentTimeText}</span>
+                        )}
                       </button>
                     );
                   })}
@@ -783,7 +756,7 @@ const Player: React.FC = () => {
         </aside>
       </main>
 
-      <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
+      <footer className={`changli-player-controls ${showFooter ? 'show' : 'hide'}`}>
         <div className="changli-player-progress">
           <span>{currentTimeText}</span>
           <div
@@ -811,7 +784,6 @@ const Player: React.FC = () => {
             <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seek(Math.max(0, currentTime - 10))}><span className="back-icon" /></button>
             <button type="button" className="changli-player-round next" aria-label="下一集" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}><span className="next-icon" /></button>
             <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
-            <button type="button" className={`changli-player-textbtn advanced ${episodeListExpanded ? 'active' : ''}`} onClick={() => setEpisodeListExpanded((open) => !open)}>{episodeListExpanded ? '收起选集' : '选集'}</button>
           </div>
 
           <div className="changli-player-right-controls">
