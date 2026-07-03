@@ -382,7 +382,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     progressTimer = setInterval(() => {{
       if (progressValue < 92) setProgress(progressValue + 1);
       else if (progressValue < 99 && Math.random() > .55) setProgress(progressValue + 1);
-    }}, 180);
+    }}, 100);
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
   window.installDone = (ok, code) => {{

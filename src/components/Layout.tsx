@@ -45,6 +45,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleMinimize = () => runWindowAction(() => appWindow.minimize(), '最小化');
   const handleToggleMaximize = () => runWindowAction(() => appWindow.toggleMaximize(), '最大化');
   const handleClose = () => runWindowAction(() => appWindow.close(), '关闭');
+  const stopWindowControlDrag = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
 
   return (
     <div className="changli-app-shell">
@@ -98,7 +101,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <img src={settingsIcon} alt="设置" className="w-5 h-5" />
               </button>
-              <div className="changli-window-controls" aria-label="窗口控制">
+              <div className="changli-window-controls" aria-label="窗口控制" onMouseDown={stopWindowControlDrag}>
                 <button type="button" onClick={handleMinimize} aria-label="最小化">−</button>
                 <button type="button" onClick={handleToggleMaximize} aria-label="最大化">□</button>
                 <button type="button" onClick={handleClose} aria-label="关闭" className="close">×</button>

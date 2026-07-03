@@ -16,17 +16,17 @@ const PageMotion: React.FC<PageMotionProps> = ({ children, motionKey }) => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion || !scopeRef.current) return;
 
-    if (motionKey.startsWith('/library') || motionKey.startsWith('/series/') || motionKey.startsWith('/actors')) {
+    if (motionKey.startsWith('/series/')) {
       gsap.fromTo(
         scopeRef.current,
         { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 0.1, ease: 'power2.out', overwrite: 'auto' }
+        { autoAlpha: 1, duration: 0.12, ease: 'power2.out', overwrite: 'auto' }
       );
       return;
     }
 
-    const sections = Array.from(scopeRef.current.querySelectorAll('section, .card, h1, h2, .category-btn, .search-input')).slice(0, 48);
-    const cards = Array.from(scopeRef.current.querySelectorAll('.card')).slice(0, 36);
+    const sections = scopeRef.current.querySelectorAll('section, .card, h1, h2, .category-btn, .search-input');
+    const cards = scopeRef.current.querySelectorAll('.card');
 
     gsap.fromTo(
       sections,

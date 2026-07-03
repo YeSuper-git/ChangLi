@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.7.35 (2026-07-03)
+
+### 修复
+- 恢复 PageMotion 到 v1.7.32 原有页面入场动效，撤回 v1.7.34 对视频库/演员页动效范围的降级，避免改没原来效果。
+
+### 优化
+- 安装器安装进度条速度调整为原来的 1.8 倍：进度刷新间隔从 180ms 改为 100ms。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.34 (2026-07-03)
 
 ### 修复

@@ -219,16 +219,44 @@ const Player: React.FC = () => {
     }
   }, [isFullscreen]);
 
+  const playerWindow = getCurrentWindow();
+
+  const runPlayerWindowAction = useCallback((action: () => Promise<void>, name: string) => {
+    action().catch((error) => console.error(`[Player] ${name}失败:`, error));
+  }, []);
+
+  const handlePlayerChromeDrag = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('button,select,input,.changli-player-actions')) return;
+    playerWindow.startDragging().catch((error) => console.error('[Player] 拖动窗口失败:', error));
+  }, [playerWindow]);
+
+  const stopWindowButtonMouseDown = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  }, []);
+
+  const handlePlayerMinimize = useCallback(() => {
+    runPlayerWindowAction(() => playerWindow.minimize(), '最小化');
+  }, [playerWindow, runPlayerWindowAction]);
+
+  const handlePlayerToggleMaximize = useCallback(() => {
+    runPlayerWindowAction(() => playerWindow.toggleMaximize(), '最大化');
+  }, [playerWindow, runPlayerWindowAction]);
+
+  const handlePlayerClose = useCallback(() => {
+    runPlayerWindowAction(() => playerWindow.close(), '关闭');
+  }, [playerWindow, runPlayerWindowAction]);
+
   // 切换置顶
   const togglePin = useCallback(async () => {
     try {
       const newPinned = !isPinned;
-      await getCurrentWindow().setAlwaysOnTop(newPinned);
+      await playerWindow.setAlwaysOnTop(newPinned);
       setIsPinned(newPinned);
     } catch (err) {
       console.error('[Player] 切换置顶失败:', err);
     }
-  }, [isPinned]);
+  }, [isPinned, playerWindow]);
 
   // 切换画中画
   const togglePiP = useCallback(async () => {
@@ -499,7 +527,7 @@ const Player: React.FC = () => {
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      <header className="changli-player-titlebar" data-tauri-drag-region>
+      <header className="changli-player-titlebar" onMouseDown={handlePlayerChromeDrag}>
         <div className="changli-player-brand">
           <img src={appIcon} alt="长离" />
           <span>ChangLi Player</span>
@@ -508,11 +536,11 @@ const Player: React.FC = () => {
           <div className="changli-player-title">{displayTitle} - {activeEpisodeLabel}</div>
           <div className="changli-player-sub">独立播放窗口 · 原资料库窗口可继续操作</div>
         </div>
-        <div className="changli-player-actions">
+        <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
           <button type="button" className={`changli-player-pill ${isPinned ? 'active' : ''}`} onClick={togglePin}>置顶</button>
-          <button type="button" className="changli-player-winbtn" onClick={() => getCurrentWindow().minimize()}>-</button>
-          <button type="button" className="changli-player-winbtn" onClick={() => getCurrentWindow().toggleMaximize()}>□</button>
-          <button type="button" className="changli-player-winbtn close" onClick={() => getCurrentWindow().close()}>×</button>
+          <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}>-</button>
+          <button type="button" className="changli-player-winbtn" aria-label="最大化" onClick={handlePlayerToggleMaximize}>□</button>
+          <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}>×</button>
         </div>
       </header>
 
