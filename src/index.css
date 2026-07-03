@@ -608,6 +608,35 @@ body {
   pointer-events: none;
 }
 
+.changli-category-unit-select-wrap {
+  display: inline-flex;
+  width: 104px;
+}
+
+.changli-category-unit-select-wrap::after {
+  right: 14px;
+  color: rgba(251, 91, 123, 0.72);
+  font-size: 15px;
+}
+
+.changli-category-unit-select {
+  width: 100%;
+  min-height: 36px;
+  border-color: rgba(232, 235, 242, 0.96);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 252, 0.94));
+  color: #343946;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 8px 34px 8px 15px;
+  box-shadow: 0 10px 24px rgba(33, 38, 48, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.changli-category-unit-select:hover {
+  border-color: rgba(251, 91, 123, 0.30);
+  background: #fff;
+}
+
 .changli-status-switch {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
@@ -717,22 +746,36 @@ body {
 .changli-window-controls .maximize-icon::after {
   content: '';
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border: 1.8px solid currentColor;
   border-radius: 3px;
   background: transparent;
 }
 
 .changli-window-controls .maximize-icon::before {
-  right: 1px;
-  top: 1px;
-  opacity: 0.64;
+  inset: 2px;
 }
 
 .changli-window-controls .maximize-icon::after {
+  display: none;
+}
+
+.changli-window-controls .is-maximized .maximize-icon::before {
+  inset: auto;
+  right: 1px;
+  top: 1px;
+  width: 10px;
+  height: 10px;
+  opacity: 0.64;
+}
+
+.changli-window-controls .is-maximized .maximize-icon::after {
   left: 1px;
   bottom: 1px;
+  display: block;
+  width: 10px;
+  height: 10px;
   background: rgba(255, 255, 255, 0.64);
 }
 
@@ -1548,12 +1591,38 @@ body.changli-player-body #root {
   background: currentColor;
 }
 
-.changli-player-winbtn[aria-label="最大化"] span::before {
+.changli-player-winbtn[aria-label="最大化"] span::before,
+.changli-player-winbtn[aria-label="最大化"] span::after {
   content: "";
   position: absolute;
-  inset: 1.5px;
   border: 1.6px solid currentColor;
   border-radius: 3px;
+}
+
+.changli-player-winbtn[aria-label="最大化"] span::before {
+  inset: 1.5px;
+}
+
+.changli-player-winbtn[aria-label="最大化"] span::after {
+  display: none;
+}
+
+.changli-player-winbtn.is-maximized[aria-label="最大化"] span::before {
+  inset: auto;
+  right: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  opacity: 0.68;
+}
+
+.changli-player-winbtn.is-maximized[aria-label="最大化"] span::after {
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: 9px;
+  height: 9px;
+  background: rgba(255, 255, 255, 0.10);
 }
 
 .changli-player-winbtn[aria-label="关闭"] span::before,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
+import { getCurrentWindow, currentMonitor, Window } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
@@ -42,6 +42,7 @@ const Player: React.FC = () => {
   const [episodeListExpanded, setEpisodeListExpanded] = useState(false);
   const [showResumeNotice, setShowResumeNotice] = useState(false);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
   
   // 悬浮预览
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -56,6 +57,7 @@ const Player: React.FC = () => {
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
   useEffect(() => {
@@ -260,11 +262,33 @@ const Player: React.FC = () => {
         setIsFullscreen(false);
       }
       await playerWindow.toggleMaximize();
+      setIsWindowMaximized(await playerWindow.isMaximized());
     }, '最大化');
   }, [isFullscreen, playerWindow, runPlayerWindowAction]);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
+    playerWindow.onResized(async () => {
+      setIsWindowMaximized(await playerWindow.isMaximized());
+    }).then((fn) => {
+      unlisten = fn;
+    }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
+    return () => unlisten?.();
+  }, [playerWindow]);
+
   const handlePlayerClose = useCallback(() => {
-    runPlayerWindowAction(() => playerWindow.close(), '关闭');
+    runPlayerWindowAction(async () => {
+      const mainWindow = await Window.getByLabel('main');
+      if (mainWindow) {
+        await mainWindow.unminimize().catch(() => undefined);
+        await mainWindow.setAlwaysOnTop(true).catch(() => undefined);
+        await mainWindow.setFocus().catch(() => undefined);
+        await new Promise((resolve) => window.setTimeout(resolve, 120));
+        await mainWindow.setAlwaysOnTop(false).catch((error) => console.error('[Player] 取消主窗口置顶失败:', error));
+      }
+      await playerWindow.close();
+    }, '关闭');
   }, [playerWindow, runPlayerWindowAction]);
 
   // 切换画中画
@@ -335,41 +359,73 @@ const Player: React.FC = () => {
   }, [isPiP, togglePiP]);
   const handleProgressBarHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressBarRef.current || !duration) return;
-    
+
     const rect = progressBarRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percent = x / rect.width;
     const time = percent * duration;
-    
+
     setHoverTime(time);
     setHoverX(x);
 
-    // 防抖生成预览帧
+    // 防抖生成预览帧：只更新悬停缩略图，不能 seek 主播放器。
     if (previewTimerRef.current) {
       clearTimeout(previewTimerRef.current);
     }
     const seq = ++previewSeqRef.current;
     previewTimerRef.current = setTimeout(async () => {
       try {
-        // 先跳转到目标时间
-        await command('seek', [time, 'absolute']);
-        // 等待帧渲染
-        await new Promise(r => setTimeout(r, 200));
-        // 检查是否还是最新的请求
+        if (!currentVideo?.file_path) return;
+        let video = previewVideoRef.current;
+        if (!video || video.dataset.src !== currentVideo.file_path) {
+          video = document.createElement('video');
+          video.dataset.src = currentVideo.file_path;
+          video.src = convertFileSrc(currentVideo.file_path);
+          video.muted = true;
+          video.preload = 'metadata';
+          video.crossOrigin = 'anonymous';
+          previewVideoRef.current = video;
+        }
+        if (video.readyState < 1) {
+          await new Promise<void>((resolve, reject) => {
+            const cleanup = () => {
+              video?.removeEventListener('loadedmetadata', onLoaded);
+              video?.removeEventListener('error', onError);
+            };
+            const onLoaded = () => { cleanup(); resolve(); };
+            const onError = () => { cleanup(); reject(new Error('preview metadata load failed')); };
+            video?.addEventListener('loadedmetadata', onLoaded, { once: true });
+            video?.addEventListener('error', onError, { once: true });
+          });
+        }
+        video.currentTime = Math.min(Math.max(time, 0), Math.max((video.duration || duration) - 0.1, 0));
+        await new Promise<void>((resolve, reject) => {
+          const cleanup = () => {
+            video?.removeEventListener('seeked', onSeeked);
+            video?.removeEventListener('error', onError);
+          };
+          const onSeeked = () => { cleanup(); resolve(); };
+          const onError = () => { cleanup(); reject(new Error('preview seek failed')); };
+          video?.addEventListener('seeked', onSeeked, { once: true });
+          video?.addEventListener('error', onError, { once: true });
+        });
         if (seq !== previewSeqRef.current) return;
-        // 截图到临时文件
-        const screenshotPath = `/tmp/changli_preview_${seq}.jpg`;
-        await command('screenshot-to-file', [screenshotPath, 'window']);
+        const canvas = document.createElement('canvas');
+        const width = video.videoWidth || 160;
+        const height = video.videoHeight || 90;
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')?.drawImage(video, 0, 0, width, height);
         if (seq !== previewSeqRef.current) return;
-        setThumbnailUrl(convertFileSrc(screenshotPath));
+        setThumbnailUrl(canvas.toDataURL('image/jpeg', 0.72));
       } catch {
-        // 截图失败时清空缩略图
+        // 预览帧失败时退回当前视频缩略图，但不影响主播放器进度。
         if (seq === previewSeqRef.current) {
-          setThumbnailUrl(null);
+          setThumbnailUrl(currentVideo?.thumbnail_data_url || null);
         }
       }
     }, 300);
-  }, [duration]);
+  }, [currentVideo, duration]);
 
   // 进度条鼠标离开
   const handleProgressBarLeave = useCallback(() => {
@@ -413,7 +469,7 @@ const Player: React.FC = () => {
     }
     setShowControls(true);
     if (autoHide && isPlaying) {
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 1000);
     }
   }, [isPlaying]);
 
@@ -425,7 +481,7 @@ const Player: React.FC = () => {
     revealControls(!(nearTop || nearBottom));
   }, [revealControls]);
 
-  // 控制栏自动隐藏：鼠标靠近顶部/底部一直展示；离开热区后 3s 淡出。
+  // 控制栏自动隐藏：鼠标靠近顶部/底部一直展示；离开热区后 1s 淡出。
   useEffect(() => {
     if (!isPlaying) {
       revealControls(false);
@@ -579,7 +635,7 @@ const Player: React.FC = () => {
         </div>
         <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
           <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}><span /></button>
-          <button type="button" className="changli-player-winbtn" aria-label="最大化" onClick={handlePlayerToggleMaximize}><span /></button>
+          <button type="button" className={`changli-player-winbtn ${isWindowMaximized ? 'is-maximized' : ''}`} aria-label="最大化" onClick={handlePlayerToggleMaximize}><span /></button>
           <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}><span /></button>
         </div>
       </header>

@@ -338,6 +338,14 @@ const Settings: React.FC = () => {
     let opts: string[] = [];
     try { if (field.options) opts = JSON.parse(field.options); } catch {}
     setFieldForm({ field_key: field.field_key, field_label: field.field_label, field_type: field.field_type, enabled: field.enabled, options: opts });
+    setNewOptionValue('');
+    setShowFieldModal(true);
+  };
+
+  const openAddField = () => {
+    setEditingField(null);
+    setFieldForm({ field_key: '', field_label: '', field_type: 'text', enabled: true, options: [] });
+    setNewOptionValue('');
     setShowFieldModal(true);
   };
 
@@ -665,8 +673,10 @@ const Settings: React.FC = () => {
 
         {(() => {
           const presetKeySet = new Set(allPresetTemplates.map(t => t.key));
+          const extensionPresetKeySet = new Set(presetTemplates.map(t => t.key));
           const sorted = [...actorFields.filter(f => {
             if (f.field_key === 'name') return false;
+            if (extensionPresetKeySet.has(f.field_key) && !f.enabled) return false;
             return true;
           })].sort((a, b) => {
             const aPreset = presetKeySet.has(a.field_key) ? 0 : 1;
@@ -685,6 +695,14 @@ const Settings: React.FC = () => {
                   <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
                 </div>
               ))}
+              <button
+                type="button"
+                onClick={openAddField}
+                className="min-h-[118px] rounded-2xl border-2 border-dashed border-gray-300 bg-white/58 p-4 text-gray-500 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-50/40 hover:text-rose-500"
+              >
+                <span className="block text-3xl leading-none">+</span>
+                <span className="mt-2 block text-sm font-semibold">新增字段</span>
+              </button>
             </div>
           );
         })()}
@@ -849,18 +867,20 @@ const Settings: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-700">剧集单位</span>
                     <div className="flex items-center gap-2">
-                      <select
-                      value={categoryForm.features.episode || '部'}
-                      onChange={(e) => setCategoryForm({
-                        ...categoryForm,
-                        features: { ...categoryForm.features, episode: e.target.value }
-                      })}
-                      className="changli-select !w-auto px-3 py-1 text-sm"
-                      >
-                      <option value="话">话</option>
-                      <option value="部">部</option>
-                      <option value="集">集</option>
-                      </select>
+                      <span className="changli-select-wrap changli-category-unit-select-wrap">
+                        <select
+                          value={categoryForm.features.episode || '部'}
+                          onChange={(e) => setCategoryForm({
+                            ...categoryForm,
+                            features: { ...categoryForm.features, episode: e.target.value }
+                          })}
+                          className="changli-select changli-category-unit-select"
+                        >
+                          <option value="话">话</option>
+                          <option value="部">部</option>
+                          <option value="集">集</option>
+                        </select>
+                      </span>
                       <span className="group relative">
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
                         <span className="changli-tooltip absolute bottom-full right-0 mb-2 px-3 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import PageMotion from './PageMotion';
@@ -12,7 +12,9 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
   const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors');
 
   const navItems = [
@@ -42,11 +44,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const handleMinimize = () => runWindowAction(() => appWindow.minimize(), '最小化');
-  const handleToggleMaximize = () => runWindowAction(() => appWindow.toggleMaximize(), '最大化');
+  const handleToggleMaximize = () => runWindowAction(async () => {
+    await appWindow.toggleMaximize();
+    setIsMaximized(await appWindow.isMaximized());
+  }, '最大化');
   const handleClose = () => runWindowAction(() => appWindow.close(), '关闭');
   const stopWindowControlDrag = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
   };
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    window.scrollTo(0, 0);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    appWindow.isMaximized().then(setIsMaximized).catch((error) => console.error('[Layout] 获取最大化状态失败:', error));
+    appWindow.onResized(async () => {
+      setIsMaximized(await appWindow.isMaximized());
+    }).then((fn) => {
+      unlisten = fn;
+    }).catch((error) => console.error('[Layout] 监听窗口大小失败:', error));
+    return () => unlisten?.();
+  }, [appWindow]);
 
   return (
     <div className="changli-app-shell">
@@ -100,7 +121,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button type="button" onClick={handleMinimize} aria-label="最小化" title="最小化">
                   <span className="control-icon minimize-icon" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={handleToggleMaximize} aria-label="最大化" title="最大化">
+                <button type="button" onClick={handleToggleMaximize} aria-label="最大化" className={isMaximized ? 'is-maximized' : ''} title="最大化">
                   <span className="control-icon maximize-icon" aria-hidden="true" />
                 </button>
                 <button type="button" onClick={handleClose} aria-label="关闭" className="close" title="关闭">
@@ -113,7 +134,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </nav>
 
       {/* 主内容区 */}
-      <main className="changli-main w-full px-4 py-10 sm:px-5 xl:px-6 2xl:px-8">
+      <main ref={mainRef} className="changli-main w-full px-4 py-10 sm:px-5 xl:px-6 2xl:px-8">
         <PageMotion motionKey={`${location.pathname}${location.search}`}>
           {children}
         </PageMotion>

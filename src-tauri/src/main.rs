@@ -1697,6 +1697,33 @@ async fn open_player_window(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "视频不存在".to_string())?;
+    let mut target_w = 1280.0;
+    let mut target_h = 720.0;
+    if let Some(main) = app.get_webview_window("main") {
+        let main_size = main.outer_size().map_err(|e| e.to_string())?;
+        let scale = main.scale_factor().unwrap_or(1.0);
+        target_w = (main_size.width as f64 / scale * 0.90).max(960.0);
+        target_h = (main_size.height as f64 / scale * 0.88).max(540.0);
+    } else if let Some(monitor) = app.primary_monitor().map_err(|e| e.to_string())? {
+        let scale = monitor.scale_factor();
+        target_w = (monitor.size().width as f64 / scale * 0.78).max(960.0);
+        target_h = (monitor.size().height as f64 / scale * 0.78).max(540.0);
+    }
+
+    // 播放窗口按视频比例贴近主程序窗口大小：高分辨率会被限制，低分辨率也会自动放大。
+    let aspect = match (video.width, video.height) {
+        (Some(w), Some(h)) if w > 0 && h > 0 => (w as f64 / h as f64).clamp(0.45, 3.20),
+        _ => 16.0 / 9.0,
+    };
+    let mut player_w = target_w;
+    let mut player_h = (player_w / aspect).round();
+    if player_h > target_h {
+        player_h = target_h;
+        player_w = (player_h * aspect).round();
+    }
+    player_w = player_w.max(640.0).min(target_w);
+    player_h = player_h.max(360.0).min(target_h);
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
@@ -1705,8 +1732,8 @@ async fn open_player_window(
     let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
     let window = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("ChangLi Player - {}", video.file_name))
-        .inner_size(1280.0, 760.0)
-        .min_inner_size(960.0, 540.0)
+        .inner_size(player_w, player_h)
+        .min_inner_size(520.0, 292.0)
         .resizable(true)
         .decorations(false)
         .transparent(true)
@@ -1718,8 +1745,6 @@ async fn open_player_window(
         let main_pos = main.outer_position().map_err(|e| e.to_string())?;
         let main_size = main.outer_size().map_err(|e| e.to_string())?;
         let scale = main.scale_factor().unwrap_or(1.0);
-        let player_w = 1280.0;
-        let player_h = 760.0;
         let x = main_pos.x as f64 / scale + (main_size.width as f64 / scale - player_w) / 2.0;
         let y = main_pos.y as f64 / scale + (main_size.height as f64 / scale - player_h) / 2.0;
         window
@@ -2150,8 +2175,10 @@ fn main() {
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 window.center()?;
+                // 启动时短暂置顶一次用于拉到最前方，随后立即取消，避免程序长期始终置顶。
                 window.set_always_on_top(true)?;
                 window.set_focus()?;
+                window.set_always_on_top(false)?;
             }
             // 播放器主路径已切到前端 /player/:id + tauri-plugin-libmpv。
             // 旧的外部 mpv 播放窗口只保留给历史 play_video 命令兜底，不再注册全局快捷键，
