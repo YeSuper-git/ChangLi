@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.7.36 (2026-07-03)
+
+### 修复
+- 安装器透明圆角方案移除 Windows GDI 原生裁剪，不再使用 `CreateRoundRectRgn` / `SetWindowRgn` 裁切窗口，避免硬裁剪带来的圆角锯齿、白色线条和白底反复问题。
+- 安装器继续保留透明父窗口 + 内缩 WebView2 + CSS `.shell` 圆角主体结构，由浏览器渲染可见圆角和阴影。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.35 (2026-07-03)
 
 ### 修复

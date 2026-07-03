@@ -359,7 +359,6 @@ dependencies = [
  "rfd",
  "serde_json",
  "tao",
- "windows",
  "winreg",
  "winresource",
  "wry",

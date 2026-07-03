@@ -8,8 +8,6 @@ use std::{
 };
 
 use base64::{engine::general_purpose, Engine as _};
-#[cfg(target_os = "windows")]
-use tao::platform::windows::WindowExtWindows;
 
 use tao::{
     dpi::{LogicalSize, PhysicalPosition},
@@ -405,25 +403,6 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     )
 }
 
-#[cfg(target_os = "windows")]
-fn apply_transparent_shell_region(window: &tao::window::Window) {
-    use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
-
-    let hwnd = windows::Win32::Foundation::HWND(window.hwnd() as *mut core::ffi::c_void);
-    unsafe {
-        // Clip to the actual 980x640 shell placed at (10,10). This is a defensive layer:
-        // even if WebView2 paints its transparent pixels white on a user's machine, the
-        // rectangular child backing cannot leak outside the rounded shell.
-        let region = CreateRoundRectRgn(10, 10, 990, 650, 68, 68);
-        if !region.is_invalid() {
-            let _ = SetWindowRgn(hwnd, region, true);
-        }
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn apply_transparent_shell_region(_window: &tao::window::Window) {}
-
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -451,7 +430,6 @@ fn main() -> wry::Result<()> {
         builder = builder.with_position(pos);
     }
     let window = builder.build(&event_loop).expect("create installer window");
-    apply_transparent_shell_region(&window);
 
     let nav_proxy = proxy.clone();
     let mut web_context = WebContext::new(Some(webview_data_dir()));
