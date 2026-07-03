@@ -31,9 +31,13 @@
 
 html {
   background: var(--changli-bg);
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
+  height: 100%;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   color: var(--changli-ink);
@@ -47,11 +51,15 @@ body {
 
 #root {
   width: 100%;
+  height: 100%;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .changli-app-shell {
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -124,56 +132,78 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, 210px);
   gap: 20px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-video {
   display: grid;
   grid-template-columns: repeat(auto-fill, 270px);
   gap: 20px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-mixed {
   display: grid;
   grid-template-columns: repeat(auto-fill, 220px);
   gap: 20px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-actor {
   display: grid;
   grid-template-columns: repeat(auto-fill, 250px);
   gap: 24px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-work {
   display: grid;
   grid-template-columns: repeat(auto-fill, 210px);
   gap: 24px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-episode {
   display: grid;
   grid-template-columns: repeat(auto-fill, 190px);
   gap: 20px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-compact {
   display: grid;
   grid-template-columns: repeat(auto-fill, 160px);
   gap: 16px;
-  justify-content: start;
+  justify-content: center;
 }
 
 .changli-auto-grid-info {
   display: grid;
   grid-template-columns: repeat(auto-fill, 220px);
   gap: 16px;
-  justify-content: start;
+  justify-content: center;
+}
+
+.changli-home-one-row {
+  overflow: hidden;
+}
+
+.changli-home-one-row-series {
+  max-height: 332px;
+}
+
+.changli-home-one-row-video {
+  max-height: 204px;
+}
+
+@media (max-width: 720px) {
+  .changli-home-one-row-series {
+    max-height: 264px;
+  }
+
+  .changli-home-one-row-video {
+    max-height: 176px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -611,44 +641,120 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 3px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(232, 235, 242, 0.72);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .changli-window-controls button {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 32px;
+  width: 32px;
+  height: 30px;
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: #6f7480;
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1;
+  color: #69707c;
   cursor: pointer;
   transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
-.changli-window-controls button img {
-  opacity: 0.72;
-  transition: opacity 0.16s ease, filter 0.16s ease;
+.changli-window-controls .control-icon {
+  position: relative;
+  display: block;
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+}
+
+.changli-window-controls .settings-icon {
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+
+.changli-window-controls .settings-icon::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.changli-window-controls .settings-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 3px;
+  height: 23px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.54);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.changli-window-controls .minimize-icon::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.changli-window-controls .maximize-icon::before,
+.changli-window-controls .maximize-icon::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1.8px solid currentColor;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.changli-window-controls .maximize-icon::before {
+  right: 1px;
+  top: 1px;
+  opacity: 0.64;
+}
+
+.changli-window-controls .maximize-icon::after {
+  left: 1px;
+  bottom: 1px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.changli-window-controls .close-icon::before,
+.changli-window-controls .close-icon::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 7px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.changli-window-controls .close-icon::before {
+  transform: rotate(45deg);
+}
+
+.changli-window-controls .close-icon::after {
+  transform: rotate(-45deg);
 }
 
 .changli-window-controls button:hover {
   background: linear-gradient(135deg, rgba(251, 91, 123, 0.11), rgba(255, 138, 76, 0.11));
   color: #fb5b7b;
   box-shadow: inset 0 0 0 1px rgba(251, 91, 123, 0.12);
-}
-
-.changli-window-controls button:hover img {
-  opacity: 1;
-  filter: invert(42%) sepia(88%) saturate(1621%) hue-rotate(315deg) brightness(98%) contrast(98%);
 }
 
 .changli-window-controls button:active {

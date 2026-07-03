@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import PageMotion from './PageMotion';
-import settingsIcon from '../assets/icons/settings.svg';
 import searchIcon from '../assets/icons/search.svg';
 import appIcon from '../assets/brand/app-icon.png';
 
@@ -95,12 +94,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </form>
               )}
               <div className="changli-window-controls" aria-label="窗口控制" onMouseDown={stopWindowControlDrag}>
-                <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" className="settings">
-                  <img src={settingsIcon} alt="设置" className="w-4 h-4" />
+                <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" className="settings" title="设置">
+                  <span className="control-icon settings-icon" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={handleMinimize} aria-label="最小化">−</button>
-                <button type="button" onClick={handleToggleMaximize} aria-label="最大化">□</button>
-                <button type="button" onClick={handleClose} aria-label="关闭" className="close">×</button>
+                <button type="button" onClick={handleMinimize} aria-label="最小化" title="最小化">
+                  <span className="control-icon minimize-icon" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={handleToggleMaximize} aria-label="最大化" title="最大化">
+                  <span className="control-icon maximize-icon" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={handleClose} aria-label="关闭" className="close" title="关闭">
+                  <span className="control-icon close-icon" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </div>
