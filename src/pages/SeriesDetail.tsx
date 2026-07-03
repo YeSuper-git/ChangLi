@@ -129,6 +129,7 @@ const SeriesDetail: React.FC = () => {
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   // 右键菜单
   const [contextMenu, setContextMenu] = useState<{ videoId: number; videoName: string; x: number; y: number } | null>(null);
+  const [posterMenu, setPosterMenu] = useState<{ x: number; y: number } | null>(null);
   // 管理季
   const [showSeasonManager, setShowSeasonManager] = useState(false);
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
@@ -176,13 +177,13 @@ const SeriesDetail: React.FC = () => {
 
   // 点击空白关闭右键菜单
   useEffect(() => {
-    if (!contextMenu) return;
-    const close = () => { setContextMenu(null); clearPending(); };
+    if (!contextMenu && !posterMenu) return;
+    const close = () => { setContextMenu(null); setPosterMenu(null); clearPending(); };
     window.addEventListener('click', close);
     return () => {
       window.removeEventListener('click', close);
     };
-  }, [contextMenu, clearPending]);
+  }, [contextMenu, posterMenu, clearPending]);
 
   const loadSeries = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!seriesId) return;
@@ -390,6 +391,15 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+
+  const openPosterMenu = (event: React.MouseEvent) => {
+    if (editing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu(null);
+    setPosterMenu({ x: event.clientX, y: event.clientY });
+  };
+
   const backState = routeState;
   const fallbackBackTo = fromActor ? `/actors/${fromActor}` : '/library';
   const fallbackBackLabel = fromActor ? '返回演员详情' : '返回视频';
@@ -452,7 +462,7 @@ const SeriesDetail: React.FC = () => {
     if (episodeA !== episodeB) return episodeA - episodeB;
     return a.file_name.localeCompare(b.file_name);
   });
-  const hasWatchProgress = !isWatched && lastWatchedEpisode > 0;
+  const hasWatchProgress = lastWatchedEpisode > 0;
   const playButtonLabel = hasWatchProgress ? '继续观看' : '立即观看';
   const playButtonHint = hasWatchProgress
     ? progressReminder
@@ -550,8 +560,9 @@ const SeriesDetail: React.FC = () => {
         <div className="flex gap-6">
           <div className={`w-80 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm ring-1 ring-black/5 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
             <div
-              className={`relative w-full h-full group ${editing ? 'cursor-pointer' : ''}`}
+              className={`relative w-full h-full group ${editing ? 'cursor-pointer' : 'cursor-context-menu'}`}
               onClick={editing ? handleSelectPoster : undefined}
+              onContextMenu={openPosterMenu}
             >
               <SmartPoster
                 src={series.poster_data_url}
@@ -751,7 +762,9 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
+                <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
+                  {series.description || '暂无简介'}
+                </p>
                 <div className="mb-4 space-y-3">
                   {features.tags && (
                     <div>
@@ -783,23 +796,21 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap items-start gap-2">
-                  <div className="flex flex-col items-start">
-                    <button
-                      type="button"
-                      onClick={handlePrimaryPlay}
-                      disabled={orderedVideos.length === 0}
-                      className="group flex min-h-[58px] min-w-[246px] items-center justify-between gap-4 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-5 py-4 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
-                      title={playButtonHint}
-                    >
-                      <span className="block text-base font-extrabold leading-none">{playButtonLabel}</span>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
-                    </button>
-                    <span className="mt-2 max-w-[246px] text-xs font-semibold text-gray-500">{playButtonHint}</span>
+                <div className="mt-5 flex flex-wrap items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handlePrimaryPlay}
+                    disabled={orderedVideos.length === 0}
+                    className="group inline-flex min-h-[54px] min-w-[188px] items-center justify-center gap-3 rounded-full border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-6 text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
+                    title={playButtonHint}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:scale-105 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                    <span className="text-base font-extrabold leading-none">{playButtonLabel}</span>
+                  </button>
+                  <div className="min-w-[180px] text-sm font-semibold text-gray-500">
+                    {playButtonHint}
                   </div>
-                  <button onClick={() => setEditing(true)} className="action-btn">编辑信息</button>
-                  <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
-                  <button onClick={handleCheckUpdates} className="action-btn">检查更新</button>
+                  <div className="text-xs text-gray-400">右键海报可编辑信息、管理季或检查更新</div>
                 </div>
               </>
             )}
@@ -821,6 +832,42 @@ const SeriesDetail: React.FC = () => {
         />
       ) : (
         <div className="changli-empty-state text-gray-500">暂无分集</div>
+      )}
+
+
+      {/* 海报右键菜单 */}
+      {posterMenu && (
+        <div
+          className="changli-context-menu fixed z-50 py-2 w-fit"
+          style={{ left: posterMenu.x, top: posterMenu.y }}
+          ref={(node) => {
+            if (node) {
+              const rect = node.getBoundingClientRect();
+              if (rect.right > window.innerWidth) node.style.left = `${posterMenu.x - rect.width}px`;
+              if (rect.bottom > window.innerHeight) node.style.top = `${posterMenu.y - rect.height}px`;
+            }
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="changli-menu-item"
+            onClick={() => { setPosterMenu(null); setEditing(true); }}
+          >
+            编辑信息
+          </button>
+          <button
+            className="changli-menu-item"
+            onClick={() => { setPosterMenu(null); handleOpenSeasonManager(); }}
+          >
+            管理季
+          </button>
+          <button
+            className="changli-menu-item"
+            onClick={() => { setPosterMenu(null); handleCheckUpdates(); }}
+          >
+            检查更新
+          </button>
+        </div>
       )}
 
       {/* 右键菜单 */}

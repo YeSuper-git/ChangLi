@@ -1139,37 +1139,6 @@ body.changli-player-body #root {
   background: transparent !important;
 }
 
-.changli-category-title {
-  cursor: pointer;
-  color: #a1a7b3;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  transition: color 0.18s ease;
-}
-
-.changli-category-title.active {
-  color: var(--changli-ink);
-}
-
-.changli-category-title:hover {
-  color: #4b5563;
-}
-
-.changli-library-grid-portrait {
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-}
-
-.changli-library-grid-landscape {
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
-
-@media (min-width: 1600px) {
-  .changli-library-grid-portrait { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-  .changli-library-grid-landscape { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
-}
-
 .changli-player-window {
   --player-rose: #fb5b7b;
   --player-orange: #ff8a4c;

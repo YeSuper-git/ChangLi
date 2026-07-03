@@ -25,7 +25,7 @@ const PageMotion: React.FC<PageMotionProps> = ({ children, motionKey }) => {
       return;
     }
 
-    const sections = scopeRef.current.querySelectorAll('section, .card, h1:not(.changli-category-title), h2, .category-btn, .search-input');
+    const sections = scopeRef.current.querySelectorAll('section, .card, h1, h2, .category-btn, .search-input');
     const cards = scopeRef.current.querySelectorAll('.card');
 
     gsap.fromTo(

@@ -1,6 +1,21 @@
 # Changelog
 
 
+## v1.7.42 - 2026-07-03
+
+### 修复
+- 安装器稳定切换为圆角 Region 裁剪方案，并在 shell 边缘增加内侧柔光、渐变和阴影以淡化硬裁锯齿，不再使用易回退白底的纯透明缓冲方案。
+- 视频页 B2 动效回滚：恢复大类标题原始选中放大和页面入场动画。
+- 视频页 B1 响应式按原固定列数为基础追加大屏断点，默认尺寸保持横版 4 列、竖版 5 列，窗口更大时再增加列数。
+- 视频集详情页：海报右键菜单承载编辑信息、管理季、检查更新；空简介显示“暂无简介”；已看完仍展示上次观看进度；播放 CTA 与进度文案调整到更接近视频客户端的位置和尺寸。
+
+### 验证
+- `npm run build`
+- `cargo check`
+- `cargo fmt --manifest-path installer-shell/Cargo.toml -- --check`
+- `CHANGLI_NSIS_SETUP="$PWD/package.json" cargo check --manifest-path installer-shell/Cargo.toml`
+- `CHANGLI_NSIS_SETUP="$PWD/package.json" cargo check --manifest-path installer-shell/Cargo.toml --target x86_64-pc-windows-msvc`
+
 ## v1.7.41 - 2026-07-03
 
 ### 修复

@@ -172,7 +172,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ width:980px; height:640px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell {{ position:relative; width:1000px; height:660px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell::before {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.72), inset 0 0 26px rgba(255,255,255,.34), inset 0 -18px 34px rgba(31,35,49,.045); }}
+  .shell::after {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; background:linear-gradient(135deg,rgba(255,255,255,.38),transparent 16%,transparent 84%,rgba(31,35,49,.07)); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
@@ -421,9 +423,9 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
 
     let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
     unsafe {
-        // 纯透明链路：只处理宿主 HWND 的透明合成，不使用 Region/GDI 硬裁像素。
-        // 圆角和阴影由 WebView2 内部 CSS shell 自然抗锯齿渲染；外层 10px buffer
-        // 必须是真透明，而不是被父窗口或 WebView2 回退成白底。
+        // 现实 Windows artifact 已多次证明纯透明链路在部分环境会回退成白底。
+        // 这里明确采用“圆角 region 裁剪 + 内侧柔光/渐变/阴影淡化边缘”的稳定路线，
+        // 不再在纯透明白底和硬裁之间来回切换。
         let margins = MARGINS {
             cxLeftWidth: -1,
             cxRightWidth: -1,
@@ -434,6 +436,12 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
         let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
         let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+
+        use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, 68, 68);
+        if !region.is_invalid() {
+            let _ = SetWindowRgn(hwnd, region, true);
+        }
     }
 }
 
@@ -473,8 +481,8 @@ fn main() -> wry::Result<()> {
     let mut web_context = WebContext::new(Some(webview_data_dir()));
     let webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_bounds(Rect {
-            position: WebLogicalPosition::new(10, 10).into(),
-            size: WebLogicalSize::new(980, 640).into(),
+            position: WebLogicalPosition::new(0, 0).into(),
+            size: WebLogicalSize::new(W, H).into(),
         })
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
