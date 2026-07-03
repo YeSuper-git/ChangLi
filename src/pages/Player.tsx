@@ -15,6 +15,8 @@ const OBSERVED_PROPERTIES = [
   ['duration', 'double', 'none'],
   ['volume', 'double', 'none'],
   ['speed', 'double', 'none'],
+  ['dwidth', 'int64', 'none'],
+  ['dheight', 'int64', 'none'],
 ] as const satisfies MpvObservableProperty[];
 
 const Player: React.FC = () => {
@@ -56,6 +58,7 @@ const Player: React.FC = () => {
   // Refs
   const progressBarRef = useRef<HTMLDivElement>(null);
   const mpvInitialized = useRef(false);
+  const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,19 +80,20 @@ const Player: React.FC = () => {
     if (!id) return;
 
     const initMpv = async () => {
-      try {
-        setLoading(true);
-        setError('');
+      // 通过锁串行化所有 mpv 操作，避免 destroy/init 竞态
+      mpvOperationLock.current = mpvOperationLock.current.then(async () => {
+        try {
+          setLoading(true);
+          setError('');
 
-        // 先销毁旧实例（如果有），确保完全清理
-        if (mpvInitialized.current) {
-          try {
-            await destroy();
-          } catch { /* ignore destroy errors */ }
-          mpvInitialized.current = false;
-          // 等待 mpv 释放资源
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        }
+          // 先销毁旧实例（如果有），确保完全清理
+          if (mpvInitialized.current) {
+            try {
+              await destroy();
+            } catch { /* ignore destroy errors */ }
+            mpvInitialized.current = false;
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -120,16 +124,20 @@ const Player: React.FC = () => {
         await init({
           initialOptions: {
             'vo': 'gpu',
-            'hwdec': 'd3d11va',
+            'hwdec': 'd3d11va-copy',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
             'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
+            'no-config': 'yes',
             // 避免被 NVIDIA 驱动识别为游戏
             'd3d11-sync-interval': '0',
             'video-sync': 'audio',
+            'dither-depth': 'no',
+            'vd-lavc-dr': 'no',
+            'gpu-dumb-mode': 'yes',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -160,6 +168,26 @@ const Player: React.FC = () => {
                 break;
               case 'speed':
                 setSpeed(data ?? 1);
+                break;
+              case 'dwidth':
+              case 'dheight':
+                // 视频尺寸变化时，按比例调整播放器窗口大小
+                if (name === 'dwidth' && data && data > 0) {
+                  const win = getCurrentWindow();
+                  const videoW = data as number;
+                  // dheight 可能还没到，先用当前窗口比例估算
+                  win.outerSize().then((size) => {
+                    const scale = window.devicePixelRatio || 1;
+                    const currentW = size.width / scale;
+                    const currentH = size.height / scale;
+                    const targetH = Math.round(videoW * (currentH / currentW));
+                    if (targetH > 200 && targetH < 2000) {
+                      const newW = Math.round(Math.min(videoW, 1600));
+                      const newH = Math.round(newW * (targetH / videoW));
+                      win.setSize(new LogicalSize(newW, Math.max(360, newH))).catch(() => {});
+                    }
+                  }).catch(() => {});
+                }
                 break;
             }
           } catch { /* ignore observer errors */ }
@@ -193,6 +221,7 @@ const Player: React.FC = () => {
         setError(String(err));
         setLoading(false);
       }
+      }); // end mpvOperationLock.then
     };
 
     initMpv();
@@ -520,8 +549,8 @@ const Player: React.FC = () => {
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const y = event.clientY - rect.top;
-    const nearTop = y <= 82;
-    const nearBottom = y >= rect.height - 132;
+    const nearTop = y <= 60;
+    const nearBottom = y >= rect.height - 100;
     if (nearTop) {
       setShowHeader(true);
       setShowFooter(false);

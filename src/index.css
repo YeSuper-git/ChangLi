@@ -1464,11 +1464,11 @@ body.changli-player-body #root {
   top: 0;
   left: 0;
   right: 0;
-  height: 58px;
+  height: 42px;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 210px;
   align-items: center;
-  padding: 0 18px 0 20px;
+  padding: 0 14px 0 16px;
   border-bottom: 1px solid var(--player-line);
   background: rgba(12, 13, 18, 0.96);
   backdrop-filter: blur(22px);
@@ -1844,7 +1844,7 @@ body.changli-player-body #root {
   bottom: 0;
   z-index: 5;
   border-top: 1px solid var(--player-line);
-  padding: 14px 20px 18px;
+  padding: 8px 16px 10px;
   background: rgba(17, 18, 23, 0.94);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
