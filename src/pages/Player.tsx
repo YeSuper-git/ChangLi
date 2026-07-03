@@ -4,7 +4,7 @@ import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
-import type { Video, VideoSeries } from '../utils/api';
+import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -26,6 +26,7 @@ const Player: React.FC = () => {
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [series, setSeries] = useState<VideoSeries | null>(null);
   const [episodes, setEpisodes] = useState<Video[]>([]);
+  const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
   
   // 播放器状态
   const [isPlaying, setIsPlaying] = useState(false);
@@ -33,13 +34,13 @@ const Player: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(80);
   const [speed, setSpeed] = useState(1);
-  const [subtitleLoaded, setSubtitleLoaded] = useState(false);
   
   // UI 状态
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
+  const [episodeListExpanded, setEpisodeListExpanded] = useState(false);
+  const [showResumeNotice, setShowResumeNotice] = useState(false);
   
   // 悬浮预览
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -54,6 +55,12 @@ const Player: React.FC = () => {
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
+
+  // 透明 WebView 让 libmpv 视频层可见
+  useEffect(() => {
+    document.body.classList.add('changli-player-body');
+    return () => document.body.classList.remove('changli-player-body');
+  }, []);
 
   // 初始化 mpv
   useEffect(() => {
@@ -81,12 +88,17 @@ const Player: React.FC = () => {
         }
 
         const history = await getPlayHistory();
+        setPlayHistory(history);
         const previousPosition = history.find((item) => item.video_id === currentVideo.id)?.last_position ?? 0;
+        if (previousPosition > 5) {
+          setShowResumeNotice(true);
+          window.setTimeout(() => setShowResumeNotice(false), 5000);
+        }
 
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu',
+            'vo': 'gpu-next',
             'hwdec': 'auto-safe',
             'keep-open': 'yes',
             'force-window': 'yes',
@@ -127,9 +139,6 @@ const Player: React.FC = () => {
         await command('loadfile', [currentVideo.file_path, 'replace']);
         if (currentVideo.subtitle) {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
-          setSubtitleLoaded(true);
-        } else {
-          setSubtitleLoaded(false);
         }
         if (previousPosition > 5) {
           await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
@@ -160,8 +169,13 @@ const Player: React.FC = () => {
   // 播放/暂停
   const togglePlay = useCallback(async () => {
     try {
-      await setProperty('pause', !isPlayingRef.current);
+      const nextPaused = isPlayingRef.current;
+      isPlayingRef.current = !nextPaused;
+      setIsPlaying(!nextPaused);
+      await setProperty('pause', nextPaused);
     } catch (err) {
+      isPlayingRef.current = !isPlayingRef.current;
+      setIsPlaying(isPlayingRef.current);
       console.error('[Player] 切换播放状态失败:', err);
     }
   }, []);
@@ -193,21 +207,6 @@ const Player: React.FC = () => {
     }
   }, []);
 
-  const toggleSubtitle = useCallback(async () => {
-    if (!currentVideo?.subtitle) return;
-    try {
-      if (subtitleLoaded) {
-        await setProperty('sid', 'no');
-        setSubtitleLoaded(false);
-      } else {
-        await command('sub-add', [currentVideo.subtitle, 'select']);
-        setSubtitleLoaded(true);
-      }
-    } catch (err) {
-      console.error('[Player] 切换字幕失败:', err);
-    }
-  }, [currentVideo?.subtitle, subtitleLoaded]);
-
   // 切换全屏
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -225,9 +224,10 @@ const Player: React.FC = () => {
     action().catch((error) => console.error(`[Player] ${name}失败:`, error));
   }, []);
 
-  const handlePlayerChromeDrag = useCallback((event: React.MouseEvent<HTMLElement>) => {
+  const handlePlayerWindowDrag = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest('button,select,input,.changli-player-actions')) return;
+    if (target.closest('button,select,input,.changli-player-actions,.changli-player-controls,.changli-player-side,.changli-player-badge,.changli-player-center-play')) return;
     playerWindow.startDragging().catch((error) => console.error('[Player] 拖动窗口失败:', error));
   }, [playerWindow]);
 
@@ -246,17 +246,6 @@ const Player: React.FC = () => {
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(() => playerWindow.close(), '关闭');
   }, [playerWindow, runPlayerWindowAction]);
-
-  // 切换置顶
-  const togglePin = useCallback(async () => {
-    try {
-      const newPinned = !isPinned;
-      await playerWindow.setAlwaysOnTop(newPinned);
-      setIsPinned(newPinned);
-    } catch (err) {
-      console.error('[Player] 切换置顶失败:', err);
-    }
-  }, [isPinned, playerWindow]);
 
   // 切换画中画
   const togglePiP = useCallback(async () => {
@@ -291,7 +280,6 @@ const Player: React.FC = () => {
         }
         await win.setAlwaysOnTop(true);
         setIsPiP(true);
-        setIsPinned(true);
       } else {
         // 退出画中画：恢复窗口
         await win.setAlwaysOnTop(false);
@@ -303,7 +291,6 @@ const Player: React.FC = () => {
           await win.setSize(new LogicalSize(1280, 720));
         }
         setIsPiP(false);
-        setIsPinned(false);
       }
     } catch (err) {
       console.error('[Player] 切换画中画失败:', err);
@@ -479,6 +466,9 @@ const Player: React.FC = () => {
     return a.file_name.localeCompare(b.file_name);
   });
   const activeIndex = sortedEpisodes.findIndex((episode) => episode.id === currentVideo?.id);
+  const visibleEpisodes = episodeListExpanded || activeIndex < 0
+    ? sortedEpisodes
+    : sortedEpisodes.slice(Math.max(0, activeIndex - 2), Math.min(sortedEpisodes.length, activeIndex + 3));
   const activeEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex] : currentVideo;
   const displayTitle = series?.title || currentVideo?.series_title || currentVideo?.file_name || 'ChangLi Player';
   const episodeWord = '话';
@@ -492,7 +482,14 @@ const Player: React.FC = () => {
   const seasonSummary = activeEpisode?.season && activeEpisode.season > 0 && activeEpisode.season !== 999
     ? `第${activeEpisode.season}季 · ${sortedEpisodes.length}${episodeWord} · 当前${activeEpisodeLabel.replace(/^第\d+季 /, '')}`
     : `${sortedEpisodes.length || 1}${episodeWord} · 当前${activeEpisodeLabel}`;
-  const progressBadge = currentTime > 0 ? `继续观看 · 已看到${activeEpisodeLabel}` : `立即观看 · ${activeEpisodeLabel}`;
+  const getEpisodeStatus = (episode: Video) => {
+    if (episode.id === currentVideo?.id) return `播放中 · ${currentTimeText}`;
+    const history = playHistory.find((item) => item.video_id === episode.id);
+    if (!history || history.last_position < 1) return '尚未播放';
+    const total = history.total_duration || episode.duration || 0;
+    if (total > 0 && history.last_position >= total * 0.9) return '已看完';
+    return `上次看到${formatTime(history.last_position)}`;
+  };
 
   const playEpisode = (episode: Video | null) => {
     if (!episode || episode.id === currentVideo?.id) return;
@@ -524,20 +521,19 @@ const Player: React.FC = () => {
   return (
     <section
       className="changli-player-window"
+      onMouseDown={handlePlayerWindowDrag}
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      <header className="changli-player-titlebar" onMouseDown={handlePlayerChromeDrag}>
+      <header className="changli-player-titlebar">
         <div className="changli-player-brand">
           <img src={appIcon} alt="长离" />
           <span>ChangLi Player</span>
         </div>
         <div className="changli-player-meta">
           <div className="changli-player-title">{displayTitle} - {activeEpisodeLabel}</div>
-          <div className="changli-player-sub">独立播放窗口 · 原资料库窗口可继续操作</div>
         </div>
         <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
-          <button type="button" className={`changli-player-pill ${isPinned ? 'active' : ''}`} onClick={togglePin}>置顶</button>
           <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}>-</button>
           <button type="button" className="changli-player-winbtn" aria-label="最大化" onClick={handlePlayerToggleMaximize}>□</button>
           <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}>×</button>
@@ -547,17 +543,26 @@ const Player: React.FC = () => {
       <main className="changli-player-main">
         <div className="changli-player-stage" onClick={togglePlay}>
           <div className="changli-player-video-art" />
-          <div className="changli-player-badge">{progressBadge}</div>
+          {showResumeNotice && (
+            <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>
+          )}
           {!isPlaying && <div className="changli-player-center-play">▶</div>}
         </div>
 
         <aside className="changli-player-side">
           <div className="changli-player-side-head">
-            <strong>分集列表</strong>
-            <span>{seasonSummary}</span>
+            <div className="changli-player-side-title-row">
+              <strong>分集列表</strong>
+              {sortedEpisodes.length > 5 && (
+                <button type="button" onClick={() => setEpisodeListExpanded((value) => !value)}>
+                  {episodeListExpanded ? '收起' : '展开'}
+                </button>
+              )}
+            </div>
+            <span>{episodeListExpanded ? seasonSummary : `当前附近 · ${activeEpisodeLabel}`}</span>
           </div>
           <div className="changli-player-episodes">
-            {sortedEpisodes.map((episode, index) => {
+            {visibleEpisodes.map((episode) => {
               const active = episode.id === currentVideo?.id;
               const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
               return (
@@ -569,8 +574,8 @@ const Player: React.FC = () => {
                 >
                   <div className="changli-player-thumb" />
                   <div>
-                    <p>{label} {episode.subtitle || episode.file_name}</p>
-                    <small>{active ? `播放中 · ${currentTimeText}` : `第${index + 1}个视频`}</small>
+                    <p>{label}</p>
+                    <small>{active ? `播放中 · ${currentTimeText}` : getEpisodeStatus(episode)}</small>
                   </div>
                 </button>
               );
@@ -608,7 +613,6 @@ const Player: React.FC = () => {
             <button type="button" className="changli-player-round" onClick={() => seek(Math.min(duration, currentTime + 10))}>↻</button>
             <div className="changli-player-now">
               <strong>{activeEpisodeLabel}</strong>
-              <span>正在记录观看进度</span>
             </div>
           </div>
 
@@ -617,7 +621,6 @@ const Player: React.FC = () => {
             <select value={speed} onChange={(e) => changeSpeed(parseFloat(e.target.value))} className="changli-player-textbtn as-select">
               {speedOptions.map((spd) => <option key={spd} value={spd}>{spd}x</option>)}
             </select>
-            <button type="button" className={`changli-player-textbtn ${subtitleLoaded ? 'active' : ''}`} disabled={!currentVideo?.subtitle} onClick={toggleSubtitle}>{currentVideo?.subtitle ? (subtitleLoaded ? '字幕 开' : '字幕 关') : '无字幕'}</button>
             <button type="button" className="changli-player-textbtn" onClick={() => changeVolume(volume === 0 ? 80 : 0)}>音量 {Math.round(volume)}%</button>
             <input
               type="range"

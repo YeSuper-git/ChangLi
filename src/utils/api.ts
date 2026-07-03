@@ -433,6 +433,10 @@ export async function rescanSingleSeriesMetadata(seriesId: number): Promise<bool
   return invoke<boolean>('rescan_single_series_metadata', { seriesId });
 }
 
+export async function getMissingSeriesVideos(seriesId: number): Promise<Video[]> {
+  return invoke<Video[]>('get_missing_series_videos', { seriesId });
+}
+
 // 演员相关
 export interface Actor {
   id: number;

@@ -26,6 +26,16 @@ function App() {
   const loadAll = useLibraryStore((s) => s.loadAll);
 
   useEffect(() => {
+    const preventBrowserContextMenu = (event: MouseEvent) => {
+      if (!event.defaultPrevented) {
+        event.preventDefault();
+      }
+    };
+    document.addEventListener('contextmenu', preventBrowserContextMenu);
+    return () => document.removeEventListener('contextmenu', preventBrowserContextMenu);
+  }, []);
+
+  useEffect(() => {
     if (isPlayerWindow) {
       return;
     }

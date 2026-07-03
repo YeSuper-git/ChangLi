@@ -13,7 +13,6 @@ import {
   addSeriesActor,
   addSeriesTag,
   addTag,
-  addVideoToSeries,
   deleteVideo,
   deleteSeason,
   getActors,
@@ -24,6 +23,7 @@ import {
   openPlayerWindow,
   getTags,
   getVideoSeriesDetail,
+  getMissingSeriesVideos,
   removeSeriesActor,
   removeSeriesTag,
   removeVideoFromSeries,
@@ -33,6 +33,7 @@ import {
   toggleChineseSub,
   getAllCategories,
   formatSeriesWatchLabel,
+  rescanSingleSeriesMetadata,
   parseCategoryFeatures,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
@@ -132,6 +133,7 @@ const SeriesDetail: React.FC = () => {
   const [showSeasonManager, setShowSeasonManager] = useState(false);
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [missingVideos, setMissingVideos] = useState<Video[]>([]);
   const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
@@ -340,24 +342,6 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleAddEpisode = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [{
-        name: '视频',
-        extensions: ['mp4', 'mkv', 'avi', 'flv', 'mov', 'wmv', 'webm', 'm4v', 'mpg', 'mpeg', '3gp', 'ts', 'rmvb', 'rm', 'vob', 'asf', 'f4v'],
-      }],
-    });
-    if (!selected) return;
-    try {
-      await addVideoToSeries(seriesId, selected as string);
-      await loadSeries();
-    } catch (error) {
-      console.error('添加分集失败:', error);
-      notify({ message: '添加分集失败: ' + String(error), type: 'error' });
-    }
-  };
-
   const handleRemoveEpisode = async (videoId: number) => {
     try {
       await removeVideoFromSeries(videoId);
@@ -507,6 +491,43 @@ const SeriesDetail: React.FC = () => {
       await refreshSeries();
     } catch (error) {
       console.error('切换中文字幕状态失败:', error);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    if (!series) return;
+    try {
+      const matched = await rescanSingleSeriesMetadata(series.id);
+      const missing = await getMissingSeriesVideos(series.id);
+      seriesDetailCache.delete(series.id);
+      await loadSeries();
+      await refreshSeries();
+      if (missing.length > 0) {
+        setMissingVideos(missing);
+        notify({ message: `发现 ${missing.length} 个本地已不存在的分集`, type: 'info' });
+      } else {
+        notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      }
+    } catch (error) {
+      console.error('[SeriesDetail] 检查更新失败:', error);
+      notify({ message: '检查更新失败: ' + String(error), type: 'error' });
+    }
+  };
+
+  const handleDeleteMissingVideos = async () => {
+    if (missingVideos.length === 0) return;
+    try {
+      for (const video of missingVideos) {
+        await deleteVideo(video.id);
+      }
+      setMissingVideos([]);
+      seriesDetailCache.delete(seriesId);
+      await loadSeries();
+      await refreshSeries();
+      notify({ message: '已删除本地不存在的分集记录', type: 'success' });
+    } catch (error) {
+      console.error('[SeriesDetail] 删除缺失分集失败:', error);
+      notify({ message: '删除缺失分集失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -725,20 +746,7 @@ const SeriesDetail: React.FC = () => {
                       )}
                       <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">全 {series.video_count} {epWord}</span>
                     </div>
-                    {progressReminder && <div className="mt-2 text-xs font-medium text-rose-500">{progressReminder}</div>}
                   </div>
-                  <button
-                    type="button"
-                    onClick={handlePrimaryPlay}
-                    disabled={orderedVideos.length === 0}
-                    className="group flex min-w-[184px] items-center justify-between gap-3 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 py-3 text-left text-white shadow-[0_14px_30px_rgba(251,91,123,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(251,91,123,0.26)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
-                  >
-                    <span>
-                      <span className="block text-sm font-extrabold leading-none">{playButtonLabel}</span>
-                      <span className="mt-1 block max-w-[116px] truncate text-[11px] font-semibold text-white/80 group-disabled:text-gray-400">{playButtonHint}</span>
-                    </span>
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
-                  </button>
                 </div>
                 {series.description && <p className="text-gray-700 whitespace-pre-wrap mb-4">{series.description}</p>}
                 <div className="mb-4 space-y-3">
@@ -770,10 +778,17 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditing(true)} className="action-btn action-btn-primary">编辑信息</button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePrimaryPlay}
+                    disabled={orderedVideos.length === 0}
+                    className="action-btn action-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    title={playButtonHint}
+                  >{playButtonLabel}</button>
+                  <button onClick={() => setEditing(true)} className="action-btn">编辑信息</button>
                   <button onClick={handleOpenSeasonManager} className="action-btn">管理季</button>
-                  <button onClick={handleAddEpisode} className="action-btn">添加{features.episode === '话' ? '分集' : features.episode === '集' ? '分集' : '分部'}</button>
+                  <button onClick={handleCheckUpdates} className="action-btn">检查更新</button>
                 </div>
               </>
             )}
@@ -827,6 +842,33 @@ const SeriesDetail: React.FC = () => {
           >
             {pendingKey === `delete-${contextMenu.videoId}` ? '确认删除' : '删除视频'}
           </button>
+        </div>
+      )}
+
+
+      {missingVideos.length > 0 && (
+        <div className="changli-modal-backdrop">
+          <div className="changli-modal-panel !w-[min(100%,560px)] !p-0">
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">检查更新</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">发现本地已不存在的分集</h2>
+              <p className="mt-2 text-sm text-gray-500">下面这些分集的文件已经不在磁盘上。确认后只删除应用内记录，不会删除其他文件。</p>
+            </div>
+            <div className="changli-modal-body max-h-80 overflow-y-auto">
+              <div className="space-y-2">
+                {missingVideos.map((video) => (
+                  <div key={video.id} className="rounded-2xl border border-gray-100 bg-[#f8f9fc] p-3">
+                    <div className="text-sm font-semibold text-gray-900">{video.episode_number ? `第${video.episode_number}${epWord}` : video.file_name}</div>
+                    <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="changli-modal-footer">
+              <button onClick={() => setMissingVideos([])} className="action-btn flex-1">先不删除</button>
+              <button onClick={handleDeleteMissingVideos} className="action-btn action-btn-danger flex-1">确认删除记录</button>
+            </div>
+          </div>
         </div>
       )}
 

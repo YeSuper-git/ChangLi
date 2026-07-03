@@ -6,8 +6,9 @@ import {
   getFavoriteVideos,
   getFavoriteSeries,
   toggleFavorite as apiToggleFavorite,
+  getAllCategories,
 } from '../utils/api';
-import type { Actor, Tag, Video, VideoSeries } from '../utils/api';
+import type { Actor, Category, Tag, Video, VideoSeries } from '../utils/api';
 
 export type FavoriteItem = Video | VideoSeries;
 
@@ -16,6 +17,7 @@ interface LibraryState {
   actors: Actor[];
   tags: Tag[];
   favorites: FavoriteItem[];
+  categories: Category[];
   watchedIds: Set<number>;
   loading: boolean;
   loaded: boolean;
@@ -25,6 +27,7 @@ interface LibraryState {
   refreshSeries: () => Promise<void>;
   refreshActors: () => Promise<void>;
   refreshTags: () => Promise<void>;
+  refreshCategories: () => Promise<void>;
   loadFavorites: () => Promise<void>;
   loadWatched: () => void;
   toggleFavorite: (id: number, type: 'video' | 'series') => Promise<void>;
@@ -38,6 +41,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   actors: [],
   tags: [],
   favorites: [],
+  categories: [],
   watchedIds: new Set<number>(),
   loading: false,
   loaded: false,
@@ -49,10 +53,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ loading: true });
     try {
       const { sortBy, sortOrder } = get();
-      const [series, actors, tags, favVideos, favSeries] = await Promise.all([
+      const [series, actors, tags, categories, favVideos, favSeries] = await Promise.all([
         getVideoSeriesList(sortBy, sortOrder),
         getActors(),
         getTags(),
+        getAllCategories(),
         getFavoriteVideos(),
         getFavoriteSeries(),
       ]);
@@ -61,7 +66,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       for (const s of series) {
         if (s.is_watched === 1) watchedIds.add(s.id);
       }
-      set({ series, actors, tags, favorites, watchedIds, loaded: true });
+      set({ series, actors, tags, categories, favorites, watchedIds, loaded: true });
     } catch (error) {
       console.error('[LibraryStore] loadAll failed:', error);
     } finally {
@@ -103,6 +108,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       set({ tags });
     } catch (error) {
       console.error('[LibraryStore] refreshTags failed:', error);
+    }
+  },
+
+  refreshCategories: async () => {
+    try {
+      const categories = await getAllCategories();
+      set({ categories });
+    } catch (error) {
+      console.error('[LibraryStore] refreshCategories failed:', error);
     }
   },
 

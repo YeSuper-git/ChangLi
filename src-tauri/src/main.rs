@@ -1709,12 +1709,32 @@ async fn open_player_window(
         .min_inner_size(960.0, 540.0)
         .resizable(true)
         .decorations(false)
+        .transparent(true)
         .visible(true)
         .build()
         .map_err(|e| e.to_string())?;
     window.center().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+async fn get_missing_series_videos(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    let videos = db::get_series_videos(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(videos
+        .into_iter()
+        .filter(|video| !std::path::Path::new(&video.file_path).is_file())
+        .collect())
 }
 
 #[tauri::command]
@@ -2186,6 +2206,7 @@ fn main() {
             update_actor_work_period,
             play_video,
             open_player_window,
+            get_missing_series_videos,
             update_play_history,
             get_play_history,
             get_recent_watch_items,

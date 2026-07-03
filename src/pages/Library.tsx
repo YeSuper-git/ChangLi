@@ -7,7 +7,6 @@ import {
   deleteVideoSeries,
   rescanSingleSeriesMetadata,
   switchSeriesTypeTo,
-  getAllCategories,
   formatSeriesWatchLabel,
   parseCategoryFeatures,
   scanCategory,
@@ -36,7 +35,7 @@ const clearLibraryFilterCaches = () => {
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { series: storeSeries, favorites, watchedIds, refreshSeries } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
@@ -54,29 +53,39 @@ const Library: React.FC = () => {
   const [mainCategory, setMainCategory] = useState<string>(() => {
     return searchParams.get('cat') || '';
   });
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(() => storeCategories);
   const [tags, setTags] = useState<{ id: number; name: string; created_at: string }[]>([]);
   const [actors, setActors] = useState<{ id: number; name: string; work_count: number; [k: string]: any }[]>([]);
   const defaultCategoryKey = useMemo(() => {
     return [...categories].sort((a, b) => a.sort_order - b.sort_order)[0]?.key || 'anime';
   }, [categories]);
 
-  // 加载大类配置。未准备好前先不渲染真实页面，避免跳转后标题/筛选/卡片分批冒出来。
+  // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
   useEffect(() => {
-    let cancelled = false;
     window.scrollTo(0, 0);
-    getAllCategories()
-      .then((data) => {
-        if (cancelled) return;
-        setCategories(data);
-        if (!searchParams.get('cat')) {
-          const sorted = [...data].sort((a, b) => a.sort_order - b.sort_order);
-          if (sorted.length > 0) setMainCategory(sorted[0].key);
+    if (storeCategories.length > 0) {
+      setCategories(storeCategories);
+      if (!searchParams.get('cat') && !mainCategory) {
+        const sorted = [...storeCategories].sort((a, b) => a.sort_order - b.sort_order);
+        if (sorted.length > 0) setMainCategory(sorted[0].key);
+      }
+      return;
+    }
+    let cancelled = false;
+    refreshCategories()
+      .then(() => {
+        if (!cancelled) {
+          const next = useLibraryStore.getState().categories;
+          setCategories(next);
+          if (!searchParams.get('cat') && !mainCategory) {
+            const sorted = [...next].sort((a, b) => a.sort_order - b.sort_order);
+            if (sorted.length > 0) setMainCategory(sorted[0].key);
+          }
         }
       })
-      .catch((err) => console.error('[Library] 加载大类配置失败:', err))
+      .catch((err) => console.error('[Library] 加载大类配置失败:', err));
     return () => { cancelled = true; };
-  }, []);
+  }, [storeCategories, refreshCategories, searchParams, mainCategory]);
 
   // 按大类加载标签和演员。缓存分类筛选数据，返回视频页时首帧直接复用，避免筛选栏卡顿。
   const loadCategoryFilters = useCallback(async () => {
