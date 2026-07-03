@@ -25,8 +25,8 @@ use tao::platform::windows::WindowExtWindows;
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
-const W: i32 = 1000;
-const H: i32 = 660;
+const W: i32 = 980;
+const H: i32 = 640;
 const SETUP_BYTES: &[u8] = include_bytes!(env!("CHANGLI_NSIS_SETUP"));
 const ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -421,9 +421,7 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
 
     let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
     unsafe {
-        // 不再用 GDI region / DWM 圆角裁窗口：那会带来锯齿或白线。
-        // 这里只把宿主 HWND 变成真正透明的 layered + full-client DWM frame，
-        // 让 WebView2 的透明像素落到桌面，而不是回退成白色矩形边框。
+        // 第一层：让宿主 HWND 支持 per-pixel alpha，避免 Tao 父窗口回退成白底。
         let margins = MARGINS {
             cxLeftWidth: -1,
             cxRightWidth: -1,
@@ -434,6 +432,16 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
         let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
         let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+
+        // 第二层兜底：真实 Windows artifact 已证明 transparent parent/WebView2 仍可能露出
+        // 白色矩形底。把外层 HWND 裁成与 HTML shell 同尺寸的圆角区域，避免任何
+        // 父窗口/截图背景在四角或 10px 透明缓冲区里变成白色矩形。
+        // 这里不再保留外扩透明 buffer；WebView2 与 shell 同尺寸，region 只负责裁掉外框。
+        use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, 68, 68);
+        if !region.is_invalid() {
+            let _ = SetWindowRgn(hwnd, region, true);
+        }
     }
 }
 
@@ -473,8 +481,8 @@ fn main() -> wry::Result<()> {
     let mut web_context = WebContext::new(Some(webview_data_dir()));
     let webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_bounds(Rect {
-            position: WebLogicalPosition::new(10, 10).into(),
-            size: WebLogicalSize::new(980, 640).into(),
+            position: WebLogicalPosition::new(0, 0).into(),
+            size: WebLogicalSize::new(W, H).into(),
         })
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
