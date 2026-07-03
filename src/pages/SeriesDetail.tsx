@@ -7,6 +7,7 @@ import favoriteIcon from '../assets/icons/favorite.svg';
 import notFavoriteIcon from '../assets/icons/not-favorite.svg';
 import watchedIcon from '../assets/icons/watched.svg';
 import translateIcon from '../assets/icons/translate.svg';
+import FloatingActions from '../components/FloatingActions';
 
 import {
   addActor,
@@ -544,6 +545,7 @@ const SeriesDetail: React.FC = () => {
   };
 
   return (
+    <>
     <div className="changli-page">
       {refreshing && (
         <div className="fixed right-6 top-20 z-40 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-xs font-medium text-gray-500 shadow-sm">同步中</div>
@@ -1064,6 +1066,8 @@ const SeriesDetail: React.FC = () => {
         </div>
       )}
     </div>
+    <FloatingActions onRefresh={async () => { await loadSeries(); await refreshSeries(); }} refreshLabel="刷新" />
+    </>
   );
 };
 

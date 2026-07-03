@@ -13,14 +13,15 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "fullscreen": false,
-        "resizable": true,
-        "decorations": false,
-        "title": "长离",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 600
+          "fullscreen": false,
+          "resizable": true,
+          "decorations": false,
+          "center": true,
+          "title": "长离",
+          "width": 1280,
+          "height": 800,
+          "minWidth": 800,
+          "minHeight": 600
       }
     ],
     "security": {

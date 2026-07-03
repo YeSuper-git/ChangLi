@@ -5,6 +5,7 @@ import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
+import { videoPosterDataUrl } from '../utils/media';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-libmpv-api';
 import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
@@ -32,7 +33,9 @@ const Player: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(80);
+  const [volume, setVolume] = useState(() => {
+    try { return parseInt(localStorage.getItem('changli-player-volume') || '80', 10) || 80; } catch { return 80; }
+  });
   const [speed, setSpeed] = useState(1);
   
   // UI 状态
@@ -153,6 +156,8 @@ const Player: React.FC = () => {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
         }
         if (previousPosition > 5) {
+          // 等待 mpv 加载文件后再 seek，避免 seek 被忽略
+          await new Promise((resolve) => setTimeout(resolve, 800));
           await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
@@ -177,6 +182,11 @@ const Player: React.FC = () => {
       }
     };
   }, [id]);
+
+  // 保存音量到本地
+  useEffect(() => {
+    try { localStorage.setItem('changli-player-volume', String(Math.round(volume))); } catch { /* ignore */ }
+  }, [volume]);
 
   // 播放/暂停
   const togglePlay = useCallback(async () => {
@@ -568,7 +578,6 @@ const Player: React.FC = () => {
     return a.file_name.localeCompare(b.file_name);
   });
   const activeIndex = sortedEpisodes.findIndex((episode) => episode.id === currentVideo?.id);
-  const visibleEpisodes = episodeListExpanded ? sortedEpisodes : [];
   const activeEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex] : currentVideo;
   const displayTitle = series?.title || currentVideo?.series_title || currentVideo?.file_name || 'ChangLi Player';
   const episodeWord = '话';
@@ -656,37 +665,71 @@ const Player: React.FC = () => {
           {!isPlaying && <div className="changli-player-center-play"><span className="play-icon" /></div>}
         </div>
 
-        {episodeListExpanded && (
-          <aside className="changli-player-side">
-            <div className="changli-player-side-head">
-              <div className="changli-player-side-title-row">
-                <strong>选集</strong>
-                <button type="button" onClick={() => setEpisodeListExpanded(false)}>收起</button>
-              </div>
-              <span>{seasonSummary}</span>
-            </div>
-            <div className="changli-player-episodes">
-              {visibleEpisodes.map((episode) => {
-              const active = episode.id === currentVideo?.id;
-              const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
-              return (
-                <button
-                  type="button"
-                  key={episode.id}
-                  onClick={() => playEpisode(episode)}
-                  className={`changli-player-episode ${active ? 'active' : ''}`}
-                >
-                  <div className="changli-player-thumb" />
-                  <div>
-                    <p>{label}</p>
-                    <small>{active ? `播放中 · ${currentTimeText}` : getEpisodeStatus(episode)}</small>
-                  </div>
-                </button>
-              );
-              })}
-            </div>
-          </aside>
+        {/* 选集边缘触发箭头 */}
+        {!episodeListExpanded && !isFullscreen && !isPiP && (
+          <button
+            type="button"
+            className="changli-player-edge-trigger"
+            onClick={() => setEpisodeListExpanded(true)}
+            aria-label="展开选集"
+          >
+            ‹
+          </button>
         )}
+
+        <aside className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}>
+          <div className="changli-player-side-head">
+            <div className="changli-player-side-title-row">
+              <strong>选集</strong>
+              <button type="button" onClick={() => setEpisodeListExpanded(false)}>×</button>
+            </div>
+            <span>{seasonSummary}</span>
+          </div>
+          <div className="changli-player-episodes">
+            {(() => {
+              // 按季分组
+              const seasons = new Map<number, Video[]>();
+              for (const ep of sortedEpisodes) {
+                const s = ep.season ?? 0;
+                if (!seasons.has(s)) seasons.set(s, []);
+                seasons.get(s)!.push(ep);
+              }
+              const hasMultipleSeasons = seasons.size > 1;
+              const entries = hasMultipleSeasons ? [...seasons.entries()].sort(([a], [b]) => a - b) : [[0, sortedEpisodes] as const];
+
+              return entries.map(([seasonNum, eps]) => (
+                <React.Fragment key={seasonNum}>
+                  {hasMultipleSeasons && (
+                    <div className="changli-player-season-header">
+                      {seasonNum > 0 && seasonNum !== 999 ? `第${seasonNum}季` : '未分季'}
+                    </div>
+                  )}
+                  {eps.map((episode) => {
+                    const active = episode.id === currentVideo?.id;
+                    const label = episode.episode_number ? `第${episode.episode_number}${episodeWord}` : episode.file_name;
+                    const poster = videoPosterDataUrl(episode);
+                    return (
+                      <button
+                        type="button"
+                        key={episode.id}
+                        onClick={() => playEpisode(episode)}
+                        className={`changli-player-episode ${active ? 'active' : ''}`}
+                      >
+                        <div className="changli-player-thumb">
+                          {poster ? <img src={poster} alt="" /> : <span />}
+                        </div>
+                        <div>
+                          <p>{label}</p>
+                          <small>{getEpisodeStatus(episode)}</small>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </React.Fragment>
+              ));
+            })()}
+          </div>
+        </aside>
       </main>
 
       <footer className={`changli-player-controls ${showControls ? 'show' : 'hide'}`}>
