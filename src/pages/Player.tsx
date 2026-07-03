@@ -119,14 +119,17 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu-next',
-            'hwdec': 'auto-safe',
+            'vo': 'gpu',
+            'hwdec': 'd3d11va',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
-            'gpu-api': 'auto',
+            'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
+            // 避免被 NVIDIA 驱动识别为游戏
+            'd3d11-sync-interval': '0',
+            'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
@@ -209,6 +212,27 @@ const Player: React.FC = () => {
       }
     };
   }, []);
+
+  // mpv 健康检查：检测播放中 mpv 是否崩溃
+  useEffect(() => {
+    if (!mpvInitialized.current) return;
+    let failCount = 0;
+    const timer = window.setInterval(async () => {
+      try {
+        await command('get_property', ['time-pos']);
+        failCount = 0;
+      } catch {
+        failCount++;
+        if (failCount >= 3) {
+          console.error('[Player] mpv 连续无响应，可能已崩溃');
+          setError('播放器异常退出，请重新打开');
+          mpvInitialized.current = false;
+          window.clearInterval(timer);
+        }
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [currentVideo]);
 
   // 保存音量到本地
   useEffect(() => {
