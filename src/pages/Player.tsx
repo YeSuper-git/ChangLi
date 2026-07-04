@@ -127,7 +127,7 @@ const Player: React.FC = () => {
         await init({
           initialOptions: {
             'vo': 'gpu',
-            'hwdec': 'd3d11va-copy',
+            'hwdec': 'd3d11va',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
@@ -138,9 +138,6 @@ const Player: React.FC = () => {
             // 避免被 NVIDIA 驱动识别为游戏
             'd3d11-sync-interval': '0',
             'video-sync': 'audio',
-            'dither-depth': 'no',
-            'vd-lavc-dr': 'no',
-            'gpu-dumb-mode': 'yes',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
