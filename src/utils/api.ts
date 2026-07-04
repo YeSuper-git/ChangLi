@@ -413,8 +413,8 @@ export async function deleteVideosByCategory(categoryKey: string): Promise<{ vid
   return { videoCount, seriesCount };
 }
 
-export async function rescanCategoryMetadata(categoryKey: string): Promise<[number, number]> {
-  return invoke<[number, number]>('rescan_category_metadata', { categoryKey });
+export async function rescanCategoryMetadata(categoryKey: string): Promise<[number, number, number, number]> {
+  return invoke<[number, number, number, number]>('rescan_category_metadata', { categoryKey });
 }
 
 export async function rescanAllSeriesMetadata(): Promise<[number, number]> {

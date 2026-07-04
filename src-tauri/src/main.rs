@@ -2506,7 +2506,7 @@ async fn delete_videos_by_category(state: State<'_, AppState>, category_key: Str
 }
 
 #[tauri::command]
-async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64), String> {
+async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64, i64, i64), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()

@@ -174,7 +174,7 @@ const Settings: React.FC = () => {
     setRescanningCategory(key);
     try {
       const result = await rescanCategoryMetadata(key);
-      notify({ message: `扫描完成，更新了 ${result[0]} 部，跳过 ${result[1]} 部`, type: 'success' });
+      notify({ message: `扫描完成，更新了${result[0]}部，跳过${result[1]}部，发现${result[2]}个视频集资源缺失，${result[3]}个分集资源缺失`, type: 'success' });
     } catch (error) {
       console.error('重新扫描分类元数据失败:', error);
       notify({ message: '扫描失败: ' + String(error), type: 'info' });
