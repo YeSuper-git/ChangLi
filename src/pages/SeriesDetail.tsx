@@ -36,6 +36,7 @@ import {
   parseCategoryFeatures,
   checkSeriesUpdates,
   addVideoToSeries,
+  getTagColor,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
@@ -802,7 +803,7 @@ const SeriesDetail: React.FC = () => {
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
                       {seriesTags.length > 0 ? seriesTags.map((tag) => (
-                        <span key={tag.id} className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">{tag.name}</span>
+                        <span key={tag.id} className={`inline-block mr-2 mb-2 px-3 py-1 ${getTagColor(tag.id).bg} ${getTagColor(tag.id).text} rounded-full text-sm`}>{tag.name}</span>
                       )) : <span className="text-sm text-gray-400">暂无</span>}
                     </div>
                   )}

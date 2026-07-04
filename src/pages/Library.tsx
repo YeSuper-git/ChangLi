@@ -15,6 +15,8 @@ import {
   checkCategoryUpdates,
   addVideoToSeries,
   deleteVideo,
+  getTagColor,
+  toggleWatched,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -38,7 +40,7 @@ const clearLibraryFilterCaches = () => {
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty, toggleFavorite } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
@@ -642,7 +644,7 @@ const Library: React.FC = () => {
                   <button
                     key={tag.id}
                     onClick={() => handleTagClick(tag.id)}
-                    className={`changli-filter-pill ${activeTagId === tag.id ? 'active' : ''}`}
+                    className={`changli-filter-pill ${activeTagId === tag.id ? 'active' : `${getTagColor(tag.id).bg} ${getTagColor(tag.id).text}`}`}
                   >
                     {tag.name}
                   </button>
@@ -847,7 +849,11 @@ const Library: React.FC = () => {
 
       </div>
 
-      {contextMenu && (
+      {contextMenu && (() => {
+        const series = storeSeries.find(s => s.id === contextMenu.id);
+        const isFav = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+        const isWatched = series ? watchedIds.has(series.id) : false;
+        return (
         <div
           className="changli-context-menu fixed z-50 py-2 w-fit"
           style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
@@ -858,6 +864,26 @@ const Library: React.FC = () => {
             onClick={handleEditContextItem}
           >
             编辑
+          </button>
+          <button
+            className="changli-menu-item"
+            onClick={async () => {
+              await toggleFavorite(contextMenu.id, 'series');
+              await refreshSeries();
+              setContextMenu(null);
+            }}
+          >
+            {isFav ? '取消追番' : '追番'}
+          </button>
+          <button
+            className="changli-menu-item"
+            onClick={async () => {
+              await toggleWatched(contextMenu.id);
+              await refreshSeries();
+              setContextMenu(null);
+            }}
+          >
+            {isWatched ? '取消已看完' : '已看完'}
           </button>
           <button
             className="changli-menu-item"
@@ -884,7 +910,8 @@ const Library: React.FC = () => {
             {pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}
           </button>
         </div>
-      )}
+        )
+      })()}
     </div>
 
     <ConfirmDialog

@@ -1129,3 +1129,23 @@ export async function setGameOverlayDisabled(disabled: boolean): Promise<string>
 export async function getGameOverlayDisabled(): Promise<boolean> {
   return invoke<boolean>('get_game_overlay_disabled');
 }
+
+// 标签颜色：基于标签名哈希，同一标签在不同页面颜色一致
+const TAG_COLORS = [
+  { bg: 'bg-rose-50', text: 'text-rose-700' },
+  { bg: 'bg-blue-50', text: 'text-blue-700' },
+  { bg: 'bg-amber-50', text: 'text-amber-700' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  { bg: 'bg-violet-50', text: 'text-violet-700' },
+  { bg: 'bg-cyan-50', text: 'text-cyan-700' },
+  { bg: 'bg-pink-50', text: 'text-pink-700' },
+  { bg: 'bg-teal-50', text: 'text-teal-700' },
+  { bg: 'bg-orange-50', text: 'text-orange-700' },
+  { bg: 'bg-indigo-50', text: 'text-indigo-700' },
+  { bg: 'bg-lime-50', text: 'text-lime-700' },
+  { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700' },
+];
+
+export function getTagColor(tagId: number): { bg: string; text: string } {
+  return TAG_COLORS[Math.abs(tagId) % TAG_COLORS.length];
+}
