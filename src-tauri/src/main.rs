@@ -1753,8 +1753,8 @@ async fn open_player_window(
     } else {
         window.center().map_err(|e| e.to_string())?;
     }
-    window.show().map_err(|e| e.to_string())?;
-    window.set_focus().map_err(|e| e.to_string())?;
+    // 窗口保持隐藏，由前端在 mpv 报告视频尺寸并调整窗口大小后显示
+    // window.show() 移至前端 Player.tsx dwidth/dheight handler
     Ok(())
 }
 
