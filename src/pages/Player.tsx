@@ -63,6 +63,7 @@ const Player: React.FC = () => {
   const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
   const isMountedRef = useRef(true);
+  const windowShownRef = useRef(false);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
@@ -135,7 +136,6 @@ const Player: React.FC = () => {
             'osc': 'no',
             'osd-level': 0,
             // 防 overlay inject
-            'd3d11-sync-interval': '0',
             'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
@@ -171,11 +171,10 @@ const Player: React.FC = () => {
                 break;
               case 'dwidth':
               case 'dheight':
-                // 视频尺寸变化时，按比例调整播放器窗口大小
+                // 视频尺寸变化时，按比例调整播放器窗口大小，首次调整后显示窗口
                 if (name === 'dwidth' && data && data > 0 && isMountedRef.current) {
                   const win = getCurrentWindow();
                   const videoW = data as number;
-                  // dheight 可能还没到，先用当前窗口比例估算
                   win.outerSize().then((size) => {
                     const scale = window.devicePixelRatio || 1;
                     const currentW = size.width / scale;
@@ -184,7 +183,15 @@ const Player: React.FC = () => {
                     if (targetH > 200 && targetH < 2000) {
                       const newW = Math.round(Math.min(videoW, 1600));
                       const newH = Math.round(newW * (targetH / videoW));
-                      win.setSize(new LogicalSize(newW, Math.max(360, newH))).catch(() => {});
+                      win.setSize(new LogicalSize(newW, Math.max(360, newH))).then(() => {
+                        if (!windowShownRef.current) {
+                          windowShownRef.current = true;
+                          win.show().catch(() => {});
+                        }
+                      }).catch(() => {});
+                    } else if (!windowShownRef.current) {
+                      windowShownRef.current = true;
+                      win.show().catch(() => {});
                     }
                   }).catch(() => {});
                 }

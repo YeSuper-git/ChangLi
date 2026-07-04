@@ -183,7 +183,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  // ==================== 大类管理 ====================
+  // ==================== 分类配置 ====================
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -439,7 +439,7 @@ const Settings: React.FC = () => {
           <div>
             <h2 className="text-xl font-semibold">数据存储</h2>
             <p className="text-sm text-gray-500 mt-1">
-              默认使用系统数据目录；如果程序同级存在 data 目录或 portable.flag，则自动切换为便携模式。
+              管理视频数据和缓存的存储位置
             </p>
           </div>
           <button
@@ -473,62 +473,47 @@ const Settings: React.FC = () => {
       </section>
 
 
-
-      {/* 标签管理 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
+      {/* 游戏覆盖 */}
+      <section className="changli-panel p-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold">标签管理</h2>
-            <p className="text-sm text-gray-500 mt-1">标签入口已移动到设置中，可在这里统一新增和删除。</p>
+            <h2 className="text-xl font-semibold">游戏覆盖</h2>
+            <p className="text-sm text-gray-500 mt-1">防止录屏软件干扰视频播放</p>
           </div>
         </div>
-
-        <div className="changli-panel p-6 mb-4">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={newTagName}
-              onChange={(event) => setNewTagName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') handleAddTag();
-              }}
-              placeholder="输入新标签名称"
-              className="search-input flex-1"
-            />
-            <button
-              onClick={handleAddTag}
-              disabled={!newTagName.trim()}
-              className="action-btn action-btn-primary disabled:opacity-50"
-            >
-              添加标签
-            </button>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-gray-700">禁用游戏覆盖</span>
+            <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
           </div>
+          <Switch
+            checked={gameOverlayDisabled}
+            disabled={gameOverlayLoading}
+            onChange={async (checked) => {
+              setGameOverlayLoading(true);
+              try {
+                await setGameOverlayDisabled(checked);
+                setGameOverlayState(checked);
+                notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
+              } catch (error) {
+                notify({ message: '操作失败: ' + String(error), type: 'error' });
+              } finally {
+                setGameOverlayLoading(false);
+              }
+            }}
+            ariaLabel="禁用游戏覆盖"
+          />
         </div>
-
-        {tags.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
-            {tags.map((tag) => (
-              <div key={tag.id} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
-                <span className="text-sm text-gray-800">{tag.name}</span>
-                <button
-                  onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
-                  className="text-gray-400 hover:text-red-500"
-                  aria-label={`删除标签 ${tag.name}`}
-                >
-                  {pendingKey === `settings-tag-${tag.id}` ? '确认' : '✕'}
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="changli-empty-state text-gray-500">暂无标签</div>
-        )}
       </section>
+
 
       {/* 网站管理 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">网站管理</h2>
+          <div>
+            <h2 className="text-xl font-semibold">网站管理</h2>
+            <p className="text-sm text-gray-500 mt-1">配置视频来源网站</p>
+          </div>
           <button
             onClick={() => setShowAddModal(true)}
             className="action-btn action-btn-primary"
@@ -565,12 +550,13 @@ const Settings: React.FC = () => {
         )}
       </section>
 
-      {/* 大类管理 */}
+
+      {/* 分类配置 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold">大类管理</h2>
-            <p className="text-sm text-gray-500 mt-1">配置不同大类的卡片布局和功能开关</p>
+            <h2 className="text-xl font-semibold">分类配置</h2>
+            <p className="text-sm text-gray-500 mt-1">自定义视频分类的显示方式和功能</p>
           </div>
           <button
             onClick={openAddCategory}
@@ -658,12 +644,65 @@ const Settings: React.FC = () => {
         )}
       </section>
 
-      {/* 演员字段管理 */}
+
+      {/* 标签管理 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold">演员管理</h2>
-            <p className="text-sm text-gray-500 mt-1">配置演员详情页显示的字段</p>
+            <h2 className="text-xl font-semibold">标签管理</h2>
+            <p className="text-sm text-gray-500 mt-1">管理视频标签，方便筛选和分类</p>
+          </div>
+        </div>
+
+        <div className="changli-panel p-6 mb-4">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={newTagName}
+              onChange={(event) => setNewTagName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleAddTag();
+              }}
+              placeholder="输入新标签名称"
+              className="search-input flex-1"
+            />
+            <button
+              onClick={handleAddTag}
+              disabled={!newTagName.trim()}
+              className="action-btn action-btn-primary disabled:opacity-50"
+            >
+              添加标签
+            </button>
+          </div>
+        </div>
+
+        {tags.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {tags.map((tag) => (
+              <div key={tag.id} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+                <span className="text-sm text-gray-800">{tag.name}</span>
+                <button
+                  onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
+                  className="text-gray-400 hover:text-red-500"
+                  aria-label={`删除标签 ${tag.name}`}
+                >
+                  {pendingKey === `settings-tag-${tag.id}` ? '确认' : '✕'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="changli-empty-state text-gray-500">暂无标签</div>
+        )}
+      </section>
+
+
+      {/* 演员配置 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">演员配置</h2>
+            <p className="text-sm text-gray-500 mt-1">自定义演员详情页显示的信息</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -711,6 +750,8 @@ const Settings: React.FC = () => {
           );
         })()}
       </section>
+
+
 
       {/* 大类视频删除确认弹窗 */}
       {deleteCatConfirm && (
@@ -1089,7 +1130,7 @@ const Settings: React.FC = () => {
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel !w-[min(100%,480px)]">
             <h2 className="text-xl font-bold mb-4">扩展系统预设</h2>
-            <p className="text-sm text-gray-500 mb-4">启用后将在演员管理中显示对应字段</p>
+            <p className="text-sm text-gray-500 mb-4">启用后将在演员配置中显示对应字段</p>
             <div className="space-y-3">
               {presetTemplates.map((template) => {
                 const enabled = presetEnabledMap[template.key] || false;
@@ -1165,6 +1206,8 @@ const Settings: React.FC = () => {
         </div>
       )}
 
+
+
       {/* 检查更新 & 版本信息 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
@@ -1193,38 +1236,6 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
-      {/* 游戏覆盖 */}
-      <section className="changli-panel p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-semibold">游戏覆盖</h2>
-            <p className="text-sm text-gray-500 mt-1">禁用后可防止 NVIDIA App、游戏加加等软件把播放器识别为游戏</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-sm text-gray-700">禁用游戏覆盖</span>
-            <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
-          </div>
-          <Switch
-            checked={gameOverlayDisabled}
-            disabled={gameOverlayLoading}
-            onChange={async (checked) => {
-              setGameOverlayLoading(true);
-              try {
-                await setGameOverlayDisabled(checked);
-                setGameOverlayState(checked);
-                notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
-              } catch (error) {
-                notify({ message: '操作失败: ' + String(error), type: 'error' });
-              } finally {
-                setGameOverlayLoading(false);
-              }
-            }}
-            ariaLabel="禁用游戏覆盖"
-          />
-        </div>
-      </section>
 
       {/* 版本更新记录弹窗 */}
       {showChangelog && (
@@ -1288,6 +1299,8 @@ const Settings: React.FC = () => {
           setUpdateStatus(null);
         }}
       />
+
+
     </div>
   );
 };
