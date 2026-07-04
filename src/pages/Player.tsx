@@ -135,19 +135,8 @@ const Player: React.FC = () => {
             'osc': 'no',
             'osd-level': 0,
             // 防 overlay inject
-            'd3d11-flip': 'no',
-            'd3d11-exclusive-fs': 'no',
-            'd3d11va-zero-copy': 'no',
-            'border': 'yes',
-            // HDR 直通
-            'target-colorspace-hint': 'yes',
-            'target-colorspace-hint-mode': 'source',
-            'hdr-compute-peak': 'yes',
-            // SDR 色彩
-            'target-trc': 'gamma2.2',
-            // 替代旧 desaturate / gamut-clipping
-            'tone-mapping-mode': 'auto',
-            'gamut-mapping-mode': 'auto',
+            'd3d11-sync-interval': '0',
+            'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
