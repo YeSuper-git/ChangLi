@@ -135,8 +135,10 @@ const Player: React.FC = () => {
             'osc': 'no',
             'osd-level': 0,
             'no-config': 'yes',
-            // 避免被 NVIDIA 驱动识别为游戏
-            'd3d11-sync-interval': '0',
+            // 降低 NVIDIA/游戏加加误识别概率
+            'd3d11-flip': 'no',
+            'd3d11-exclusive-fs': 'no',
+            'd3d11va-zero-copy': 'no',
             'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,

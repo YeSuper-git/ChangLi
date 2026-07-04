@@ -2180,9 +2180,8 @@ fn main() {
                 window.set_focus()?;
                 window.set_always_on_top(false)?;
             }
-            // 播放器主路径已切到前端 /player/:id + tauri-plugin-libmpv。
-            // 旧的外部 mpv 播放窗口只保留给历史 play_video 命令兜底，不再注册全局快捷键，
-            // 避免快捷键误创建旧架构的 player WebView 窗口。
+            // 禁用 Windows Game DVR，防止 NVIDIA/游戏加加把播放器识别为游戏
+            player::disable_game_dvr();
             Ok(())
         })
         .on_window_event(|window, event| {

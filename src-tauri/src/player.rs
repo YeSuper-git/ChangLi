@@ -155,6 +155,38 @@ pub fn register_shortcuts(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// 禁用 Windows Game DVR，防止 NVIDIA/游戏加加把播放器识别为游戏
+#[cfg(target_os = "windows")]
+pub fn disable_game_dvr() {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+    // 禁用 Game DVR
+    if let Ok(key) = hkcu.create_subkey_with_flags(
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
+        KEY_SET_VALUE,
+    ) {
+        let _ = key.0.set_value("AppCaptureEnabled", &0u32);
+    }
+
+    // 禁用 GameDVR
+    if let Ok(key) = hkcu.create_subkey_with_flags("System\\GameConfigStore", KEY_SET_VALUE) {
+        let _ = key.0.set_value("GameDVR_Enabled", &0u32);
+    }
+
+    // 禁用自动游戏模式
+    if let Ok(key) =
+        hkcu.create_subkey_with_flags("SOFTWARE\\Microsoft\\GameBar", KEY_SET_VALUE)
+    {
+        let _ = key.0.set_value("AllowAutoGameMode", &0u32);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn disable_game_dvr() {}
+
 fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         apply_player_window_style(&window)?;
@@ -326,7 +358,11 @@ fn spawn_mpv_process(
 
     command
         .arg("--force-window=yes")
-        .arg("--hwdec=auto-safe")
+        .arg("--hwdec=d3d11va")
+        .arg("--d3d11-flip=no")
+        .arg("--d3d11-exclusive-fs=no")
+        .arg("--d3d11va-zero-copy=no")
+        .arg("--video-sync=audio")
         .arg("--osc=yes")
         .arg("--input-default-bindings=yes")
         .arg("--keep-open=no")
