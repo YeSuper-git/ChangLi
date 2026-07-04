@@ -35,7 +35,7 @@ const clearLibraryFilterCaches = () => {
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
@@ -63,8 +63,10 @@ const Library: React.FC = () => {
   // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
   useEffect(() => {
     window.scrollTo(0, 0);
-    // 每次进入视频页都刷新 series，获取最新的观看状态
-    refreshSeries().catch(() => {});
+    // 只在数据有变更时才刷新 series（播放/扫描/删除后标记 dirty）
+    if (seriesDirty) {
+      refreshSeries().catch(() => {});
+    }
     if (storeCategories.length > 0) {
       setCategories(storeCategories);
       if (!searchParams.get('cat') && !mainCategory) {

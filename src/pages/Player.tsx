@@ -4,6 +4,7 @@ import { getCurrentWindow, currentMonitor, Window } from '@tauri-apps/api/window
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
+import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-libmpv-api';
@@ -610,10 +611,13 @@ const Player: React.FC = () => {
 
   // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
 
+  const markSeriesDirty = useLibraryStore(s => s.markSeriesDirty);
+
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;
     try {
       await updatePlayHistory(currentVideo.id, currentTime, duration || currentVideo.duration);
+      markSeriesDirty();
     } catch (err) {
       console.error('[Player] 保存播放进度失败:', err);
     }

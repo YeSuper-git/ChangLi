@@ -637,10 +637,10 @@ const SeriesDetail: React.FC = () => {
                       placeholder="简介"
                     />
                   </>
-                ) : (
+                ) : features.status ? (
                   <div>
-                    <div className="text-sm font-medium text-gray-500 mb-2">追番状态</div>
-                    <div className="changli-status-switch" role="group" aria-label="追番状态">
+                    <div className="text-sm font-medium text-gray-500 mb-2">连载状态</div>
+                    <div className="changli-status-switch" role="group" aria-label="连载状态">
                       <button
                         type="button"
                         onClick={() => setEditData({ ...editData, status: 'ongoing' })}
@@ -653,7 +653,7 @@ const SeriesDetail: React.FC = () => {
                       >已完结</button>
                     </div>
                   </div>
-                )}
+                ) : null}
                 {features.tags && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
