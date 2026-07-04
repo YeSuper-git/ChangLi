@@ -367,7 +367,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 if sub_result.videos.is_empty() {
                     continue;
                 }
-                let sub_poster = sub_result.posters.values().next().cloned();
+                let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster
                     .as_deref()
                     .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
@@ -490,7 +490,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 if sub_result.videos.is_empty() {
                     continue;
                 }
-                let sub_poster = sub_result.posters.values().next().cloned();
+                let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster
                     .as_deref()
                     .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
@@ -626,7 +626,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut series_poster = result.posters.values().next().cloned();
+    let mut series_poster = crate::scanner::find_folder_poster(&std::path::Path::new(&path));
     // 空文件夹：尝试从文件夹内找图片作为海报
     if series_poster.is_none() {
         if let Ok(entries) = std::fs::read_dir(&path) {
@@ -811,7 +811,7 @@ async fn scan_videos_for_actor(
         if sub_result.videos.is_empty() {
             continue;
         }
-        let sub_poster = sub_result.posters.values().next().cloned();
+        let sub_poster = crate::scanner::find_folder_poster(&entry_path);
         let sub_poster_base64 = sub_poster
             .as_deref()
             .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
@@ -1997,6 +1997,34 @@ async fn rescan_single_series_metadata(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn check_series_updates(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<db::SeriesUpdateResult, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::check_series_updates(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn check_category_updates(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<db::CategoryUpdateResult, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::check_category_updates(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // 演员多海报命令
 #[tauri::command]
 async fn get_actor_photos(
@@ -2281,6 +2309,8 @@ fn main() {
             play_video,
             open_player_window,
             get_missing_series_videos,
+            check_series_updates,
+            check_category_updates,
             update_play_history,
             get_play_history,
             get_recent_watch_items,
@@ -2632,7 +2662,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
         let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
         let scan_result = scanner::scan_directory(&scan_path).await.map_err(|e| e.to_string())?;
         if !scan_result.videos.is_empty() {
-            let poster = scan_result.posters.values().next().cloned();
+            let poster = crate::scanner::find_folder_poster(&std::path::Path::new(&scan_path));
             let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
                 db::update_video_series_poster(&pool, existing.id, poster.as_deref(), poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
@@ -2701,7 +2731,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 if sub_result.videos.is_empty() {
                     continue;
                 }
-                let sub_poster = sub_result.posters.values().next().cloned();
+                let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
                     scanner::generate_thumbnail_base64(std::path::Path::new(p))
                 });

@@ -2432,7 +2432,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     };
     let poster = scan_result
         .as_ref()
-        .and_then(|result| result.posters.values().next().cloned())
+        .and_then(|result| crate::scanner::find_folder_poster(folder_path_std))
         .or_else(|| crate::scanner::find_folder_poster(folder_path_std));
     let poster_base64 = poster
         .as_deref()
@@ -2453,7 +2453,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
             let new_title = info.title.unwrap_or_else(|| folder_name.clone());
 
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
             )
             .bind(&code)
             .bind(has_chinese_sub)
@@ -3211,4 +3211,155 @@ pub async fn disable_preset_template(pool: &SqlitePool, key: &str) -> Result<()>
     .execute(pool)
     .await?;
     Ok(())
+}
+
+// ==================== 检查更新 ====================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeriesUpdateResult {
+    pub new_videos: Vec<Video>,
+    pub missing_videos: Vec<Video>,
+}
+
+/// 检测单个视频集的更新：新增分集 + 丢失分集（仅检测，不修改数据库）
+pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<SeriesUpdateResult> {
+    let row = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, folder_path FROM video_series WHERE id = ?",
+    )
+    .bind(series_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let (_id, title, folder_path) = match row {
+        Some(r) => r,
+        None => return Ok(SeriesUpdateResult { new_videos: vec![], missing_videos: vec![] }),
+    };
+
+    let source = folder_path.as_deref().unwrap_or(&title);
+    let folder_path_std = std::path::Path::new(source);
+
+    // 获取数据库中现有的视频
+    let existing_videos = get_series_videos(pool, series_id).await?;
+    let existing_paths: std::collections::HashSet<String> = existing_videos
+        .iter()
+        .map(|v| v.file_path.clone())
+        .collect();
+
+    // 检测丢失的视频（数据库中有记录但文件不存在）
+    let missing_videos: Vec<Video> = existing_videos
+        .into_iter()
+        .filter(|v| !std::path::Path::new(&v.file_path).is_file())
+        .collect();
+
+    // 扫描文件夹获取当前视频
+    let new_videos = if folder_path_std.is_dir() {
+        let scan_result = crate::scanner::scan_directory(source).await?;
+        scan_result
+            .videos
+            .into_iter()
+            .filter(|v| !existing_paths.contains(&v.file_path))
+            .collect()
+    } else {
+        vec![]
+    };
+
+    Ok(SeriesUpdateResult { new_videos, missing_videos })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeriesUpdateSummary {
+    pub series_id: i64,
+    pub series_title: String,
+    pub new_videos: Vec<Video>,
+    pub missing_videos: Vec<Video>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoryUpdateResult {
+    pub new_series: Vec<String>,               // 新发现的文件夹名（尚未入库）
+    pub missing_series: Vec<String>,           // 数据库中有但文件夹已删除的视频集标题
+    pub series_updates: Vec<SeriesUpdateSummary>, // 每个视频集的新增/丢失分集
+}
+
+/// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
+pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Result<CategoryUpdateResult> {
+    // 获取分类下的所有视频集
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        category_key, category_key
+    ))
+    .fetch_all(pool)
+    .await?;
+
+    let mut missing_series = Vec::new();
+    let mut series_updates = Vec::new();
+
+    // 建立 folder_path 到 series 的映射，用于后续匹配新文件夹
+    let mut existing_folder_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for (id, title, folder_path) in &series_list {
+        let source = folder_path.as_deref().unwrap_or(title);
+        existing_folder_paths.insert(source.to_string());
+
+        let folder_path_std = std::path::Path::new(source);
+
+        // 检测视频集文件夹是否缺失
+        let series_missing = if folder_path.is_some() {
+            !folder_path_std.is_dir()
+        } else {
+            !std::path::Path::new(title).is_dir()
+        };
+
+        if series_missing {
+            missing_series.push(title.clone());
+            continue;
+        }
+
+        // 检测该视频集下新增和丢失的分集
+        let update_result = check_series_updates(pool, *id).await?;
+        if !update_result.new_videos.is_empty() || !update_result.missing_videos.is_empty() {
+            series_updates.push(SeriesUpdateSummary {
+                series_id: *id,
+                series_title: title.clone(),
+                new_videos: update_result.new_videos,
+                missing_videos: update_result.missing_videos,
+            });
+        }
+    }
+
+    // 检测 scan_path 下的新文件夹（尚未入库的视频集）
+    let category = get_category_by_key(pool, category_key).await?;
+    let new_series = if let Some(ref scan_path) = category.and_then(|c| c.scan_path) {
+        let path = std::path::Path::new(scan_path);
+        if path.is_dir() {
+            let mut new_folders = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    let entry_path = entry.path();
+                    if !entry_path.is_dir() {
+                        continue;
+                    }
+                    let folder_path_str = entry_path.to_string_lossy().to_string();
+                    if !existing_folder_paths.contains(&folder_path_str) {
+                        let folder_name = entry_path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        new_folders.push(folder_name);
+                    }
+                }
+            }
+            new_folders
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
+    Ok(CategoryUpdateResult {
+        new_series,
+        missing_series,
+        series_updates,
+    })
 }

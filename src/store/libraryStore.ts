@@ -21,10 +21,12 @@ interface LibraryState {
   watchedIds: Set<number>;
   loading: boolean;
   loaded: boolean;
+  seriesDirty: boolean;
   sortBy: 'created_at' | 'title';
   sortOrder: 'asc' | 'desc';
   loadAll: () => Promise<void>;
   refreshSeries: () => Promise<void>;
+  markSeriesDirty: () => void;
   refreshActors: () => Promise<void>;
   refreshTags: () => Promise<void>;
   refreshCategories: () => Promise<void>;
@@ -45,6 +47,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   watchedIds: new Set<number>(),
   loading: false,
   loaded: false,
+  seriesDirty: false,
   sortBy: 'created_at',
   sortOrder: 'desc',
 
@@ -87,11 +90,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       for (const s of series) {
         if (s.is_watched === 1) watchedIds.add(s.id);
       }
-      set({ series, favorites, watchedIds });
+      set({ series, favorites, watchedIds, seriesDirty: false });
     } catch (error) {
       console.error('[LibraryStore] refreshSeries failed:', error);
     }
   },
+
+  markSeriesDirty: () => set({ seriesDirty: true }),
 
   refreshActors: async () => {
     try {

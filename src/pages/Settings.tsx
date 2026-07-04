@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -147,8 +147,6 @@ const Settings: React.FC = () => {
   };
 
   const [deleteCatConfirm, setDeleteCatConfirm] = useState<string | null>(null);
-  const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
-  const [rescanConfirm, setRescanConfirm] = useState<string | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
   const refreshCategories = useLibraryStore((s) => s.refreshCategories);
 
@@ -167,19 +165,6 @@ const Settings: React.FC = () => {
       console.error('删除分类视频失败:', error);
       notify({ message: '删除失败: ' + String(error), type: 'error' });
     } finally {
-    }
-  };
-
-  const handleRescanCategory = async (key: string) => {
-    setRescanningCategory(key);
-    try {
-      const result = await rescanCategoryMetadata(key);
-      notify({ message: `扫描完成，更新了${result[0]}部，跳过${result[1]}部，发现${result[2]}个视频集资源缺失，${result[3]}个分集资源缺失`, type: 'success' });
-    } catch (error) {
-      console.error('重新扫描分类元数据失败:', error);
-      notify({ message: '扫描失败: ' + String(error), type: 'info' });
-    } finally {
-      setRescanningCategory(null);
     }
   };
 
@@ -614,17 +599,10 @@ const Settings: React.FC = () => {
                         编辑
                       </button>
                       <button
-                        onClick={() => setRescanConfirm(cat.key)}
-                        disabled={rescanningCategory === cat.key}
-                        className="action-btn text-sm disabled:opacity-50"
-                      >
-                        {rescanningCategory === cat.key ? '扫描中...' : '扫描元数据'}
-                      </button>
-                      <button
                         onClick={() => setDeleteCatConfirm(cat.key)}
                         className="action-btn action-btn-danger text-sm"
                       >
-                        删除视频
+                        删除所有视频
                       </button>
                       <button
                         onClick={() => setCategoryDeleteConfirm(cat.key)}
@@ -681,7 +659,7 @@ const Settings: React.FC = () => {
         {tags.length > 0 ? (
           <div className="flex flex-wrap gap-3">
             {tags.map((tag) => (
-              <div key={tag.id} className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+              <div key={tag.id} className={`inline-flex items-center gap-2 px-4 py-2 ${getTagColor(tag.id).bg} rounded-full`}>
                 <span className="text-sm text-gray-800">{tag.name}</span>
                 <button
                   onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
@@ -733,8 +711,14 @@ const Settings: React.FC = () => {
               {sorted.map((field) => (
                 <div key={field.field_key} className="changli-panel p-4 cursor-pointer flex flex-col items-center justify-center transition-transform duration-200 hover:-translate-y-0.5" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
                   <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
-                  {presetKeySet.has(field.field_key) && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">预设</span>
+                  {presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">系统预设</span>
+                  )}
+                  {extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-700 mt-1">扩展预设</span>
+                  )}
+                  {!presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-green-50 text-[10px] text-green-700 mt-1">自定义</span>
                   )}
                   <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : field.field_type === 'compound' ? '复合' : '选择'}</p>
                   <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
@@ -1078,30 +1062,6 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 重新扫描元数据确认弹窗 */}
-      {rescanConfirm && (
-        <div className="changli-modal-backdrop">
-          <div className="changli-modal-panel">
-            <p className="text-gray-900 text-base mb-6">
-              确定重新扫描该分类的所有视频元数据？
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { handleRescanCategory(rescanConfirm); setRescanConfirm(null); }}
-                className="action-btn action-btn-primary flex-1 text-sm"
-              >
-                确定
-              </button>
-              <button
-                onClick={() => setRescanConfirm(null)}
-                className="action-btn flex-1 text-sm"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 演员字段删除确认弹窗 */}
       {deleteFieldConfirm && (
