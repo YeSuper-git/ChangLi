@@ -724,8 +724,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 {
                     eprintln!(
                         "[ChangLi] 父目录 '{}' 匹配演员 '{}'，自动关联",
-                        parent_name, actor.name
-                                None,
+                        parent_name, actor.name,
                     );
                     let _ = db::add_series_actor(&pool, series.id, actor.id, None, None).await;
                     let _ = db::update_video_series_display_type(&pool, series.id, "adult").await;

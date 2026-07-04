@@ -130,6 +130,7 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     }
 }
 
+#[allow(unused_variables)]
 pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
     let mut flag = ALWAYS_ON_TOP
         .lock()
