@@ -136,7 +136,6 @@ const Player: React.FC = () => {
             'osc': 'no',
             'osd-level': 0,
             // 防 overlay inject
-            'd3d11-sync-interval': '0',
             'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
