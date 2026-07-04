@@ -2432,7 +2432,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     };
     let poster = scan_result
         .as_ref()
-        .and_then(|result| result.posters.values().next().cloned())
+        .and_then(|result| crate::scanner::find_folder_poster(folder_path_std))
         .or_else(|| crate::scanner::find_folder_poster(folder_path_std));
     let poster_base64 = poster
         .as_deref()
