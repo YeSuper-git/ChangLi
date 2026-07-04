@@ -80,6 +80,25 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     let new_session =
         spawn_mpv_with_options(app, None, geometry.as_deref(), &ipc_path, video_path)?;
     *session = Some(new_session);
+    // 延迟一小段时间等 mpv 窗口创建，然后尝试激活到前台
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        // 查找 mpv 窗口并激活
+        #[cfg(target_os = "windows")]
+        {
+            use windows::Win32::UI::WindowsAndMessaging::*;
+            use windows::Win32::Foundation::*;
+            unsafe {
+                // 查找标题含 "ChangLi" 的窗口（mpv --title 设置的）
+                let mut found_hwnd = HWND::default();
+                EnumWindows(Some(enum_windows_callback), LPARAM(&mut found_hwnd as *mut _ as isize));
+                if !found_hwnd.0.is_null() {
+                    let _ = SetForegroundWindow(found_hwnd);
+                    let _ = ShowWindow(found_hwnd, SW_SHOW);
+                }
+            }
+        }
+    });
     Ok(())
 }
 
