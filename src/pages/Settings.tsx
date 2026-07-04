@@ -711,8 +711,14 @@ const Settings: React.FC = () => {
               {sorted.map((field) => (
                 <div key={field.field_key} className="changli-panel p-4 cursor-pointer flex flex-col items-center justify-center transition-transform duration-200 hover:-translate-y-0.5" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
                   <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
-                  {presetKeySet.has(field.field_key) && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">预设</span>
+                  {presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">系统预设</span>
+                  )}
+                  {extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-700 mt-1">扩展预设</span>
+                  )}
+                  {!presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-green-50 text-[10px] text-green-700 mt-1">自定义</span>
                   )}
                   <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : field.field_type === 'compound' ? '复合' : '选择'}</p>
                   <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
