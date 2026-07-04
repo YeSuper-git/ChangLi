@@ -1,3 +1,10 @@
+## v1.7.77 (2026-07-05)
+
+### 修复
+- 修复 v1.7.76 Windows CI 新暴露的 Rust 编译错误：`player.rs` 不再引用未直接依赖的 `windows_core::BOOL`，改用 `windows::Win32::Foundation::BOOL`
+- 修复 `EnumWindows` 调用参数类型，按 windows 0.61 API 传入 `Some(enum_windows_callback)`
+- 继续补发 v1.7.68-v1.7.75 未成功发布的全部代码
+
 ## v1.7.76 (2026-07-05)
 
 ### 修复
