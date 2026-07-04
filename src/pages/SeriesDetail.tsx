@@ -628,7 +628,7 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
-                {features.actors && series?.has_actor && (
+                {features.actors && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
                     <div className="flex flex-wrap gap-2 mb-3">
