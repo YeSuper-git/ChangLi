@@ -127,7 +127,7 @@ const Player: React.FC = () => {
         await init({
           initialOptions: {
             'vo': 'gpu-next',
-            'hwdec': 'd3d11va-copy',
+            'hwdec': 'd3d11va',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
@@ -138,6 +138,7 @@ const Player: React.FC = () => {
             // 防 overlay inject
             'd3d11-flip': 'no',
             'd3d11-exclusive-fs': 'no',
+            'd3d11va-zero-copy': 'no',
             'border': 'yes',
             // HDR 直通
             'target-colorspace-hint': 'yes',
