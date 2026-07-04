@@ -3451,7 +3451,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         // 3) 去掉集数后缀再匹配
                         let base = crate::scanner::strip_episode_suffix(&name);
                         if !existing_base_names.contains(&base) {
-                            result.push(name);
+                            // 4) 只有包含视频文件的文件夹才报为新增
+                            if has_video_files(&p) {
+                                result.push(name);
+                            }
                         }
                     }
                 }

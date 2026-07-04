@@ -111,6 +111,11 @@ const Library: React.FC = () => {
     missingSeries: Set<string>;
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTagId, setActiveTagId] = useState<number | null>(() => {
@@ -242,9 +247,9 @@ const Library: React.FC = () => {
       unfinished: unfinishedFilter ? '1' : null,
       scope: scopeAll ? 'all' : null,
       cat: !scopeAll && mainCategory && mainCategory !== defaultCategoryKey ? mainCategory : null,
-      q: searchTerm.trim() ? searchTerm.trim() : null,
+      q: debouncedSearch.trim() ? debouncedSearch.trim() : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, unfinishedFilter, mainCategory, scopeAll, searchTerm, defaultCategoryKey, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, unfinishedFilter, mainCategory, scopeAll, debouncedSearch, defaultCategoryKey, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -580,7 +585,7 @@ const Library: React.FC = () => {
     return set;
   }, [favorites]);
 
-  const normalizedSearch = searchTerm.toLowerCase();
+  const normalizedSearch = debouncedSearch.toLowerCase().trim();
   const currentCategory = useMemo(() => categories.find(c => c.key === mainCategory), [categories, mainCategory]);
   const getSeriesCategory = useCallback((series: VideoSeries) => {
     return categories.find(c => c.key === series.display_type)
@@ -610,7 +615,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', searchTerm.trim()].join('|');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', debouncedSearch.trim()].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
