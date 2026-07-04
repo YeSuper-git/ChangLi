@@ -3494,7 +3494,41 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         || actor_labels.contains(&name)
                     {
                         // 2) 匹配标签/演员 → 递归进去找视频集
-                        new_folders.extend(collect_new(&sub_path));
+                        // 检查子文件夹是否匹配该演员的时期名
+                        let actor_periods_in_folder: std::collections::HashSet<String> =
+                            if actor_names.contains(&name) || actor_labels.contains(&name) {
+                                // 找到对应的 actor_id
+                                let aid = sqlx::query_scalar::<_, i64>(
+                                    "SELECT id FROM actors WHERE name = ? OR COALESCE(label, name) = ?")
+                                    .bind(&name).bind(&name).fetch_one(pool).await.unwrap_or(0);
+                                sqlx::query_scalar::<_, String>(
+                                    "SELECT name FROM actor_periods WHERE actor_id = ?")
+                                    .bind(aid).fetch_all(pool).await.unwrap_or_default().into_iter().collect()
+                            } else {
+                                std::collections::HashSet::new()
+                            };
+
+                        if !actor_periods_in_folder.is_empty() {
+                            // 有时期信息：子文件夹匹配时期名 → 递归进去找视频集
+                            if let Ok(sub_entries) = std::fs::read_dir(&sub_path) {
+                                for sub_entry in sub_entries.filter_map(|e| e.ok()) {
+                                    let sub_sub = sub_entry.path();
+                                    if !sub_sub.is_dir() { continue; }
+                                    let sub_name = sub_sub.file_name()
+                                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                                    if actor_periods_in_folder.contains(&sub_name) {
+                                        // 时期文件夹 → 递归找视频集
+                                        new_folders.extend(collect_new(&sub_sub));
+                                    } else if has_video_files(&sub_sub) {
+                                        // 直接的视频集文件夹（无时期匹配）
+                                        new_folders.extend(collect_new(&sub_sub));
+                                    }
+                                }
+                            }
+                        } else {
+                            // 无时期信息：直接递归
+                            new_folders.extend(collect_new(&sub_path));
+                        }
                     } else if has_video_files(&sub_path) {
                         // 3) 含视频文件 → 视频集
                         let folder_path_str = sub_path.to_string_lossy().to_string();
