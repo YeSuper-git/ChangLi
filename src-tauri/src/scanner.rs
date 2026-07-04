@@ -332,7 +332,7 @@ fn sort_episode_files(files: &mut Vec<PathBuf>) {
     }
 }
 
-fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<String> {
+pub fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<String> {
     let video_parent = video_path.parent()?;
     let video_stem = file_stem_lower(video_path);
     // 1. 找和视频同名的图片（同目录下，文件名不含扩展名相同）

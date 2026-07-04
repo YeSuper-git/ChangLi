@@ -867,23 +867,21 @@ const Library: React.FC = () => {
           </button>
           <button
             className="changli-menu-item"
-            onClick={async () => {
-              await toggleFavorite(contextMenu.id, 'series');
-              await refreshSeries();
+            onClick={() => {
               setContextMenu(null);
+              toggleFavorite(contextMenu.id, 'series').then(() => refreshSeries());
             }}
           >
             {isFav ? '取消追番' : '追番'}
           </button>
           <button
             className="changli-menu-item"
-            onClick={async () => {
-              await toggleWatched(contextMenu.id);
-              await refreshSeries();
+            onClick={() => {
               setContextMenu(null);
+              toggleWatched(contextMenu.id).then(() => refreshSeries());
             }}
           >
-            {isWatched ? '取消已看完' : '已看完'}
+            {isWatched ? '取消已看完标记' : '标记为已看完'}
           </button>
           <button
             className="changli-menu-item"

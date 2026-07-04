@@ -3252,16 +3252,59 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
         .collect();
 
     // 扫描文件夹获取当前视频
-    let new_videos = if folder_path_std.is_dir() {
+    let (new_videos, poster_map) = if folder_path_std.is_dir() {
         let scan_result = crate::scanner::scan_directory(source).await?;
-        scan_result
+        let new: Vec<Video> = scan_result
             .videos
             .into_iter()
             .filter(|v| !existing_paths.contains(&v.file_path))
-            .collect()
+            .collect();
+        (new, scan_result.posters)
     } else {
-        vec![]
+        (vec![], std::collections::HashMap::new())
     };
+
+    // 为没有海报的现有视频更新海报和缩略图
+    let existing_no_poster = sqlx::query_as::<_, (i64, String)>(
+        "SELECT id, file_path FROM videos WHERE series_id = ? AND (thumbnail IS NULL OR thumbnail = '')",
+    )
+    .bind(series_id)
+    .fetch_all(pool)
+    .await?;
+
+    if !existing_no_poster.is_empty() {
+        // 收集目录下所有图片文件用于海报匹配
+        let mut image_files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(folder_path_std) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let p = entry.path();
+                if p.is_file() {
+                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                        if crate::scanner::IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+                            image_files.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        
+
+        for (vid, vpath) in &existing_no_poster {
+            let video_path = std::path::Path::new(vpath);
+            let poster_path = poster_map.get(vpath)
+                .cloned()
+                .or_else(|| crate::scanner::find_poster_for_video(video_path, &image_files));
+            if let Some(poster_path) = poster_path {
+                let base64 = crate::scanner::generate_thumbnail_base64(std::path::Path::new(&poster_path));
+                sqlx::query("UPDATE videos SET thumbnail = ?, thumbnail_base64 = ? WHERE id = ?")
+                    .bind(&poster_path)
+                    .bind(&base64)
+                    .bind(vid)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    }
 
     Ok(SeriesUpdateResult { new_videos, missing_videos })
 }
@@ -3335,31 +3378,55 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         }
     }
 
-    // 检测 scan_path 下的新文件夹（尚未入库的视频集）
+    // 检测 scan_path 下的新视频集文件夹
+    // 扫描路径结构：scan_path/标签或演员/视频集文件夹/视频文件
+    // 如果 tags/actors 启用，顶层是标签/演员文件夹，需要递归一层
     let category = get_category_by_key(pool, category_key).await?;
+    let features: serde_json::Value = category.as_ref()
+        .map(|c| serde_json::from_str(&c.features).unwrap_or_default())
+        .unwrap_or_default();
+    let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
+    let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
+
     let new_series = if let Some(ref scan_path) = category.and_then(|c| c.scan_path) {
         let path = std::path::Path::new(scan_path);
         if path.is_dir() {
             let mut new_folders = Vec::new();
-            if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries.filter_map(|e| e.ok()) {
-                    let entry_path = entry.path();
-                    if !entry_path.is_dir() {
-                        continue;
-                    }
-                    let folder_path_str = entry_path.to_string_lossy().to_string();
-                    if !existing_folder_paths.contains(&folder_path_str) {
-                        let folder_name = entry_path
-                            .file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        // 用基础名称匹配：去掉 " 1-N" 后缀后比较
-                        let base = crate::scanner::strip_episode_suffix(&folder_name);
-                        if !existing_base_names.contains(&base) {
-                            new_folders.push(folder_name);
+            let collect_new = |parent: &std::path::Path, folders: &mut Vec<String>| {
+                if let Ok(entries) = std::fs::read_dir(parent) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        let entry_path = entry.path();
+                        if !entry_path.is_dir() {
+                            continue;
+                        }
+                        let folder_path_str = entry_path.to_string_lossy().to_string();
+                        if !existing_folder_paths.contains(&folder_path_str) {
+                            let folder_name = entry_path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default();
+                            let base = crate::scanner::strip_episode_suffix(&folder_name);
+                            if !existing_base_names.contains(&base) {
+                                folders.push(folder_name);
+                            }
                         }
                     }
                 }
+            };
+
+            if actors_enabled || tags_enabled {
+                // 顶层文件夹是标签/演员名，递归一层进去找视频集
+                if let Ok(top_entries) = std::fs::read_dir(path) {
+                    for entry in top_entries.filter_map(|e| e.ok()) {
+                        let sub_path = entry.path();
+                        if sub_path.is_dir() {
+                            collect_new(&sub_path, &mut new_folders);
+                        }
+                    }
+                }
+            } else {
+                // 无标签/演员，顶层就是视频集
+                collect_new(path, &mut new_folders);
             }
             new_folders
         } else {
