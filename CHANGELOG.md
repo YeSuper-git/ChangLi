@@ -3,6 +3,8 @@
 ### 修复
 - 修复 v1.7.77 Windows CI 新暴露的 `BOOL` 类型路径问题：为 Windows target 显式添加 `windows-core = "0.61"` 依赖，并使用 `windows_core::BOOL` 匹配 `WNDENUMPROC`
 - 调整播放器后台有声无窗口修复方案：撤掉 `EnumWindows`/`SetForegroundWindow` Win32 后置捞窗口逻辑，改用 mpv 自身 `force-window=immediate`、置顶、非最小化、几何定位来确保原生播放器窗口立即显示，避免 Windows API 类型反复导致部署失败
+- 修复全量检查更新会清空正常视频集海报的问题：未匹配到新海报时保留旧海报，不再写空
+- 修复检查更新不能恢复视频集海报的问题：视频集海报或缓存为空时，从本地视频集文件夹重新匹配海报并回填
 - 继续补发 v1.7.68-v1.7.75 未成功发布的全部代码
 
 ## v1.7.77 (2026-07-05)

@@ -778,10 +778,10 @@ pub async fn update_video_series_poster(
     poster_base64: Option<&str>,
     poster_orientation: Option<&str>,
 ) -> Result<()> {
-    sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = ?, poster_orientation = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    sqlx::query("UPDATE video_series SET poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(poster)
         .bind(poster_base64)
-        .bind(poster_orientation.unwrap_or("landscape"))
+        .bind(poster_orientation)
         .bind(id)
         .execute(pool)
         .await?;
@@ -3239,6 +3239,35 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
     let source = folder_path.as_deref().unwrap_or(&title);
     let folder_path_std = std::path::Path::new(source);
+
+    // 检查更新也负责修复缺失的视频集海报：仅当当前视频集海报为空时，
+    // 从本地视频集文件夹重新匹配海报；找不到时不覆盖旧值。
+    let series_poster_missing = sqlx::query_as::<_, (Option<String>, Option<String>)>(
+        "SELECT poster, poster_base64 FROM video_series WHERE id = ?",
+    )
+    .bind(series_id)
+    .fetch_one(pool)
+    .await
+    .map(|(poster, poster_base64)| {
+        poster.as_deref().unwrap_or_default().trim().is_empty()
+            || poster_base64.as_deref().unwrap_or_default().trim().is_empty()
+    })
+    .unwrap_or(false);
+
+    if series_poster_missing && folder_path_std.is_dir() {
+        if let Some(series_poster) = crate::scanner::find_folder_poster(folder_path_std) {
+            let series_poster_base64 =
+                crate::scanner::generate_thumbnail_base64(std::path::Path::new(&series_poster));
+            update_video_series_poster(
+                pool,
+                series_id,
+                Some(&series_poster),
+                series_poster_base64.as_deref(),
+                Some("landscape"),
+            )
+            .await?;
+        }
+    }
 
     // 获取数据库中现有的视频
     let existing_videos = get_series_videos(pool, series_id).await?;
