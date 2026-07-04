@@ -1,3 +1,13 @@
+## v1.7.51 (2026-07-04)
+
+### 优化
+- 渲染引擎迁移: vo=gpu → vo=gpu-next (libplacebo)
+- hwdec: d3d11va → d3d11va-copy (防 overlay 踩 decoder surface)
+- HDR 直通: target-colorspace-hint + hdr-compute-peak
+- 色彩管理: target-trc=gamma2.2 (SDR LCD 防偏暗)
+- 设置页一键禁用游戏覆盖开关
+- 捆绑 nvidiaProfileInspector.exe，零操作全自动
+
 ## v1.7.50 (2026-07-03)
 
 ### 修复
