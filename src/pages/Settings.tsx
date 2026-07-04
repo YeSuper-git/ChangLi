@@ -474,19 +474,20 @@ const Settings: React.FC = () => {
 
 
       {/* 游戏覆盖 */}
-      <section className="changli-panel p-6">
-        <div className="flex items-center justify-between mb-4">
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">游戏覆盖</h2>
             <p className="text-sm text-gray-500 mt-1">防止录屏软件干扰视频播放</p>
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-sm text-gray-700">禁用游戏覆盖</span>
-            <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
-          </div>
-          <Switch
+        <div className="changli-panel p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm text-gray-700">禁用游戏覆盖</span>
+              <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
+            </div>
+            <Switch
             checked={gameOverlayDisabled}
             disabled={gameOverlayLoading}
             onChange={async (checked) => {
@@ -503,6 +504,7 @@ const Settings: React.FC = () => {
             }}
             ariaLabel="禁用游戏覆盖"
           />
+          </div>
         </div>
       </section>
 
