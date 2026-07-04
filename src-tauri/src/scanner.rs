@@ -109,7 +109,7 @@ pub fn is_video_file(path: &Path) -> bool {
 }
 
 // 支持的图片格式
-const IMAGE_EXTENSIONS: &[&str] = &[
+pub const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "webp", "bmp", "gif", "avif", "svg", "tif", "tiff", "ico",
 ];
 

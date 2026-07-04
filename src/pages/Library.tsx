@@ -687,7 +687,7 @@ const Library: React.FC = () => {
       </div>
 
       <div className="px-4 mb-3">
-        <span className="text-xs text-gray-400">共 {filteredSeries.length} 个视频集</span>
+        <span className="text-xs text-gray-400">共 {filteredSeries.length} 个视频</span>
       </div>
 
       {selectMode && (
