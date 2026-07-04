@@ -128,6 +128,7 @@ const Library: React.FC = () => {
   }, [loadCategoryFilters]);
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
+  const [unfinishedFilter, setUnfinishedFilter] = useState(false);
   const [chineseSubFilter, setChineseSubFilter] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
@@ -173,11 +174,12 @@ const Library: React.FC = () => {
       type: typeFilter !== 'all' ? typeFilter : null,
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
+      unfinished: unfinishedFilter ? '1' : null,
       scope: scopeAll ? 'all' : null,
       cat: !scopeAll && mainCategory && mainCategory !== defaultCategoryKey ? mainCategory : null,
       q: searchTerm.trim() ? searchTerm.trim() : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, mainCategory, scopeAll, searchTerm, defaultCategoryKey, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, unfinishedFilter, mainCategory, scopeAll, searchTerm, defaultCategoryKey, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -520,7 +522,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', searchTerm.trim()].join('|');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', searchTerm.trim()].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
@@ -533,6 +535,7 @@ const Library: React.FC = () => {
     return matchesText
       && (!favoriteFilter || favoriteIds.has(`s-${series.id}`))
       && (!watchedFilter || watchedIds.has(series.id))
+      && (!unfinishedFilter || (favoriteIds.has(`s-${series.id}`) && !watchedIds.has(series.id)))
       && (!chineseSubFilter || series.has_chinese_sub === 1)
       && matchesCategory;
   });
@@ -695,16 +698,17 @@ const Library: React.FC = () => {
           <div className="changli-filter-row is-expanded">
             {features.tracking ? (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
                 <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
-                <button onClick={() => setWatchedFilter(!watchedFilter)} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
+                <button onClick={() => { setUnfinishedFilter(!unfinishedFilter); setWatchedFilter(false); }} className={`changli-filter-pill ${unfinishedFilter ? 'active' : ''}`}>未看完</button>
+                <button onClick={() => { setWatchedFilter(!watchedFilter); setUnfinishedFilter(false); }} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
                 )}
               </>
             ) : (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
                 )}

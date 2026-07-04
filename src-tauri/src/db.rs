@@ -669,14 +669,16 @@ pub async fn add_video_series(
     poster_orientation: Option<&str>,
     status: Option<&str>,
     poster_base64: Option<&str>,
+    display_type: Option<&str>,
 ) -> Result<VideoSeries> {
-    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status, poster_base64) VALUES (?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status, poster_base64, display_type) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ''))")
         .bind(title)
         .bind(folder_path)
         .bind(poster)
         .bind(poster_orientation.unwrap_or("landscape"))
         .bind(status.unwrap_or("ongoing"))
         .bind(poster_base64)
+        .bind(display_type)
         .execute(pool)
         .await?;
     if let Some(path) = folder_path {
@@ -3326,9 +3328,9 @@ pub struct CategoryUpdateResult {
 
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
 pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Result<CategoryUpdateResult> {
-    // 获取分类下的所有视频集
+    // 获取分类下的所有视频集（空字符串 display_type 归入默认分类）
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
-        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
     ))
     .fetch_all(pool)
@@ -3427,6 +3429,13 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
 
             /// 收集目录下不在 existing_base_names 中的子文件夹名
+            // 路径规范化：统一斜杠方向和大小写
+            let normalize = |s: &str| -> String {
+                s.replace("\\", "/").to_lowercase()
+            };
+            let normalized_db_paths: std::collections::HashSet<String> =
+                existing_folder_paths.iter().map(|p| normalize(p)).collect();
+
             let collect_new = |parent: &std::path::Path| -> Vec<String> {
                 let mut result = Vec::new();
                 if let Ok(entries) = std::fs::read_dir(parent) {
@@ -3434,8 +3443,12 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         let p = entry.path();
                         if !p.is_dir() { continue; }
                         let fps = p.to_string_lossy().to_string();
-                        if existing_folder_paths.contains(&fps) { continue; }
+                        // 1) 规范化路径比较
+                        if normalized_db_paths.contains(&normalize(&fps)) { continue; }
                         let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                        // 2) 文件夹名直接匹配
+                        if existing_base_names.contains(&name) { continue; }
+                        // 3) 去掉集数后缀再匹配
                         let base = crate::scanner::strip_episode_suffix(&name);
                         if !existing_base_names.contains(&base) {
                             result.push(name);

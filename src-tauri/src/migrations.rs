@@ -25,6 +25,12 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     add_column_if_not_exists(pool, "categories", "scan_path", "TEXT")
         .await?;
     seed_default_categories(pool).await?;
+    // 回填历史空 display_type：动漫类（scan_path 含 '动漫' 或 key='anime' 的分类下）
+    execute(
+        pool,
+        "UPDATE video_series SET display_type = 'anime' WHERE display_type = '' OR display_type IS NULL",
+        "backfill empty display_type to anime",
+    ).await?;
     seed_default_actor_fields(pool).await?;
     // Remove stale 'name' field from actor_fields (task #1)
     execute(pool, "DELETE FROM actor_fields WHERE field_key = 'name'", "delete name from actor_fields").await?;
