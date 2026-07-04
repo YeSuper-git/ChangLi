@@ -759,14 +759,12 @@ const SeriesDetail: React.FC = () => {
                     )}
                   </div>
                 )}
-                {features.tags && (
-                  <textarea
+                <textarea
                     value={editData.description}
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     className="search-input min-h-[120px]"
                     placeholder="简介"
                   />
-                )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
