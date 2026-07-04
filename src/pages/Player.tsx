@@ -134,7 +134,6 @@ const Player: React.FC = () => {
             'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
-            'no-config': 'yes',
             // 防 overlay inject
             'd3d11-flip': 'no',
             'd3d11-exclusive-fs': 'no',
