@@ -5,9 +5,10 @@ interface BubbleSelectProps {
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
   className?: string;
+  dropUp?: boolean;
 }
 
-const BubbleSelect: React.FC<BubbleSelectProps> = ({ value, options, onChange, className }) => {
+const BubbleSelect: React.FC<BubbleSelectProps> = ({ value, options, onChange, className, dropUp }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -29,7 +30,7 @@ const BubbleSelect: React.FC<BubbleSelectProps> = ({ value, options, onChange, c
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </span>
       {open && (
-        <div className="changli-bubble-select-dropdown">
+        <div className={`changli-bubble-select-dropdown ${dropUp ? 'drop-up' : ''}`}>
           {options.map((opt) => (
             <button
               key={opt.value}

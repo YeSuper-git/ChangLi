@@ -602,19 +602,30 @@ body {
   animation: bubbleSelectIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.changli-bubble-select-dropdown.drop-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation: bubbleSelectUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @keyframes bubbleSelectIn {
   from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bubbleSelectUp {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .changli-bubble-select-option {
   display: block;
   width: 100%;
-  padding: 7px 12px;
+  padding: 5px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #374151;
   text-align: left;

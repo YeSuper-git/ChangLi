@@ -875,6 +875,7 @@ const Settings: React.FC = () => {
                           ...categoryForm,
                           features: { ...categoryForm.features, episode: v }
                         })}
+                        dropUp
                       />
                       <span className="group relative">
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
