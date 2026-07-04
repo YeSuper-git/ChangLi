@@ -107,7 +107,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
             unsafe {
                 // 查找标题含 "ChangLi" 的窗口（mpv --title 设置的）
                 let mut found_hwnd = HWND::default();
-                EnumWindows(Some(enum_windows_callback), windows::Win32::Foundation::LPARAM(&mut found_hwnd as *mut _ as isize));
+                EnumWindows(Some(enum_windows_callback as WNDENUMPROC), windows::Win32::Foundation::LPARAM(&mut found_hwnd as *mut _ as isize));
                 if !found_hwnd.0.is_null() {
                     let _ = SetForegroundWindow(found_hwnd);
                     let _ = ShowWindow(found_hwnd, SW_SHOW);
