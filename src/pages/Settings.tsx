@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -147,8 +147,6 @@ const Settings: React.FC = () => {
   };
 
   const [deleteCatConfirm, setDeleteCatConfirm] = useState<string | null>(null);
-  const [rescanningCategory, setRescanningCategory] = useState<string | null>(null);
-  const [rescanConfirm, setRescanConfirm] = useState<string | null>(null);
   const refreshSeries = useLibraryStore((s) => s.refreshSeries);
   const refreshCategories = useLibraryStore((s) => s.refreshCategories);
 
@@ -167,19 +165,6 @@ const Settings: React.FC = () => {
       console.error('删除分类视频失败:', error);
       notify({ message: '删除失败: ' + String(error), type: 'error' });
     } finally {
-    }
-  };
-
-  const handleRescanCategory = async (key: string) => {
-    setRescanningCategory(key);
-    try {
-      const result = await rescanCategoryMetadata(key);
-      notify({ message: `扫描完成，更新了${result[0]}部，跳过${result[1]}部，发现${result[2]}个视频集资源缺失，${result[3]}个分集资源缺失`, type: 'success' });
-    } catch (error) {
-      console.error('重新扫描分类元数据失败:', error);
-      notify({ message: '扫描失败: ' + String(error), type: 'info' });
-    } finally {
-      setRescanningCategory(null);
     }
   };
 
@@ -612,13 +597,6 @@ const Settings: React.FC = () => {
                         className="action-btn action-btn-primary"
                       >
                         编辑
-                      </button>
-                      <button
-                        onClick={() => setRescanConfirm(cat.key)}
-                        disabled={rescanningCategory === cat.key}
-                        className="action-btn text-sm disabled:opacity-50"
-                      >
-                        {rescanningCategory === cat.key ? '扫描中...' : '扫描元数据'}
                       </button>
                       <button
                         onClick={() => setDeleteCatConfirm(cat.key)}
@@ -1078,30 +1056,6 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 重新扫描元数据确认弹窗 */}
-      {rescanConfirm && (
-        <div className="changli-modal-backdrop">
-          <div className="changli-modal-panel">
-            <p className="text-gray-900 text-base mb-6">
-              确定重新扫描该分类的所有视频元数据？
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => { handleRescanCategory(rescanConfirm); setRescanConfirm(null); }}
-                className="action-btn action-btn-primary flex-1 text-sm"
-              >
-                确定
-              </button>
-              <button
-                onClick={() => setRescanConfirm(null)}
-                className="action-btn flex-1 text-sm"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 演员字段删除确认弹窗 */}
       {deleteFieldConfirm && (
