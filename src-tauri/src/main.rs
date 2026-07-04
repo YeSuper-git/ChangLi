@@ -2726,11 +2726,77 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
         }
 
         // 4. 处理子文件夹下的子文件夹/视频
+        // 如果匹配到演员，预加载时期列表用于时期文件夹匹配
+        let actor_periods: Vec<db::ActorPeriod> = if let Some(aid) = matched_actor {
+            db::get_actor_periods(&pool, aid).await.unwrap_or_default()
+        } else {
+            vec![]
+        };
+        // 演员时期名 → period_id 的映射
+        let period_map: std::collections::HashMap<String, i64> = actor_periods
+            .iter()
+            .map(|p| (p.name.clone(), p.id))
+            .collect();
+
         let sub_entries = std::fs::read_dir(&entry_path).map_err(|e| e.to_string())?;
         for sub_entry in sub_entries {
             let sub_entry = sub_entry.map_err(|e| e.to_string())?;
             let sub_entry_path = sub_entry.path();
             let sub_entry_name = sub_entry.file_name().to_string_lossy().to_string();
+
+            // 如果子文件夹名匹配演员时期名，递归进时期文件夹扫描
+            let matched_period_id = period_map.get(&sub_entry_name).copied();
+            if sub_entry_path.is_dir() && matched_period_id.is_some() {
+                let period_path = &sub_entry_path;
+                let period_entries = std::fs::read_dir(period_path).map_err(|e| e.to_string())?;
+                for period_entry in period_entries {
+                    let period_entry = period_entry.map_err(|e| e.to_string())?;
+                    let pe_path = period_entry.path();
+                    if !pe_path.is_dir() { continue; }
+                    let pe_name = period_entry.file_name().to_string_lossy().to_string();
+                    let pe_result = scanner::scan_directory(&pe_path.to_string_lossy())
+                        .await.map_err(|e| e.to_string())?;
+                    if pe_result.videos.is_empty() { continue; }
+                    let pe_poster = crate::scanner::find_folder_poster(period_path);
+                    let pe_poster_base64 = pe_poster.as_deref().and_then(|p| {
+                        scanner::generate_thumbnail_base64(std::path::Path::new(p))
+                    });
+                    let pe_folder = pe_path.to_string_lossy().to_string();
+
+                    if let Some(existing) = db::get_video_series_by_folder_path(&pool, &pe_folder)
+                        .await.map_err(|e| e.to_string())?
+                    {
+                        db::update_video_series_poster(&pool, existing.id, pe_poster.as_deref(), pe_poster_base64.as_deref(), Some("landscape"))
+                            .await.map_err(|e| e.to_string())?;
+                        db::add_videos_batch(&pool, pe_result.videos, Some(existing.id))
+                            .await.map_err(|e| e.to_string())?;
+                        if let Some(aid) = matched_actor {
+                            let _ = db::add_series_actor(&pool, existing.id, aid, None, matched_period_id).await;
+                            let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                        }
+                        updated += 1;
+                    } else {
+                        let (series_title, code, has_chinese_sub) = extract_adult_metadata(&pe_name);
+                        let series = db::add_video_series(
+                            &pool, &series_title, Some(&pe_folder),
+                            pe_poster.as_deref(), Some("landscape"), Some("ongoing"),
+                            pe_poster_base64.as_deref(), Some(&category_key),
+                        ).await.map_err(|e| e.to_string())?;
+                        if let Some(c) = code {
+                            let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                                .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                        }
+                        db::add_videos_batch(&pool, pe_result.videos, Some(series.id))
+                            .await.map_err(|e| e.to_string())?;
+                        if let Some(aid) = matched_actor {
+                            let _ = db::add_series_actor(&pool, series.id, aid, None, matched_period_id).await;
+                        }
+                        let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                        added += 1;
+                    }
+                }
+                continue; // 时期文件夹已处理，跳过下面的直接视频集逻辑
+            }
 
             if sub_entry_path.is_dir() {
                 let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
