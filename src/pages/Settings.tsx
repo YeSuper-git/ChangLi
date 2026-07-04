@@ -602,7 +602,7 @@ const Settings: React.FC = () => {
                         onClick={() => setDeleteCatConfirm(cat.key)}
                         className="action-btn action-btn-danger text-sm"
                       >
-                        删除视频
+                        删除所有视频
                       </button>
                       <button
                         onClick={() => setCategoryDeleteConfirm(cat.key)}
