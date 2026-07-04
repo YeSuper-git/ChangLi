@@ -97,7 +97,7 @@ pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
 }
 
 // 支持的视频格式
-const VIDEO_EXTENSIONS: &[&str] = &[
+pub const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mkv", "avi", "flv", "mov", "wmv", "webm", "m4v", "mpg", "mpeg", "3gp", "ts", "rmvb",
     "rm", "vob", "asf", "f4v",
 ];
