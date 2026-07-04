@@ -995,14 +995,15 @@ export interface CategoryFeatures {
 }
 
 export function parseCategoryFeatures(features: string): CategoryFeatures {
+  const defaults: CategoryFeatures = { tags: false, actors: false, tracking: false, status: false, chinese_sub: false, episode: '部' };
   try {
     const parsed = JSON.parse(features);
     if (typeof parsed.episode === 'boolean') {
       parsed.episode = parsed.episode ? '话' : '部';
     }
-    return parsed;
+    return { ...defaults, ...parsed };
   } catch {
-    return { tags: false, actors: false, tracking: false, status: false, chinese_sub: false, episode: '部' };
+    return defaults;
   }
 }
 

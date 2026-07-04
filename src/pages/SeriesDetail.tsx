@@ -104,6 +104,7 @@ const SeriesDetail: React.FC = () => {
   };
   const seriesId = Number(id);
   const routeState = location.state as { from?: string; backLabel?: string; filterSearch?: string; seriesSnapshot?: VideoSeries } | null;
+  const seriesDirty = useLibraryStore((s) => s.seriesDirty);
   const cachedDetail = Number.isFinite(seriesId) ? seriesDetailCache.get(seriesId) : undefined;
   const initialSeries = cachedDetail?.series || routeState?.seriesSnapshot || null;
 
@@ -159,6 +160,14 @@ const SeriesDetail: React.FC = () => {
       loadSeries({ silent: Boolean(nextSeries) });
     }
   }, [seriesId]);
+
+  // 检查更新后自动刷新详情页数据
+  useEffect(() => {
+    if (seriesDirty && seriesId) {
+      seriesDetailCache.delete(seriesId);
+      loadSeries({ silent: true });
+    }
+  }, [seriesDirty, seriesId]);
 
   useEffect(() => {
     if (editFromUrl && series) {

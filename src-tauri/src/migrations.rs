@@ -34,6 +34,22 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actor_fields(pool).await?;
     // Remove stale 'name' field from actor_fields (task #1)
     execute(pool, "DELETE FROM actor_fields WHERE field_key = 'name'", "delete name from actor_fields").await?;
+    // 回填历史分类 features 中缺失的 status 字段
+    {
+        let rows = sqlx::query_scalar::<_, String>("SELECT features FROM categories")
+            .fetch_all(pool).await.unwrap_or_default();
+        for features_str in rows {
+            if let Ok(mut features) = serde_json::from_str::<serde_json::Value>(&features_str) {
+                if features.get("status").is_none() {
+                    features["status"] = serde_json::Value::Bool(true);
+                    let new_features = serde_json::to_string(&features).unwrap_or(features_str.clone());
+                    sqlx::query("UPDATE categories SET features = ? WHERE features = ?")
+                        .bind(&new_features).bind(&features_str)
+                        .execute(pool).await?;
+                }
+            }
+        }
+    }
     add_column_if_not_exists(pool, "actor_fields", "options", "TEXT")
         .await?;
     add_column_if_not_exists(pool, "actor_fields", "format", "TEXT")
@@ -922,7 +938,7 @@ async fn seed_default_categories(pool: &SqlitePool) -> Result<()> {
     .bind("adult")
     .bind("影视")
     .bind("landscape")
-    .bind(r#"{"tags":false,"actors":true,"tracking":false,"chinese_sub":true,"episode":false}"#)
+    .bind(r#"{"tags":false,"actors":true,"tracking":false,"status":true,"chinese_sub":true,"episode":false}"#)
     .bind(2)
     .execute(pool)
     .await?;
