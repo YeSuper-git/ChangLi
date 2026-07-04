@@ -53,7 +53,7 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-unsafe extern "system" fn enum_windows_callback(hwnd: windows::Win32::Foundation::HWND, lparam: windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::BOOL {
+unsafe extern "system" fn enum_windows_callback(hwnd: windows::Win32::Foundation::HWND, lparam: windows::Win32::Foundation::LPARAM) -> windows_core::BOOL {
     use windows::Win32::UI::WindowsAndMessaging::*;
     let buf = &mut [0u16; 256];
     let len = GetWindowTextW(hwnd, buf);
@@ -62,10 +62,10 @@ unsafe extern "system" fn enum_windows_callback(hwnd: windows::Win32::Foundation
         if title.contains("ChangLi") {
             let found = &mut *(lparam.0 as *mut windows::Win32::Foundation::HWND);
             *found = hwnd;
-            return windows::Win32::Foundation::BOOL(0);
+            return windows_core::BOOL(0);
         }
     }
-    windows::Win32::Foundation::BOOL(1)
+    windows_core::BOOL(1)
 }
 
 #[cfg(target_os = "windows")]
