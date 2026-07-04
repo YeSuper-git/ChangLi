@@ -104,6 +104,7 @@ const SeriesDetail: React.FC = () => {
   };
   const seriesId = Number(id);
   const routeState = location.state as { from?: string; backLabel?: string; filterSearch?: string; seriesSnapshot?: VideoSeries } | null;
+  const seriesDirty = useLibraryStore((s) => s.seriesDirty);
   const cachedDetail = Number.isFinite(seriesId) ? seriesDetailCache.get(seriesId) : undefined;
   const initialSeries = cachedDetail?.series || routeState?.seriesSnapshot || null;
 
@@ -159,6 +160,14 @@ const SeriesDetail: React.FC = () => {
       loadSeries({ silent: Boolean(nextSeries) });
     }
   }, [seriesId]);
+
+  // 检查更新后自动刷新详情页数据
+  useEffect(() => {
+    if (seriesDirty && seriesId) {
+      seriesDetailCache.delete(seriesId);
+      loadSeries({ silent: true });
+    }
+  }, [seriesDirty, seriesId]);
 
   useEffect(() => {
     if (editFromUrl && series) {
@@ -619,56 +628,67 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
-                {features.actors ? (
-                  <>
-                    {series?.has_actor && (
-                      <>
-                        <div>
-                          <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {allActors.map((actor) => {
-                              const selected = selectedActorIds.includes(actor.id);
-                              return (
-                                <button
-                                  key={actor.id}
-                                  type="button"
-                                  onClick={() => toggleActor(actor.id)}
-                                  className={`px-3 py-1 rounded-full text-sm font-semibold border transition-colors ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'}`}
-                                >
-                                  {actor.name}
-                                </button>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              onClick={() => setShowNewActorModal(true)}
-                              className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
-                            >
-                              + 新建演员
-                            </button>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
-                          <input
-                            type="text"
-                            value={editData.code}
-                            onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
-                            className="search-input"
-                            placeholder="如 JJK-098"
-                            style={{ textTransform: 'uppercase' }}
-                          />
-                        </div>
-                      </>
-                    )}
-                    <textarea
+                {features.actors && (
+                  <div>
+                    <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {allActors.map((actor) => {
+                        const selected = selectedActorIds.includes(actor.id);
+                        return (
+                          <button
+                            key={actor.id}
+                            type="button"
+                            onClick={() => toggleActor(actor.id)}
+                            className={`px-3 py-1 rounded-full text-sm font-semibold border transition-colors ${selected ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] border-transparent text-white shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-600'}`}
+                          >
+                            {actor.name}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setShowNewActorModal(true)}
+                        className="px-3 py-1 rounded-full text-sm font-semibold border border-dashed border-rose-200 text-rose-500 bg-white hover:bg-rose-50/70"
+                      >
+                        + 新建演员
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {editData.code && (
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
+                      <input
+                        type="text"
+                        value={editData.code}
+                        onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                        className="search-input"
+                        placeholder="如 JJK-098"
+                        style={{ textTransform: 'uppercase' }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="checkbox"
+                          checked={editData.has_chinese_sub}
+                          onChange={(e) => setEditData({ ...editData, has_chinese_sub: e.target.checked })}
+                          className="w-4 h-4 rounded accent-green-500"
+                        />
+                        <span className="text-sm text-gray-600">有中文字幕</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <textarea
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                       className="search-input min-h-[120px]"
                       placeholder="简介"
                     />
-                  </>
-                ) : features.status ? (
+                {features.status && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">连载状态</div>
                     <div className="changli-status-switch" role="group" aria-label="连载状态">
@@ -684,7 +704,7 @@ const SeriesDetail: React.FC = () => {
                       >已完结</button>
                     </div>
                   </div>
-                ) : null}
+                )}
                 {features.tags && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">标签</div>
@@ -739,14 +759,12 @@ const SeriesDetail: React.FC = () => {
                     )}
                   </div>
                 )}
-                {features.tags && (
-                  <textarea
+                <textarea
                     value={editData.description}
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     className="search-input min-h-[120px]"
                     placeholder="简介"
                   />
-                )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
@@ -822,7 +840,7 @@ const SeriesDetail: React.FC = () => {
                       )) : <span className="text-sm text-gray-400">暂无</span>}
                     </div>
                   )}
-                  {features.actors && series.code && (
+                  {series.code && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">车牌：</span>
                       <span className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 font-mono">{series.code}</span>
