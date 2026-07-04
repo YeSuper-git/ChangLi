@@ -669,14 +669,16 @@ pub async fn add_video_series(
     poster_orientation: Option<&str>,
     status: Option<&str>,
     poster_base64: Option<&str>,
+    display_type: Option<&str>,
 ) -> Result<VideoSeries> {
-    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status, poster_base64) VALUES (?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT OR IGNORE INTO video_series (title, folder_path, poster, poster_orientation, status, poster_base64, display_type) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ''))")
         .bind(title)
         .bind(folder_path)
         .bind(poster)
         .bind(poster_orientation.unwrap_or("landscape"))
         .bind(status.unwrap_or("ongoing"))
         .bind(poster_base64)
+        .bind(display_type)
         .execute(pool)
         .await?;
     if let Some(path) = folder_path {

@@ -317,6 +317,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
             Some("landscape"),
             Some("ongoing"),
             thumb.as_deref(),
+            None,
         )
         .await
         .map_err(|e| e.to_string())?;
@@ -399,6 +400,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         sub_poster_base64.as_deref(),
+                                None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -450,6 +452,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         thumb.as_deref(),
+                                None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -523,6 +526,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         sub_poster_base64.as_deref(),
+                                None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -590,6 +594,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         thumb.as_deref(),
+                                None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -690,6 +695,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
             Some("landscape"),
             Some("ongoing"),
             series_poster_base64.as_deref(),
+            None,
         )
         .await
         .map_err(|e| e.to_string())?;
@@ -719,6 +725,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                     eprintln!(
                         "[ChangLi] 父目录 '{}' 匹配演员 '{}'，自动关联",
                         parent_name, actor.name
+                                None,
                     );
                     let _ = db::add_series_actor(&pool, series.id, actor.id, None, None).await;
                     let _ = db::update_video_series_display_type(&pool, series.id, "adult").await;
@@ -845,6 +852,7 @@ async fn scan_videos_for_actor(
                 Some("landscape"),
                 Some("ongoing"),
                 sub_poster_base64.as_deref(),
+                None,
             )
             .await
             .map_err(|e| e.to_string())?;
@@ -2669,7 +2677,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
                 updated += 1;
             } else {
-                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref(), Some(&category_key)).await.map_err(|e| e.to_string())?;
                 if let Some(c) = code {
                     let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
                 }
@@ -2759,7 +2767,8 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let series = db::add_video_series(
                         &pool, &series_title, Some(&folder_path_str),
                         sub_poster.as_deref(), Some("landscape"), Some("ongoing"),
-                        sub_poster_base64.as_deref(),
+                        Some(&category_key),
+                                None,
                     ).await.map_err(|e| e.to_string())?;
                     if let Some(c) = code {
                         let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
@@ -2809,6 +2818,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                         &pool, &series_title, Some(&file_path_str),
                         video.thumbnail.as_deref(), Some("landscape"), Some("ongoing"),
                         thumb.as_deref(),
+                                None,
                     ).await.map_err(|e| e.to_string())?;
                     if let Some(c) = code {
                         let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
