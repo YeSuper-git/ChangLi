@@ -855,29 +855,47 @@ body {
 }
 
 .changli-window-controls .settings-icon {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
 }
 
-.changli-window-controls .settings-icon::before,
+/* 齿轮体：8齿圆角多边形 */
+.changli-window-controls .settings-icon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+  clip-path: polygon(
+    50% 0%, 58% 0%, 62% 8%, 68% 6%,
+    76% 14%, 82% 18%, 90% 14%, 94% 20%,
+    100% 28%, 96% 36%, 92% 40%, 94% 48%,
+    100% 56%, 96% 62%, 90% 66%, 86% 72%,
+    90% 80%, 84% 86%, 76% 82%, 70% 86%,
+    64% 94%, 58% 96%, 52% 100%, 44% 96%,
+    38% 92%, 32% 94%, 24% 86%, 20% 80%,
+    14% 82%, 8% 76%, 6% 68%, 10% 62%,
+    0% 54%, 4% 46%, 8% 40%, 6% 32%,
+    0% 24%, 6% 18%, 12% 14%, 14% 8%,
+    22% 4%, 28% 0%, 36% 0%, 40% 6%
+  );
+}
+
+/* 中心圆孔 */
 .changli-window-controls .settings-icon::after {
   content: '';
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 6px;
-  height: 6px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: transparent;
   transform: translate(-50%, -50%);
-}
-
-.changli-window-controls .settings-icon::after {
-  width: 15px;
-  height: 15px;
-  border-radius: 5px;
-  border-style: dashed;
-  transform: translate(-50%, -50%) rotate(22.5deg);
 }
 
 .changli-window-controls .minimize-icon::before {
