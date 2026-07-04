@@ -471,7 +471,7 @@ const SeriesDetail: React.FC = () => {
   const playButtonHint = hasWatchProgress
     ? progressReminder
     : orderedVideos.length > 0
-      ? '尚未观看'
+      ? ''
       : '暂无可播放分集';
   const episodeCountLabel = series.video_count === 0
     ? '暂无资源'
@@ -837,12 +837,14 @@ const SeriesDetail: React.FC = () => {
                     className="group inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-transparent bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] px-4 text-white shadow-[0_10px_22px_rgba(251,91,123,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(251,91,123,0.24)] disabled:cursor-not-allowed disabled:border-gray-100 disabled:bg-none disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none disabled:hover:translate-y-0"
                     title={playButtonHint}
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/18 text-xs font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] transition-transform duration-200 group-hover:scale-105 group-disabled:bg-white/60 group-disabled:text-gray-400">▶</span>
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)] transition-transform duration-200 group-hover:scale-110 group-hover:fill-white/90 group-disabled:fill-gray-400" xmlns="http://www.w3.org/2000/svg"><path d="M8 5v14l11-7z"/></svg>
                     <span className="text-sm font-extrabold leading-none">{playButtonLabel}</span>
                   </button>
-                  <div className="min-w-[150px] max-w-[260px] text-sm font-semibold text-gray-500">
-                    {playButtonHint}
-                  </div>
+                  {playButtonHint && (
+                    <div className="min-w-[150px] max-w-[260px] text-sm font-semibold text-gray-500">
+                      {playButtonHint}
+                    </div>
+                  )}
                 </div>
               </>
             )}
