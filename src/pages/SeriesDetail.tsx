@@ -655,31 +655,33 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
-                    <input
-                      type="text"
-                      value={editData.code}
-                      onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
-                      className="search-input"
-                      placeholder="如 JJK-098"
-                      style={{ textTransform: 'uppercase' }}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
-                    <div className="flex items-center gap-2 mt-2">
+                {editData.code && (
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
                       <input
-                        type="checkbox"
-                        checked={editData.has_chinese_sub}
-                        onChange={(e) => setEditData({ ...editData, has_chinese_sub: e.target.checked })}
-                        className="w-4 h-4 rounded accent-green-500"
+                        type="text"
+                        value={editData.code}
+                        onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                        className="search-input"
+                        placeholder="如 JJK-098"
+                        style={{ textTransform: 'uppercase' }}
                       />
-                      <span className="text-sm text-gray-600">有中文字幕</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="checkbox"
+                          checked={editData.has_chinese_sub}
+                          onChange={(e) => setEditData({ ...editData, has_chinese_sub: e.target.checked })}
+                          className="w-4 h-4 rounded accent-green-500"
+                        />
+                        <span className="text-sm text-gray-600">有中文字幕</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 <textarea
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
