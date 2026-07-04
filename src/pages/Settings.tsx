@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, rescanCategoryMetadata, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -61,12 +61,13 @@ const Settings: React.FC = () => {
 
   const loadSettingsData = async () => {
     try {
-      const [sitesList, tagsList, storage, catsList, fieldsList] = await Promise.all([getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
+      const [sitesList, tagsList, storage, catsList, fieldsList, overlayDisabled] = await Promise.all([getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields(), getGameOverlayDisabled().catch(() => false)]);
       setSites(sitesList);
       setTags(tagsList);
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
+      setGameOverlayState(overlayDisabled);
       // 加载扩展预设模板
       try {
         const templates = await getExtensionPresetTemplates();
@@ -298,6 +299,8 @@ const Settings: React.FC = () => {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [gameOverlayDisabled, setGameOverlayState] = useState(false);
+  const [gameOverlayLoading, setGameOverlayLoading] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
@@ -875,6 +878,7 @@ const Settings: React.FC = () => {
                           ...categoryForm,
                           features: { ...categoryForm.features, episode: v }
                         })}
+                        dropUp
                       />
                       <span className="group relative">
                         <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
@@ -1186,6 +1190,39 @@ const Settings: React.FC = () => {
               版本更新记录
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* 游戏覆盖 */}
+      <section className="changli-panel p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold">游戏覆盖</h2>
+            <p className="text-sm text-gray-500 mt-1">禁用后可防止 NVIDIA App、游戏加加等软件把播放器识别为游戏</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-gray-700">禁用游戏覆盖</span>
+            <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
+          </div>
+          <Switch
+            checked={gameOverlayDisabled}
+            disabled={gameOverlayLoading}
+            onChange={async (checked) => {
+              setGameOverlayLoading(true);
+              try {
+                await setGameOverlayDisabled(checked);
+                setGameOverlayState(checked);
+                notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
+              } catch (error) {
+                notify({ message: '操作失败: ' + String(error), type: 'error' });
+              } finally {
+                setGameOverlayLoading(false);
+              }
+            }}
+            ariaLabel="禁用游戏覆盖"
+          />
         </div>
       </section>
 

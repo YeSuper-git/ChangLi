@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-16"?>
+<ArrayOfProfile>
+  <Profile>
+    <ProfileName>ChangLi</ProfileName>
+    <Executeables>
+      <string>changli.exe</string>
+    </Executeables>
+    <Settings>
+      <ProfileSetting>
+        <SettingName>Unknown</SettingName>
+        <SettingID>0x809D5F60</SettingID>
+        <ValueType>String</ValueType>
+        <CurrentValue>
+          <string>0x10000000</string>
+        </CurrentValue>
+      </ProfileSetting>
+    </Settings>
+  </Profile>
+</ArrayOfProfile>

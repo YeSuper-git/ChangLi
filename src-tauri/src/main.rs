@@ -1758,6 +1758,18 @@ async fn open_player_window(
     Ok(())
 }
 
+/// 一键切换游戏覆盖禁用状态
+#[tauri::command]
+fn set_game_overlay_disabled(disabled: bool) -> Result<String, String> {
+    player::set_game_overlay_disabled(disabled)
+}
+
+/// 读取游戏覆盖当前禁用状态
+#[tauri::command]
+fn get_game_overlay_disabled() -> Result<bool, String> {
+    player::read_game_overlay_disabled()
+}
+
 #[tauri::command]
 async fn get_missing_series_videos(
     state: State<'_, AppState>,
@@ -2180,9 +2192,8 @@ fn main() {
                 window.set_focus()?;
                 window.set_always_on_top(false)?;
             }
-            // 播放器主路径已切到前端 /player/:id + tauri-plugin-libmpv。
-            // 旧的外部 mpv 播放窗口只保留给历史 play_video 命令兜底，不再注册全局快捷键，
-            // 避免快捷键误创建旧架构的 player WebView 窗口。
+            // 禁用 Windows Game DVR，防止 NVIDIA/游戏加加把播放器识别为游戏
+            player::disable_game_dvr();
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -2312,6 +2323,8 @@ fn main() {
             is_preset_template_enabled_cmd,
             enable_preset_template_cmd,
             disable_preset_template_cmd,
+            set_game_overlay_disabled,
+            get_game_overlay_disabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

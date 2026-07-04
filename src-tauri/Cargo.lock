@@ -386,6 +386,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "windows",
+ "winreg",
 ]
 
 [[package]]

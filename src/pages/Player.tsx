@@ -126,7 +126,7 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu',
+            'vo': 'gpu-next',
             'hwdec': 'd3d11va-copy',
             'keep-open': 'yes',
             'force-window': 'yes',
@@ -135,12 +135,19 @@ const Player: React.FC = () => {
             'osc': 'no',
             'osd-level': 0,
             'no-config': 'yes',
-            // 避免被 NVIDIA 驱动识别为游戏
-            'd3d11-sync-interval': '0',
-            'video-sync': 'audio',
-            'dither-depth': 'no',
-            'vd-lavc-dr': 'no',
-            'gpu-dumb-mode': 'yes',
+            // 防 overlay inject
+            'd3d11-flip': 'no',
+            'd3d11-exclusive-fs': 'no',
+            'border': 'yes',
+            // HDR 直通
+            'target-colorspace-hint': 'yes',
+            'target-colorspace-hint-mode': 'source',
+            'hdr-compute-peak': 'yes',
+            // SDR 色彩
+            'target-trc': 'gamma2.2',
+            // 替代旧 desaturate / gamut-clipping
+            'tone-mapping-mode': 'auto',
+            'gamut-mapping-mode': 'auto',
           },
           observedProperties: OBSERVED_PROPERTIES,
         });
