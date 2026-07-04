@@ -413,8 +413,8 @@ export async function deleteVideosByCategory(categoryKey: string): Promise<{ vid
   return { videoCount, seriesCount };
 }
 
-export async function rescanCategoryMetadata(categoryKey: string): Promise<[number, number]> {
-  return invoke<[number, number]>('rescan_category_metadata', { categoryKey });
+export async function rescanCategoryMetadata(categoryKey: string): Promise<[number, number, number, number]> {
+  return invoke<[number, number, number, number]>('rescan_category_metadata', { categoryKey });
 }
 
 export async function rescanAllSeriesMetadata(): Promise<[number, number]> {
@@ -963,6 +963,7 @@ export interface CategoryFeatures {
   tags: boolean;
   actors: boolean;
   tracking: boolean;
+  status: boolean;
   chinese_sub: boolean;
   episode: string;
 }
@@ -975,7 +976,7 @@ export function parseCategoryFeatures(features: string): CategoryFeatures {
     }
     return parsed;
   } catch {
-    return { tags: false, actors: false, tracking: false, chinese_sub: false, episode: '部' };
+    return { tags: false, actors: false, tracking: false, status: false, chinese_sub: false, episode: '部' };
   }
 }
 

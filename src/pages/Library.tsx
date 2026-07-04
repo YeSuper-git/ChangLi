@@ -686,6 +686,10 @@ const Library: React.FC = () => {
         </div>
       </div>
 
+      <div className="px-4 mb-3">
+        <span className="text-xs text-gray-400">共 {filteredSeries.length} 个视频</span>
+      </div>
+
       {selectMode && (
         <div className="changli-toolbar mb-4 flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -764,7 +768,7 @@ const Library: React.FC = () => {
                       </span>
                     )}
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.status === 'completed' || !itemFeatures.tracking ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
+                      {series.status === 'completed' || !itemFeatures.status ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
                     </div>
                   </div>
                   <div className="mt-2">

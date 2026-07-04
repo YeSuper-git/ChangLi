@@ -675,7 +675,7 @@ pub async fn add_video_series(
         .bind(folder_path)
         .bind(poster)
         .bind(poster_orientation.unwrap_or("landscape"))
-        .bind(status.unwrap_or("completed"))
+        .bind(status.unwrap_or("ongoing"))
         .bind(poster_base64)
         .execute(pool)
         .await?;
@@ -803,7 +803,7 @@ pub async fn update_video_series(
         .bind(description)
         .bind(poster)
         .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
-        .bind(status.unwrap_or_else(|| "completed".to_string()))
+        .bind(status.unwrap_or_else(|| "ongoing".to_string()))
         .bind(poster_base64)
         .bind(code)
         .bind(has_chinese_sub.unwrap_or(0))
@@ -2875,8 +2875,9 @@ pub async fn delete_videos_by_category(
     Ok((video_count.0, series_count.0))
 }
 
-/// 重新扫描某个大类下所有视频集的元数据
-pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64)> {
+/// 重新扫描某个大类下所有视频集的元数据，同时检测缺失的视频集文件夹和分集文件
+/// 返回 (updated, skipped, missing_series_count, missing_videos_count)
+pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64, i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
         "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
@@ -2886,8 +2887,35 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
 
     let mut updated: i64 = 0;
     let mut skipped: i64 = 0;
+    let mut missing_series_count: i64 = 0;
+    let mut missing_videos_count: i64 = 0;
 
     for (id, title, folder_path) in series_list {
+        // 检测视频集文件夹是否缺失
+        let series_missing = if let Some(ref fp) = folder_path {
+            !std::path::Path::new(fp).is_dir()
+        } else {
+            // 没有 folder_path 的视频集，用 title 作为路径检测
+            !std::path::Path::new(&title).is_dir()
+        };
+
+        if series_missing {
+            missing_series_count += 1;
+            continue; // 文件夹缺失，跳过元数据更新
+        }
+
+        // 检测该视频集下缺失的分集文件
+        let videos = sqlx::query_as::<_, (String,)>("SELECT file_path FROM videos WHERE series_id = ?")
+            .bind(id)
+            .fetch_all(pool)
+            .await?;
+        for (file_path,) in &videos {
+            if !std::path::Path::new(file_path).is_file() {
+                missing_videos_count += 1;
+            }
+        }
+
+        // 原有的元数据更新逻辑
         let source = folder_path.as_deref().unwrap_or(&title);
         let folder_name = std::path::Path::new(source)
             .file_name()
@@ -2919,7 +2947,7 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
         }
     }
 
-    Ok((updated, skipped))
+    Ok((updated, skipped, missing_series_count, missing_videos_count))
 }
 
 pub async fn get_category_by_key(pool: &SqlitePool, key: &str) -> Result<Option<Category>> {

@@ -315,7 +315,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
             Some(&parent_dir),
             video.thumbnail.as_deref(),
             Some("landscape"),
-            Some("completed"),
+            Some("ongoing"),
             thumb.as_deref(),
         )
         .await
@@ -397,7 +397,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some(&folder_path_str),
                         sub_poster.as_deref(),
                         Some("landscape"),
-                        Some("completed"),
+                        Some("ongoing"),
                         sub_poster_base64.as_deref(),
                     )
                     .await
@@ -448,7 +448,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some(&file_path_str),
                         video.thumbnail.as_deref(),
                         Some("landscape"),
-                        Some("completed"),
+                        Some("ongoing"),
                         thumb.as_deref(),
                     )
                     .await
@@ -521,7 +521,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some(&folder_path_str),
                         sub_poster.as_deref(),
                         Some("landscape"),
-                        Some("completed"),
+                        Some("ongoing"),
                         sub_poster_base64.as_deref(),
                     )
                     .await
@@ -588,7 +588,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some(&file_path_str),
                         video.thumbnail.as_deref(),
                         Some("landscape"),
-                        Some("completed"),
+                        Some("ongoing"),
                         thumb.as_deref(),
                     )
                     .await
@@ -626,7 +626,23 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
         .await
         .map_err(|e| e.to_string())?;
 
-    let series_poster = result.posters.values().next().cloned();
+    let mut series_poster = result.posters.values().next().cloned();
+    // 空文件夹：尝试从文件夹内找图片作为海报
+    if series_poster.is_none() {
+        if let Ok(entries) = std::fs::read_dir(&path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let p = entry.path();
+                if p.is_file() {
+                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                        if scanner::IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+                            series_poster = Some(p.to_string_lossy().to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
     let series_poster_base64 = series_poster
         .as_deref()
         .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
@@ -672,7 +688,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
             Some(&path),
             series_poster.as_deref(),
             Some("landscape"),
-            Some("completed"),
+            Some("ongoing"),
             series_poster_base64.as_deref(),
         )
         .await
@@ -827,7 +843,7 @@ async fn scan_videos_for_actor(
                 Some(&folder_path_str),
                 sub_poster.as_deref(),
                 Some("landscape"),
-                Some("completed"),
+                Some("ongoing"),
                 sub_poster_base64.as_deref(),
             )
             .await
@@ -2490,7 +2506,7 @@ async fn delete_videos_by_category(state: State<'_, AppState>, category_key: Str
 }
 
 #[tauri::command]
-async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64), String> {
+async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64, i64, i64), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -2623,7 +2639,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
                 updated += 1;
             } else {
-                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("completed"), poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
+                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref()).await.map_err(|e| e.to_string())?;
                 if let Some(c) = code {
                     let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
                 }
@@ -2712,7 +2728,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let (series_title, code, has_chinese_sub) = extract_adult_metadata(&sub_entry_name);
                     let series = db::add_video_series(
                         &pool, &series_title, Some(&folder_path_str),
-                        sub_poster.as_deref(), Some("landscape"), Some("completed"),
+                        sub_poster.as_deref(), Some("landscape"), Some("ongoing"),
                         sub_poster_base64.as_deref(),
                     ).await.map_err(|e| e.to_string())?;
                     if let Some(c) = code {
@@ -2761,7 +2777,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
                     let series = db::add_video_series(
                         &pool, &series_title, Some(&file_path_str),
-                        video.thumbnail.as_deref(), Some("landscape"), Some("completed"),
+                        video.thumbnail.as_deref(), Some("landscape"), Some("ongoing"),
                         thumb.as_deref(),
                     ).await.map_err(|e| e.to_string())?;
                     if let Some(c) = code {

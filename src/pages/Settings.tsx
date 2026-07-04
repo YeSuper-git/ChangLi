@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
       await deleteVideosByCategory(key);
       await refreshSeries();
     } catch (error) {
-      console.error('删除大类视频失败:', error);
+      console.error('删除分类视频失败:', error);
       notify({ message: '删除失败: ' + String(error), type: 'error' });
     } finally {
     }
@@ -174,9 +174,9 @@ const Settings: React.FC = () => {
     setRescanningCategory(key);
     try {
       const result = await rescanCategoryMetadata(key);
-      notify({ message: `扫描完成，更新了 ${result[0]} 部，跳过 ${result[1]} 部`, type: 'success' });
+      notify({ message: `扫描完成，更新了${result[0]}部，跳过${result[1]}部，发现${result[2]}个视频集资源缺失，${result[3]}个分集资源缺失`, type: 'success' });
     } catch (error) {
-      console.error('重新扫描大类元数据失败:', error);
+      console.error('重新扫描分类元数据失败:', error);
       notify({ message: '扫描失败: ' + String(error), type: 'info' });
     } finally {
       setRescanningCategory(null);
@@ -191,7 +191,7 @@ const Settings: React.FC = () => {
     key: '',
     name: '',
     card_layout: 'auto' as 'portrait' | 'landscape' | 'auto',
-    features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
+    features: { tags: true, actors: true, tracking: true, status: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
     scan_path: '' as string,
   });
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
@@ -201,14 +201,14 @@ const Settings: React.FC = () => {
     try {
       await reloadCategoriesEverywhere();
     } catch (error) {
-      console.error('加载大类失败:', error);
+      console.error('加载分类失败:', error);
     }
   };
 
 
   const openAddCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, chinese_sub: true, episode: '话' }, scan_path: '' });
+    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
     setShowCategoryModal(true);
   };
 
@@ -235,7 +235,7 @@ const Settings: React.FC = () => {
       setShowCategoryModal(false);
       await loadCategories();
     } catch (error) {
-      console.error('保存大类失败:', error);
+      console.error('保存分类失败:', error);
     }
   };
 
@@ -266,7 +266,7 @@ const Settings: React.FC = () => {
       await deleteCategory(key);
       await loadCategories();
     } catch (error) {
-      console.error('删除大类失败:', error);
+      console.error('删除分类失败:', error);
     }
   };
 
@@ -282,7 +282,7 @@ const Settings: React.FC = () => {
       await reorderCategories(newCategories.map(c => c.key));
       await reloadCategoriesEverywhere();
     } catch (error) {
-      console.error('大类排序失败:', error);
+      console.error('分类排序失败:', error);
     }
   };
 
@@ -564,7 +564,7 @@ const Settings: React.FC = () => {
             onClick={openAddCategory}
             className="action-btn action-btn-primary"
           >
-            新增大类
+            新增分类
           </button>
         </div>
 
@@ -640,8 +640,8 @@ const Settings: React.FC = () => {
           </div>
         ) : (
           <div className="changli-empty-state">
-            <p className="text-gray-500 mb-4">暂无大类配置</p>
-            <p className="text-gray-400 text-sm">点击"新增大类"添加</p>
+            <p className="text-gray-500 mb-4">暂无分类配置</p>
+            <p className="text-gray-400 text-sm">点击"新增分类"添加</p>
           </div>
         )}
       </section>
@@ -755,7 +755,7 @@ const Settings: React.FC = () => {
 
 
 
-      {/* 大类视频删除确认弹窗 */}
+      {/* 分类视频删除确认弹窗 */}
       {deleteCatConfirm && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">
@@ -836,14 +836,14 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 大类编辑/新增弹窗 */}
+      {/* 分类编辑/新增弹窗 */}
       {showCategoryModal && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel max-h-[90vh] !w-[min(100%,520px)] overflow-y-auto">
-            <h2 className="changli-modal-title">{editingCategory ? '编辑大类' : '新增大类'}</h2>
+            <h2 className="changli-modal-title">{editingCategory ? '编辑分类' : '新增分类'}</h2>
             <div className="space-y-4">
               <div>
-                <label className="changli-form-label">大类名称</label>
+                <label className="changli-form-label">分类名称</label>
                 <input
                   type="text"
                   value={categoryForm.name}
@@ -891,6 +891,7 @@ const Settings: React.FC = () => {
                     { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
                     { key: 'actors' as const, label: '演员', tip: '控制是否支持给视频集关联演员' },
                     { key: 'tracking' as const, label: '追番', tip: '控制是否支持追番/已看完功能' },
+                    { key: 'status' as const, label: '连载状态', tip: '控制是否显示连载中/已完结状态' },
                     { key: 'chinese_sub' as const, label: '中文字幕', tip: '控制是否支持中文字幕标记' },
                   ]).map(({ key, label, tip }) => (
                     <div key={key} className="flex items-center justify-between">
@@ -951,12 +952,12 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 大类删除确认弹窗 */}
+      {/* 分类删除确认弹窗 */}
       {categoryDeleteConfirm && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">
             <p className="mb-6 text-base text-gray-900">
-              确定要删除大类「{categories.find(c => c.key === categoryDeleteConfirm)?.name || categoryDeleteConfirm}」吗？
+              确定要删除分类「{categories.find(c => c.key === categoryDeleteConfirm)?.name || categoryDeleteConfirm}」吗？
             </p>
             <div className="flex gap-3">
               <button
@@ -1082,7 +1083,7 @@ const Settings: React.FC = () => {
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
-              确定重新扫描该大类的所有视频元数据？
+              确定重新扫描该分类的所有视频元数据？
             </p>
             <div className="flex gap-3">
               <button
@@ -1183,12 +1184,12 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* 新增大类后立即扫描确认弹窗 */}
+      {/* 新增分类后立即扫描确认弹窗 */}
       {scanAfterCreate && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">
             <p className="text-gray-900 text-base mb-6">
-              大类已创建，是否立即扫描并添加？
+              分类已创建，是否立即扫描并添加？
             </p>
             <div className="flex gap-3">
               <button
