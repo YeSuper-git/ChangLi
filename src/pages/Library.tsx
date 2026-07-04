@@ -12,8 +12,11 @@ import {
   scanCategory,
   getTagsByCategory,
   getActorsByCategory,
+  checkCategoryUpdates,
+  addVideoToSeries,
+  deleteVideo,
 } from '../utils/api';
-import type { VideoSeries, Category, CategoryFeatures, Tag, Actor } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
 import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -39,6 +42,7 @@ const Library: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [scanConfirm, setScanConfirm] = useState(false);
+  const [categoryUpdateResult, setCategoryUpdateResult] = useState<CategoryUpdateResult | null>(null);
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -404,24 +408,69 @@ const Library: React.FC = () => {
     setScanConfirm(false);
     setCategoryScanning(true);
     try {
-      clearLibraryFilterCaches();
-      const result = await scanCategory(mainCategory);
+      const result = await checkCategoryUpdates(mainCategory);
+      const hasChanges = result.new_series.length > 0 || result.missing_series.length > 0 || result.series_updates.length > 0;
+      if (!hasChanges) {
+        // 没有变更，执行一键扫描以发现新文件夹
+        clearLibraryFilterCaches();
+        const scanResult = await scanCategory(mainCategory);
+        await refreshSeries();
+        if (activeTagId !== null) await filterByTag(activeTagId);
+        if (activeActorId !== null) await filterByActor(activeActorId);
+        const { added, updated } = scanResult;
+        if (added > 0 && updated > 0) {
+          notify({ message: `扫描完成，添加了 ${added} 部，更新了 ${updated} 部`, type: 'success' });
+        } else if (added > 0) {
+          notify({ message: `扫描完成，添加了 ${added} 部`, type: 'success' });
+        } else if (updated > 0) {
+          notify({ message: `扫描完成，更新了 ${updated} 部`, type: 'info' });
+        } else {
+          notify({ message: '无更新', type: 'info' });
+        }
+      } else {
+        setCategoryUpdateResult(result);
+      }
+    } catch (error) {
+      console.error('[Library] 检查更新失败:', error);
+      notify({ message: '检查更新失败: ' + String(error), type: 'info' });
+    } finally {
+      setCategoryScanning(false);
+    }
+  };
+
+  const handleConfirmCategoryUpdates = async () => {
+    if (!categoryUpdateResult) return;
+    setCategoryScanning(true);
+    setCategoryUpdateResult(null);
+    try {
+      // 1. 处理新增视频集：执行一键扫描以添加新文件夹
+      if (categoryUpdateResult.new_series.length > 0) {
+        clearLibraryFilterCaches();
+        await scanCategory(mainCategory);
+      }
+      // 2. 处理每个视频集的新增分集
+      for (const su of categoryUpdateResult.series_updates) {
+        for (const video of su.new_videos) {
+          await addVideoToSeries(su.series_id, video.file_path);
+        }
+        for (const video of su.missing_videos) {
+          await deleteVideo(video.id);
+        }
+      }
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
-      const { added, updated } = result;
-      if (added > 0 && updated > 0) {
-        notify({ message: `扫描完成，添加了 ${added} 部，更新了 ${updated} 部`, type: 'success' });
-      } else if (added > 0) {
-        notify({ message: `扫描完成，添加了 ${added} 部`, type: 'success' });
-      } else if (updated > 0) {
-        notify({ message: `扫描完成，更新了 ${updated} 部`, type: 'info' });
-      } else {
-        notify({ message: '扫描完成，未发现新作品', type: 'info' });
-      }
+      const parts: string[] = [];
+      if (categoryUpdateResult.new_series.length > 0) parts.push(`新增 ${categoryUpdateResult.new_series.length} 部视频集`);
+      const totalNewEps = categoryUpdateResult.series_updates.reduce((s, u) => s + u.new_videos.length, 0);
+      const totalMissEps = categoryUpdateResult.series_updates.reduce((s, u) => s + u.missing_videos.length, 0);
+      if (totalNewEps > 0) parts.push(`新增 ${totalNewEps} 个分集`);
+      if (totalMissEps > 0) parts.push(`删除 ${totalMissEps} 个丢失分集`);
+      if (categoryUpdateResult.missing_series.length > 0) parts.push(`${categoryUpdateResult.missing_series.length} 个视频集资源缺失`);
+      notify({ message: parts.length > 0 ? parts.join('，') : '更新完成', type: 'success' });
     } catch (error) {
-      console.error('[Library] 一键扫描失败:', error);
-      notify({ message: '扫描失败: ' + String(error), type: 'info' });
+      console.error('[Library] 更新失败:', error);
+      notify({ message: '更新失败: ' + String(error), type: 'error' });
     } finally {
       setCategoryScanning(false);
     }
@@ -569,7 +618,7 @@ const Library: React.FC = () => {
               disabled={categoryScanning}
               className="action-btn action-btn-primary disabled:opacity-50"
             >
-              {categoryScanning ? '扫描中...' : '一键扫描'}
+              {categoryScanning ? '检查中...' : '检查更新'}
             </button>
           )}
           <button
@@ -848,12 +897,12 @@ const Library: React.FC = () => {
       onCancel={() => setBatchDeleteConfirm(false)}
     />
 
-    {/* 一键扫描确认弹窗 */}
+    {/* 检查更新确认弹窗 */}
     {scanConfirm && (
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            确定对「{categoryDisplayName}」执行一键扫描？<br />
+            确定对「{categoryDisplayName}」执行检查更新？<br />
             <span className="text-sm text-gray-500">扫描路径：{currentCategory?.scan_path}</span>
           </p>
           <div className="flex gap-3">
@@ -861,7 +910,7 @@ const Library: React.FC = () => {
               onClick={handleCategoryScan}
               className="action-btn action-btn-primary flex-1 text-sm"
             >
-              确认扫描
+              确认检查
             </button>
             <button
               onClick={() => setScanConfirm(false)}
@@ -869,6 +918,75 @@ const Library: React.FC = () => {
             >
               取消
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 分类更新确认弹窗 */}
+    {categoryUpdateResult && (
+      <div className="changli-modal-backdrop" onClick={() => setCategoryUpdateResult(null)}>
+        <div className="changli-modal-panel !w-[min(100%,560px)] !p-0" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-header">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">检查更新</p>
+            <h2 className="mt-1 text-2xl font-bold text-gray-900">发现变更</h2>
+          </div>
+          <div className="changli-modal-body max-h-80 overflow-y-auto">
+            {categoryUpdateResult.new_series.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增视频集 ({categoryUpdateResult.new_series.length})</h3>
+                <div className="space-y-2">
+                  {categoryUpdateResult.new_series.map((name, idx) => (
+                    <div key={idx} className="rounded-2xl border border-green-100 bg-green-50/50 p-3">
+                      <div className="text-sm font-semibold text-gray-900">{name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {categoryUpdateResult.series_updates.filter(su => su.new_videos.length > 0).length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增分集</h3>
+                <div className="space-y-2">
+                  {categoryUpdateResult.series_updates.filter(su => su.new_videos.length > 0).map(su => (
+                    <div key={su.series_id} className="rounded-2xl border border-green-100 bg-green-50/50 p-3">
+                      <div className="text-sm font-semibold text-gray-900">{su.series_title}</div>
+                      <div className="mt-1 text-xs text-gray-500">{su.new_videos.map(v => v.file_name).join('、')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {categoryUpdateResult.missing_series.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失视频集 ({categoryUpdateResult.missing_series.length})</h3>
+                <div className="space-y-2">
+                  {categoryUpdateResult.missing_series.map((name, idx) => (
+                    <div key={idx} className="rounded-2xl border border-red-100 bg-red-50/50 p-3">
+                      <div className="text-sm font-semibold text-gray-900">{name}</div>
+                      <div className="mt-1 text-xs text-gray-400">文件夹已不存在</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {categoryUpdateResult.series_updates.filter(su => su.missing_videos.length > 0).length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失分集</h3>
+                <div className="space-y-2">
+                  {categoryUpdateResult.series_updates.filter(su => su.missing_videos.length > 0).map(su => (
+                    <div key={su.series_id} className="rounded-2xl border border-red-100 bg-red-50/50 p-3">
+                      <div className="text-sm font-semibold text-gray-900">{su.series_title}</div>
+                      <div className="mt-1 text-xs text-gray-400">{su.missing_videos.length} 个分集文件已丢失</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="changli-modal-footer">
+            <button onClick={handleConfirmCategoryUpdates} className="action-btn action-btn-primary flex-1">确认更新</button>
+            <button onClick={() => setCategoryUpdateResult(null)} className="action-btn flex-1">取消</button>
           </div>
         </div>
       </div>

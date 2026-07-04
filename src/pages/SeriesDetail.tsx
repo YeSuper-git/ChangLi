@@ -24,7 +24,6 @@ import {
   openPlayerWindow,
   getTags,
   getVideoSeriesDetail,
-  getMissingSeriesVideos,
   removeSeriesActor,
   removeSeriesTag,
   removeVideoFromSeries,
@@ -35,6 +34,8 @@ import {
   getAllCategories,
   rescanSingleSeriesMetadata,
   parseCategoryFeatures,
+  checkSeriesUpdates,
+  addVideoToSeries,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
@@ -135,6 +136,7 @@ const SeriesDetail: React.FC = () => {
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [missingVideos, setMissingVideos] = useState<Video[]>([]);
+  const [updateDialog, setUpdateDialog] = useState<{ newVideos: Video[]; missingVideos: Video[] } | null>(null);
   const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
@@ -513,20 +515,46 @@ const SeriesDetail: React.FC = () => {
   const handleCheckUpdates = async () => {
     if (!series) return;
     try {
-      const matched = await rescanSingleSeriesMetadata(series.id);
-      const missing = await getMissingSeriesVideos(series.id);
-      seriesDetailCache.delete(series.id);
-      await loadSeries();
-      await refreshSeries();
-      if (missing.length > 0) {
-        setMissingVideos(missing);
-        notify({ message: `发现 ${missing.length} 个本地已不存在的分集`, type: 'info' });
-      } else {
-        notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      const result = await checkSeriesUpdates(series.id);
+      if (result.new_videos.length === 0 && result.missing_videos.length === 0) {
+        notify({ message: '无更新', type: 'info' });
+        // 仍然执行元数据更新
+        await rescanSingleSeriesMetadata(series.id);
+        seriesDetailCache.delete(series.id);
+        await loadSeries();
+        await refreshSeries();
+        return;
       }
+      setUpdateDialog({ newVideos: result.new_videos, missingVideos: result.missing_videos });
     } catch (error) {
       console.error('[SeriesDetail] 检查更新失败:', error);
       notify({ message: '检查更新失败: ' + String(error), type: 'error' });
+    }
+  };
+
+  const handleConfirmUpdates = async () => {
+    if (!updateDialog || !series) return;
+    const { newVideos, missingVideos: missVids } = updateDialog;
+    setUpdateDialog(null);
+    try {
+      // 添加新分集
+      for (const video of newVideos) {
+        await addVideoToSeries(series.id, video.file_path);
+      }
+      // 删除丢失的分集
+      for (const video of missVids) {
+        await deleteVideo(video.id);
+      }
+      seriesDetailCache.delete(series.id);
+      await loadSeries();
+      await refreshSeries();
+      const parts: string[] = [];
+      if (newVideos.length > 0) parts.push(`添加了 ${newVideos.length} 个新分集`);
+      if (missVids.length > 0) parts.push(`删除了 ${missVids.length} 个丢失分集`);
+      notify({ message: parts.join('，'), type: 'success' });
+    } catch (error) {
+      console.error('[SeriesDetail] 更新失败:', error);
+      notify({ message: '更新失败: ' + String(error), type: 'error' });
     }
   };
 
@@ -928,6 +956,50 @@ const SeriesDetail: React.FC = () => {
             <div className="changli-modal-footer">
               <button onClick={() => setMissingVideos([])} className="action-btn flex-1">先不删除</button>
               <button onClick={handleDeleteMissingVideos} className="action-btn action-btn-danger flex-1">确认删除记录</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 检查更新确认弹窗 */}
+      {updateDialog && (
+        <div className="changli-modal-backdrop" onClick={() => setUpdateDialog(null)}>
+          <div className="changli-modal-panel !w-[min(100%,560px)] !p-0" onClick={e => e.stopPropagation()}>
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">检查更新</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">发现变更</h2>
+            </div>
+            <div className="changli-modal-body max-h-80 overflow-y-auto">
+              {updateDialog.newVideos.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">新增分集 ({updateDialog.newVideos.length})</h3>
+                  <div className="space-y-2">
+                    {updateDialog.newVideos.map((video, idx) => (
+                      <div key={idx} className="rounded-2xl border border-green-100 bg-green-50/50 p-3">
+                        <div className="text-sm font-semibold text-gray-900">{video.file_name}</div>
+                        <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {updateDialog.missingVideos.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失分集 ({updateDialog.missingVideos.length})</h3>
+                  <div className="space-y-2">
+                    {updateDialog.missingVideos.map((video) => (
+                      <div key={video.id} className="rounded-2xl border border-red-100 bg-red-50/50 p-3">
+                        <div className="text-sm font-semibold text-gray-900">{video.episode_number ? `第${video.episode_number}${epWord}` : video.file_name}</div>
+                        <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="changli-modal-footer">
+              <button onClick={handleConfirmUpdates} className="action-btn action-btn-primary flex-1">确认更新</button>
+              <button onClick={() => setUpdateDialog(null)} className="action-btn flex-1">取消</button>
             </div>
           </div>
         </div>

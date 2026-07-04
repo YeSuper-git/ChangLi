@@ -437,6 +437,32 @@ export async function getMissingSeriesVideos(seriesId: number): Promise<Video[]>
   return invoke<Video[]>('get_missing_series_videos', { seriesId });
 }
 
+export interface SeriesUpdateResult {
+  new_videos: Video[];
+  missing_videos: Video[];
+}
+
+export async function checkSeriesUpdates(seriesId: number): Promise<SeriesUpdateResult> {
+  return invoke<SeriesUpdateResult>('check_series_updates', { seriesId });
+}
+
+export interface SeriesUpdateSummary {
+  series_id: number;
+  series_title: string;
+  new_videos: Video[];
+  missing_videos: Video[];
+}
+
+export interface CategoryUpdateResult {
+  new_series: string[];
+  missing_series: string[];
+  series_updates: SeriesUpdateSummary[];
+}
+
+export async function checkCategoryUpdates(categoryKey: string): Promise<CategoryUpdateResult> {
+  return invoke<CategoryUpdateResult>('check_category_updates', { categoryKey });
+}
+
 // 演员相关
 export interface Actor {
   id: number;

@@ -1997,6 +1997,34 @@ async fn rescan_single_series_metadata(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn check_series_updates(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<db::SeriesUpdateResult, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::check_series_updates(&pool, series_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn check_category_updates(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<db::CategoryUpdateResult, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::check_category_updates(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // 演员多海报命令
 #[tauri::command]
 async fn get_actor_photos(
@@ -2281,6 +2309,8 @@ fn main() {
             play_video,
             open_player_window,
             get_missing_series_videos,
+            check_series_updates,
+            check_category_updates,
             update_play_history,
             get_play_history,
             get_recent_watch_items,
