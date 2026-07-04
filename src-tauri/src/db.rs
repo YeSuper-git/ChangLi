@@ -3295,11 +3295,19 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     let mut series_updates = Vec::new();
 
     // 建立 folder_path 到 series 的映射，用于后续匹配新文件夹
+    // 同时建立基础名称集合，用于匹配 "xxxx 1-3" → "xxxx" 这种改名场景
     let mut existing_folder_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut existing_base_names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for (id, title, folder_path) in &series_list {
         let source = folder_path.as_deref().unwrap_or(title);
         existing_folder_paths.insert(source.to_string());
+        // 提取文件夹名，去掉集数后缀，用于匹配
+        let folder_name = std::path::Path::new(source)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| title.clone());
+        existing_base_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
 
         let folder_path_std = std::path::Path::new(source);
 
@@ -3345,7 +3353,11 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             .file_name()
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_default();
-                        new_folders.push(folder_name);
+                        // 用基础名称匹配：去掉 " 1-N" 后缀后比较
+                        let base = crate::scanner::strip_episode_suffix(&folder_name);
+                        if !existing_base_names.contains(&base) {
+                            new_folders.push(folder_name);
+                        }
                     }
                 }
             }

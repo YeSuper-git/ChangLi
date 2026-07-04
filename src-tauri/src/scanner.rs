@@ -113,6 +113,22 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "webp", "bmp", "gif", "avif", "svg", "tif", "tiff", "ico",
 ];
 
+/// 去除文件夹名末尾的 " 1-N" 集数标记，返回基础名称用于匹配。
+/// 例如 "xxxx 1-3" → "xxxx", "xxxx 1-25" → "xxxx", "xxxx" → "xxxx"
+pub fn strip_episode_suffix(name: &str) -> String {
+    let trimmed = name.trim();
+    // 匹配末尾 " 数字-数字" 或 " 数字集" 等模式
+    if let Some(pos) = trimmed.rfind(' ') {
+        let suffix = &trimmed[pos + 1..];
+        if suffix.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '集' || c == '话')
+            && suffix.contains('-')
+        {
+            return trimmed[..pos].to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
 // 扫描结果
 #[derive(Debug)]
 pub struct ScanResult {

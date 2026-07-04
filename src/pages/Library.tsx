@@ -373,7 +373,7 @@ const Library: React.FC = () => {
       if (activeActorId !== null) await filterByActor(activeActorId);
       notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
     } catch (error) {
-      console.error('[Library] 重新扫描元数据失败:', error);
+      console.error('[Library] 检查更新失败:', error);
       notify({ message: '重新扫描失败: ' + String(error), type: 'info' });
     }
   };
@@ -889,7 +889,7 @@ const Library: React.FC = () => {
             className="changli-menu-item"
             onClick={() => handleRescanMetadata(contextMenu.id)}
           >
-            重新扫描元数据
+            检查更新
           </button>
           <button
             className="changli-menu-item"
