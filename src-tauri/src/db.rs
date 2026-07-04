@@ -3326,9 +3326,9 @@ pub struct CategoryUpdateResult {
 
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
 pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Result<CategoryUpdateResult> {
-    // 获取分类下的所有视频集
+    // 获取分类下的所有视频集（空字符串 display_type 归入默认分类）
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
-        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
     ))
     .fetch_all(pool)
