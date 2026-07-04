@@ -842,7 +842,7 @@ const SeriesDetail: React.FC = () => {
                       )) : <span className="text-sm text-gray-400">暂无</span>}
                     </div>
                   )}
-                  {features.actors && series.code && (
+                  {series.code && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">车牌：</span>
                       <span className="inline-block mr-2 mb-2 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 font-mono">{series.code}</span>
