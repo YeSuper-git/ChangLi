@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
@@ -58,16 +58,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   // 保存当前页面滚动位置，返回时恢复
-  useEffect(() => {
+  useLayoutEffect(() => {
     const key = location.pathname + location.search;
     const main = mainRef.current;
 
     if (scrollPositions.has(key)) {
       // 该页面之前访问过，恢复保存的位置
       const savedTop = scrollPositions.get(key)!;
-      requestAnimationFrame(() => {
+      // 用 setTimeout 确保在 DOM 更新后执行
+      setTimeout(() => {
         mainRef.current?.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
-      });
+      }, 0);
     } else {
       // 新页面，滚到顶部
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -76,7 +77,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     // 离开时保存当前滚动位置
     return () => {
-      if (main) {
+      if (main && main.scrollTop > 0) {
         scrollPositions.set(location.pathname + location.search, main.scrollTop);
       }
     };
