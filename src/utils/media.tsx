@@ -1,4 +1,5 @@
 import React from 'react';
+import brandIcon from '../assets/brand/app-icon.png';
 
 export function imageDataUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -25,7 +26,7 @@ export const StaticImagePlaceholder: React.FC<PlaceholderProps> = ({ kind, class
       className={`w-full h-full flex items-center justify-center ${className}`}
       aria-label={isVideo ? '视频封面占位图' : '演员头像占位图'}
     >
-      <div className={isVideo ? 'text-4xl' : 'text-5xl'}>{isVideo ? '▶️' : '👤'}</div>
+      {isVideo ? <img src={brandIcon} alt="ChangLi" className="w-12 h-12 object-contain opacity-40" /> : <div className="text-5xl">👤</div>}
     </div>
   );
 };
