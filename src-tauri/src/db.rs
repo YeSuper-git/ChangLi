@@ -2453,7 +2453,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
             let new_title = info.title.unwrap_or_else(|| folder_name.clone());
 
             sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
+                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
             )
             .bind(&code)
             .bind(has_chinese_sub)
