@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
+import settingsIcon from '../assets/icons/settings.svg';
 import PageMotion from './PageMotion';
 
 interface LayoutProps {
@@ -151,7 +152,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 )}
                 <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" title="设置">
-                  <span className="control-icon settings-icon" aria-hidden="true" />
+                  <img src={settingsIcon} alt="" className="w-[14px] h-[14px]" />
                 </button>
                 <button type="button" onClick={handleMinimize} aria-label="最小化" title="最小化">
                   <span className="control-icon minimize-icon" aria-hidden="true" />
