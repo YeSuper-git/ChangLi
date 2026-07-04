@@ -543,6 +543,9 @@ const Library: React.FC = () => {
                 setActorFilteredSeries(null);
                 setActiveTagId(null);
                 setTagFilteredSeries(null);
+                setFavoriteFilter(false);
+                setWatchedFilter(false);
+                setSearchTerm('');
               }}
             >
               {cat.name}
