@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, MemoryRouter, Routes, Route } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { BrowserRouter as Router, MemoryRouter, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Layout from './components/Layout';
@@ -84,8 +84,42 @@ function App() {
     );
   }
 
+  // ScrollRestoration: POP(返回)恢复位置，PUSH/REPLACE(导航)滚到顶部
+  const ScrollRestoration: React.FC = () => {
+    const location = useLocation();
+    const navigationType = useNavigationType();
+    const positions = useRef<Map<string, number>>(new Map());
+
+    // 保存离开前的位置
+    useEffect(() => {
+      return () => {
+        // cleanup 时保存当前位置（仅在 POP 前的正常导航时）
+        const key = location.key || location.pathname;
+        positions.current.set(key, window.scrollY);
+      };
+    }, [location]);
+
+    // 页面渲染后决定滚动位置
+    useEffect(() => {
+      const key = location.key || location.pathname;
+      if (navigationType === 'POP') {
+        // 返回：恢复之前保存的位置
+        const saved = positions.current.get(key);
+        if (saved !== undefined && saved > 0) {
+          requestAnimationFrame(() => window.scrollTo(0, saved));
+          return;
+        }
+      }
+      // PUSH 或 REPLACE：滚到顶部
+      window.scrollTo(0, 0);
+    }, [location.pathname, location.search]);
+
+    return null;
+  };
+
   return (
     <Router>
+      <ScrollRestoration />
       <Layout>
         <ToastProvider />
         <Routes>
