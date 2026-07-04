@@ -172,16 +172,14 @@ body {
 
 .changli-auto-grid-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 160px);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
-  justify-content: center;
 }
 
 .changli-auto-grid-info {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 220px);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
-  justify-content: center;
 }
 
 .changli-actor-info-grid {
