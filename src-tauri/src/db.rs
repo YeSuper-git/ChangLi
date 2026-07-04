@@ -3427,6 +3427,13 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
 
             /// 收集目录下不在 existing_base_names 中的子文件夹名
+            // 路径规范化：统一斜杠方向和大小写
+            let normalize = |s: &str| -> String {
+                s.replace("\\", "/").to_lowercase()
+            };
+            let normalized_db_paths: std::collections::HashSet<String> =
+                existing_folder_paths.iter().map(|p| normalize(p)).collect();
+
             let collect_new = |parent: &std::path::Path| -> Vec<String> {
                 let mut result = Vec::new();
                 if let Ok(entries) = std::fs::read_dir(parent) {
@@ -3434,8 +3441,12 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         let p = entry.path();
                         if !p.is_dir() { continue; }
                         let fps = p.to_string_lossy().to_string();
-                        if existing_folder_paths.contains(&fps) { continue; }
+                        // 1) 规范化路径比较
+                        if normalized_db_paths.contains(&normalize(&fps)) { continue; }
                         let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                        // 2) 文件夹名直接匹配
+                        if existing_base_names.contains(&name) { continue; }
+                        // 3) 去掉集数后缀再匹配
                         let base = crate::scanner::strip_episode_suffix(&name);
                         if !existing_base_names.contains(&base) {
                             result.push(name);
