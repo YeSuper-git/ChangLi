@@ -3379,26 +3379,18 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     }
 
     // 检测 scan_path 下的新视频集文件夹
-    // 扫描路径结构：scan_path/标签或演员/视频集文件夹/视频文件
-    // 如果 tags/actors 启用，顶层是标签/演员文件夹，需要递归一层
+    // 自动判断文件夹层级：匹配标签/演员名 → 递归进去找视频集；含视频文件 → 视频集；否则跳过
     let category = get_category_by_key(pool, category_key).await?;
-    let features: serde_json::Value = category.as_ref()
-        .map(|c| serde_json::from_str(&c.features).unwrap_or_default())
-        .unwrap_or_default();
-    let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
-    let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
 
     let new_series = if let Some(ref scan_path) = category.and_then(|c| c.scan_path) {
         let path = std::path::Path::new(scan_path);
         if path.is_dir() {
             let mut new_folders = Vec::new();
-            let collect_new = |parent: &std::path::Path, folders: &mut Vec<String>| {
+            let collect_new_from_dir = |parent: &std::path::Path, folders: &mut Vec<String>| {
                 if let Ok(entries) = std::fs::read_dir(parent) {
                     for entry in entries.filter_map(|e| e.ok()) {
                         let entry_path = entry.path();
-                        if !entry_path.is_dir() {
-                            continue;
-                        }
+                        if !entry_path.is_dir() { continue; }
                         let folder_path_str = entry_path.to_string_lossy().to_string();
                         if !existing_folder_paths.contains(&folder_path_str) {
                             let folder_name = entry_path
@@ -3414,19 +3406,37 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 }
             };
 
-            if actors_enabled || tags_enabled {
-                // 顶层文件夹是标签/演员名，递归一层进去找视频集
-                if let Ok(top_entries) = std::fs::read_dir(path) {
-                    for entry in top_entries.filter_map(|e| e.ok()) {
-                        let sub_path = entry.path();
-                        if sub_path.is_dir() {
-                            collect_new(&sub_path, &mut new_folders);
-                        }
+            // 预加载所有标签名和演员名用于匹配
+            let tag_names: std::collections::HashSet<String> =
+                sqlx::query_scalar::<_, String>("SELECT name FROM tags")
+                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+            let actor_names: std::collections::HashSet<String> =
+                sqlx::query_scalar::<_, String>("SELECT name FROM actors")
+                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+            // 也按 label 匹配
+            let actor_labels: std::collections::HashSet<String> =
+                sqlx::query_scalar::<_, String>("SELECT COALESCE(label, name) FROM actors")
+                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+
+            if let Ok(top_entries) = std::fs::read_dir(path) {
+                for entry in top_entries.filter_map(|e| e.ok()) {
+                    let sub_path = entry.path();
+                    if !sub_path.is_dir() { continue; }
+                    let name = sub_path.file_name()
+                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+
+                    // 1) 文件夹名匹配标签/演员 → 标签/演员层，递归进去找视频集
+                    if tag_names.contains(&name)
+                        || actor_names.contains(&name)
+                        || actor_labels.contains(&name)
+                    {
+                        collect_new_from_dir(&sub_path, &mut new_folders);
+                    } else {
+                        // 2) 不匹配 → 可能是直接的视频集文件夹
+                        collect_new_from_dir(path, &mut new_folders);
+                        break; // 已经处理了所有顶层，跳出
                     }
                 }
-            } else {
-                // 无标签/演员，顶层就是视频集
-                collect_new(path, &mut new_folders);
             }
             new_folders
         } else {
