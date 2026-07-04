@@ -1,3 +1,9 @@
+## v1.7.78 (2026-07-05)
+
+### 修复
+- 修复 v1.7.77 Windows CI 新暴露的 `BOOL` 类型路径问题：为 Windows target 显式添加 `windows-core = "0.61"` 依赖，并使用 `windows_core::BOOL` 匹配 `WNDENUMPROC`
+- 继续补发 v1.7.68-v1.7.75 未成功发布的全部代码
+
 ## v1.7.77 (2026-07-05)
 
 ### 修复

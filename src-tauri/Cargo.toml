@@ -1,6 +1,6 @@
 [package]
 name = "changli"
-version = "1.7.77"
+version = "1.7.78"
 description = "长离 - 全功能视频管理播放平台"
 authors = ["YeSuper"]
 license = "MIT"
@@ -39,6 +39,7 @@ tauri-plugin-libmpv = "0.3.2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+windows-core = "0.61"
 winreg = "0.55"
 
 [features]
