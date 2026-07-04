@@ -64,7 +64,7 @@ const Home: React.FC = () => {
             </span>
           )}
           <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
-            {series.video_count === 0 ? '暂无资源' : series.status === 'completed' || !isTracking ? `共${series.video_count}${epWord}` : `更新至第${series.video_count}${epWord}`}
+            {series.video_count === 0 ? '暂无资源' : series.status === 'completed' || !isTracking ? `全 ${series.video_count} ${epWord}` : `更新至第${series.video_count}${epWord}`}
           </div>
         </div>
         <div className="mt-2 min-w-0">
