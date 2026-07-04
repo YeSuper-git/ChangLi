@@ -100,8 +100,13 @@ function App() {
     }, [location]);
 
     // 页面渲染后决定滚动位置
+    const prevPathname = useRef(location.pathname);
     useEffect(() => {
-      const key = location.key || location.pathname;
+      // 只在路由路径变化时处理滚动，search params变化（筛选）不影响
+      if (prevPathname.current === location.pathname) return;
+      prevPathname.current = location.pathname;
+
+      const key = location.pathname;
       if (navigationType === 'POP') {
         // 返回：恢复之前保存的位置
         const saved = positions.current.get(key);
@@ -112,7 +117,7 @@ function App() {
       }
       // PUSH 或 REPLACE：滚到顶部
       window.scrollTo(0, 0);
-    }, [location.pathname, location.search]);
+    }, [location.pathname]);
 
     return null;
   };
