@@ -53,6 +53,22 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
+unsafe extern "system" fn enum_windows_callback(hwnd: windows::Win32::Foundation::HWND, lparam: windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::BOOL {
+    use windows::Win32::UI::WindowsAndMessaging::*;
+    let buf = &mut [0u16; 256];
+    let len = GetWindowTextW(hwnd, buf);
+    if len > 0 {
+        let title = String::from_utf16_lossy(&buf[..len as usize]);
+        if title.contains("ChangLi") {
+            let found = &mut *(lparam.0 as *mut windows::Win32::Foundation::HWND);
+            *found = hwnd;
+            return false.into();
+        }
+    }
+    true.into()
+}
+
+#[cfg(target_os = "windows")]
 fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // 根因确认：此前 Windows 路径创建了一个 Tauri WebView 播放壳，再把 mpv --wid
     // 嵌入到这个 WebView HWND。这个架构在 WebView2/DWM 合成下反复出现“外部悬浮、
