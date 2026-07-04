@@ -53,25 +53,6 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-unsafe extern "system" fn enum_windows_callback(
-    hwnd: windows::Win32::Foundation::HWND,
-    lparam: windows::Win32::Foundation::LPARAM,
-) -> windows_core::BOOL {
-    use windows::Win32::UI::WindowsAndMessaging::*;
-    let buf = &mut [0u16; 256];
-    let len = GetWindowTextW(hwnd, buf);
-    if len > 0 {
-        let title = String::from_utf16_lossy(&buf[..len as usize]);
-        if title.contains("ChangLi") {
-            let found = &mut *(lparam.0 as *mut windows::Win32::Foundation::HWND);
-            *found = hwnd;
-            return windows_core::BOOL(0);
-        }
-    }
-    windows_core::BOOL(1)
-}
-
-#[cfg(target_os = "windows")]
 fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // 根因确认：此前 Windows 路径创建了一个 Tauri WebView 播放壳，再把 mpv --wid
     // 嵌入到这个 WebView HWND。这个架构在 WebView2/DWM 合成下反复出现“外部悬浮、
@@ -99,28 +80,6 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     let new_session =
         spawn_mpv_with_options(app, None, geometry.as_deref(), &ipc_path, video_path)?;
     *session = Some(new_session);
-    // 延迟一小段时间等 mpv 窗口创建，然后尝试激活到前台
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        // 查找 mpv 窗口并激活
-        #[cfg(target_os = "windows")]
-        {
-            use windows::Win32::UI::WindowsAndMessaging::*;
-            use windows::Win32::Foundation::*;
-            unsafe {
-                // 查找标题含 "ChangLi" 的窗口（mpv --title 设置的）
-                let mut found_hwnd = HWND::default();
-                let _ = EnumWindows(
-                    Some(enum_windows_callback),
-                    windows::Win32::Foundation::LPARAM(&mut found_hwnd as *mut _ as isize),
-                );
-                if !found_hwnd.0.is_null() {
-                    let _ = SetForegroundWindow(found_hwnd);
-                    let _ = ShowWindow(found_hwnd, SW_SHOW);
-                }
-            }
-        }
-    });
     Ok(())
 }
 
@@ -430,7 +389,11 @@ fn spawn_mpv_process(
                 .arg("--background=none")
                 .arg("--no-border");
         } else {
-            command.arg("--border=yes").arg("--ontop");
+            command
+                .arg("--border=yes")
+                .arg("--ontop")
+                .arg("--screen=0")
+                .arg("--no-window-minimized");
             if let Some(geometry) = _geometry {
                 command.arg(format!("--geometry={geometry}"));
             }
@@ -446,7 +409,7 @@ fn spawn_mpv_process(
     }
 
     command
-        .arg("--force-window=yes")
+        .arg("--force-window=immediate")
         .arg("--hwdec=d3d11va")
         .arg("--d3d11-sync-interval=0")
         .arg("--video-sync=audio")
