@@ -435,6 +435,7 @@ const SeriesDetail: React.FC = () => {
       tags: !isAdult,
       actors: isAdult,
       tracking: !isAdult,
+      status: !isAdult,
       chinese_sub: isAdult,
       episode: !isAdult ? '话' : '部',
     };
@@ -469,7 +470,7 @@ const SeriesDetail: React.FC = () => {
     : orderedVideos.length > 0
       ? '尚未观看'
       : '暂无可播放分集';
-  const episodeCountLabel = series.status === 'completed' || !features.tracking
+  const episodeCountLabel = series.status === 'completed' || !features.status
     ? `全 ${series.video_count} ${epWord}`
     : `更新至第 ${series.video_count} ${epWord}`;
 

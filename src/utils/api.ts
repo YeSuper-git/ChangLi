@@ -963,6 +963,7 @@ export interface CategoryFeatures {
   tags: boolean;
   actors: boolean;
   tracking: boolean;
+  status: boolean;
   chinese_sub: boolean;
   episode: string;
 }
@@ -975,7 +976,7 @@ export function parseCategoryFeatures(features: string): CategoryFeatures {
     }
     return parsed;
   } catch {
-    return { tags: false, actors: false, tracking: false, chinese_sub: false, episode: '部' };
+    return { tags: false, actors: false, tracking: false, status: false, chinese_sub: false, episode: '部' };
   }
 }
 

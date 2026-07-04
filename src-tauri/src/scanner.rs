@@ -288,6 +288,10 @@ fn file_stem_lower(path: &Path) -> String {
         .to_lowercase()
 }
 
+fn same_dir(a: &Path, b: &Path) -> bool {
+    a == b || a.to_string_lossy().trim_end_matches('/') == b.to_string_lossy().trim_end_matches('/')
+}
+
 fn fixed_episode_from_path(path: &Path) -> Option<i32> {
     let stem = path.file_stem()?.to_str()?;
     if !stem.is_empty() && stem.chars().all(|c| c.is_ascii_digit()) {
@@ -315,9 +319,10 @@ fn sort_episode_files(files: &mut Vec<PathBuf>) {
 fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<String> {
     let video_parent = video_path.parent()?;
     let video_stem = file_stem_lower(video_path);
-    // 1. 找和视频同名的图片
+    // 1. 找和视频同名的图片（同目录下，文件名不含扩展名相同）
     if let Some(found) = image_files.iter().find_map(|image_path| {
-        if image_path.parent() == Some(video_parent) && file_stem_lower(image_path) == video_stem {
+        let img_parent = image_path.parent()?;
+        if same_dir(img_parent, video_parent) && file_stem_lower(image_path) == video_stem {
             Some(image_path.to_string_lossy().to_string())
         } else {
             None
@@ -327,7 +332,8 @@ fn find_poster_for_video(video_path: &Path, image_files: &[PathBuf]) -> Option<S
     }
     // 2. 找文件名包含 "pl" 的图片
     image_files.iter().find_map(|image_path| {
-        if image_path.parent() == Some(video_parent) {
+        let img_parent = image_path.parent()?;
+        if same_dir(img_parent, video_parent) {
             let name = image_path.file_stem()?.to_str()?.to_lowercase();
             if name.contains("pl") {
                 Some(image_path.to_string_lossy().to_string())
@@ -366,7 +372,7 @@ fn find_poster_for_folder(
     // 策略1：查找与文件夹同名的图片
     for image_path in image_files {
         if let Some(image_parent) = image_path.parent() {
-            if image_parent == folder {
+            if same_dir(image_parent, folder) {
                 let image_stem = image_path
                     .file_stem()
                     .unwrap_or_default()
@@ -383,7 +389,7 @@ fn find_poster_for_folder(
     // 策略2：查找与视频文件同名的图片（如 abc.mp4 → abc.jpg）
     for video_path in video_files {
         if let Some(video_parent) = video_path.parent() {
-            if video_parent == folder {
+            if same_dir(video_parent, folder) {
                 let video_stem = video_path
                     .file_stem()
                     .unwrap_or_default()
@@ -391,7 +397,7 @@ fn find_poster_for_folder(
                     .to_lowercase();
                 for image_path in image_files {
                     if let Some(image_parent) = image_path.parent() {
-                        if image_parent == folder {
+                        if same_dir(image_parent, folder) {
                             let image_stem = image_path
                                 .file_stem()
                                 .unwrap_or_default()
@@ -410,7 +416,7 @@ fn find_poster_for_folder(
     // 策略3：查找图片名称中带 "pl" 的图片
     for image_path in image_files {
         if let Some(image_parent) = image_path.parent() {
-            if image_parent == folder {
+            if same_dir(image_parent, folder) {
                 let image_stem = image_path
                     .file_stem()
                     .unwrap_or_default()
@@ -428,7 +434,7 @@ fn find_poster_for_folder(
         let code_lower = info.code.to_lowercase();
         for image_path in image_files {
             if let Some(image_parent) = image_path.parent() {
-                if image_parent == folder {
+                if same_dir(image_parent, folder) {
                     let image_stem = image_path
                         .file_stem()
                         .unwrap_or_default()
@@ -445,7 +451,7 @@ fn find_poster_for_folder(
     // 策略5：查找文件夹内的第一张图片
     for image_path in image_files {
         if let Some(image_parent) = image_path.parent() {
-            if image_parent == folder {
+            if same_dir(image_parent, folder) {
                 return Some(image_path.to_string_lossy().to_string());
             }
         }

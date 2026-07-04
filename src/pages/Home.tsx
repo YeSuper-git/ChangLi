@@ -36,6 +36,7 @@ const Home: React.FC = () => {
         tags: !isLegacyAdult,
         actors: isLegacyAdult,
         tracking: !isLegacyAdult,
+        status: !isLegacyAdult,
         chinese_sub: isLegacyAdult,
         episode: !isLegacyAdult ? '话' : '部',
       };

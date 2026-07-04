@@ -768,7 +768,7 @@ const Library: React.FC = () => {
                       </span>
                     )}
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.status === 'completed' || !itemFeatures.tracking ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
+                      {series.status === 'completed' || !itemFeatures.status ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
                     </div>
                   </div>
                   <div className="mt-2">
