@@ -405,9 +405,10 @@ fn spawn_mpv_process(
 
     command
         .arg("--force-window=yes")
-        .arg("--hwdec=d3d11va-copy")
+        .arg("--hwdec=d3d11va")
         .arg("--d3d11-flip=no")
         .arg("--d3d11-exclusive-fs=no")
+        .arg("--d3d11va-zero-copy=no")
         .arg("--border=yes")
         .arg("--target-colorspace-hint=yes")
         .arg("--target-colorspace-hint-mode=source")
