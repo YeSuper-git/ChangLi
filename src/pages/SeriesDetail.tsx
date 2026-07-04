@@ -470,7 +470,9 @@ const SeriesDetail: React.FC = () => {
     : orderedVideos.length > 0
       ? '尚未观看'
       : '暂无可播放分集';
-  const episodeCountLabel = series.status === 'completed' || !features.status
+  const episodeCountLabel = series.video_count === 0
+    ? '暂无资源'
+    : series.status === 'completed' || !features.status
     ? `全 ${series.video_count} ${epWord}`
     : `更新至第 ${series.video_count} ${epWord}`;
 
