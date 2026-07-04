@@ -335,8 +335,8 @@ fn spawn_mpv_process(
 
         if wid.is_some() {
             command
-                .arg("--vo=gpu")
-                .arg("--gpu-context=angle")
+                .arg("--vo=gpu-next")
+                .arg("--gpu-context=d3d11")
                 .arg("--no-keepaspect-window")
                 .arg("--background=none")
                 .arg("--no-border");
@@ -358,11 +358,16 @@ fn spawn_mpv_process(
 
     command
         .arg("--force-window=yes")
-        .arg("--hwdec=d3d11va")
+        .arg("--hwdec=d3d11va-copy")
         .arg("--d3d11-flip=no")
         .arg("--d3d11-exclusive-fs=no")
-        .arg("--d3d11va-zero-copy=no")
-        .arg("--video-sync=audio")
+        .arg("--border=yes")
+        .arg("--target-colorspace-hint=yes")
+        .arg("--target-colorspace-hint-mode=source")
+        .arg("--hdr-compute-peak=yes")
+        .arg("--target-trc=gamma2.2")
+        .arg("--tone-mapping-mode=auto")
+        .arg("--gamut-mapping-mode=auto")
         .arg("--osc=yes")
         .arg("--input-default-bindings=yes")
         .arg("--keep-open=no")
