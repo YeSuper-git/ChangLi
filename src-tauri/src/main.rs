@@ -1758,6 +1758,18 @@ async fn open_player_window(
     Ok(())
 }
 
+/// 一键切换游戏覆盖禁用状态
+#[tauri::command]
+fn set_game_overlay_disabled(disabled: bool) -> Result<String, String> {
+    player::set_game_overlay_disabled(disabled)
+}
+
+/// 读取游戏覆盖当前禁用状态
+#[tauri::command]
+fn get_game_overlay_disabled() -> Result<bool, String> {
+    player::read_game_overlay_disabled()
+}
+
 #[tauri::command]
 async fn get_missing_series_videos(
     state: State<'_, AppState>,
@@ -2311,6 +2323,8 @@ fn main() {
             is_preset_template_enabled_cmd,
             enable_preset_template_cmd,
             disable_preset_template_cmd,
+            set_game_overlay_disabled,
+            get_game_overlay_disabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1093,3 +1093,12 @@ export interface LatestReleaseInfo {
 export async function checkLatestRelease(): Promise<LatestReleaseInfo> {
   return invoke<LatestReleaseInfo>('check_latest_release');
 }
+
+// 游戏覆盖（NVIDIA / 游戏加加）
+export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
+  return invoke<string>('set_game_overlay_disabled', { disabled });
+}
+
+export async function getGameOverlayDisabled(): Promise<boolean> {
+  return invoke<boolean>('get_game_overlay_disabled');
+}

@@ -155,37 +155,84 @@ pub fn register_shortcuts(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// 禁用 Windows Game DVR，防止 NVIDIA/游戏加加把播放器识别为游戏
+/// Game DVR 注册表键路径
 #[cfg(target_os = "windows")]
-pub fn disable_game_dvr() {
-    use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+const GAME_DVR_KEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR";
+#[cfg(target_os = "windows")]
+const GAME_CONFIG_KEY: &str = "System\\GameConfigStore";
+#[cfg(target_os = "windows")]
+const GAME_BAR_KEY: &str = "SOFTWARE\\Microsoft\\GameBar";
+
+/// 一键禁用游戏覆盖（Game DVR + NVIDIA Profile）
+#[cfg(target_os = "windows")]
+pub fn set_game_overlay_disabled(disabled: bool) -> Result<String, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
     use winreg::RegKey;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let val: u32 = if disabled { 0 } else { 1 };
 
-    // 禁用 Game DVR
-    if let Ok(key) = hkcu.create_subkey_with_flags(
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
-        KEY_SET_VALUE,
-    ) {
-        let _ = key.0.set_value("AppCaptureEnabled", &0u32);
+    // Game DVR
+    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_DVR_KEY, KEY_SET_VALUE) {
+        let _ = key.0.set_value("AppCaptureEnabled", &val);
+    }
+    // GameConfigStore
+    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_CONFIG_KEY, KEY_SET_VALUE) {
+        let _ = key.0.set_value("GameDVR_Enabled", &val);
+    }
+    // GameBar
+    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_BAR_KEY, KEY_SET_VALUE) {
+        let _ = key.0.set_value("AllowAutoGameMode", &val);
     }
 
-    // 禁用 GameDVR
-    if let Ok(key) = hkcu.create_subkey_with_flags("System\\GameConfigStore", KEY_SET_VALUE) {
-        let _ = key.0.set_value("GameDVR_Enabled", &0u32);
+    // NVIDIA Profile Inspector 导入（仅禁用时）
+    if disabled {
+        if let Ok(exe_dir) = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()) {
+            let nip_exe = exe_dir.join("nvidiaProfileInspector.exe");
+            let nip_xml = exe_dir.join("changli-disable-overlay.xml");
+            if nip_exe.exists() && nip_xml.exists() {
+                let _ = std::process::Command::new(&nip_exe)
+                    .arg("-import")
+                    .arg(&nip_xml)
+                    .output();
+            }
+        }
     }
 
-    // 禁用自动游戏模式
-    if let Ok(key) =
-        hkcu.create_subkey_with_flags("SOFTWARE\\Microsoft\\GameBar", KEY_SET_VALUE)
-    {
-        let _ = key.0.set_value("AllowAutoGameMode", &0u32);
+    // 读取当前状态
+    let current = read_game_overlay_disabled().unwrap_or(disabled);
+    Ok(if current { "disabled".into() } else { "enabled".into() })
+}
+
+/// 读取当前游戏覆盖禁用状态
+#[cfg(target_os = "windows")]
+pub fn read_game_overlay_disabled() -> Result<bool, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(key) = hkcu.open_subkey_with_flags(GAME_DVR_KEY, KEY_READ) {
+        if let Ok(val) = key.get_value::<u32, _>("AppCaptureEnabled") {
+            return Ok(val == 0);
+        }
     }
+    Ok(false)
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn disable_game_dvr() {}
+pub fn set_game_overlay_disabled(_disabled: bool) -> Result<String, String> {
+    Ok("unsupported".into())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn read_game_overlay_disabled() -> Result<bool, String> {
+    Ok(false)
+}
+
+/// 启动时自动禁用 Game DVR（保持向后兼容）
+pub fn disable_game_dvr() {
+    let _ = set_game_overlay_disabled(true);
+}
 
 fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
