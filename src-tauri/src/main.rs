@@ -1311,6 +1311,30 @@ async fn open_data_dir() -> Result<(), String> {
     open::that(&data_dir).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn repair_missing_posters_silent(state: State<'_, AppState>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    tauri::async_runtime::spawn(async move {
+        match db::repair_missing_posters(&pool).await {
+            Ok(result) => eprintln!(
+                "[ChangLi] 批量修复海报完成: scanned_series={}, updated_series={}, scanned_videos={}, updated_videos={}, skipped={}",
+                result.scanned_series,
+                result.updated_series,
+                result.scanned_videos,
+                result.updated_videos,
+                result.skipped,
+            ),
+            Err(error) => eprintln!("[ChangLi] 批量修复海报失败: {error}"),
+        }
+    });
+
+    Ok(())
+}
+
 fn preview_temp_dir() -> PathBuf {
     std::env::temp_dir().join("changli-preview")
 }
@@ -2333,6 +2357,7 @@ fn main() {
             delete_preview_file,
             get_storage_info,
             open_data_dir,
+            repair_missing_posters_silent,
             toggle_favorite,
             toggle_chinese_sub,
             toggle_watched,

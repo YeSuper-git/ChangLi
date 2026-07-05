@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -48,6 +48,7 @@ const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
+  const [posterRepairing, setPosterRepairing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
@@ -95,6 +96,20 @@ const Settings: React.FC = () => {
   const loadTags = async () => {
     const tagsList = await getTags();
     setTags(tagsList);
+  };
+
+  const handleRepairMissingPosters = async () => {
+    if (posterRepairing) return;
+    setPosterRepairing(true);
+    try {
+      await repairMissingPostersSilent();
+      notify({ message: '已开始后台修复海报，可继续使用', type: 'success' });
+    } catch (error) {
+      console.error('启动批量修复海报失败:', error);
+      notify({ message: '启动失败: ' + String(error), type: 'error' });
+    } finally {
+      window.setTimeout(() => setPosterRepairing(false), 1200);
+    }
   };
 
   const handleAddSite = async () => {
@@ -427,12 +442,21 @@ const Settings: React.FC = () => {
               管理视频数据和缓存的存储位置
             </p>
           </div>
-          <button
-            onClick={() => openDataDir()}
-            className="action-btn action-btn-primary"
-          >
-            打开数据目录
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRepairMissingPosters}
+              disabled={posterRepairing}
+              className="action-btn action-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {posterRepairing ? '已启动修复' : '批量修复海报'}
+            </button>
+            <button
+              onClick={() => openDataDir()}
+              className="action-btn action-btn-primary"
+            >
+              打开数据目录
+            </button>
+          </div>
         </div>
 
         <div className="changli-panel p-6 space-y-4">

@@ -3282,60 +3282,17 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
         .filter(|v| !std::path::Path::new(&v.file_path).is_file())
         .collect();
 
-    // 扫描文件夹获取当前视频
-    let (new_videos, poster_map) = if folder_path_std.is_dir() {
+    // 扫描文件夹获取当前视频。检查更新只做资源差异检测，不在这里回填海报/生成 base64，避免全量检查被图片解码拖慢。
+    let new_videos = if folder_path_std.is_dir() {
         let scan_result = crate::scanner::scan_directory(source).await?;
-        let new: Vec<Video> = scan_result
+        scan_result
             .videos
             .into_iter()
             .filter(|v| !existing_paths.contains(&v.file_path))
-            .collect();
-        (new, scan_result.posters)
+            .collect()
     } else {
-        (vec![], std::collections::HashMap::new())
+        vec![]
     };
-
-    // 为没有海报的现有视频更新海报和缩略图
-    let existing_no_poster = sqlx::query_as::<_, (i64, String)>(
-        "SELECT id, file_path FROM videos WHERE series_id = ? AND (thumbnail IS NULL OR thumbnail = '')",
-    )
-    .bind(series_id)
-    .fetch_all(pool)
-    .await?;
-
-    if !existing_no_poster.is_empty() {
-        // 收集目录下所有图片文件用于海报匹配
-        let mut image_files = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(folder_path_std) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let p = entry.path();
-                if p.is_file() {
-                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-                        if crate::scanner::IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                            image_files.push(p);
-                        }
-                    }
-                }
-            }
-        }
-        
-
-        for (vid, vpath) in &existing_no_poster {
-            let video_path = std::path::Path::new(vpath);
-            let poster_path = poster_map.get(vpath)
-                .cloned()
-                .or_else(|| crate::scanner::find_poster_for_video(video_path, &image_files));
-            if let Some(poster_path) = poster_path {
-                let base64 = crate::scanner::generate_thumbnail_base64(std::path::Path::new(&poster_path));
-                sqlx::query("UPDATE videos SET thumbnail = ?, thumbnail_base64 = ? WHERE id = ?")
-                    .bind(&poster_path)
-                    .bind(&base64)
-                    .bind(vid)
-                    .execute(pool)
-                    .await?;
-            }
-        }
-    }
 
     Ok(SeriesUpdateResult { new_videos, missing_videos })
 }
@@ -3359,6 +3316,149 @@ pub struct CategoryUpdateResult {
     pub new_series: Vec<SeriesInfo>,               // 新发现的文件夹名+视频数
     pub missing_series: Vec<SeriesInfo>,           // 数据库中已丢失的视频集标题+分集数
     pub series_updates: Vec<SeriesUpdateSummary>,  // 每个视频集的新增/丢失分集
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PosterRepairResult {
+    pub scanned_series: i64,
+    pub updated_series: i64,
+    pub scanned_videos: i64,
+    pub updated_videos: i64,
+    pub skipped: i64,
+}
+
+pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairResult> {
+    let mut result = PosterRepairResult {
+        scanned_series: 0,
+        updated_series: 0,
+        scanned_videos: 0,
+        updated_videos: 0,
+        skipped: 0,
+    };
+
+    let series_rows = sqlx::query("SELECT id, folder_path, poster, poster_base64 FROM video_series ORDER BY id")
+        .fetch_all(pool)
+        .await?;
+
+    for row in series_rows {
+        result.scanned_series += 1;
+        let id: i64 = row.get("id");
+        let folder_path: Option<String> = row.try_get("folder_path").ok().flatten();
+        let poster: Option<String> = row.try_get("poster").ok().flatten();
+        let poster_base64: Option<String> = row.try_get("poster_base64").ok().flatten();
+        let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
+        let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
+
+        if !poster_missing && !base64_missing {
+            continue;
+        }
+
+        let folder = match folder_path.as_deref() {
+            Some(path) if Path::new(path).is_dir() => Path::new(path),
+            _ => {
+                result.skipped += 1;
+                continue;
+            }
+        };
+
+        let candidate = if poster_missing {
+            crate::scanner::find_folder_poster(folder)
+        } else {
+            poster.clone()
+        };
+
+        if let Some(poster_path) = candidate {
+            let resolved = storage::resolve_data_path(&poster_path);
+            let base64 = if base64_missing {
+                crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
+            } else {
+                poster_base64.clone()
+            };
+            let orientation = crate::scanner::get_image_orientation(Path::new(&resolved));
+            sqlx::query("UPDATE video_series SET poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(if poster_missing { Some(poster_path.as_str()) } else { None })
+                .bind(base64.as_deref())
+                .bind(orientation.as_deref())
+                .bind(id)
+                .execute(pool)
+                .await?;
+            result.updated_series += 1;
+        } else {
+            result.skipped += 1;
+        }
+    }
+
+    let video_rows = sqlx::query("SELECT id, file_path, thumbnail, thumbnail_base64 FROM videos ORDER BY id")
+        .fetch_all(pool)
+        .await?;
+
+    for row in video_rows {
+        result.scanned_videos += 1;
+        let id: i64 = row.get("id");
+        let file_path: String = row.get("file_path");
+        let thumbnail: Option<String> = row.try_get("thumbnail").ok().flatten();
+        let thumbnail_base64: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
+        let thumbnail_missing = thumbnail.as_deref().unwrap_or_default().trim().is_empty();
+        let base64_missing = thumbnail_base64.as_deref().unwrap_or_default().trim().is_empty();
+
+        if !thumbnail_missing && !base64_missing {
+            continue;
+        }
+
+        let video_path = Path::new(&file_path);
+        let parent = match video_path.parent() {
+            Some(parent) if parent.is_dir() => parent,
+            _ => {
+                result.skipped += 1;
+                continue;
+            }
+        };
+
+        let image_files: Vec<std::path::PathBuf> = std::fs::read_dir(parent)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .map(|entry| entry.path())
+                    .filter(|path| path.is_file())
+                    .filter(|path| {
+                        path.extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| crate::scanner::IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+                            .unwrap_or(false)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let candidate = if thumbnail_missing {
+            crate::scanner::find_poster_for_video(video_path, &image_files)
+                .or_else(|| crate::scanner::find_folder_poster(parent))
+        } else {
+            thumbnail.clone()
+        };
+
+        if let Some(thumbnail_path) = candidate {
+            let resolved = storage::resolve_data_path(&thumbnail_path);
+            let base64 = if base64_missing {
+                crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
+            } else {
+                thumbnail_base64.clone()
+            };
+            let orientation = crate::scanner::get_image_orientation(Path::new(&resolved));
+            sqlx::query("UPDATE videos SET thumbnail = COALESCE(?, thumbnail), thumbnail_base64 = COALESCE(?, thumbnail_base64), poster_orientation = COALESCE(?, poster_orientation) WHERE id = ?")
+                .bind(if thumbnail_missing { Some(thumbnail_path.as_str()) } else { None })
+                .bind(base64.as_deref())
+                .bind(orientation.as_deref())
+                .bind(id)
+                .execute(pool)
+                .await?;
+            result.updated_videos += 1;
+        } else {
+            result.skipped += 1;
+        }
+    }
+
+    Ok(result)
 }
 
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集

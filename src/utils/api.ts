@@ -30,6 +30,17 @@ export async function openDataDir(): Promise<void> {
   }
 }
 
+export async function repairMissingPostersSilent(): Promise<void> {
+  console.log('[API] 调用 repairMissingPostersSilent');
+  try {
+    await invoke('repair_missing_posters_silent');
+    console.log('[API] repairMissingPostersSilent 已启动');
+  } catch (err) {
+    console.error('[API] repairMissingPostersSilent 失败:', err);
+    throw err;
+  }
+}
+
 // 网站相关
 export interface Site {
   id: number;
