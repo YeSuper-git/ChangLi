@@ -3464,22 +3464,13 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         // 3) 去掉集数后缀再匹配
                         let base = crate::scanner::strip_episode_suffix(&name);
                         if !existing_base_names.contains(&base) {
-                            // 4) 只有直接包含视频文件且没有子目录的文件夹才报为新增
-                            //    避免把时期文件夹等中间目录误报为视频集
-                            if has_video_files(&p) {
-                                let has_subdirs = std::fs::read_dir(&p)
-                                    .map(|entries| entries.filter_map(|e| e.ok()).any(|e| e.path().is_dir()))
-                                    .unwrap_or(false);
-                                if !has_subdirs {
-                                    // 统计视频文件数
-                                    let count = std::fs::read_dir(&p)
-                                        .map(|entries| entries.filter_map(|e| e.ok())
-                                            .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
-                                            .count())
-                                        .unwrap_or(0);
-                                    result.push((name, count));
-                                }
-                            }
+                            // 统计视频文件数
+                            let count = std::fs::read_dir(&p)
+                                .map(|entries| entries.filter_map(|e| e.ok())
+                                    .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
+                                    .count())
+                                .unwrap_or(0);
+                            result.push((name, count));
                         }
                     }
                 }
