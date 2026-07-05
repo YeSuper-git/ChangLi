@@ -2406,6 +2406,27 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
     Ok((video_count.0, series_count.0))
 }
 
+fn usable_series_folder<'a>(folder_path: Option<&'a str>, title: &'a str) -> Option<&'a str> {
+    folder_path
+        .filter(|path| !path.trim().is_empty() && Path::new(path).is_dir())
+        .or_else(|| {
+            if !title.trim().is_empty() && Path::new(title).is_dir() {
+                Some(title)
+            } else {
+                None
+            }
+        })
+}
+
+fn normalize_path_string(path: &str) -> String {
+    Path::new(path).to_string_lossy().replace('\\', "/")
+}
+
+fn same_stored_path(left: Option<&str>, right: &str) -> bool {
+    left.map(|value| normalize_path_string(value) == normalize_path_string(right))
+        .unwrap_or(false)
+}
+
 /// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
 /// 重新扫描单个视频集的元数据（车牌、中字、标题、海报）
 pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) -> Result<bool> {
@@ -2421,24 +2442,18 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         None => return Ok(false),
     };
 
-    let source = folder_path.as_deref().unwrap_or(&title);
-    let folder_name = std::path::Path::new(source)
-        .file_name()
+    let source = usable_series_folder(folder_path.as_deref(), &title);
+    let folder_name = source
+        .and_then(|path| std::path::Path::new(path).file_name())
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| title.clone());
-    let folder_path_std = std::path::Path::new(source);
-    let scan_result = if folder_path_std.is_dir() {
-        Some(crate::scanner::scan_directory(source).await?)
-    } else {
-        None
-    };
-    let poster = scan_result
-        .as_ref()
-        .and_then(|_| crate::scanner::find_folder_poster(folder_path_std))
-        .or_else(|| crate::scanner::find_folder_poster(folder_path_std));
-    let poster_base64 = poster
-        .as_deref()
-        .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+    let poster = source
+        .map(std::path::Path::new)
+        .and_then(crate::scanner::find_folder_poster);
+    let poster_base64 = poster.as_deref().and_then(|p| {
+        let resolved = storage::resolve_data_path(p);
+        crate::scanner::generate_thumbnail_base64(std::path::Path::new(&resolved))
+    });
     let poster_updated = if let Some(ref poster_path) = poster {
         update_video_series_poster(
             pool,
@@ -2454,7 +2469,8 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     };
 
     let mut found_video_files = false;
-    if let Some(result) = scan_result {
+    if let Some(source) = source {
+        let result = crate::scanner::scan_directory(source).await?;
         found_video_files = !result.videos.is_empty();
         if found_video_files {
             add_videos_batch(pool, result.videos, Some(id)).await?;
@@ -2907,33 +2923,40 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
     let mut missing_series_count: i64 = 0;
 
     for (id, title, folder_path, poster, poster_base64) in series_list {
-        let source = folder_path.as_deref().unwrap_or(&title);
+        let source = match usable_series_folder(folder_path.as_deref(), &title) {
+            Some(path) => path,
+            None => {
+                missing_series_count += 1;
+                skipped += 1;
+                continue;
+            }
+        };
         let folder_path_std = std::path::Path::new(source);
-        if !folder_path_std.is_dir() {
-            missing_series_count += 1;
-            skipped += 1;
-            continue;
-        }
+        let candidate = crate::scanner::find_folder_poster(folder_path_std);
+        let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
+        let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
+        let candidate_changed = candidate
+            .as_deref()
+            .map(|candidate_path| !same_stored_path(poster.as_deref(), candidate_path))
+            .unwrap_or(false);
 
-        let series_poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty()
-            || poster_base64.as_deref().unwrap_or_default().trim().is_empty();
-        if !series_poster_missing {
-            skipped += 1;
-            continue;
-        }
-
-        if let Some(series_poster) = crate::scanner::find_folder_poster(folder_path_std) {
-            let series_poster_base64 =
-                crate::scanner::generate_thumbnail_base64(std::path::Path::new(&series_poster));
-            update_video_series_poster(
-                pool,
-                id,
-                Some(&series_poster),
-                series_poster_base64.as_deref(),
-                Some("landscape"),
-            )
-            .await?;
-            updated += 1;
+        if let Some(series_poster) = candidate {
+            if poster_missing || base64_missing || candidate_changed {
+                let resolved = storage::resolve_data_path(&series_poster);
+                let series_poster_base64 =
+                    crate::scanner::generate_thumbnail_base64(std::path::Path::new(&resolved));
+                let orientation = crate::scanner::get_image_orientation(std::path::Path::new(&resolved));
+                sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .bind(series_poster.as_str())
+                    .bind(series_poster_base64.as_deref())
+                    .bind(orientation.as_deref())
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+                updated += 1;
+            } else {
+                skipped += 1;
+            }
         } else {
             skipped += 1;
         }
@@ -3411,10 +3434,11 @@ where
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
 
-        let folder = match folder_path.as_deref() {
-            Some(path) if Path::new(path).is_dir() => Path::new(path),
-            _ => {
+        let folder = match usable_series_folder(folder_path.as_deref(), "") {
+            Some(path) => Path::new(path),
+            None => {
                 result.skipped += 1;
+                progress(&result);
                 continue;
             }
         };
@@ -3431,19 +3455,19 @@ where
             })
             .unwrap_or(false);
 
-        if !poster_missing && !base64_missing && !wrong_parent_poster {
+        let candidate = crate::scanner::find_folder_poster(folder);
+        let candidate_changed = candidate
+            .as_deref()
+            .map(|candidate_path| !same_stored_path(poster.as_deref(), candidate_path))
+            .unwrap_or(false);
+
+        if !poster_missing && !base64_missing && !wrong_parent_poster && !candidate_changed {
             continue;
         }
 
-        let candidate = if poster_missing || wrong_parent_poster {
-            crate::scanner::find_folder_poster(folder)
-        } else {
-            poster.clone()
-        };
-
-        if let Some(poster_path) = candidate {
+        if let Some(poster_path) = candidate.or_else(|| poster.clone()) {
             let resolved = storage::resolve_data_path(&poster_path);
-            let base64 = if poster_missing || base64_missing || wrong_parent_poster {
+            let base64 = if poster_missing || base64_missing || wrong_parent_poster || candidate_changed {
                 crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
             } else {
                 poster_base64.clone()
