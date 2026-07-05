@@ -550,6 +550,17 @@ const Library: React.FC = () => {
           }
         }
       }
+      // 3. 处理选中的丢失视频集
+      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(n => updateSelection.missingSeries.has(n));
+      for (const name of selectedMissingSeries) {
+        // 找到对应的 series_id
+        // 丢失视频集不在 series_updates 里
+        // 丢失视频集不在 series_updates 里，需要从 store 找
+        const seriesInStore = seriesList.find(s => s.title === name || s.folder_path?.includes(name));
+        if (seriesInStore) {
+          await deleteVideoSeries(seriesInStore.id, true);
+        }
+      }
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
