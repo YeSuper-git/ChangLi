@@ -5,7 +5,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // 网站配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2406,16 +2406,90 @@ pub async fn delete_all_adult(pool: &SqlitePool) -> Result<(i64, i64)> {
     Ok((video_count.0, series_count.0))
 }
 
-fn usable_series_folder<'a>(folder_path: Option<&'a str>, title: &'a str) -> Option<&'a str> {
-    folder_path
-        .filter(|path| !path.trim().is_empty() && Path::new(path).is_dir())
-        .or_else(|| {
-            if !title.trim().is_empty() && Path::new(title).is_dir() {
-                Some(title)
+fn usable_series_folder(folder_path: Option<&str>, title: &str) -> Option<PathBuf> {
+    [folder_path.unwrap_or_default(), title]
+        .into_iter()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .find_map(|path| {
+            let direct = Path::new(path);
+            if direct.is_dir() {
+                return Some(direct.to_path_buf());
+            }
+
+            let resolved = storage::resolve_data_path(path);
+            if resolved.is_dir() {
+                Some(resolved)
             } else {
                 None
             }
         })
+}
+
+fn find_child_folder_by_name(root: &Path, target_name: &str, max_depth: usize) -> Option<PathBuf> {
+    if max_depth == 0 || target_name.trim().is_empty() || !root.is_dir() {
+        return None;
+    }
+
+    let entries = std::fs::read_dir(root).ok()?;
+    let mut child_dirs = Vec::new();
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name == target_name {
+            return Some(path);
+        }
+        child_dirs.push(path);
+    }
+
+    for child in child_dirs {
+        if let Some(found) = find_child_folder_by_name(&child, target_name, max_depth - 1) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+async fn resolve_series_folder(
+    pool: &SqlitePool,
+    folder_path: Option<&str>,
+    title: &str,
+    display_type: Option<&str>,
+) -> Result<Option<PathBuf>> {
+    if let Some(folder) = usable_series_folder(folder_path, title) {
+        return Ok(Some(folder));
+    }
+
+    let scan_paths = if let Some(kind) = display_type.filter(|kind| !kind.trim().is_empty()) {
+        sqlx::query_scalar::<_, String>(
+            "SELECT scan_path FROM categories WHERE key = ? AND scan_path IS NOT NULL AND scan_path != ''",
+        )
+        .bind(kind)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_scalar::<_, String>(
+            "SELECT scan_path FROM categories WHERE scan_path IS NOT NULL AND scan_path != ''",
+        )
+        .fetch_all(pool)
+        .await?
+    };
+
+    for scan_path in scan_paths {
+        if let Some(root) = usable_series_folder(Some(&scan_path), "") {
+            if let Some(found) = find_child_folder_by_name(&root, title, 4) {
+                return Ok(Some(found));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 fn normalize_path_string(path: &str) -> String {
@@ -2442,13 +2516,14 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         None => return Ok(false),
     };
 
-    let source = usable_series_folder(folder_path.as_deref(), &title);
+    let source = resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref()).await?;
     let folder_name = source
-        .and_then(|path| std::path::Path::new(path).file_name())
+        .as_deref()
+        .and_then(std::path::Path::file_name)
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| title.clone());
     let poster = source
-        .map(std::path::Path::new)
+        .as_deref()
         .and_then(crate::scanner::find_folder_poster);
     let poster_base64 = poster.as_deref().and_then(|p| {
         let resolved = storage::resolve_data_path(p);
@@ -2469,8 +2544,8 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     };
 
     let mut found_video_files = false;
-    if let Some(source) = source {
-        let result = crate::scanner::scan_directory(source).await?;
+    if let Some(source) = source.as_deref() {
+        let result = crate::scanner::scan_directory(&source.to_string_lossy()).await?;
         found_video_files = !result.videos.is_empty();
         if found_video_files {
             add_videos_batch(pool, result.videos, Some(id)).await?;
@@ -2923,7 +2998,7 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
     let mut missing_series_count: i64 = 0;
 
     for (id, title, folder_path, poster, poster_base64) in series_list {
-        let source = match usable_series_folder(folder_path.as_deref(), &title) {
+        let folder_path_std = match resolve_series_folder(pool, folder_path.as_deref(), &title, Some(category_key)).await? {
             Some(path) => path,
             None => {
                 missing_series_count += 1;
@@ -2931,8 +3006,7 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
                 continue;
             }
         };
-        let folder_path_std = std::path::Path::new(source);
-        let candidate = crate::scanner::find_folder_poster(folder_path_std);
+        let candidate = crate::scanner::find_folder_poster(&folder_path_std);
         let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let candidate_changed = candidate
@@ -3420,7 +3494,7 @@ where
         skipped: 0,
     };
 
-    let series_rows = sqlx::query("SELECT id, folder_path, poster, poster_base64 FROM video_series ORDER BY id")
+    let series_rows = sqlx::query("SELECT id, title, folder_path, display_type, poster, poster_base64 FROM video_series ORDER BY id")
         .fetch_all(pool)
         .await?;
 
@@ -3428,14 +3502,16 @@ where
         result.scanned_series += 1;
         progress(&result);
         let id: i64 = row.get("id");
+        let title: String = row.try_get("title").unwrap_or_default();
         let folder_path: Option<String> = row.try_get("folder_path").ok().flatten();
+        let display_type: Option<String> = row.try_get("display_type").ok().flatten();
         let poster: Option<String> = row.try_get("poster").ok().flatten();
         let poster_base64: Option<String> = row.try_get("poster_base64").ok().flatten();
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
 
-        let folder = match usable_series_folder(folder_path.as_deref(), "") {
-            Some(path) => Path::new(path),
+        let folder = match resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref()).await? {
+            Some(path) => path,
             None => {
                 result.skipped += 1;
                 progress(&result);
@@ -3447,7 +3523,7 @@ where
             .as_deref()
             .map(|poster_path| {
                 let poster_path = Path::new(poster_path);
-                !poster_path.starts_with(folder)
+                !poster_path.starts_with(&folder)
                     && poster_path
                         .parent()
                         .map(|poster_parent| folder.starts_with(poster_parent))
@@ -3455,7 +3531,7 @@ where
             })
             .unwrap_or(false);
 
-        let candidate = crate::scanner::find_folder_poster(folder);
+        let candidate = crate::scanner::find_folder_poster(&folder);
         let candidate_changed = candidate
             .as_deref()
             .map(|candidate_path| !same_stored_path(poster.as_deref(), candidate_path))
