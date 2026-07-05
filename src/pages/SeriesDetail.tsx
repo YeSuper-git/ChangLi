@@ -547,11 +547,11 @@ const SeriesDetail: React.FC = () => {
     const { newVideos, missingVideos: missVids } = updateDialog;
     setUpdateDialog(null);
     try {
-      // 添加新分集
+      // 添加新发现的视频
       for (const video of newVideos) {
         await addVideoToSeries(series.id, video.file_path);
       }
-      // 删除丢失的分集
+      // 移除本地已删除的视频记录
       for (const video of missVids) {
         await deleteVideo(video.id);
       }
@@ -559,8 +559,8 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
       await refreshSeries();
       const parts: string[] = [];
-      if (newVideos.length > 0) parts.push(`添加了 ${newVideos.length} 个新分集`);
-      if (missVids.length > 0) parts.push(`删除了 ${missVids.length} 个丢失分集`);
+      if (newVideos.length > 0) parts.push(`添加 ${newVideos.length} 个新发现的视频`);
+      if (missVids.length > 0) parts.push(`移除 ${missVids.length} 个本地已删除的视频记录`);
       notify({ message: parts.join('，'), type: 'success' });
     } catch (error) {
       console.error('[SeriesDetail] 更新失败:', error);
@@ -961,8 +961,8 @@ const SeriesDetail: React.FC = () => {
           <div className="changli-modal-panel !w-[min(100%,560px)] !p-0">
             <div className="changli-modal-header">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">检查更新</p>
-              <h2 className="mt-1 text-2xl font-bold text-gray-900">发现本地已不存在的分集</h2>
-              <p className="mt-2 text-sm text-gray-500">下面这些分集的文件已经不在磁盘上。确认后只删除应用内记录，不会删除其他文件。</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">发现本地已删除的视频</h2>
+              <p className="mt-2 text-sm text-gray-500">下面这些视频文件已从本地删除。确认后只移除应用内记录，不会删除其他文件。</p>
             </div>
             <div className="changli-modal-body max-h-80 overflow-y-auto">
               <div className="space-y-2">
@@ -993,7 +993,7 @@ const SeriesDetail: React.FC = () => {
             <div className="changli-modal-body max-h-80 overflow-y-auto">
               {updateDialog.newVideos.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">新增分集 ({updateDialog.newVideos.length})</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">新发现视频 ({updateDialog.newVideos.length})</h3>
                   <div className="space-y-2">
                     {updateDialog.newVideos.map((video, idx) => (
                       <div key={idx} className="rounded-2xl border border-green-100 bg-green-50/50 p-3">
@@ -1006,7 +1006,7 @@ const SeriesDetail: React.FC = () => {
               )}
               {updateDialog.missingVideos.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失分集 ({updateDialog.missingVideos.length})</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频 ({updateDialog.missingVideos.length})</h3>
                   <div className="space-y-2">
                     {updateDialog.missingVideos.map((video) => (
                       <div key={video.id} className="rounded-2xl border border-red-100 bg-red-50/50 p-3">

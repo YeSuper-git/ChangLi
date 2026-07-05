@@ -3535,24 +3535,6 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         if path.is_dir() {
             let mut new_folders = Vec::new();
 
-            // 检测目录下是否直接包含视频文件
-            let has_video_files = |dir: &std::path::Path| -> bool {
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let p = entry.path();
-                        if p.is_file() {
-                            if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-                                let ext_lower = ext.to_lowercase();
-                                if crate::scanner::VIDEO_EXTENSIONS.contains(&ext_lower.as_str()) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                false
-            };
-
             // 预加载所有标签名、演员名、分类名用于匹配
             let tag_names: std::collections::HashSet<String> =
                 sqlx::query_scalar::<_, String>("SELECT name FROM tags")
@@ -3569,8 +3551,11 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
             let cat_keys: std::collections::HashSet<String> =
                 sqlx::query_scalar::<_, String>("SELECT key FROM categories")
                     .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+            let all_actor_period_names: std::collections::HashSet<String> =
+                sqlx::query_scalar::<_, String>("SELECT name FROM actor_periods")
+                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
 
-            /// 收集目录下不在 existing_base_names 中的子文件夹名
+            // 收集目录下不在 existing_base_names 中的子文件夹名
             // 路径规范化：统一斜杠方向和大小写
             let normalize = |s: &str| -> String {
                 s.replace("\\", "/").to_lowercase()
@@ -3588,8 +3573,8 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         // 1) 规范化路径比较
                         if normalized_db_paths.contains(&normalize(&fps)) { continue; }
                         let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                        // 2) 文件夹名直接匹配
-                        if existing_base_names.contains(&name) { continue; }
+                        // 2) 文件夹名直接匹配；时期文件夹本身不是视频集
+                        if existing_base_names.contains(&name) || all_actor_period_names.contains(&name) { continue; }
                         // 3) 去掉集数后缀再匹配
                         let base = crate::scanner::strip_episode_suffix(&name);
                         if !existing_base_names.contains(&base) {
@@ -3664,9 +3649,9 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                     if actor_periods_in_folder.contains(&sub_name) {
                                         // 时期文件夹 → 递归找视频集
                                         new_folders.extend(collect_new(&sub_sub));
-                                    } else if has_video_files(&sub_sub) {
-                                        // 直接的视频集文件夹（无时期匹配）
-                                        new_folders.extend(collect_new(&sub_sub));
+                                    } else {
+                                        // 直接的视频集文件夹（允许暂无视频的空视频集）
+                                        new_folders.extend(collect_new(&sub_path));
                                     }
                                 }
                             }
@@ -3674,12 +3659,12 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             // 无时期信息：直接递归
                             new_folders.extend(collect_new(&sub_path));
                         }
-                    } else if has_video_files(&sub_path) {
-                        // 3) 含视频文件 → 视频集
+                    } else {
+                        // 3) 未匹配标签/演员/分类时，只有直接的视频集文件夹才加入；允许暂无视频的空视频集
                         let folder_path_str = sub_path.to_string_lossy().to_string();
-                        if !existing_folder_paths.contains(&folder_path_str) {
+                        if !normalized_db_paths.contains(&normalize(&folder_path_str)) {
                             let base = crate::scanner::strip_episode_suffix(&name);
-                            if !existing_base_names.contains(&base) {
+                            if !existing_base_names.contains(&base) && !all_actor_period_names.contains(&name) {
                                 let count = std::fs::read_dir(&sub_path)
                                     .map(|entries| entries.filter_map(|e| e.ok())
                                         .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
@@ -3692,6 +3677,8 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     // 4) 都不匹配 → 跳过
                 }
             }
+            new_folders.sort_by(|a, b| a.0.cmp(&b.0));
+            new_folders.dedup_by(|a, b| a.0 == b.0);
             new_folders.into_iter().map(|(name, video_count)| SeriesInfo { name, video_count }).collect()
         } else {
             vec![]

@@ -365,9 +365,6 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 let sub_result = scanner::scan_directory(&entry_path.to_string_lossy())
                     .await
                     .map_err(|e| e.to_string())?;
-                if sub_result.videos.is_empty() {
-                    continue;
-                }
                 let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster
                     .as_deref()
@@ -490,9 +487,6 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                 let sub_result = scanner::scan_directory(&entry_path.to_string_lossy())
                     .await
                     .map_err(|e| e.to_string())?;
-                if sub_result.videos.is_empty() {
-                    continue;
-                }
                 let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster
                     .as_deref()
@@ -814,9 +808,6 @@ async fn scan_videos_for_actor(
         let sub_result = scanner::scan_directory(&entry_path.to_string_lossy())
             .await
             .map_err(|e| e.to_string())?;
-        if sub_result.videos.is_empty() {
-            continue;
-        }
         let sub_poster = crate::scanner::find_folder_poster(&entry_path);
         let sub_poster_base64 = sub_poster
             .as_deref()
@@ -2782,7 +2773,6 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let pe_name = period_entry.file_name().to_string_lossy().to_string();
                     let pe_result = scanner::scan_directory(&pe_path.to_string_lossy())
                         .await.map_err(|e| e.to_string())?;
-                    if pe_result.videos.is_empty() { continue; }
                     let pe_poster = crate::scanner::find_folder_poster(period_path);
                     let pe_poster_base64 = pe_poster.as_deref().and_then(|p| {
                         scanner::generate_thumbnail_base64(std::path::Path::new(p))
@@ -2828,9 +2818,6 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
                     .await
                     .map_err(|e| e.to_string())?;
-                if sub_result.videos.is_empty() {
-                    continue;
-                }
                 let sub_poster = crate::scanner::find_folder_poster(&entry_path);
                 let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
                     scanner::generate_thumbnail_base64(std::path::Path::new(p))
@@ -2859,8 +2846,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let series = db::add_video_series(
                         &pool, &series_title, Some(&folder_path_str),
                         sub_poster.as_deref(), Some("landscape"), Some("ongoing"),
-                        Some(&category_key),
-                                None,
+                        sub_poster_base64.as_deref(), Some(&category_key),
                     ).await.map_err(|e| e.to_string())?;
                     if let Some(c) = code {
                         let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")

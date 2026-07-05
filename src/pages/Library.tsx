@@ -46,7 +46,7 @@ const Library: React.FC = () => {
   const [scanConfirm, setScanConfirm] = useState(false);
   const [categoryUpdateResult, setCategoryUpdateResult] = useState<CategoryUpdateResult | null>(null);
   // 检查更新选中状态：new_series: Set<name>, series_updates: Map<series_id, {selected: bool, newVideos: Set<filePath>, missingVideos: Set<id>}>
-  // 切换单个新增视频集的选中状态
+  // 切换单个新发现视频集的选中状态
   const toggleNewSeries = (name: string) => {
     setUpdateSelection(prev => {
       if (!prev) return prev;
@@ -80,7 +80,7 @@ const Library: React.FC = () => {
       return next;
     });
   };
-  // 切换单个丢失视频的选中
+  // 切换单个已移除视频的选中
   const toggleMissingVideo = (seriesId: number, videoId: number) => {
     setUpdateSelection(prev => {
       if (!prev) return prev;
@@ -94,7 +94,7 @@ const Library: React.FC = () => {
       return next;
     });
   };
-  // 切换单个丢失视频集的选中
+  // 切换单个已移除视频集的选中
   const toggleMissingSeries = (name: string) => {
     setUpdateSelection(prev => {
       if (!prev) return prev;
@@ -110,6 +110,7 @@ const Library: React.FC = () => {
     seriesUpdates: Map<number, { selected: boolean; newVideos: Set<string>; missingVideos: Set<number> }>;
     missingSeries: Set<string>;
   } | null>(null);
+  const hasInitialCatParamRef = useRef(searchParams.has('cat'));
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   useEffect(() => {
@@ -145,7 +146,7 @@ const Library: React.FC = () => {
     }
     if (storeCategories.length > 0) {
       setCategories(storeCategories);
-      if (!searchParams.get('cat') && !mainCategory) {
+      if (!hasInitialCatParamRef.current && !mainCategory) {
         const sorted = [...storeCategories].sort((a, b) => a.sort_order - b.sort_order);
         if (sorted.length > 0) setMainCategory(sorted[0].key);
       }
@@ -157,7 +158,7 @@ const Library: React.FC = () => {
         if (!cancelled) {
           const next = useLibraryStore.getState().categories;
           setCategories(next);
-          if (!searchParams.get('cat') && !mainCategory) {
+          if (!hasInitialCatParamRef.current && !mainCategory) {
             const sorted = [...next].sort((a, b) => a.sort_order - b.sort_order);
             if (sorted.length > 0) setMainCategory(sorted[0].key);
           }
@@ -165,7 +166,7 @@ const Library: React.FC = () => {
       })
       .catch((err) => console.error('[Library] 加载大类配置失败:', err));
     return () => { cancelled = true; };
-  }, [storeCategories, refreshCategories, searchParams, mainCategory]);
+  }, [storeCategories, refreshCategories, mainCategory]);
 
   // 按大类加载标签和演员。缓存分类筛选数据，返回视频页时首帧直接复用，避免筛选栏卡顿。
   const loadCategoryFilters = useCallback(async () => {
@@ -529,7 +530,7 @@ const Library: React.FC = () => {
     setCategoryScanning(true);
     setCategoryUpdateResult(null);
     try {
-      // 1. 处理选中的新增视频集
+      // 1. 处理选中的新发现视频集
       const selectedNewSeries = categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name));
       if (categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length > 0) {
         clearLibraryFilterCaches();
@@ -550,12 +551,12 @@ const Library: React.FC = () => {
           }
         }
       }
-      // 3. 处理选中的丢失视频集
+      // 3. 处理选中的已移除视频集
       const selectedMissingSeries = categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name));
       for (const info of selectedMissingSeries) {
         // 找到对应的 series_id
-        // 丢失视频集不在 series_updates 里
-        // 丢失视频集不在 series_updates 里，需要从 store 找
+        // 已移除视频集不在 series_updates 里
+        // 已移除视频集不在 series_updates 里，需要从 store 找
         const seriesInStore = seriesList.find(s => s.title === info.name || s.folder_path?.includes(info.name));
         if (seriesInStore) {
           await deleteVideoSeries(seriesInStore.id, true);
@@ -565,7 +566,7 @@ const Library: React.FC = () => {
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
       const parts: string[] = [];
-      if (selectedNewSeries.length > 0) parts.push(`新增 ${selectedNewSeries.length} 部视频集`);
+      if (selectedNewSeries.length > 0) parts.push(`添加 ${selectedNewSeries.length} 个新发现的视频集`);
       let totalNewEps = 0, totalMissEps = 0;
       for (const su of categoryUpdateResult.series_updates) {
         const suSel = updateSelection.seriesUpdates.get(su.series_id);
@@ -573,8 +574,8 @@ const Library: React.FC = () => {
         totalNewEps += su.new_videos.filter(v => suSel.newVideos.has(v.file_path)).length;
         totalMissEps += su.missing_videos.filter(v => suSel.missingVideos.has(v.id)).length;
       }
-      if (totalNewEps > 0) parts.push(`新增 ${totalNewEps} 个分集`);
-      if (totalMissEps > 0) parts.push(`删除 ${totalMissEps} 个丢失分集`);
+      if (totalNewEps > 0) parts.push(`添加 ${totalNewEps} 个新发现的视频`);
+      if (totalMissEps > 0) parts.push(`移除 ${totalMissEps} 个本地已删除的视频记录`);
       notify({ message: parts.length > 0 ? parts.join('，') : '更新完成', type: 'success' });
     } catch (error) {
       console.error('[Library] 更新失败:', error);
@@ -1065,10 +1066,10 @@ const Library: React.FC = () => {
             <h2 className="mt-1 text-2xl font-bold text-gray-900">发现变更</h2>
           </div>
           <div className="changli-modal-body max-h-[60vh] overflow-y-auto">
-            {/* 新增视频集 */}
+            {/* 新发现视频集 */}
             {categoryUpdateResult.new_series.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增视频集 ({categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length}/{categoryUpdateResult.new_series.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">新发现视频集 ({categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length}/{categoryUpdateResult.new_series.length})</h3>
                 <div className="space-y-2">
                   {categoryUpdateResult.new_series.map((s, idx) => {
                     const checked = updateSelection.newSeries.has(s.name);
@@ -1082,10 +1083,10 @@ const Library: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* 新增分集 */}
+            {/* 新发现视频 */}
             {categoryUpdateResult.series_updates.filter(su => su.new_videos.length > 0).length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增分集</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">新发现视频</h3>
                 <div className="space-y-2">
                   {categoryUpdateResult.series_updates.filter(su => su.new_videos.length > 0).map(su => {
                     const suSel = updateSelection.seriesUpdates.get(su.series_id);
@@ -1115,10 +1116,10 @@ const Library: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* 丢失视频集 */}
+            {/* 已移除视频集 */}
             {categoryUpdateResult.missing_series.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失视频集 ({categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name)).length}/{categoryUpdateResult.missing_series.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频集 ({categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name)).length}/{categoryUpdateResult.missing_series.length})</h3>
                 <div className="space-y-2">
                   {categoryUpdateResult.missing_series.map((s, idx) => {
                     const checked = updateSelection.missingSeries.has(s.name);
@@ -1126,8 +1127,8 @@ const Library: React.FC = () => {
                       <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleMissingSeries(s.name)}>
                         <input type="checkbox" checked={checked} onChange={() => toggleMissingSeries(s.name)} className="w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">{s.name} <span className="text-xs font-normal text-gray-500">{s.video_count} 个分集</span></div>
-                          <div className="text-xs text-gray-400">文件夹已不存在</div>
+                          <div className="text-sm font-semibold text-gray-900">{s.name} <span className="text-xs font-normal text-gray-500">{s.video_count} 个视频</span></div>
+                          <div className="text-xs text-gray-400">本地文件夹已不存在</div>
                         </div>
                       </div>
                     );
@@ -1135,10 +1136,10 @@ const Library: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* 丢失分集 */}
+            {/* 已移除视频 */}
             {categoryUpdateResult.series_updates.filter(su => su.missing_videos.length > 0).length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失分集</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频</h3>
                 <div className="space-y-2">
                   {categoryUpdateResult.series_updates.filter(su => su.missing_videos.length > 0).map(su => {
                     const suSel = updateSelection.seriesUpdates.get(su.series_id);
