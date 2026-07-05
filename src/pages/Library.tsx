@@ -504,7 +504,7 @@ const Library: React.FC = () => {
       } else {
         setCategoryUpdateResult(result);
         // 初始化全选状态
-        const newSeriesSet = new Set(result.new_series);
+        const newSeriesSet = new Set(result.new_series.map(s => s.name));
         const seriesUpdatesMap = new Map<number, { selected: boolean; newVideos: Set<string>; missingVideos: Set<number> }>();
         for (const su of result.series_updates) {
           seriesUpdatesMap.set(su.series_id, {
@@ -513,7 +513,7 @@ const Library: React.FC = () => {
             missingVideos: new Set(su.missing_videos.map(v => v.id)),
           });
         }
-        const missingSeriesSet = new Set(result.missing_series);
+        const missingSeriesSet = new Set(result.missing_series.map(s => s.name));
         setUpdateSelection({ newSeries: newSeriesSet, seriesUpdates: seriesUpdatesMap, missingSeries: missingSeriesSet });
       }
     } catch (error) {
@@ -530,8 +530,8 @@ const Library: React.FC = () => {
     setCategoryUpdateResult(null);
     try {
       // 1. 处理选中的新增视频集
-      const selectedNewSeries = categoryUpdateResult.new_series.filter(n => updateSelection.newSeries.has(n));
-      if (selectedNewSeries.length > 0) {
+      const selectedNewSeries = categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name));
+      if (categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length > 0) {
         clearLibraryFilterCaches();
         await scanCategory(mainCategory);
       }
@@ -551,12 +551,12 @@ const Library: React.FC = () => {
         }
       }
       // 3. 处理选中的丢失视频集
-      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(n => updateSelection.missingSeries.has(n));
-      for (const name of selectedMissingSeries) {
+      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name));
+      for (const info of selectedMissingSeries) {
         // 找到对应的 series_id
         // 丢失视频集不在 series_updates 里
         // 丢失视频集不在 series_updates 里，需要从 store 找
-        const seriesInStore = seriesList.find(s => s.title === name || s.folder_path?.includes(name));
+        const seriesInStore = seriesList.find(s => s.title === info.name || s.folder_path?.includes(info.name));
         if (seriesInStore) {
           await deleteVideoSeries(seriesInStore.id, true);
         }
@@ -1068,14 +1068,14 @@ const Library: React.FC = () => {
             {/* 新增视频集 */}
             {categoryUpdateResult.new_series.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增视频集 ({categoryUpdateResult.new_series.filter(n => updateSelection.newSeries.has(n)).length}/{categoryUpdateResult.new_series.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">新增视频集 ({categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length}/{categoryUpdateResult.new_series.length})</h3>
                 <div className="space-y-2">
-                  {categoryUpdateResult.new_series.map((name, idx) => {
-                    const checked = updateSelection.newSeries.has(name);
+                  {categoryUpdateResult.new_series.map((s, idx) => {
+                    const checked = updateSelection.newSeries.has(s.name);
                     return (
-                      <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleNewSeries(name)}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleNewSeries(name)} className="w-4 h-4 rounded accent-green-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
-                        <div className="text-sm font-semibold text-gray-900">{name}</div>
+                      <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-green-200 bg-green-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleNewSeries(s.name)}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleNewSeries(s.name)} className="w-4 h-4 rounded accent-green-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
+                        <div className="text-sm font-semibold text-gray-900">{s.name} <span className="text-xs font-normal text-gray-500">{s.video_count} 个视频</span></div>
                       </div>
                     );
                   })}
@@ -1118,15 +1118,15 @@ const Library: React.FC = () => {
             {/* 丢失视频集 */}
             {categoryUpdateResult.missing_series.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失视频集 ({categoryUpdateResult.missing_series.filter(n => updateSelection.missingSeries.has(n)).length}/{categoryUpdateResult.missing_series.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">丢失视频集 ({categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name)).length}/{categoryUpdateResult.missing_series.length})</h3>
                 <div className="space-y-2">
-                  {categoryUpdateResult.missing_series.map((name, idx) => {
-                    const checked = updateSelection.missingSeries.has(name);
+                  {categoryUpdateResult.missing_series.map((s, idx) => {
+                    const checked = updateSelection.missingSeries.has(s.name);
                     return (
-                      <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleMissingSeries(name)}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleMissingSeries(name)} className="w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
+                      <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleMissingSeries(s.name)}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleMissingSeries(s.name)} className="w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">{name}</div>
+                          <div className="text-sm font-semibold text-gray-900">{s.name} <span className="text-xs font-normal text-gray-500">{s.video_count} 个分集</span></div>
                           <div className="text-xs text-gray-400">文件夹已不存在</div>
                         </div>
                       </div>

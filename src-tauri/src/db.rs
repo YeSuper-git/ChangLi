@@ -3320,10 +3320,16 @@ pub struct SeriesUpdateSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeriesInfo {
+    pub name: String,
+    pub video_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryUpdateResult {
-    pub new_series: Vec<String>,               // 新发现的文件夹名（尚未入库）
-    pub missing_series: Vec<String>,           // 数据库中有但文件夹已删除的视频集标题
-    pub series_updates: Vec<SeriesUpdateSummary>, // 每个视频集的新增/丢失分集
+    pub new_series: Vec<SeriesInfo>,               // 新发现的文件夹名+视频数
+    pub missing_series: Vec<SeriesInfo>,           // 数据库中已丢失的视频集标题+分集数
+    pub series_updates: Vec<SeriesUpdateSummary>,  // 每个视频集的新增/丢失分集
 }
 
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
@@ -3364,7 +3370,14 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         };
 
         if series_missing {
-            missing_series.push(title.clone());
+            // 查询该视频集的分集数
+            let video_count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM videos WHERE series_id = ?")
+                .bind(id).fetch_one(pool).await.unwrap_or(0);
+            missing_series.push(SeriesInfo {
+                name: title.clone(),
+                video_count: video_count as usize,
+            });
             continue;
         }
 
@@ -3436,7 +3449,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
             let normalized_db_paths: std::collections::HashSet<String> =
                 existing_folder_paths.iter().map(|p| normalize(p)).collect();
 
-            let collect_new = |parent: &std::path::Path| -> Vec<String> {
+            let collect_new = |parent: &std::path::Path| -> Vec<(String, usize)> {
                 let mut result = Vec::new();
                 if let Ok(entries) = std::fs::read_dir(parent) {
                     for entry in entries.filter_map(|e| e.ok()) {
@@ -3458,7 +3471,13 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                     .map(|entries| entries.filter_map(|e| e.ok()).any(|e| e.path().is_dir()))
                                     .unwrap_or(false);
                                 if !has_subdirs {
-                                    result.push(name);
+                                    // 统计视频文件数
+                                    let count = std::fs::read_dir(&p)
+                                        .map(|entries| entries.filter_map(|e| e.ok())
+                                            .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
+                                            .count())
+                                        .unwrap_or(0);
+                                    result.push((name, count));
                                 }
                             }
                         }
@@ -3541,14 +3560,19 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         if !existing_folder_paths.contains(&folder_path_str) {
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if !existing_base_names.contains(&base) {
-                                new_folders.push(name);
+                                let count = std::fs::read_dir(&sub_path)
+                                    .map(|entries| entries.filter_map(|e| e.ok())
+                                        .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
+                                        .count())
+                                    .unwrap_or(0);
+                                new_folders.push((name, count));
                             }
                         }
                     }
                     // 4) 都不匹配 → 跳过
                 }
             }
-            new_folders
+            new_folders.into_iter().map(|(name, video_count)| SeriesInfo { name, video_count }).collect()
         } else {
             vec![]
         }
