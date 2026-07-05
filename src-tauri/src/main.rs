@@ -2723,7 +2723,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
             let poster = crate::scanner::find_folder_poster(&std::path::Path::new(&scan_path));
             let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
-                db::update_video_series_poster(&pool, existing.id, poster.as_deref(), poster_base64.as_deref(), Some("landscape")).await.map_err(|e| e.to_string())?;
+                // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                 db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
                 updated += 1;
             } else {
@@ -2765,8 +2765,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 .await
                 .map_err(|e| e.to_string())?
             {
-                db::update_video_series_poster(&pool, existing.id, poster.as_deref(), poster_base64.as_deref(), Some("landscape"))
-                    .await.map_err(|e| e.to_string())?;
+                // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                 db::add_videos_batch(&pool, scan_result.videos, Some(existing.id))
                     .await.map_err(|e| e.to_string())?;
                 let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
@@ -2851,7 +2850,9 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     let pe_name = period_entry.file_name().to_string_lossy().to_string();
                     let pe_result = scanner::scan_directory(&pe_path.to_string_lossy())
                         .await.map_err(|e| e.to_string())?;
-                    let pe_poster = crate::scanner::find_folder_poster(period_path);
+                    // 时期文件夹下每个视频集必须只取自己的海报，不能取时期父目录海报，
+                    // 否则同一时期下的多个无季视频集会被批量替换成同一张图。
+                    let pe_poster = crate::scanner::find_folder_poster(&pe_path);
                     let pe_poster_base64 = pe_poster.as_deref().and_then(|p| {
                         scanner::generate_thumbnail_base64(std::path::Path::new(p))
                     });
@@ -2860,8 +2861,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     if let Some(existing) = db::get_video_series_by_folder_path(&pool, &pe_folder)
                         .await.map_err(|e| e.to_string())?
                     {
-                        db::update_video_series_poster(&pool, existing.id, pe_poster.as_deref(), pe_poster_base64.as_deref(), Some("landscape"))
-                            .await.map_err(|e| e.to_string())?;
+                        // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                         db::add_videos_batch(&pool, pe_result.videos, Some(existing.id))
                             .await.map_err(|e| e.to_string())?;
                         if let Some(aid) = matched_actor {
@@ -2896,7 +2896,9 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 let sub_result = scanner::scan_directory(&sub_entry_path.to_string_lossy())
                     .await
                     .map_err(|e| e.to_string())?;
-                let sub_poster = crate::scanner::find_folder_poster(&entry_path);
+                // 演员/标签目录下每个视频集必须只取自己的海报，不能取演员/标签父目录海报，
+                // 否则同一演员/标签下多个无季视频集会被批量替换成同一张图。
+                let sub_poster = crate::scanner::find_folder_poster(&sub_entry_path);
                 let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
                     scanner::generate_thumbnail_base64(std::path::Path::new(p))
                 });
@@ -2906,8 +2908,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     .await
                     .map_err(|e| e.to_string())?
                 {
-                    db::update_video_series_poster(&pool, existing.id, sub_poster.as_deref(), sub_poster_base64.as_deref(), Some("landscape"))
-                        .await.map_err(|e| e.to_string())?;
+                    // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                     db::add_videos_batch(&pool, sub_result.videos, Some(existing.id))
                         .await.map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
@@ -2955,8 +2956,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str)
                     .await.map_err(|e| e.to_string())?
                 {
-                    db::update_video_series_poster(&pool, existing.id, video.thumbnail.as_deref(), thumb.as_deref(), Some("landscape"))
-                        .await.map_err(|e| e.to_string())?;
+                    // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                     db::add_videos_batch(&pool, vec![video], Some(existing.id))
                         .await.map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
