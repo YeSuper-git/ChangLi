@@ -555,6 +555,7 @@ const SeriesDetail: React.FC = () => {
       for (const video of missVids) {
         await deleteVideo(video.id);
       }
+      await rescanSingleSeriesMetadata(series.id);
       seriesDetailCache.delete(series.id);
       await loadSeries();
       await refreshSeries();

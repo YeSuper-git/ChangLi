@@ -2426,10 +2426,28 @@ fn usable_series_folder(folder_path: Option<&str>, title: &str) -> Option<PathBu
         })
 }
 
-fn find_child_folder_by_name(root: &Path, target_name: &str, max_depth: usize) -> Option<PathBuf> {
-    if max_depth == 0 || target_name.trim().is_empty() || !root.is_dir() {
+fn folder_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+fn find_child_folder_by_identity(
+    root: &Path,
+    title: &str,
+    code: Option<&str>,
+    max_depth: usize,
+) -> Option<PathBuf> {
+    if max_depth == 0 || !root.is_dir() {
         return None;
     }
+
+    let title = title.trim();
+    let title_lower = title.to_lowercase();
+    let code_upper = code
+        .map(str::trim)
+        .filter(|code| !code.is_empty())
+        .map(|code| code.to_uppercase());
 
     let entries = std::fs::read_dir(root).ok()?;
     let mut child_dirs = Vec::new();
@@ -2438,18 +2456,30 @@ fn find_child_folder_by_name(root: &Path, target_name: &str, max_depth: usize) -
         if !path.is_dir() {
             continue;
         }
-        let name = path
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_default();
-        if name == target_name {
+
+        let name = folder_name(&path);
+        let name_lower = name.to_lowercase();
+        let name_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
+
+        let title_matches = !title.is_empty()
+            && (name == title
+                || name_lower == title_lower
+                || crate::scanner::strip_episode_suffix(&name).to_lowercase() == title_lower);
+        let code_matches = code_upper
+            .as_deref()
+            .map(|code| {
+                name_code.as_deref() == Some(code) || name.to_uppercase().contains(code)
+            })
+            .unwrap_or(false);
+
+        if title_matches || code_matches {
             return Some(path);
         }
         child_dirs.push(path);
     }
 
     for child in child_dirs {
-        if let Some(found) = find_child_folder_by_name(&child, target_name, max_depth - 1) {
+        if let Some(found) = find_child_folder_by_identity(&child, title, code, max_depth - 1) {
             return Some(found);
         }
     }
@@ -2461,6 +2491,7 @@ async fn resolve_series_folder(
     folder_path: Option<&str>,
     title: &str,
     display_type: Option<&str>,
+    code: Option<&str>,
 ) -> Result<Option<PathBuf>> {
     if let Some(folder) = usable_series_folder(folder_path, title) {
         return Ok(Some(folder));
@@ -2483,7 +2514,7 @@ async fn resolve_series_folder(
 
     for scan_path in scan_paths {
         if let Some(root) = usable_series_folder(Some(&scan_path), "") {
-            if let Some(found) = find_child_folder_by_name(&root, title, 4) {
+            if let Some(found) = find_child_folder_by_identity(&root, title, code, 5) {
                 return Ok(Some(found));
             }
         }
@@ -2504,19 +2535,19 @@ fn same_stored_path(left: Option<&str>, right: &str) -> bool {
 /// 重新扫描所有 video_series 的元数据（code、has_chinese_sub）
 /// 重新扫描单个视频集的元数据（车牌、中字、标题、海报）
 pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) -> Result<bool> {
-    let row = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>)>(
-        "SELECT id, title, folder_path, display_type FROM video_series WHERE id = ?",
+    let row = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(
+        "SELECT id, title, folder_path, display_type, code FROM video_series WHERE id = ?",
     )
     .bind(series_id)
     .fetch_optional(pool)
     .await?;
 
-    let (id, title, folder_path, display_type) = match row {
+    let (id, title, folder_path, display_type, code) = match row {
         Some(r) => r,
         None => return Ok(false),
     };
 
-    let source = resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref()).await?;
+    let source = resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref(), code.as_deref()).await?;
     let folder_name = source
         .as_deref()
         .and_then(std::path::Path::file_name)
@@ -2986,8 +3017,8 @@ pub async fn delete_videos_by_category(
 /// 只在视频集海报路径或缓存缺失时从本地文件夹重新匹配海报；找不到不覆盖旧值；不新增/删除视频，不改标题/车牌/中字。
 /// 返回 (updated, skipped, missing_series_count, missing_videos_count)，missing_videos_count 保持 0 以兼容旧接口。
 pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64, i64, i64)> {
-    let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(&format!(
-        "SELECT id, title, folder_path, poster, poster_base64 FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>, Option<String>)>(&format!(
+        "SELECT id, title, folder_path, code, poster, poster_base64 FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
     ))
     .fetch_all(pool)
@@ -2997,8 +3028,8 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
     let mut skipped: i64 = 0;
     let mut missing_series_count: i64 = 0;
 
-    for (id, title, folder_path, poster, poster_base64) in series_list {
-        let folder_path_std = match resolve_series_folder(pool, folder_path.as_deref(), &title, Some(category_key)).await? {
+    for (id, title, folder_path, code, poster, poster_base64) in series_list {
+        let folder_path_std = match resolve_series_folder(pool, folder_path.as_deref(), &title, Some(category_key), code.as_deref()).await? {
             Some(path) => path,
             None => {
                 missing_series_count += 1;
@@ -3312,20 +3343,31 @@ pub struct SeriesUpdateResult {
 
 /// 检测单个视频集的更新：新增分集 + 丢失分集（仅检测，不修改数据库）
 pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<SeriesUpdateResult> {
-    let row = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, folder_path FROM video_series WHERE id = ?",
+    let row = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(
+        "SELECT id, title, folder_path, display_type, code FROM video_series WHERE id = ?",
     )
     .bind(series_id)
     .fetch_optional(pool)
     .await?;
 
-    let (_id, title, folder_path) = match row {
+    let (_id, title, folder_path, display_type, code) = match row {
         Some(r) => r,
         None => return Ok(SeriesUpdateResult { new_videos: vec![], missing_videos: vec![] }),
     };
 
-    let source = folder_path.as_deref().unwrap_or(&title);
-    let folder_path_std = std::path::Path::new(source);
+    let folder_path_buf = resolve_series_folder(
+        pool,
+        folder_path.as_deref(),
+        &title,
+        display_type.as_deref(),
+        code.as_deref(),
+    )
+    .await?;
+    let source = folder_path_buf
+        .as_deref()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| folder_path.clone().unwrap_or_else(|| title.clone()));
+    let folder_path_std = Path::new(&source);
 
     // 检查更新也负责修复缺失的视频集海报：仅当当前视频集海报为空时，
     // 从本地视频集文件夹重新匹配海报；找不到时不覆盖旧值。
@@ -3373,7 +3415,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
     // 扫描文件夹获取当前视频。检查更新只做资源差异检测；但字幕文件名升级
     // （JUR-472 → JUR-472-C / JUR-472-AI → JUR-472-AI-C）按同一视频处理并更新路径，避免误报新增+丢失。
     let new_videos = if folder_path_std.is_dir() {
-        let mut scanned_new: Vec<Video> = crate::scanner::scan_directory_video_index(source)
+        let mut scanned_new: Vec<Video> = crate::scanner::scan_directory_video_index(&source)
             .await?
             .into_iter()
             .filter(|v| !existing_paths.contains(&v.file_path))
@@ -3494,7 +3536,7 @@ where
         skipped: 0,
     };
 
-    let series_rows = sqlx::query("SELECT id, title, folder_path, display_type, poster, poster_base64 FROM video_series ORDER BY id")
+    let series_rows = sqlx::query("SELECT id, title, folder_path, display_type, code, poster, poster_base64 FROM video_series ORDER BY id")
         .fetch_all(pool)
         .await?;
 
@@ -3505,12 +3547,13 @@ where
         let title: String = row.try_get("title").unwrap_or_default();
         let folder_path: Option<String> = row.try_get("folder_path").ok().flatten();
         let display_type: Option<String> = row.try_get("display_type").ok().flatten();
+        let code: Option<String> = row.try_get("code").ok().flatten();
         let poster: Option<String> = row.try_get("poster").ok().flatten();
         let poster_base64: Option<String> = row.try_get("poster_base64").ok().flatten();
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
 
-        let folder = match resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref()).await? {
+        let folder = match resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref(), code.as_deref()).await? {
             Some(path) => path,
             None => {
                 result.skipped += 1;
@@ -3650,8 +3693,8 @@ where
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
 pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Result<CategoryUpdateResult> {
     // 获取分类下的所有视频集（空字符串 display_type 归入默认分类）
-    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
-        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(&format!(
+        "SELECT id, title, folder_path, display_type, code FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
     ))
     .fetch_all(pool)
@@ -3664,25 +3707,38 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     // 同时建立基础名称集合，用于匹配 "xxxx 1-3" → "xxxx" 这种改名场景
     let mut existing_folder_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut existing_base_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut existing_codes: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    for (id, title, folder_path) in &series_list {
-        let source = folder_path.as_deref().unwrap_or(title);
-        existing_folder_paths.insert(source.to_string());
+    for (id, title, folder_path, display_type, code) in &series_list {
+        let resolved_folder = resolve_series_folder(
+            pool,
+            folder_path.as_deref(),
+            title,
+            display_type.as_deref().or(Some(category_key)),
+            code.as_deref(),
+        )
+        .await?;
+        let source = resolved_folder
+            .as_deref()
+            .map(|path| path.to_string_lossy().to_string())
+            .or_else(|| folder_path.clone())
+            .unwrap_or_else(|| title.clone());
+        existing_folder_paths.insert(source.clone());
+        if let Some(code) = code.as_deref().filter(|code| !code.trim().is_empty()) {
+            existing_codes.insert(code.to_uppercase());
+        }
+        existing_base_names.insert(title.clone());
         // 提取文件夹名，去掉集数后缀，用于匹配
-        let folder_name = std::path::Path::new(source)
+        let folder_name = std::path::Path::new(&source)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| title.clone());
         existing_base_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
 
-        let folder_path_std = std::path::Path::new(source);
+        let folder_path_std = Path::new(&source);
 
         // 检测视频集文件夹是否缺失
-        let series_missing = if folder_path.is_some() {
-            !folder_path_std.is_dir()
-        } else {
-            !std::path::Path::new(title).is_dir()
-        };
+        let series_missing = !folder_path_std.is_dir();
 
         if series_missing {
             // 查询该视频集的分集数
@@ -3768,8 +3824,11 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             // 1) 规范化路径比较
                             if normalized_db_paths.contains(&normalize(&fps)) { continue; }
                             let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                            // 2) 文件夹名直接匹配；时期文件夹本身不是视频集
-                            if existing_base_names.contains(&name) || all_actor_period_names.contains(&name) { continue; }
+                            // 2) 文件夹名/车牌直接匹配；时期文件夹本身不是视频集
+                            let parsed_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
+                            if existing_base_names.contains(&name)
+                                || all_actor_period_names.contains(&name)
+                                || parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) { continue; }
                             // 3) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if !existing_base_names.contains(&base) {
