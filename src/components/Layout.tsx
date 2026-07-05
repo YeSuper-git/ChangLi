@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
 import settingsIcon from '../assets/icons/settings.svg';
@@ -15,6 +15,7 @@ const scrollPositions = new Map<string, number>();
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const mainRef = useRef<HTMLElement>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
@@ -58,31 +59,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     event.stopPropagation();
   };
 
-  // 保存当前页面滚动位置，返回时恢复
+  // 保存当前页面滚动位置，仅浏览器/应用返回时恢复；普通切页始终回到顶部
   useLayoutEffect(() => {
     const key = location.pathname + location.search;
     const main = mainRef.current;
 
-    if (scrollPositions.has(key)) {
-      // 该页面之前访问过，恢复保存的位置
+    if (navigationType === 'POP' && scrollPositions.has(key)) {
       const savedTop = scrollPositions.get(key)!;
-      // 用 setTimeout 确保在 DOM 更新后执行
       setTimeout(() => {
         mainRef.current?.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
       }, 0);
     } else {
-      // 新页面，滚到顶部
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       window.scrollTo(0, 0);
     }
 
-    // 离开时保存当前滚动位置
     return () => {
       if (main && main.scrollTop > 0) {
-        scrollPositions.set(location.pathname + location.search, main.scrollTop);
+        scrollPositions.set(key, main.scrollTop);
       }
     };
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, navigationType]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
