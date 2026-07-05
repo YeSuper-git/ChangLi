@@ -453,9 +453,14 @@ export interface SeriesUpdateSummary {
   missing_videos: Video[];
 }
 
+export interface SeriesInfo {
+  name: string;
+  video_count: number;
+}
+
 export interface CategoryUpdateResult {
-  new_series: string[];
-  missing_series: string[];
+  new_series: SeriesInfo[];
+  missing_series: SeriesInfo[];
   series_updates: SeriesUpdateSummary[];
 }
 
