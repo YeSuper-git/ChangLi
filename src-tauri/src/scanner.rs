@@ -289,6 +289,141 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
     Ok(ScanResult { videos, posters })
 }
 
+/// 轻量扫描目录更新：只收集视频文件元数据，不读取图片、不生成缩略图。
+/// 全量检查更新只需要比较文件增删；避免为每个已有视频集重复压缩海报导致卡慢。
+pub async fn scan_directory_video_index(path: &str) -> Result<Vec<Video>> {
+    let path = Path::new(path);
+    if !path.exists() {
+        return Err(anyhow::anyhow!("目录不存在: {}", path.display()));
+    }
+
+    let mut videos = Vec::new();
+    let mut subdirs: Vec<PathBuf> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                subdirs.push(entry.path());
+            }
+        }
+    }
+
+    if subdirs.is_empty() {
+        process_directory_video_index(path, None, None, &mut videos).await?;
+    } else {
+        subdirs.sort_by(|a, b| {
+            let a_name = a.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+            let b_name = b.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+            a_name.cmp(&b_name)
+        });
+
+        let mut season_counter = 0;
+        for subdir in &subdirs {
+            let count = count_videos_in_folder(subdir);
+            if count == 0 {
+                continue;
+            }
+
+            let folder_name = subdir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let (season, subtitle) = match classify_series_subfolder(&folder_name) {
+                SeriesSubfolderKind::Movie => (999, Some(folder_name)),
+                SeriesSubfolderKind::Season(season) => (season, None),
+                SeriesSubfolderKind::Unknown if count <= 3 => (999, Some(folder_name)),
+                SeriesSubfolderKind::Unknown => {
+                    season_counter += 1;
+                    (season_counter, None)
+                }
+            };
+            process_directory_video_index(subdir, Some(season), subtitle.as_deref(), &mut videos).await?;
+        }
+    }
+
+    Ok(videos)
+}
+
+async fn process_directory_video_index(
+    dir: &Path,
+    season: Option<i32>,
+    subtitle: Option<&str>,
+    videos: &mut Vec<Video>,
+) -> Result<()> {
+    let mut video_files: Vec<PathBuf> = Vec::new();
+
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+    {
+        let file_path = entry.path();
+        if is_video_file(file_path) {
+            video_files.push(file_path.to_path_buf());
+        }
+    }
+
+    let mut folder_videos: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    for video_path in &video_files {
+        if let Some(parent) = video_path.parent() {
+            folder_videos.entry(parent.to_path_buf()).or_insert_with(Vec::new).push(video_path.clone());
+        }
+    }
+
+    for videos_in_folder in folder_videos.values() {
+        let mut sorted_videos = videos_in_folder.clone();
+        sort_episode_files(&mut sorted_videos);
+        let fixed_episode_names = folder_uses_fixed_episode_names(&sorted_videos);
+
+        for (index, video_path) in sorted_videos.iter().enumerate() {
+            let mut video = scan_video_file_index(video_path)?;
+            video.season = season;
+            video.subtitle = subtitle.map(|s| s.to_string()).or(video.subtitle);
+            if fixed_episode_names {
+                video.episode_number = video_path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .and_then(|stem| stem.parse::<i32>().ok());
+            } else if video.episode_number.is_none() {
+                video.episode_number = Some((index + 1) as i32);
+            }
+            videos.push(video);
+        }
+    }
+
+    Ok(())
+}
+
+fn scan_video_file_index(path: &Path) -> Result<Video> {
+    let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_size = std::fs::metadata(path)?.len() as i64;
+    let adult_info = parse_adult_filename(&file_name);
+
+    Ok(Video {
+        id: 0,
+        file_path: path.to_string_lossy().to_string(),
+        file_name: file_name.clone(),
+        series_id: None,
+        episode_number: fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name)),
+        file_size: Some(file_size),
+        season: None,
+        subtitle: adult_info.as_ref().and_then(|info| info.title.clone()),
+        duration: None,
+        width: None,
+        height: None,
+        resolution: None,
+        source_site: None,
+        metadata: None,
+        thumbnail: None,
+        thumbnail_base64: None,
+        thumbnail_data_url: None,
+        series_title: None,
+        series_poster_data_url: None,
+        description: None,
+        poster_orientation: None,
+        created_at: chrono::Utc::now().to_rfc3339(),
+        is_favorite: None,
+        series_has_chinese_sub: None,
+        series_code: None,
+    })
+}
+
 /// 处理指定目录下的所有视频，按父文件夹分组并分配集数和季数。
 async fn process_directory_videos(
     dir: &Path,

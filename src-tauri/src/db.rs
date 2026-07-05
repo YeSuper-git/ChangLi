@@ -3286,9 +3286,8 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
     // 扫描文件夹获取当前视频。检查更新只做资源差异检测；但字幕文件名升级
     // （JUR-472 → JUR-472-C / JUR-472-AI → JUR-472-AI-C）按同一视频处理并更新路径，避免误报新增+丢失。
     let new_videos = if folder_path_std.is_dir() {
-        let scan_result = crate::scanner::scan_directory(source).await?;
-        let mut scanned_new: Vec<Video> = scan_result
-            .videos
+        let mut scanned_new: Vec<Video> = crate::scanner::scan_directory_video_index(source)
+            .await?
             .into_iter()
             .filter(|v| !existing_paths.contains(&v.file_path))
             .collect();
@@ -3411,10 +3410,6 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
 
-        if !poster_missing && !base64_missing {
-            continue;
-        }
-
         let folder = match folder_path.as_deref() {
             Some(path) if Path::new(path).is_dir() => Path::new(path),
             _ => {
@@ -3423,7 +3418,23 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
             }
         };
 
-        let candidate = if poster_missing {
+        let wrong_parent_poster = poster
+            .as_deref()
+            .map(|poster_path| {
+                let poster_path = Path::new(poster_path);
+                !poster_path.starts_with(folder)
+                    && poster_path
+                        .parent()
+                        .map(|poster_parent| folder.starts_with(poster_parent))
+                        .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        if !poster_missing && !base64_missing && !wrong_parent_poster {
+            continue;
+        }
+
+        let candidate = if poster_missing || wrong_parent_poster {
             crate::scanner::find_folder_poster(folder)
         } else {
             poster.clone()
@@ -3431,16 +3442,22 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
 
         if let Some(poster_path) = candidate {
             let resolved = storage::resolve_data_path(&poster_path);
-            let base64 = if base64_missing {
+            let base64 = if poster_missing || base64_missing || wrong_parent_poster {
                 crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
             } else {
                 poster_base64.clone()
             };
             let orientation = crate::scanner::get_image_orientation(Path::new(&resolved));
-            sqlx::query("UPDATE video_series SET poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                .bind(if poster_missing { Some(poster_path.as_str()) } else { None })
+            sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(poster_path.as_str())
                 .bind(base64.as_deref())
                 .bind(orientation.as_deref())
+                .bind(id)
+                .execute(pool)
+                .await?;
+            result.updated_series += 1;
+        } else if wrong_parent_poster {
+            sqlx::query("UPDATE video_series SET poster = NULL, poster_base64 = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                 .bind(id)
                 .execute(pool)
                 .await?;
