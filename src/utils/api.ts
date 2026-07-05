@@ -350,6 +350,10 @@ export async function deleteVideoSeries(id: number, deleteVideos: boolean): Prom
   return invoke('delete_video_series', { id, deleteVideos });
 }
 
+export async function openSeriesInFileManager(seriesId: number): Promise<void> {
+  return invoke('open_series_in_file_manager', { seriesId });
+}
+
 export async function switchSeriesType(seriesId: number): Promise<void> {
   return invoke('switch_series_type', { seriesId });
 }

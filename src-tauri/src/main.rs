@@ -1303,6 +1303,38 @@ async fn open_data_dir() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn open_series_in_file_manager(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    let folder_path = sqlx::query_scalar::<_, Option<String>>("SELECT folder_path FROM video_series WHERE id = ?")
+        .bind(series_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .flatten()
+        .ok_or_else(|| "该视频集没有源文件路径".to_string())?;
+
+    let source = std::path::PathBuf::from(&folder_path);
+    let target = if source.is_file() {
+        source
+            .parent()
+            .map(|p| p.to_path_buf())
+            .ok_or_else(|| "无法定位源文件所在位置".to_string())?
+    } else {
+        source
+    };
+
+    if !target.exists() {
+        return Err("源文件路径不存在".to_string());
+    }
+
+    open::that(&target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn repair_missing_posters_silent(state: State<'_, AppState>) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -2348,6 +2380,7 @@ fn main() {
             delete_preview_file,
             get_storage_info,
             open_data_dir,
+            open_series_in_file_manager,
             repair_missing_posters_silent,
             toggle_favorite,
             toggle_chinese_sub,
@@ -2714,6 +2747,51 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
         let entry_name = entry.file_name().to_string_lossy().to_string();
 
         if !entry_path.is_dir() {
+            continue;
+        }
+
+        // 分类未勾选演员/标签时，分类下一层直接就是视频集
+        if !actors_enabled && !tags_enabled {
+            let scan_result = scanner::scan_directory(&entry_path.to_string_lossy())
+                .await
+                .map_err(|e| e.to_string())?;
+            let poster = crate::scanner::find_folder_poster(&entry_path);
+            let poster_base64 = poster.as_deref().and_then(|p| {
+                scanner::generate_thumbnail_base64(std::path::Path::new(p))
+            });
+            let folder_path_str = entry_path.to_string_lossy().to_string();
+
+            if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                db::update_video_series_poster(&pool, existing.id, poster.as_deref(), poster_base64.as_deref(), Some("landscape"))
+                    .await.map_err(|e| e.to_string())?;
+                db::add_videos_batch(&pool, scan_result.videos, Some(existing.id))
+                    .await.map_err(|e| e.to_string())?;
+                let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                updated += 1;
+            } else {
+                let (series_title, code, has_chinese_sub) = extract_adult_metadata(&entry_name);
+                let series = db::add_video_series(
+                    &pool,
+                    &series_title,
+                    Some(&folder_path_str),
+                    poster.as_deref(),
+                    Some("landscape"),
+                    Some("ongoing"),
+                    poster_base64.as_deref(),
+                    Some(&category_key),
+                ).await.map_err(|e| e.to_string())?;
+                if let Some(c) = code {
+                    let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                        .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                }
+                db::add_videos_batch(&pool, scan_result.videos, Some(series.id))
+                    .await.map_err(|e| e.to_string())?;
+                let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                added += 1;
+            }
             continue;
         }
 

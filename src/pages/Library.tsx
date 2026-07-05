@@ -17,6 +17,7 @@ import {
   deleteVideo,
   getTagColor,
   toggleWatched,
+  openSeriesInFileManager,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -137,13 +138,19 @@ const Library: React.FC = () => {
     return [...categories].sort((a, b) => a.sort_order - b.sort_order)[0]?.key || 'anime';
   }, [categories]);
 
-  // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
+  // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
+  const dirtyRefreshHandledRef = useRef(false);
   useEffect(() => {
+    if (dirtyRefreshHandledRef.current) return;
+    dirtyRefreshHandledRef.current = true;
     window.scrollTo(0, 0);
-    // 只在数据有变更时才刷新 series（播放/扫描/删除后标记 dirty）
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
+  }, []);
+
+  // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
+  useEffect(() => {
     if (storeCategories.length > 0) {
       setCategories(storeCategories);
       if (!hasInitialCatParamRef.current && !mainCategory) {
@@ -199,7 +206,8 @@ const Library: React.FC = () => {
   }, [loadCategoryFilters]);
   const [favoriteFilter, setFavoriteFilter] = useState(() => searchParams.get('favorite') === '1');
   const [watchedFilter, setWatchedFilter] = useState(() => searchParams.get('watched') === '1');
-  const [unfinishedFilter, setUnfinishedFilter] = useState(false);
+  const [unfinishedFilter, setUnfinishedFilter] = useState(() => searchParams.get('unfinished') === '1');
+  const [emptyFilter, setEmptyFilter] = useState(() => searchParams.get('empty') === '1');
   const [chineseSubFilter, setChineseSubFilter] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
@@ -246,11 +254,12 @@ const Library: React.FC = () => {
       favorite: favoriteFilter ? '1' : null,
       watched: watchedFilter ? '1' : null,
       unfinished: unfinishedFilter ? '1' : null,
+      empty: emptyFilter ? '1' : null,
       scope: scopeAll ? 'all' : null,
       cat: !scopeAll && mainCategory && mainCategory !== defaultCategoryKey ? mainCategory : null,
       q: debouncedSearch.trim() ? debouncedSearch.trim() : null,
     });
-  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, unfinishedFilter, mainCategory, scopeAll, debouncedSearch, defaultCategoryKey, syncParams]);
+  }, [activeTagId, activeActorId, typeFilter, favoriteFilter, watchedFilter, unfinishedFilter, emptyFilter, mainCategory, scopeAll, debouncedSearch, defaultCategoryKey, syncParams]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -433,6 +442,16 @@ const Library: React.FC = () => {
     setContextMenu(null);
     clearPending();
     navigate(target, { state: { from: '/library', backLabel: '返回视频', filterSearch } });
+  };
+
+  const handleOpenSeriesInFileManager = async (seriesId: number) => {
+    setContextMenu(null);
+    try {
+      await openSeriesInFileManager(seriesId);
+    } catch (err) {
+      console.error('[Library] 打开视频集源文件位置失败:', err);
+      notify({ message: String(err || '打开源文件位置失败'), type: 'info' });
+    }
   };
 
   const handleRescanMetadata = async (seriesId: number) => {
@@ -627,7 +646,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', ].join('|');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', emptyFilter ? 'empty' : 'empty-all', chineseSubFilter ? 'sub' : 'sub-all', ].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
@@ -640,7 +659,8 @@ const Library: React.FC = () => {
     return matchesText
       && (!favoriteFilter || favoriteIds.has(`s-${series.id}`))
       && (!watchedFilter || watchedIds.has(series.id))
-      && (!unfinishedFilter || (favoriteIds.has(`s-${series.id}`) && !watchedIds.has(series.id)))
+      && (!unfinishedFilter || !watchedIds.has(series.id))
+      && (!emptyFilter || series.video_count === 0)
       && (!chineseSubFilter || series.has_chinese_sub === 1)
       && matchesCategory;
   });
@@ -708,6 +728,9 @@ const Library: React.FC = () => {
                 setTagFilteredSeries(null);
                 setFavoriteFilter(false);
                 setWatchedFilter(false);
+                setUnfinishedFilter(false);
+                setEmptyFilter(false);
+                setChineseSubFilter(false);
                 setSearchTerm('');
               }}
             >
@@ -803,17 +826,19 @@ const Library: React.FC = () => {
           <div className="changli-filter-row is-expanded">
             {features.tracking ? (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
                 <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
                 <button onClick={() => { setUnfinishedFilter(!unfinishedFilter); setWatchedFilter(false); }} className={`changli-filter-pill ${unfinishedFilter ? 'active' : ''}`}>未看完</button>
                 <button onClick={() => { setWatchedFilter(!watchedFilter); setUnfinishedFilter(false); }} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
+                <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
                 )}
               </>
             ) : (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
                 )}
@@ -973,6 +998,12 @@ const Library: React.FC = () => {
             onClick={handleEditContextItem}
           >
             编辑
+          </button>
+          <button
+            className="changli-menu-item"
+            onClick={() => handleOpenSeriesInFileManager(contextMenu.id)}
+          >
+            以文件资源管理器打开
           </button>
           <button
             className="changli-menu-item"

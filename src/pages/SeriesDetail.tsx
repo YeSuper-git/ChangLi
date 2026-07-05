@@ -628,6 +628,57 @@ const SeriesDetail: React.FC = () => {
                   className="search-input"
                   placeholder="标题"
                 />
+                {(editData.code || features.status) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {editData.code && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
+                        <input
+                          type="text"
+                          value={editData.code}
+                          onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                          className="search-input"
+                          placeholder="如 JJK-098"
+                          style={{ textTransform: 'uppercase' }}
+                        />
+                      </div>
+                    )}
+                    {features.status && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-2">连载状态</div>
+                        <div className="changli-status-switch" role="group" aria-label="连载状态">
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, status: 'ongoing' })}
+                            className={editData.status !== 'completed' ? 'active' : ''}
+                          >连载中</button>
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, status: 'completed' })}
+                            className={editData.status === 'completed' ? 'active' : ''}
+                          >已完结</button>
+                        </div>
+                      </div>
+                    )}
+                    {editData.code && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
+                        <div className="changli-status-switch" role="group" aria-label="中文字幕支持">
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, has_chinese_sub: false })}
+                            className={!editData.has_chinese_sub ? 'active' : ''}
+                          >不支持</button>
+                          <button
+                            type="button"
+                            onClick={() => setEditData({ ...editData, has_chinese_sub: true })}
+                            className={editData.has_chinese_sub ? 'active' : ''}
+                          >支持</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {features.actors && (
                   <div>
                     <div className="text-sm font-medium text-gray-500 mb-2">演员</div>
@@ -652,56 +703,6 @@ const SeriesDetail: React.FC = () => {
                       >
                         + 新建演员
                       </button>
-                    </div>
-                  </div>
-                )}
-                {editData.code && (
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-500 mb-2">车牌</div>
-                      <input
-                        type="text"
-                        value={editData.code}
-                        onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
-                        className="search-input"
-                        placeholder="如 JJK-098"
-                        style={{ textTransform: 'uppercase' }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <input
-                          type="checkbox"
-                          checked={editData.has_chinese_sub}
-                          onChange={(e) => setEditData({ ...editData, has_chinese_sub: e.target.checked })}
-                          className="w-4 h-4 rounded accent-green-500"
-                        />
-                        <span className="text-sm text-gray-600">有中文字幕</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <textarea
-                      value={editData.description}
-                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                      className="search-input min-h-[120px]"
-                      placeholder="简介"
-                    />
-                {features.status && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500 mb-2">连载状态</div>
-                    <div className="changli-status-switch" role="group" aria-label="连载状态">
-                      <button
-                        type="button"
-                        onClick={() => setEditData({ ...editData, status: 'ongoing' })}
-                        className={editData.status !== 'completed' ? 'active' : ''}
-                      >连载中</button>
-                      <button
-                        type="button"
-                        onClick={() => setEditData({ ...editData, status: 'completed' })}
-                        className={editData.status === 'completed' ? 'active' : ''}
-                      >已完结</button>
                     </div>
                   </div>
                 )}
@@ -760,11 +761,11 @@ const SeriesDetail: React.FC = () => {
                   </div>
                 )}
                 <textarea
-                    value={editData.description}
-                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                    className="search-input min-h-[120px]"
-                    placeholder="简介"
-                  />
+                  value={editData.description}
+                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                  className="search-input min-h-[120px]"
+                  placeholder="简介"
+                />
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
@@ -790,20 +791,24 @@ const SeriesDetail: React.FC = () => {
                           <span className={series.has_chinese_sub === 1 ? 'text-rose-500' : 'text-gray-400'}>中字</span>
                         </button>
                       )}
-                      <button
-                        onClick={() => toggleFavorite(series.id, 'series')}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img src={isFavorite ? favoriteIcon : notFavoriteIcon} alt="追番" className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`} />
-                        <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>{isFavorite ? '已追番' : '追番'}</span>
-                      </button>
-                      <button
-                        onClick={handleToggleWatched}
-                        className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                      >
-                        <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
-                        <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
-                      </button>
+                      {features.tracking && (
+                        <>
+                          <button
+                            onClick={() => toggleFavorite(series.id, 'series')}
+                            className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                          >
+                            <img src={isFavorite ? favoriteIcon : notFavoriteIcon} alt="追番" className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`} />
+                            <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>{isFavorite ? '已追番' : '追番'}</span>
+                          </button>
+                          <button
+                            onClick={handleToggleWatched}
+                            className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                          >
+                            <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
+                            <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
+                          </button>
+                        </>
+                      )}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>

@@ -3271,25 +3271,87 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
     // 获取数据库中现有的视频
     let existing_videos = get_series_videos(pool, series_id).await?;
-    let existing_paths: std::collections::HashSet<String> = existing_videos
+    let mut existing_paths: std::collections::HashSet<String> = existing_videos
         .iter()
         .map(|v| v.file_path.clone())
         .collect();
 
     // 检测丢失的视频（数据库中有记录但文件不存在）
-    let missing_videos: Vec<Video> = existing_videos
-        .into_iter()
+    let mut missing_videos: Vec<Video> = existing_videos
+        .iter()
         .filter(|v| !std::path::Path::new(&v.file_path).is_file())
+        .cloned()
         .collect();
 
-    // 扫描文件夹获取当前视频。检查更新只做资源差异检测，不在这里回填海报/生成 base64，避免全量检查被图片解码拖慢。
+    // 扫描文件夹获取当前视频。检查更新只做资源差异检测；但字幕文件名升级
+    // （JUR-472 → JUR-472-C / JUR-472-AI → JUR-472-AI-C）按同一视频处理并更新路径，避免误报新增+丢失。
     let new_videos = if folder_path_std.is_dir() {
         let scan_result = crate::scanner::scan_directory(source).await?;
-        scan_result
+        let mut scanned_new: Vec<Video> = scan_result
             .videos
             .into_iter()
             .filter(|v| !existing_paths.contains(&v.file_path))
-            .collect()
+            .collect();
+
+        let mut missing_by_identity: std::collections::HashMap<String, Video> = missing_videos
+            .iter()
+            .filter_map(|v| crate::scanner::adult_rename_identity(&v.file_name).map(|key| (key, v.clone())))
+            .collect();
+
+        let mut remaining_new = Vec::new();
+        let mut renamed_old_paths = std::collections::HashSet::new();
+        for scanned in scanned_new.drain(..) {
+            let identity = crate::scanner::adult_rename_identity(&scanned.file_name);
+            if let Some(existing) = identity.and_then(|key| missing_by_identity.remove(&key)) {
+                let thumbnail_base64 = scanned
+                    .thumbnail
+                    .as_deref()
+                    .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+                let poster_orientation = scanned
+                    .thumbnail
+                    .as_deref()
+                    .and_then(|p| crate::scanner::get_image_orientation(std::path::Path::new(p)));
+                sqlx::query(
+                    r#"
+                    UPDATE videos
+                    SET file_path = ?, file_name = ?, episode_number = ?, file_size = ?, season = ?, subtitle = ?,
+                        thumbnail = COALESCE(?, thumbnail), thumbnail_base64 = COALESCE(?, thumbnail_base64),
+                        poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    "#,
+                )
+                .bind(&scanned.file_path)
+                .bind(&scanned.file_name)
+                .bind(scanned.episode_number)
+                .bind(scanned.file_size)
+                .bind(scanned.season)
+                .bind(&scanned.subtitle)
+                .bind(&scanned.thumbnail)
+                .bind(thumbnail_base64.as_deref())
+                .bind(poster_orientation.as_deref())
+                .bind(existing.id)
+                .execute(pool)
+                .await?;
+
+                if crate::scanner::parse_adult_filename(&scanned.file_name)
+                    .map(|info| info.has_chinese_sub)
+                    .unwrap_or(false)
+                {
+                    let _ = sqlx::query("UPDATE video_series SET has_chinese_sub = 1 WHERE id = ?")
+                        .bind(series_id)
+                        .execute(pool)
+                        .await;
+                }
+
+                renamed_old_paths.insert(existing.file_path);
+                existing_paths.insert(scanned.file_path.clone());
+            } else {
+                remaining_new.push(scanned);
+            }
+        }
+
+        missing_videos.retain(|v| !renamed_old_paths.contains(&v.file_path));
+        remaining_new
     } else {
         vec![]
     };
@@ -3530,156 +3592,210 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     //   都不匹配 → 跳过
     let category = get_category_by_key(pool, category_key).await?;
 
-    let new_series = if let Some(ref scan_path) = category.and_then(|c| c.scan_path) {
-        let path = std::path::Path::new(scan_path);
-        if path.is_dir() {
-            let mut new_folders = Vec::new();
+    let new_series = if let Some(ref category) = category {
+        if let Some(ref scan_path) = category.scan_path {
+            let path = std::path::Path::new(scan_path);
+            if path.is_dir() {
+                let mut new_folders = Vec::new();
 
-            // 预加载所有标签名、演员名、分类名用于匹配
-            let tag_names: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT name FROM tags")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
-            let actor_names: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT name FROM actors")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
-            let actor_labels: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT COALESCE(label, name) FROM actors")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
-            let cat_names: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT name FROM categories")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
-            let cat_keys: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT key FROM categories")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
-            let all_actor_period_names: std::collections::HashSet<String> =
-                sqlx::query_scalar::<_, String>("SELECT name FROM actor_periods")
-                    .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                // 分类配置决定检查更新时如何理解目录结构：
+                //   actors=true  → 匹配演员目录，演员目录下继续识别时期
+                //   tags=true    → 匹配标签目录
+                //   两者都关闭 → 分类目录下一层直接作为视频集候选
+                let features: serde_json::Value = serde_json::from_str(&category.features).unwrap_or_default();
+                let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
+                let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
 
-            // 收集目录下不在 existing_base_names 中的子文件夹名
-            // 路径规范化：统一斜杠方向和大小写
-            let normalize = |s: &str| -> String {
-                s.replace("\\", "/").to_lowercase()
-            };
-            let normalized_db_paths: std::collections::HashSet<String> =
-                existing_folder_paths.iter().map(|p| normalize(p)).collect();
+                // 预加载所有标签名、演员名、分类名用于匹配
+                let tag_names: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT name FROM tags")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                let actor_names: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT name FROM actors")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                let actor_labels: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT COALESCE(label, name) FROM actors")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                let cat_names: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT name FROM categories")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                let cat_keys: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT key FROM categories")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                let all_actor_period_names: std::collections::HashSet<String> =
+                    sqlx::query_scalar::<_, String>("SELECT name FROM actor_periods")
+                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
 
-            let collect_new = |parent: &std::path::Path| -> Vec<(String, usize)> {
-                let mut result = Vec::new();
-                if let Ok(entries) = std::fs::read_dir(parent) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let p = entry.path();
-                        if !p.is_dir() { continue; }
-                        let fps = p.to_string_lossy().to_string();
-                        // 1) 规范化路径比较
-                        if normalized_db_paths.contains(&normalize(&fps)) { continue; }
-                        let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                        // 2) 文件夹名直接匹配；时期文件夹本身不是视频集
-                        if existing_base_names.contains(&name) || all_actor_period_names.contains(&name) { continue; }
-                        // 3) 去掉集数后缀再匹配
-                        let base = crate::scanner::strip_episode_suffix(&name);
-                        if !existing_base_names.contains(&base) {
-                            // 统计视频文件数
-                            let count = std::fs::read_dir(&p)
-                                .map(|entries| entries.filter_map(|e| e.ok())
-                                    .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
-                                    .count())
-                                .unwrap_or(0);
-                            result.push((name, count));
-                        }
-                    }
-                }
-                result
-            };
+                // 收集目录下不在 existing_base_names 中的子文件夹名
+                // 路径规范化：统一斜杠方向和大小写
+                let normalize = |s: &str| -> String {
+                    s.replace("\\", "/").to_lowercase()
+                };
+                let normalized_db_paths: std::collections::HashSet<String> =
+                    existing_folder_paths.iter().map(|p| normalize(p)).collect();
 
-            if let Ok(top_entries) = std::fs::read_dir(path) {
-                for entry in top_entries.filter_map(|e| e.ok()) {
-                    let sub_path = entry.path();
-                    if !sub_path.is_dir() { continue; }
-                    let name = sub_path.file_name()
-                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-
-                    if cat_names.contains(&name) || cat_keys.contains(&name) {
-                        // 1) 匹配分类 → 递归进入分类目录（同级）
-                        // 分类文件夹本身不是视频集，递归进去按同样逻辑处理
-                        if let Ok(sub_entries) = std::fs::read_dir(&sub_path) {
-                            for sub_entry in sub_entries.filter_map(|e| e.ok()) {
-                                let sub_sub = sub_entry.path();
-                                if !sub_sub.is_dir() { continue; }
-                                let sub_name = sub_sub.file_name()
-                                    .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                                if tag_names.contains(&sub_name)
-                                    || actor_names.contains(&sub_name)
-                                    || actor_labels.contains(&sub_name)
-                                {
-                                    // 标签/演员文件夹 → 递归找视频集
-                                    new_folders.extend(collect_new(&sub_sub));
-                                } else {
-                                    // 可能是视频集文件夹
-                                    new_folders.extend(collect_new(&sub_path));
-                                }
-                            }
-                        }
-                    } else if tag_names.contains(&name)
-                        || actor_names.contains(&name)
-                        || actor_labels.contains(&name)
-                    {
-                        // 2) 匹配标签/演员 → 递归进去找视频集
-                        // 检查子文件夹是否匹配该演员的时期名
-                        let actor_periods_in_folder: std::collections::HashSet<String> =
-                            if actor_names.contains(&name) || actor_labels.contains(&name) {
-                                // 找到对应的 actor_id
-                                let aid = sqlx::query_scalar::<_, i64>(
-                                    "SELECT id FROM actors WHERE name = ? OR COALESCE(label, name) = ?")
-                                    .bind(&name).bind(&name).fetch_one(pool).await.unwrap_or(0);
-                                sqlx::query_scalar::<_, String>(
-                                    "SELECT name FROM actor_periods WHERE actor_id = ?")
-                                    .bind(aid).fetch_all(pool).await.unwrap_or_default().into_iter().collect()
-                            } else {
-                                std::collections::HashSet::new()
-                            };
-
-                        if !actor_periods_in_folder.is_empty() {
-                            // 有时期信息：子文件夹匹配时期名 → 递归进去找视频集
-                            if let Ok(sub_entries) = std::fs::read_dir(&sub_path) {
-                                for sub_entry in sub_entries.filter_map(|e| e.ok()) {
-                                    let sub_sub = sub_entry.path();
-                                    if !sub_sub.is_dir() { continue; }
-                                    let sub_name = sub_sub.file_name()
-                                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                                    if actor_periods_in_folder.contains(&sub_name) {
-                                        // 时期文件夹 → 递归找视频集
-                                        new_folders.extend(collect_new(&sub_sub));
-                                    } else {
-                                        // 直接的视频集文件夹（允许暂无视频的空视频集）
-                                        new_folders.extend(collect_new(&sub_path));
-                                    }
-                                }
-                            }
-                        } else {
-                            // 无时期信息：直接递归
-                            new_folders.extend(collect_new(&sub_path));
-                        }
-                    } else {
-                        // 3) 未匹配标签/演员/分类时，只有直接的视频集文件夹才加入；允许暂无视频的空视频集
-                        let folder_path_str = sub_path.to_string_lossy().to_string();
-                        if !normalized_db_paths.contains(&normalize(&folder_path_str)) {
+                let collect_new = |parent: &std::path::Path| -> Vec<(String, usize)> {
+                    let mut result = Vec::new();
+                    if let Ok(entries) = std::fs::read_dir(parent) {
+                        for entry in entries.filter_map(|e| e.ok()) {
+                            let p = entry.path();
+                            if !p.is_dir() { continue; }
+                            let fps = p.to_string_lossy().to_string();
+                            // 1) 规范化路径比较
+                            if normalized_db_paths.contains(&normalize(&fps)) { continue; }
+                            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            // 2) 文件夹名直接匹配；时期文件夹本身不是视频集
+                            if existing_base_names.contains(&name) || all_actor_period_names.contains(&name) { continue; }
+                            // 3) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
-                            if !existing_base_names.contains(&base) && !all_actor_period_names.contains(&name) {
-                                let count = std::fs::read_dir(&sub_path)
+                            if !existing_base_names.contains(&base) {
+                                // 统计视频文件数；空视频集文件夹也保留为 0
+                                let count = std::fs::read_dir(&p)
                                     .map(|entries| entries.filter_map(|e| e.ok())
                                         .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
                                         .count())
                                     .unwrap_or(0);
-                                new_folders.push((name, count));
+                                result.push((name, count));
                             }
                         }
                     }
-                    // 4) 都不匹配 → 跳过
+                    result
+                };
+
+                async fn actor_period_names_for(
+                    pool: &SqlitePool,
+                    name: &str,
+                ) -> std::collections::HashSet<String> {
+                    let aid = sqlx::query_scalar::<_, i64>(
+                        "SELECT id FROM actors WHERE name = ? OR COALESCE(label, name) = ?")
+                        .bind(name).bind(name).fetch_one(pool).await.unwrap_or(0);
+                    if aid == 0 {
+                        return std::collections::HashSet::new();
+                    }
+                    sqlx::query_scalar::<_, String>(
+                        "SELECT name FROM actor_periods WHERE actor_id = ?")
+                        .bind(aid).fetch_all(pool).await.unwrap_or_default().into_iter().collect()
                 }
+
+                async fn collect_from_actor_folder<F>(
+                    pool: &SqlitePool,
+                    actor_path: &std::path::Path,
+                    collect_new: &F,
+                ) -> Vec<(String, usize)>
+                where
+                    F: Fn(&std::path::Path) -> Vec<(String, usize)>,
+                {
+                    let name = actor_path.file_name()
+                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    let actor_periods = actor_period_names_for(pool, &name).await;
+                    if actor_periods.is_empty() {
+                        return collect_new(actor_path);
+                    }
+
+                    let mut found_period = false;
+                    let mut result = Vec::new();
+                    if let Ok(entries) = std::fs::read_dir(actor_path) {
+                        for entry in entries.filter_map(|e| e.ok()) {
+                            let p = entry.path();
+                            if !p.is_dir() { continue; }
+                            let sub_name = p.file_name()
+                                .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            if actor_periods.contains(&sub_name) {
+                                found_period = true;
+                                result.extend(collect_new(&p));
+                            }
+                        }
+                    }
+                    if found_period {
+                        result
+                    } else {
+                        collect_new(actor_path)
+                    }
+                }
+
+                async fn collect_by_category_features<F>(
+                    pool: &SqlitePool,
+                    parent: &std::path::Path,
+                    actors_enabled: bool,
+                    tags_enabled: bool,
+                    actor_names: &std::collections::HashSet<String>,
+                    actor_labels: &std::collections::HashSet<String>,
+                    tag_names: &std::collections::HashSet<String>,
+                    collect_new: &F,
+                ) -> Vec<(String, usize)>
+                where
+                    F: Fn(&std::path::Path) -> Vec<(String, usize)>,
+                {
+                    if !actors_enabled && !tags_enabled {
+                        // 分类没开演员/标签：下一层就是视频集；车牌/中字格式由 scan_category 新增时解析
+                        return collect_new(parent);
+                    }
+
+                    let mut result = Vec::new();
+                    if let Ok(entries) = std::fs::read_dir(parent) {
+                        for entry in entries.filter_map(|e| e.ok()) {
+                            let p = entry.path();
+                            if !p.is_dir() { continue; }
+                            let name = p.file_name()
+                                .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+
+                            if actors_enabled && (actor_names.contains(&name) || actor_labels.contains(&name)) {
+                                result.extend(collect_from_actor_folder(pool, &p, collect_new).await);
+                                continue;
+                            }
+
+                            if tags_enabled && tag_names.contains(&name) {
+                                result.extend(collect_new(&p));
+                                continue;
+                            }
+
+                            // 分类开了演员/标签时，匹配不到就跳过，不再误报为新视频集
+                        }
+                    }
+                    result
+                }
+
+                if let Ok(top_entries) = std::fs::read_dir(path) {
+                    for entry in top_entries.filter_map(|e| e.ok()) {
+                        let sub_path = entry.path();
+                        if !sub_path.is_dir() { continue; }
+                        let name = sub_path.file_name()
+                            .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+
+                        if cat_names.contains(&name) || cat_keys.contains(&name) {
+                            // scan_path 指向父级目录时，分类文件夹内继续按当前分类 features 识别
+                            new_folders.extend(collect_by_category_features(
+                                pool,
+                                &sub_path,
+                                actors_enabled,
+                                tags_enabled,
+                                &actor_names,
+                                &actor_labels,
+                                &tag_names,
+                                &collect_new,
+                            ).await);
+                        } else if !actors_enabled && !tags_enabled {
+                            // scan_path 本身就是分类目录，且分类未开演员/标签：顶层文件夹就是视频集
+                            new_folders.extend(collect_new(path));
+                            break;
+                        } else if actors_enabled && (actor_names.contains(&name) || actor_labels.contains(&name)) {
+                            // 匹配演员 → 进入演员目录；如有时期，进入时期目录找视频集
+                            new_folders.extend(collect_from_actor_folder(pool, &sub_path, &collect_new).await);
+                        } else if tags_enabled && tag_names.contains(&name) {
+                            // 匹配标签 → 进入标签目录找视频集
+                            new_folders.extend(collect_new(&sub_path));
+                        } else {
+                            // 匹配不上分类/标签/演员的顶层文件夹直接跳过
+                            continue;
+                        }
+                    }
+                }
+                new_folders.sort_by(|a, b| a.0.cmp(&b.0));
+                new_folders.dedup_by(|a, b| a.0 == b.0);
+                new_folders.into_iter().map(|(name, video_count)| SeriesInfo { name, video_count }).collect()
+            } else {
+                vec![]
             }
-            new_folders.sort_by(|a, b| a.0.cmp(&b.0));
-            new_folders.dedup_by(|a, b| a.0 == b.0);
-            new_folders.into_iter().map(|(name, video_count)| SeriesInfo { name, video_count }).collect()
         } else {
             vec![]
         }

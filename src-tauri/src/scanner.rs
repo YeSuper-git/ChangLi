@@ -136,6 +136,82 @@ pub struct ScanResult {
     pub posters: HashMap<String, String>, // file_path -> poster_path
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum SeriesSubfolderKind {
+    Season(i32),
+    Movie,
+    Unknown,
+}
+
+fn classify_series_subfolder(name: &str) -> SeriesSubfolderKind {
+    let trimmed = name.trim();
+    let lower = trimmed.to_lowercase();
+
+    // 明确剧场版/篇名优先：有些剧场版会写成 “S1 剧场版” 或 “S2 完结篇”，
+    // 这种仍应按剧场版处理，不能被 S1/S2 抢走。
+    if trimmed.contains("剧场版") || trimmed.contains('篇') {
+        return SeriesSubfolderKind::Movie;
+    }
+
+    // 第1季 / 第二季
+    if let Ok(re) = regex::Regex::new(r"第\s*([0-9一二三四五六七八九十]+)\s*季") {
+        if let Some(caps) = re.captures(trimmed) {
+            if let Some(season) = caps.get(1).and_then(|m| parse_season_number(m.as_str())) {
+                return SeriesSubfolderKind::Season(season);
+            }
+        }
+    }
+
+    // Season 1 / season01
+    if let Ok(re) = regex::Regex::new(r"(?i)(^|[^a-z0-9])season\s*0*([1-9][0-9]?)([^a-z0-9]|$)") {
+        if let Some(caps) = re.captures(&lower) {
+            if let Some(season) = caps.get(2).and_then(|m| m.as_str().parse::<i32>().ok()) {
+                return SeriesSubfolderKind::Season(season);
+            }
+        }
+    }
+
+    // S1 / S01 / S2：必须是独立季标识，避免误伤 SSIS-123、SIS-001 等番号。
+    if let Ok(re) = regex::Regex::new(r"(?i)(^|[^a-z0-9])s0*([1-9][0-9]?)([^a-z0-9]|$)") {
+        if let Some(caps) = re.captures(&lower) {
+            if let Some(season) = caps.get(2).and_then(|m| m.as_str().parse::<i32>().ok()) {
+                return SeriesSubfolderKind::Season(season);
+            }
+        }
+    }
+
+    SeriesSubfolderKind::Unknown
+}
+
+fn parse_season_number(value: &str) -> Option<i32> {
+    if let Ok(num) = value.parse::<i32>() {
+        return Some(num);
+    }
+
+    let mut total = 0;
+    let mut current = 0;
+    for ch in value.chars() {
+        match ch {
+            '一' => current = 1,
+            '二' => current = 2,
+            '三' => current = 3,
+            '四' => current = 4,
+            '五' => current = 5,
+            '六' => current = 6,
+            '七' => current = 7,
+            '八' => current = 8,
+            '九' => current = 9,
+            '十' => {
+                total += if current == 0 { 10 } else { current * 10 };
+                current = 0;
+            }
+            _ => return None,
+        }
+    }
+    let result = total + current;
+    if result > 0 { Some(result) } else { None }
+}
+
 // 扫描目录（支持子文件夹，最小文件夹为一部作品）
 pub async fn scan_directory(path: &str) -> Result<ScanResult> {
     let path = Path::new(path);
@@ -183,17 +259,21 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
                 continue;
             }
 
-            // ≤3 部作品 → 剧场版（season = 999），多部 → 正常季
-            let (season, subtitle) = if count <= 3 {
-                let movie_title = subdir
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                (999, Some(movie_title))
-            } else {
-                season_counter += 1;
-                (season_counter, None)
+            let folder_name = subdir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            // 明确命名优先；不明确时保留原规则：≤3 部作品 → 剧场版，多部 → 正常季。
+            let (season, subtitle) = match classify_series_subfolder(&folder_name) {
+                SeriesSubfolderKind::Movie => (999, Some(folder_name)),
+                SeriesSubfolderKind::Season(season) => (season, None),
+                SeriesSubfolderKind::Unknown if count <= 3 => (999, Some(folder_name)),
+                SeriesSubfolderKind::Unknown => {
+                    season_counter += 1;
+                    (season_counter, None)
+                }
             };
             process_directory_videos(
                 subdir,
@@ -643,6 +723,7 @@ pub fn find_folder_poster(folder: &Path) -> Option<String> {
         .to_string();
     let mut image_files: Vec<PathBuf> = Vec::new();
     let mut video_files: Vec<PathBuf> = Vec::new();
+    let mut child_dirs: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(folder) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
@@ -655,10 +736,59 @@ pub fn find_folder_poster(folder: &Path) -> Option<String> {
                         video_files.push(path);
                     }
                 }
+            } else if path.is_dir() {
+                child_dirs.push(path);
             }
         }
     }
-    find_poster_for_folder(folder, &folder_name, &image_files, &video_files)
+    find_poster_for_folder(folder, &folder_name, &image_files, &video_files).or_else(|| {
+        // 多季视频集常把海报放在 S1/S2/第1季 等季文件夹里。
+        // 视频集根目录没海报时，按季文件夹名称排序后读取第一张可用海报。
+        child_dirs.sort_by_key(|path| {
+            path.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase()
+        });
+        for child in child_dirs {
+            let child_name = child
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let (child_images, child_videos) = collect_direct_media_files(&child);
+            if let Some(poster) = find_poster_for_folder(&child, &child_name, &child_images, &child_videos) {
+                return Some(poster);
+            }
+        }
+        None
+    })
+}
+
+fn collect_direct_media_files(folder: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let mut image_files = Vec::new();
+    let mut video_files = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(folder) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if let Some(ext) = path.extension() {
+                let ext = ext.to_string_lossy().to_lowercase();
+                if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+                    image_files.push(path);
+                } else if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+                    video_files.push(path);
+                }
+            }
+        }
+    }
+
+    image_files.sort_by_key(|path| file_stem_lower(path));
+    video_files.sort_by_key(|path| file_stem_lower(path));
+    (image_files, video_files)
 }
 
 /// 成人视频文件名解析结果
@@ -682,28 +812,15 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
     let code_raw = code_match.as_str();
     let after_code = &filename[code_match.end()..];
 
-    // 检查车牌后是否有中文字幕标记：-CH, -C, CH, C
-    let (sub_suffix_len, has_chinese_sub) =
-        if after_code.starts_with("-CH") || after_code.starts_with("-ch") {
-            (3, true)
-        } else if after_code.starts_with("-C") || after_code.starts_with("-c") {
-            (2, true)
-        } else if after_code
-            .get(..2)
-            .map_or(false, |s| s.eq_ignore_ascii_case("ch"))
-        {
-            (2, true)
-        } else if after_code
-            .get(..1)
-            .map_or(false, |s| s.eq_ignore_ascii_case("c"))
-        {
-            (1, true)
-        } else {
-            (0, false)
-        };
+    // 检查车牌后的中文字幕标记：支持 JUR-472-C、JUR-472-CH、JUR-472C、JUR-472ch，
+    // 也支持 JUR-472-AI-C / JUR-472-AI-CH 这种中间带版本标记的命名。
+    let marker_part = after_code.split('[').next().unwrap_or(after_code);
+    let has_chinese_sub = marker_part
+        .split(|ch: char| ch == '-' || ch == '_' || ch.is_whitespace())
+        .any(|token| token.eq_ignore_ascii_case("c") || token.eq_ignore_ascii_case("ch"));
 
     // 提取 [] 中的标题
-    let rest = &after_code[sub_suffix_len..];
+    let rest = after_code;
     let title = regex::Regex::new(r"\[([^\]]*)\]")
         .ok()
         .and_then(|re| re.captures(rest))
@@ -715,6 +832,18 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
         has_chinese_sub,
         title,
     })
+}
+
+/// 成人文件重命名匹配键：忽略中文字幕标记变化，用于把
+/// JUR-472[标题] / JUR-472-C[标题] / JUR-472-AI-C[标题] 识别为同一个视频。
+pub fn adult_rename_identity(filename: &str) -> Option<String> {
+    let info = parse_adult_filename(filename)?;
+    let title = info
+        .title
+        .unwrap_or_default()
+        .trim()
+        .to_lowercase();
+    Some(format!("{}|{}", info.code.to_uppercase(), title))
 }
 
 #[cfg(test)]
@@ -748,6 +877,77 @@ mod tests {
 
         assert_eq!(episodes[0], ("01.mp4".to_string(), Some(1)));
         assert_eq!(episodes[1], ("02.mp4".to_string(), Some(2)));
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn classifies_series_subfolder_names_before_legacy_count_rule() {
+        assert_eq!(classify_series_subfolder("S1"), SeriesSubfolderKind::Season(1));
+        assert_eq!(classify_series_subfolder("S02"), SeriesSubfolderKind::Season(2));
+        assert_eq!(classify_series_subfolder("第十二季"), SeriesSubfolderKind::Season(12));
+        assert_eq!(classify_series_subfolder("Season 3"), SeriesSubfolderKind::Season(3));
+        assert_eq!(classify_series_subfolder("完结篇"), SeriesSubfolderKind::Movie);
+        assert_eq!(classify_series_subfolder("S2 剧场版"), SeriesSubfolderKind::Movie);
+        assert_eq!(classify_series_subfolder("SSIS-123"), SeriesSubfolderKind::Unknown);
+    }
+
+    #[tokio::test]
+    async fn named_short_season_is_not_treated_as_movie() -> Result<()> {
+        let dir = temp_dir("short-season");
+        let season = dir.join("S2");
+        fs::create_dir_all(&season)?;
+        fs::write(season.join("01.mp4"), b"one")?;
+
+        let result = scan_directory(dir.to_str().unwrap()).await?;
+        assert_eq!(result.videos.len(), 1);
+        assert_eq!(result.videos[0].season, Some(2));
+        assert_eq!(result.videos[0].subtitle, None);
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn movie_keyword_wins_over_s_marker() -> Result<()> {
+        let dir = temp_dir("movie-season-marker");
+        let movie = dir.join("S1 剧场版");
+        fs::create_dir_all(&movie)?;
+        fs::write(movie.join("movie.mp4"), b"movie")?;
+
+        let result = scan_directory(dir.to_str().unwrap()).await?;
+        assert_eq!(result.videos.len(), 1);
+        assert_eq!(result.videos[0].season, Some(999));
+        assert_eq!(result.videos[0].subtitle.as_deref(), Some("S1 剧场版"));
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn adult_filename_identity_ignores_chinese_sub_marker_changes() {
+        let plain = parse_adult_filename("JUR-472[学校风波].mp4").unwrap();
+        let sub = parse_adult_filename("JUR-472-C[学校风波].mp4").unwrap();
+        let ai_sub = parse_adult_filename("JUR-472-AI-C[学校风波].mp4").unwrap();
+
+        assert!(!plain.has_chinese_sub);
+        assert!(sub.has_chinese_sub);
+        assert!(ai_sub.has_chinese_sub);
+        assert_eq!(adult_rename_identity("JUR-472[学校风波].mp4"), adult_rename_identity("JUR-472-C[学校风波].mp4"));
+        assert_eq!(adult_rename_identity("JUR-472-AI[学校风波].mp4"), adult_rename_identity("JUR-472-AI-C[学校风波].mp4"));
+    }
+
+    #[test]
+    fn finds_series_poster_inside_season_folder_when_root_has_no_poster() -> Result<()> {
+        let dir = temp_dir("season-poster");
+        let season = dir.join("S1");
+        fs::create_dir_all(&season)?;
+        let poster = season.join("cover.jpg");
+        fs::write(&poster, b"poster")?;
+        fs::write(season.join("01.mp4"), b"video")?;
+
+        assert_eq!(find_folder_poster(&dir).as_deref(), Some(poster.to_str().unwrap()));
 
         fs::remove_dir_all(dir).ok();
         Ok(())
