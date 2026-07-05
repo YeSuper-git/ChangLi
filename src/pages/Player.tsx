@@ -64,7 +64,8 @@ const Player: React.FC = () => {
   const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
   const isMountedRef = useRef(true);
-  const windowShownRef = useRef(false);
+  const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
+  const windowRatioAdjustedRef = useRef(false);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
@@ -172,28 +173,37 @@ const Player: React.FC = () => {
                 break;
               case 'dwidth':
               case 'dheight':
-                // 视频尺寸变化时，按比例调整播放器窗口大小，首次调整后显示窗口
-                if (name === 'dwidth' && data && data > 0 && isMountedRef.current) {
+                // 后端已按数据库中的视频尺寸创建并立即显示窗口。
+                // 这里仅在 mpv 报告的真实比例与当前窗口比例明显不一致时做一次微调，
+                // 不再负责首次显示，避免 dwidth/dheight 未触发时窗口一直隐藏。
+                if (data && data > 0 && isMountedRef.current) {
+                  if (name === 'dwidth') observedVideoSizeRef.current.width = data as number;
+                  if (name === 'dheight') observedVideoSizeRef.current.height = data as number;
+                }
+                if (!windowRatioAdjustedRef.current && isMountedRef.current) {
+                  const videoW = observedVideoSizeRef.current.width;
+                  const videoH = observedVideoSizeRef.current.height;
+                  if (!videoW || !videoH || videoW <= 0 || videoH <= 0) break;
                   const win = getCurrentWindow();
-                  const videoW = data as number;
                   win.outerSize().then((size) => {
+                    if (windowRatioAdjustedRef.current) return;
                     const scale = window.devicePixelRatio || 1;
                     const currentW = size.width / scale;
                     const currentH = size.height / scale;
-                    const targetH = Math.round(videoW * (currentH / currentW));
-                    if (targetH > 200 && targetH < 2000) {
-                      const newW = Math.round(Math.min(videoW, 1600));
-                      const newH = Math.round(newW * (targetH / videoW));
-                      win.setSize(new LogicalSize(newW, Math.max(360, newH))).then(() => {
-                        if (!windowShownRef.current) {
-                          windowShownRef.current = true;
-                          win.show().catch(() => {});
-                        }
-                      }).catch(() => {});
-                    } else if (!windowShownRef.current) {
-                      windowShownRef.current = true;
-                      win.show().catch(() => {});
+                    const currentRatio = currentW / Math.max(1, currentH);
+                    const videoRatio = Math.max(0.45, Math.min(3.2, videoW / videoH));
+                    const ratioDelta = Math.abs(currentRatio - videoRatio) / videoRatio;
+                    if (ratioDelta < 0.08) {
+                      windowRatioAdjustedRef.current = true;
+                      return;
                     }
+                    const newH = Math.max(360, Math.round(currentW / videoRatio));
+                    if (Math.abs(newH - currentH) < 48 || newH > 2000) {
+                      windowRatioAdjustedRef.current = true;
+                      return;
+                    }
+                    windowRatioAdjustedRef.current = true;
+                    win.setSize(new LogicalSize(currentW, newH)).catch(() => {});
                   }).catch(() => {});
                 }
                 break;

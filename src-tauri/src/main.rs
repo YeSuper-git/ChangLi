@@ -1776,8 +1776,10 @@ async fn open_player_window(
     } else {
         window.center().map_err(|e| e.to_string())?;
     }
-    // 窗口保持隐藏，由前端在 mpv 报告视频尺寸并调整窗口大小后显示
-    // window.show() 移至前端 Player.tsx dwidth/dheight handler
+    // 先立即显示并聚焦，避免 mpv 已在后台播放但窗口因 dwidth/dheight 事件未触发而一直隐藏。
+    // 前端收到视频尺寸后仍会按比例做小幅微调。
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
 }
 
