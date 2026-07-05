@@ -7,13 +7,32 @@ use walkdir::WalkDir;
 
 use crate::db::Video;
 
-/// 生成缩略图 Base64（最大 300px 宽，≤50KB）
+fn image_mime_from_extension(path: &Path) -> &'static str {
+    match path.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_lowercase().as_str() {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        _ => "image/jpeg",
+    }
+}
+
+fn raw_image_data_url(poster_path: &Path) -> Option<String> {
+    let bytes = std::fs::read(poster_path).ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:{};base64,{}", image_mime_from_extension(poster_path), encoded))
+}
+
+/// 生成缩略图 Base64（最大 300px 宽，≤50KB）。如果图片解码失败，回退为原图 data URL，避免本地海报路径存在但缓存为空。
 pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("[Scanner] open failed: {} ({})", poster_path.display(), e);
-            return None;
+            return raw_image_data_url(poster_path);
         }
     };
 
@@ -25,7 +44,7 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
                 poster_path.display(),
                 e
             );
-            return None;
+            return raw_image_data_url(poster_path);
         }
     };
 
@@ -44,14 +63,15 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     // 编码为 JPEG，质量控制在 50KB 以内
     let mut buf = Vec::new();
     let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 70);
-    resized.write_with_encoder(encoder).ok()?;
+    if resized.write_with_encoder(encoder).is_err() {
+        return raw_image_data_url(poster_path);
+    }
 
     // 如果超过 50KB，降低质量再试
     if buf.len() > 50 * 1024 {
         let mut buf2 = Vec::new();
         let encoder2 = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf2, 50);
-        resized.write_with_encoder(encoder2).ok()?;
-        if buf2.len() <= 50 * 1024 {
+        if resized.write_with_encoder(encoder2).is_ok() && buf2.len() <= 50 * 1024 {
             buf = buf2;
         }
     }
@@ -60,7 +80,7 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     Some(format!("data:image/jpeg;base64,{}", encoded))
 }
 
-/// 读取图片尺寸并判断方向：portrait / landscape / square
+/// 读取图片尺寸并判断方向：portrait / landscape / square。读取失败时给默认 landscape，避免海报方向为空导致前端展示分支异常。
 pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
@@ -70,30 +90,32 @@ pub fn get_image_orientation(poster_path: &Path) -> Option<String> {
                 poster_path.display(),
                 e
             );
-            return None;
+            return Some("landscape".to_string());
         }
     };
 
-    let (w, h) = match reader.into_dimensions() {
-        Ok(d) => d,
+    let img = match reader.decode() {
+        Ok(i) => i,
         Err(e) => {
             eprintln!(
-                "[Decoder] Failed to read dimensions: {} ({:?})",
+                "[Decoder] Failed to decode image dimensions: {} ({:?})",
                 poster_path.display(),
                 e
             );
-            return None;
+            return Some("landscape".to_string());
         }
     };
 
-    let orientation = if h as f64 > w as f64 * 1.15 {
-        "portrait"
-    } else if w as f64 > h as f64 * 1.15 {
-        "landscape"
+    let width = img.width();
+    let height = img.height();
+
+    if height > width {
+        Some("portrait".to_string())
+    } else if width > height {
+        Some("landscape".to_string())
     } else {
-        "square"
-    };
-    Some(orientation.to_string())
+        Some("square".to_string())
+    }
 }
 
 // 支持的视频格式
