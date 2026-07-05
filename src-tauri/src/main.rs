@@ -2792,29 +2792,28 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
             if e.path().is_file() && scanner::is_video_file(&e.path()) { has_videos = true; }
         }
     }
+    let root_poster = crate::scanner::find_folder_poster(std::path::Path::new(&scan_path));
 
-    // 如果没有子文件夹但有视频文件，把 scan_path 本身当一个视频集
-    if !has_subdirs && has_videos {
+    // 如果没有子文件夹，把 scan_path 本身当一个视频集；动漫暂无资源视频集可能只有海报、没有视频文件。
+    if !has_subdirs && (has_videos || root_poster.is_some()) {
         let folder_name = std::path::Path::new(&scan_path)
             .file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
         let scan_result = scanner::scan_directory(&scan_path).await.map_err(|e| e.to_string())?;
-        if !scan_result.videos.is_empty() {
-            let poster = crate::scanner::find_folder_poster(&std::path::Path::new(&scan_path));
-            let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-            if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
-                // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
-                db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
-                updated += 1;
-            } else {
-                let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref(), Some(&category_key)).await.map_err(|e| e.to_string())?;
-                if let Some(c) = code {
-                    let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
-                }
-                db::add_videos_batch(&pool, scan_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
-                let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
-                added += 1;
+        let poster = root_poster;
+        let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+        if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
+            // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
+            db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+            updated += 1;
+        } else {
+            let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref(), Some(&category_key)).await.map_err(|e| e.to_string())?;
+            if let Some(c) = code {
+                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
             }
+            db::add_videos_batch(&pool, scan_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+            let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+            added += 1;
         }
         return Ok(ScanResult { added, updated });
     }

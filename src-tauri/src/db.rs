@@ -3938,6 +3938,28 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     result
                 }
 
+                let scan_path_has_subdirs = std::fs::read_dir(path)
+                    .map(|entries| entries.filter_map(|e| e.ok()).any(|e| e.path().is_dir()))
+                    .unwrap_or(false);
+                if !scan_path_has_subdirs && !normalized_db_paths.contains(&normalize(scan_path)) {
+                    let has_root_video = std::fs::read_dir(path)
+                        .map(|entries| entries.filter_map(|e| e.ok()).any(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path())))
+                        .unwrap_or(false);
+                    let has_root_poster = crate::scanner::find_folder_poster(path).is_some();
+                    if has_root_video || has_root_poster {
+                        let root_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                        let root_base = crate::scanner::strip_episode_suffix(&root_name);
+                        if !existing_base_names.contains(&root_name) && !existing_base_names.contains(&root_base) {
+                            let count = std::fs::read_dir(path)
+                                .map(|entries| entries.filter_map(|e| e.ok())
+                                    .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
+                                    .count())
+                                .unwrap_or(0);
+                            new_folders.push((root_name, count));
+                        }
+                    }
+                }
+
                 if let Ok(top_entries) = std::fs::read_dir(path) {
                     for entry in top_entries.filter_map(|e| e.ok()) {
                         let sub_path = entry.path();
