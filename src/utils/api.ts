@@ -30,6 +30,16 @@ export async function openDataDir(): Promise<void> {
   }
 }
 
+export interface PosterRepairStatus {
+  status: 'idle' | 'running' | 'success' | 'error';
+  scanned_series: number;
+  updated_series: number;
+  scanned_videos: number;
+  updated_videos: number;
+  skipped: number;
+  error?: string | null;
+}
+
 export async function repairMissingPostersSilent(): Promise<void> {
   console.log('[API] 调用 repairMissingPostersSilent');
   try {
@@ -39,6 +49,10 @@ export async function repairMissingPostersSilent(): Promise<void> {
     console.error('[API] repairMissingPostersSilent 失败:', err);
     throw err;
   }
+}
+
+export async function getPosterRepairStatus(): Promise<PosterRepairStatus> {
+  return invoke<PosterRepairStatus>('get_poster_repair_status');
 }
 
 // 网站相关

@@ -14,12 +14,39 @@ mod storage;
 
 use image::ImageReader;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::{Manager, State};
 use tokio::sync::Mutex;
+
+#[derive(Clone, serde::Serialize)]
+struct PosterRepairStatus {
+    status: String,
+    scanned_series: i64,
+    updated_series: i64,
+    scanned_videos: i64,
+    updated_videos: i64,
+    skipped: i64,
+    error: Option<String>,
+}
+
+impl Default for PosterRepairStatus {
+    fn default() -> Self {
+        Self {
+            status: "idle".to_string(),
+            scanned_series: 0,
+            updated_series: 0,
+            scanned_videos: 0,
+            updated_videos: 0,
+            skipped: 0,
+            error: None,
+        }
+    }
+}
 
 // 应用状态
 struct AppState {
     db: Mutex<Option<sqlx::SqlitePool>>,
+    poster_repair_status: Arc<Mutex<PosterRepairStatus>>,
 }
 
 // 初始化数据库（如果已在 setup 中初始化则直接返回）
@@ -1341,21 +1368,72 @@ async fn repair_missing_posters_silent(state: State<'_, AppState>) -> Result<(),
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
 
+    let status = state.poster_repair_status.clone();
+    {
+        let mut current = status.lock().await;
+        if current.status == "running" {
+            return Ok(());
+        }
+        *current = PosterRepairStatus {
+            status: "running".to_string(),
+            ..PosterRepairStatus::default()
+        };
+    }
+
     tauri::async_runtime::spawn(async move {
-        match db::repair_missing_posters(&pool).await {
-            Ok(result) => eprintln!(
-                "[ChangLi] 批量修复海报完成: scanned_series={}, updated_series={}, scanned_videos={}, updated_videos={}, skipped={}",
-                result.scanned_series,
-                result.updated_series,
-                result.scanned_videos,
-                result.updated_videos,
-                result.skipped,
-            ),
-            Err(error) => eprintln!("[ChangLi] 批量修复海报失败: {error}"),
+        let progress_status = status.clone();
+        match db::repair_missing_posters_with_progress(&pool, move |result| {
+            let progress_status = progress_status.clone();
+            let result = result.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut current = progress_status.lock().await;
+                if current.status == "running" {
+                    current.scanned_series = result.scanned_series;
+                    current.updated_series = result.updated_series;
+                    current.scanned_videos = result.scanned_videos;
+                    current.updated_videos = result.updated_videos;
+                    current.skipped = result.skipped;
+                }
+            });
+        }).await {
+            Ok(result) => {
+                eprintln!(
+                    "[ChangLi] 批量修复海报完成: scanned_series={}, updated_series={}, scanned_videos={}, updated_videos={}, skipped={}",
+                    result.scanned_series,
+                    result.updated_series,
+                    result.scanned_videos,
+                    result.updated_videos,
+                    result.skipped,
+                );
+                let mut current = status.lock().await;
+                *current = PosterRepairStatus {
+                    status: "success".to_string(),
+                    scanned_series: result.scanned_series,
+                    updated_series: result.updated_series,
+                    scanned_videos: result.scanned_videos,
+                    updated_videos: result.updated_videos,
+                    skipped: result.skipped,
+                    error: None,
+                };
+            }
+            Err(error) => {
+                eprintln!("[ChangLi] 批量修复海报失败: {error}");
+                let mut current = status.lock().await;
+                *current = PosterRepairStatus {
+                    status: "error".to_string(),
+                    error: Some(error.to_string()),
+                    ..current.clone()
+                };
+            }
         }
     });
 
     Ok(())
+}
+
+#[tauri::command]
+async fn get_poster_repair_status(state: State<'_, AppState>) -> Result<PosterRepairStatus, String> {
+    Ok(state.poster_repair_status.lock().await.clone())
 }
 
 fn preview_temp_dir() -> PathBuf {
@@ -2283,6 +2361,7 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
             db: Mutex::new(None),
+            poster_repair_status: Arc::new(Mutex::new(PosterRepairStatus::default())),
         })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -2382,6 +2461,7 @@ fn main() {
             open_data_dir,
             open_series_in_file_manager,
             repair_missing_posters_silent,
+            get_poster_repair_status,
             toggle_favorite,
             toggle_chinese_sub,
             toggle_watched,

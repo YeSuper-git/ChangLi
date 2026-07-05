@@ -2439,6 +2439,19 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
     let poster_base64 = poster
         .as_deref()
         .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+    let poster_updated = if let Some(ref poster_path) = poster {
+        update_video_series_poster(
+            pool,
+            id,
+            Some(poster_path),
+            poster_base64.as_deref(),
+            Some("landscape"),
+        )
+        .await?;
+        true
+    } else {
+        false
+    };
 
     let mut found_video_files = false;
     if let Some(result) = scan_result {
@@ -2468,7 +2481,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
 
             Ok(true)
         } else {
-            Ok(found_video_files)
+            Ok(poster_updated || found_video_files)
         }
     } else {
         sqlx::query(
@@ -2877,11 +2890,13 @@ pub async fn delete_videos_by_category(
     Ok((video_count.0, series_count.0))
 }
 
-/// 重新扫描某个大类下所有视频集的元数据，同时检测缺失的视频集文件夹和分集文件
-/// 返回 (updated, skipped, missing_series_count, missing_videos_count)
+/// 批量补齐某个分类下视频集缺失的海报。
+/// 语义对齐“单视频集右键检查更新”的海报修复部分：
+/// 只在视频集海报路径或缓存缺失时从本地文件夹重新匹配海报；找不到不覆盖旧值；不新增/删除视频，不改标题/车牌/中字。
+/// 返回 (updated, skipped, missing_series_count, missing_videos_count)，missing_videos_count 保持 0 以兼容旧接口。
 pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64, i64, i64)> {
-    let series_list = sqlx::query_as::<_, (i64, String, Option<String>)>(&format!(
-        "SELECT id, title, folder_path FROM video_series WHERE display_type = '{}' OR (display_type IS NULL AND '{}' = 'anime')",
+    let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(&format!(
+        "SELECT id, title, folder_path, poster, poster_base64 FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
     ))
     .fetch_all(pool)
@@ -2890,58 +2905,33 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
     let mut updated: i64 = 0;
     let mut skipped: i64 = 0;
     let mut missing_series_count: i64 = 0;
-    let mut missing_videos_count: i64 = 0;
 
-    for (id, title, folder_path) in series_list {
-        // 检测视频集文件夹是否缺失
-        let series_missing = if let Some(ref fp) = folder_path {
-            !std::path::Path::new(fp).is_dir()
-        } else {
-            // 没有 folder_path 的视频集，用 title 作为路径检测
-            !std::path::Path::new(&title).is_dir()
-        };
-
-        if series_missing {
-            missing_series_count += 1;
-            continue; // 文件夹缺失，跳过元数据更新
-        }
-
-        // 检测该视频集下缺失的分集文件
-        let videos = sqlx::query_as::<_, (String,)>("SELECT file_path FROM videos WHERE series_id = ?")
-            .bind(id)
-            .fetch_all(pool)
-            .await?;
-        for (file_path,) in &videos {
-            if !std::path::Path::new(file_path).is_file() {
-                missing_videos_count += 1;
-            }
-        }
-
-        // 原有的元数据更新逻辑
+    for (id, title, folder_path, poster, poster_base64) in series_list {
         let source = folder_path.as_deref().unwrap_or(&title);
-        let folder_name = std::path::Path::new(source)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| title.clone());
-        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
-            let code = info.code;
-            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
-            let folder_path_std = std::path::Path::new(source);
-            let poster = crate::scanner::find_folder_poster(folder_path_std);
-            let poster_base64 = poster
-                .as_deref()
-                .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-            sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
+        let folder_path_std = std::path::Path::new(source);
+        if !folder_path_std.is_dir() {
+            missing_series_count += 1;
+            skipped += 1;
+            continue;
+        }
+
+        let series_poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty()
+            || poster_base64.as_deref().unwrap_or_default().trim().is_empty();
+        if !series_poster_missing {
+            skipped += 1;
+            continue;
+        }
+
+        if let Some(series_poster) = crate::scanner::find_folder_poster(folder_path_std) {
+            let series_poster_base64 =
+                crate::scanner::generate_thumbnail_base64(std::path::Path::new(&series_poster));
+            update_video_series_poster(
+                pool,
+                id,
+                Some(&series_poster),
+                series_poster_base64.as_deref(),
+                Some("landscape"),
             )
-            .bind(&code)
-            .bind(has_chinese_sub)
-            .bind(&new_title)
-            .bind(&poster)
-            .bind(&poster_base64)
-            .bind(id)
-            .execute(pool)
             .await?;
             updated += 1;
         } else {
@@ -2949,7 +2939,7 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
         }
     }
 
-    Ok((updated, skipped, missing_series_count, missing_videos_count))
+    Ok((updated, skipped, missing_series_count, 0))
 }
 
 pub async fn get_category_by_key(pool: &SqlitePool, key: &str) -> Result<Option<Category>> {
@@ -3389,6 +3379,16 @@ pub struct PosterRepairResult {
 }
 
 pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairResult> {
+    repair_missing_posters_with_progress(pool, |_| {}).await
+}
+
+pub async fn repair_missing_posters_with_progress<F>(
+    pool: &SqlitePool,
+    mut progress: F,
+) -> Result<PosterRepairResult>
+where
+    F: FnMut(&PosterRepairResult) + Send,
+{
     let mut result = PosterRepairResult {
         scanned_series: 0,
         updated_series: 0,
@@ -3403,6 +3403,7 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
 
     for row in series_rows {
         result.scanned_series += 1;
+        progress(&result);
         let id: i64 = row.get("id");
         let folder_path: Option<String> = row.try_get("folder_path").ok().flatten();
         let poster: Option<String> = row.try_get("poster").ok().flatten();
@@ -3456,14 +3457,17 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
                 .execute(pool)
                 .await?;
             result.updated_series += 1;
+            progress(&result);
         } else if wrong_parent_poster {
             sqlx::query("UPDATE video_series SET poster = NULL, poster_base64 = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                 .bind(id)
                 .execute(pool)
                 .await?;
             result.updated_series += 1;
+            progress(&result);
         } else {
             result.skipped += 1;
+            progress(&result);
         }
     }
 
@@ -3473,6 +3477,7 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
 
     for row in video_rows {
         result.scanned_videos += 1;
+        progress(&result);
         let id: i64 = row.get("id");
         let file_path: String = row.get("file_path");
         let thumbnail: Option<String> = row.try_get("thumbnail").ok().flatten();
@@ -3532,8 +3537,10 @@ pub async fn repair_missing_posters(pool: &SqlitePool) -> Result<PosterRepairRes
                 .execute(pool)
                 .await?;
             result.updated_videos += 1;
+            progress(&result);
         } else {
             result.skipped += 1;
+            progress(&result);
         }
     }
 

@@ -393,6 +393,7 @@ fn spawn_mpv_process(
                 .arg("--border=yes")
                 .arg("--ontop")
                 .arg("--screen=0")
+                .arg("--background=black")
                 .arg("--no-window-minimized");
             if let Some(geometry) = _geometry {
                 command.arg(format!("--geometry={geometry}"));
@@ -409,7 +410,7 @@ fn spawn_mpv_process(
     }
 
     command
-        .arg("--force-window=immediate")
+        .arg("--force-window=yes")
         .arg("--hwdec=d3d11va")
         .arg("--d3d11-sync-interval=0")
         .arg("--video-sync=audio")

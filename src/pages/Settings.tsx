@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
-import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
+import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -48,7 +48,7 @@ const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
-  const [posterRepairing, setPosterRepairing] = useState(false);
+  const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
@@ -58,7 +58,25 @@ const Settings: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     loadSettingsData();
+    getPosterRepairStatus().then(setPosterRepairStatus).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (posterRepairStatus.status !== 'running') return;
+    const timer = window.setInterval(() => {
+      getPosterRepairStatus()
+        .then((status) => {
+          setPosterRepairStatus(status);
+          if (status.status === 'success') {
+            notify({ message: `海报更新成功，更新了 ${status.updated_series} 个视频集`, type: 'success' });
+          } else if (status.status === 'error') {
+            notify({ message: '海报更新失败: ' + (status.error || '未知错误'), type: 'error' });
+          }
+        })
+        .catch(() => {});
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [posterRepairStatus.status]);
 
   const loadSettingsData = async () => {
     try {
@@ -99,16 +117,15 @@ const Settings: React.FC = () => {
   };
 
   const handleRepairMissingPosters = async () => {
-    if (posterRepairing) return;
-    setPosterRepairing(true);
+    if (posterRepairStatus.status === 'running') return;
     try {
+      setPosterRepairStatus({ status: 'running', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
       await repairMissingPostersSilent();
-      notify({ message: '已开始后台修复海报，可继续使用', type: 'success' });
+      notify({ message: '海报更新中，可继续使用', type: 'info' });
     } catch (error) {
       console.error('启动批量修复海报失败:', error);
+      setPosterRepairStatus((current) => ({ ...current, status: 'error', error: String(error) }));
       notify({ message: '启动失败: ' + String(error), type: 'error' });
-    } finally {
-      window.setTimeout(() => setPosterRepairing(false), 1200);
     }
   };
 
@@ -445,10 +462,10 @@ const Settings: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleRepairMissingPosters}
-              disabled={posterRepairing}
+              disabled={posterRepairStatus.status === 'running'}
               className="action-btn action-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {posterRepairing ? '已启动修复' : '批量修复海报'}
+              {posterRepairStatus.status === 'running' ? '更新中...' : '批量更新海报'}
             </button>
             <button
               onClick={() => openDataDir()}
@@ -460,6 +477,15 @@ const Settings: React.FC = () => {
         </div>
 
         <div className="changli-panel p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500 w-24">海报状态</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${posterRepairStatus.status === 'running' ? 'bg-amber-50 text-amber-700' : posterRepairStatus.status === 'success' ? 'bg-emerald-50 text-emerald-700' : posterRepairStatus.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+              {posterRepairStatus.status === 'running' && `更新中，已检查 ${posterRepairStatus.scanned_series} 个视频集，已更新 ${posterRepairStatus.updated_series} 个`}
+              {posterRepairStatus.status === 'success' && `更新成功，已更新 ${posterRepairStatus.updated_series} 个视频集海报`}
+              {posterRepairStatus.status === 'error' && `更新失败：${posterRepairStatus.error || '未知错误'}`}
+              {posterRepairStatus.status === 'idle' && '未开始'}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 w-24">当前模式</span>
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
