@@ -17,6 +17,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const navigationType = useNavigationType();
   const mainRef = useRef<HTMLElement>(null);
+  const scrollKeyRef = useRef(location.pathname + location.search);
+  scrollKeyRef.current = location.pathname + location.search;
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
@@ -59,9 +61,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     event.stopPropagation();
   };
 
-  // 保存当前页面滚动位置，仅浏览器/应用返回时恢复；普通切页始终回到顶部
+  // 保存当前页面滚动位置，仅浏览器/应用返回时恢复；普通切页始终回到顶部。
+  // 注意：这里只监听 pathname，不能监听 search。视频页搜索会同步 q 到 URL，
+  // 如果 search 变化也触发滚动逻辑，就会表现成输入时页面“自动刷新/跳动”。
   useLayoutEffect(() => {
-    const key = location.pathname + location.search;
+    const key = scrollKeyRef.current;
     const main = mainRef.current;
 
     if (navigationType === 'POP' && scrollPositions.has(key)) {
@@ -76,10 +80,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     return () => {
       if (main && main.scrollTop > 0) {
-        scrollPositions.set(key, main.scrollTop);
+        scrollPositions.set(scrollKeyRef.current, main.scrollTop);
       }
     };
-  }, [location.pathname, location.search, navigationType]);
+  }, [location.pathname, navigationType]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -168,7 +172,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* 主内容区 */}
       <main ref={mainRef} className="changli-main w-full px-4 py-10 sm:px-5 xl:px-6 2xl:px-8">
-        <PageMotion motionKey={`${location.pathname}${location.search}`}>
+        <PageMotion motionKey={location.pathname}>
           {children}
         </PageMotion>
       </main>

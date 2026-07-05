@@ -230,7 +230,7 @@ const Library: React.FC = () => {
   const actorsNeedsExpand = actors.length > 5;
 
 
-  // 同步筛选状态到 URL 参数
+  // 同步筛选状态到 URL 参数；值没变时不触发 replace，避免无意义的路由更新。
   const syncParams = useCallback((updates: Record<string, string | null>) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -241,7 +241,7 @@ const Library: React.FC = () => {
           next.set(key, value);
         }
       }
-      return next;
+      return next.toString() === prev.toString() ? prev : next;
     }, { replace: true });
   }, [setSearchParams]);
 
