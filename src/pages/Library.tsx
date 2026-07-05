@@ -6,7 +6,7 @@ import {
   scanVideos,
   deleteVideoSeries,
   rescanSingleSeriesMetadata,
-  rescanCategoryMetadata,
+  checkCategoryUpdates,
   switchSeriesTypeTo,
   formatSeriesWatchLabel,
   parseCategoryFeatures,
@@ -502,21 +502,20 @@ const Library: React.FC = () => {
     setScanConfirm(false);
     setCategoryScanning(true);
     try {
-      clearLibraryFilterCaches();
-      const [updated, skipped, missingSeries] = await rescanCategoryMetadata(mainCategory);
-      await refreshSeries();
-      if (activeTagId !== null) await filterByTag(activeTagId);
-      if (activeActorId !== null) await filterByActor(activeActorId);
-      if (updated > 0) {
-        notify({ message: `海报更新完成，补齐了 ${updated} 部`, type: 'success' });
-      } else if (missingSeries > 0) {
-        notify({ message: `未发现可补齐海报，${missingSeries} 部源文件夹不存在`, type: 'info' });
-      } else {
-        notify({ message: skipped > 0 ? '海报已是最新' : '无可更新海报', type: 'info' });
-      }
+      const result = await checkCategoryUpdates(mainCategory);
+      setCategoryUpdateResult(result);
+      setUpdateSelection({
+        newSeries: new Set(result.new_series.map(s => s.name)),
+        seriesUpdates: new Map(result.series_updates.map(su => [su.series_id, {
+          selected: true,
+          newVideos: new Set(su.new_videos.map(v => v.file_path)),
+          missingVideos: new Set(su.missing_videos.map(v => v.id)),
+        }])),
+        missingSeries: new Set(result.missing_series.map(s => s.name)),
+      });
     } catch (error) {
-      console.error('[Library] 更新海报失败:', error);
-      notify({ message: '更新海报失败: ' + String(error), type: 'info' });
+      console.error('[Library] 检查更新失败:', error);
+      notify({ message: '检查更新失败: ' + String(error), type: 'info' });
     } finally {
       setCategoryScanning(false);
     }
@@ -729,7 +728,7 @@ const Library: React.FC = () => {
               disabled={categoryScanning}
               className="action-btn action-btn-primary disabled:opacity-50"
             >
-              {categoryScanning ? '更新中...' : '更新海报'}
+              {categoryScanning ? '检查中...' : '全量检查更新'}
             </button>
           )}
           <button
@@ -1040,13 +1039,13 @@ const Library: React.FC = () => {
       onCancel={() => setBatchDeleteConfirm(false)}
     />
 
-    {/* 更新海报确认弹窗 */}
+    {/* 全量检查更新确认弹窗 */}
     {scanConfirm && (
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            确定对「{categoryDisplayName}」批量更新海报？<br />
-            <span className="text-sm text-gray-500">只补齐缺失海报，不新增或删除视频</span><br />
+            确定对「{categoryDisplayName}」执行全量检查更新？<br />
+            <span className="text-sm text-gray-500">只检查资源新增/移除，不更新已有视频集海报</span><br />
             <span className="text-sm text-gray-500">扫描路径：{currentCategory?.scan_path}</span>
           </p>
           <div className="flex gap-3">
@@ -1054,7 +1053,7 @@ const Library: React.FC = () => {
               onClick={handleCategoryScan}
               className="action-btn action-btn-primary flex-1 text-sm"
             >
-              确认更新
+              开始检查
             </button>
             <button
               onClick={() => setScanConfirm(false)}
