@@ -1045,7 +1045,6 @@ const Library: React.FC = () => {
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
             确定对「{categoryDisplayName}」执行全量检查更新？<br />
-            <span className="text-sm text-gray-500">只检查资源新增/移除，不更新已有视频集海报</span><br />
             <span className="text-sm text-gray-500">扫描路径：{currentCategory?.scan_path}</span>
           </p>
           <div className="flex gap-3">

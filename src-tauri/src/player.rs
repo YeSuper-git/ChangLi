@@ -130,32 +130,6 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     }
 }
 
-#[allow(unused_variables)]
-pub fn toggle_always_on_top(app: &AppHandle) -> Result<bool> {
-    let mut flag = ALWAYS_ON_TOP
-        .lock()
-        .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
-    *flag = !*flag;
-    #[cfg(not(target_os = "windows"))]
-    {
-        let player_window = get_or_create_player_window(app)?;
-        player_window.set_always_on_top(*flag)?;
-    }
-    Ok(*flag)
-}
-
-pub fn register_shortcuts(app: &AppHandle) -> Result<()> {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-
-    let app_for_shortcut = app.clone();
-    app.global_shortcut()
-        .on_shortcut("Ctrl+Shift+T", move |_app, _shortcut, _event| {
-            let _ = toggle_always_on_top(&app_for_shortcut);
-        })
-        .context("register Ctrl+Shift+T shortcut for player always-on-top")?;
-    Ok(())
-}
-
 /// Game DVR 注册表键路径
 #[cfg(target_os = "windows")]
 const GAME_DVR_KEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR";

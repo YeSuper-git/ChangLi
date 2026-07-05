@@ -32,25 +32,6 @@ struct JsonRpcError {
     message: String,
 }
 
-// 下载状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DownloadStatus {
-    pub gid: String,
-    pub status: String,
-    pub total_length: String,
-    pub completed_length: String,
-    pub download_speed: String,
-    pub upload_speed: String,
-    pub files: Vec<FileInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileInfo {
-    pub path: String,
-    pub length: String,
-    pub completed_length: String,
-}
-
 // 下载选项
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadOptions {
@@ -147,37 +128,6 @@ impl Aria2Client {
         Ok(gid)
     }
 
-    // 添加 HTTP/FTP 下载
-    pub async fn add_uri(&self, url: &str, options: Option<DownloadOptions>) -> Result<String> {
-        let mut params = vec![serde_json::Value::String(url.to_string())];
-
-        if let Some(opts) = options {
-            let mut options_map = serde_json::Map::new();
-            if let Some(dir) = opts.dir {
-                options_map.insert("dir".to_string(), serde_json::Value::String(dir));
-            }
-            params.push(serde_json::Value::Object(options_map));
-        }
-
-        let result = self.call("aria2.addUri", params).await?;
-        let gid = result
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("无法获取 GID"))?
-            .to_string();
-
-        Ok(gid)
-    }
-
-    // 获取下载状态
-    pub async fn get_status(&self, gid: &str) -> Result<DownloadStatus> {
-        let params = vec![serde_json::Value::String(gid.to_string())];
-
-        let result = self.call("aria2.tellStatus", params).await?;
-        let status: DownloadStatus = serde_json::from_value(result)?;
-
-        Ok(status)
-    }
-
     // 暂停下载
     pub async fn pause(&self, gid: &str) -> Result<()> {
         let params = vec![serde_json::Value::String(gid.to_string())];
@@ -202,78 +152,6 @@ impl Aria2Client {
         Ok(())
     }
 
-    // 强制删除下载
-    pub async fn force_remove(&self, gid: &str) -> Result<()> {
-        let params = vec![serde_json::Value::String(gid.to_string())];
-
-        self.call("aria2.forceRemove", params).await?;
-        Ok(())
-    }
-
-    // 获取全局统计信息
-    pub async fn get_global_stat(&self) -> Result<GlobalStat> {
-        let result = self.call("aria2.getGlobalStat", vec![]).await?;
-        let stat: GlobalStat = serde_json::from_value(result)?;
-        Ok(stat)
-    }
-
-    // 获取活跃下载列表
-    pub async fn get_active(&self) -> Result<Vec<DownloadStatus>> {
-        let result = self.call("aria2.tellActive", vec![]).await?;
-        let downloads: Vec<DownloadStatus> = serde_json::from_value(result)?;
-        Ok(downloads)
-    }
-
-    // 获取等待下载列表
-    pub async fn get_waiting(&self, offset: i64, num: i64) -> Result<Vec<DownloadStatus>> {
-        let params = vec![
-            serde_json::Value::Number(offset.into()),
-            serde_json::Value::Number(num.into()),
-        ];
-
-        let result = self.call("aria2.tellWaiting", params).await?;
-        let downloads: Vec<DownloadStatus> = serde_json::from_value(result)?;
-        Ok(downloads)
-    }
-
-    // 获取已完成下载列表
-    pub async fn get_stopped(&self, offset: i64, num: i64) -> Result<Vec<DownloadStatus>> {
-        let params = vec![
-            serde_json::Value::Number(offset.into()),
-            serde_json::Value::Number(num.into()),
-        ];
-
-        let result = self.call("aria2.tellStopped", params).await?;
-        let downloads: Vec<DownloadStatus> = serde_json::from_value(result)?;
-        Ok(downloads)
-    }
-
-    // 获取版本
-    pub async fn get_version(&self) -> Result<String> {
-        let result = self.call("aria2.getVersion", vec![]).await?;
-        let version = result
-            .get("version")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
-        Ok(version)
-    }
-
-    // 检查 aria2 是否运行
-    pub async fn is_running(&self) -> bool {
-        self.get_version().await.is_ok()
-    }
-}
-
-// 全局统计信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GlobalStat {
-    pub download_speed: String,
-    pub upload_speed: String,
-    pub num_active: String,
-    pub num_waiting: String,
-    pub num_stopped: String,
-    pub num_stopped_total: String,
 }
 
 // 全局 aria2 客户端
@@ -288,10 +166,6 @@ pub fn get_aria2_client() -> &'static Aria2Client {
 // 便捷函数
 pub async fn add_magnet(magnet: &str) -> Result<String> {
     get_aria2_client().add_magnet(magnet, None).await
-}
-
-pub async fn get_status(gid: &str) -> Result<DownloadStatus> {
-    get_aria2_client().get_status(gid).await
 }
 
 pub async fn pause(gid: &str) -> Result<()> {

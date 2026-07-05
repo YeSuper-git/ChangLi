@@ -155,7 +155,6 @@ pub fn strip_episode_suffix(name: &str) -> String {
 #[derive(Debug)]
 pub struct ScanResult {
     pub videos: Vec<Video>,
-    pub posters: HashMap<String, String>, // file_path -> poster_path
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -242,8 +241,6 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
     }
 
     let mut videos = Vec::new();
-    let mut posters = HashMap::new();
-
     // 检测是否有多季结构：根目录下存在包含视频的子文件夹
     let mut subdirs: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(path) {
@@ -256,7 +253,7 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
 
     if subdirs.is_empty() {
         // 扁平模式：没有子文件夹，直接扫描根目录
-        process_directory_videos(path, None, None, &mut videos, &mut posters).await?;
+        process_directory_videos(path, None, None, &mut videos).await?;
     } else {
         // 多季模式：每个子文件夹为一季或剧场版
         // 按文件夹名称排序，保证季数顺序一致
@@ -302,13 +299,12 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
                 Some(season),
                 subtitle.as_deref(),
                 &mut videos,
-                &mut posters,
             )
             .await?;
         }
     }
 
-    Ok(ScanResult { videos, posters })
+    Ok(ScanResult { videos })
 }
 
 /// 轻量扫描目录更新：只收集视频文件元数据，不读取图片、不生成缩略图。
@@ -452,7 +448,6 @@ async fn process_directory_videos(
     season: Option<i32>,
     subtitle: Option<&str>,
     videos: &mut Vec<Video>,
-    posters: &mut HashMap<String, String>,
 ) -> Result<()> {
     // 收集该目录下所有视频和图片文件
     let mut video_files: Vec<PathBuf> = Vec::new();
@@ -520,9 +515,6 @@ async fn process_directory_videos(
                             .and_then(|stem| stem.parse::<i32>().ok());
                     } else if video.episode_number.is_none() {
                         video.episode_number = Some((index + 1) as i32);
-                    }
-                    if let Some(ref poster) = poster_path {
-                        posters.insert(video.file_path.clone(), poster.clone());
                     }
                     videos.push(video);
                 }
@@ -806,42 +798,6 @@ pub fn extract_episode_from_filename(filename: &str) -> Option<i32> {
     None
 }
 
-// 获取文件夹结构（用于前端展示）
-pub async fn get_folder_structure(path: &str) -> Result<Vec<FolderInfo>> {
-    let path = Path::new(path);
-    if !path.exists() {
-        return Err(anyhow::anyhow!("目录不存在: {}", path.display()));
-    }
-
-    let mut folders = Vec::new();
-
-    for entry in WalkDir::new(path)
-        .min_depth(1)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_dir())
-    {
-        let folder_path = entry.path();
-        let folder_name = folder_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-
-        // 统计该文件夹下的视频数量
-        let video_count = count_videos_in_folder(folder_path);
-
-        folders.push(FolderInfo {
-            name: folder_name,
-            path: folder_path.to_string_lossy().to_string(),
-            video_count,
-        });
-    }
-
-    Ok(folders)
-}
-
 // 统计文件夹下的视频数量
 fn count_videos_in_folder(path: &Path) -> usize {
     let mut count = 0;
@@ -860,14 +816,6 @@ fn count_videos_in_folder(path: &Path) -> usize {
     }
 
     count
-}
-
-// 文件夹信息
-#[derive(Debug, serde::Serialize)]
-pub struct FolderInfo {
-    pub name: String,
-    pub path: String,
-    pub video_count: usize,
 }
 
 /// 成人视频文件名解析结果

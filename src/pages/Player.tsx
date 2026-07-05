@@ -89,17 +89,8 @@ const Player: React.FC = () => {
       // 通过锁串行化所有 mpv 操作，避免 destroy/init 竞态
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         try {
-          setLoading(true);
+          setLoading(!mpvInitialized.current);
           setError('');
-
-          // 先销毁旧实例（如果有），确保完全清理
-          if (mpvInitialized.current) {
-            try {
-              await destroy();
-            } catch { /* ignore destroy errors */ }
-            mpvInitialized.current = false;
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -124,6 +115,36 @@ const Player: React.FC = () => {
         if (previousPosition > 5) {
           setShowResumeNotice(true);
           window.setTimeout(() => setShowResumeNotice(false), 5000);
+        }
+
+        // 已经打开播放器时，切换分集只替换 mpv 当前文件，不销毁/重建播放器窗口。
+        // 这样选集播放不会再次出现透明空窗闪一下。
+        if (mpvInitialized.current) {
+          windowRatioAdjustedRef.current = false;
+          observedVideoSizeRef.current = { width: 0, height: 0 };
+          setCurrentTime(0);
+          setDuration(0);
+          try {
+            await command('loadfile', [currentVideo.file_path, 'replace']);
+          } catch (loadErr) {
+            console.error('[Player] loadfile 失败:', loadErr);
+            setError('加载视频失败: ' + String(loadErr));
+            setLoading(false);
+            return;
+          }
+          if (currentVideo.subtitle) {
+            await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+          }
+          if (previousPosition > 5) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
+            setCurrentTime(previousPosition);
+          }
+          await setProperty('pause', false).catch(() => undefined);
+          isPlayingRef.current = true;
+          setIsPlaying(true);
+          setLoading(false);
+          return;
         }
 
         // 初始化 mpv

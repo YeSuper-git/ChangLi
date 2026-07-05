@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
 import favoriteIcon from '../assets/icons/favorite.svg';
@@ -334,8 +335,8 @@ const VideoDetail: React.FC = () => {
       navigate(backTo);
     }
   };
-  const displayThumbnailDataUrl = editing && editData.thumbnail !== (video.thumbnail || '')
-    ? null
+  const displayThumbnailDataUrl = editing && editData.thumbnail && editData.thumbnail !== (video.thumbnail || '')
+    ? convertFileSrc(editData.thumbnail)
     : videoPosterDataUrl(video);
 
   return (

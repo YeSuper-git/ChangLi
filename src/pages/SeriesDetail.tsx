@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import backIcon from '../assets/icons/back.svg';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -454,6 +455,9 @@ const SeriesDetail: React.FC = () => {
   }, [currentCategory, isAdult]);
 
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
+  const displayPosterDataUrl = editing && editData.poster && editData.poster !== (series?.poster || '')
+    ? convertFileSrc(editData.poster)
+    : series?.poster_data_url;
 
   if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
@@ -608,7 +612,7 @@ const SeriesDetail: React.FC = () => {
               onContextMenu={openPosterMenu}
             >
               <SmartPoster
-                src={series.poster_data_url}
+                src={displayPosterDataUrl}
                 alt={series.title}
                 posterOrientation={series.poster_orientation}
                 imageClassName={editing && !isPortrait ? '!object-contain' : ''}

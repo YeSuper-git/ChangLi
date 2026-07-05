@@ -24,8 +24,6 @@ pub struct SiteConfig {
 #[derive(Debug, Clone)]
 pub struct Site {
     pub id: i64,
-    pub name: String,
-    pub url: String,
     pub config: SiteConfig,
 }
 

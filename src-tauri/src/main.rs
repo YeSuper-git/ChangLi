@@ -3,8 +3,6 @@
 
 mod db;
 mod downloader;
-mod html_parser;
-mod http;
 mod migrations;
 mod parser;
 mod player;
@@ -160,8 +158,6 @@ async fn search_resources(
             serde_json::from_value(site.config.clone()).map_err(|e| e.to_string())?;
         let site_info = parser::Site {
             id: site.id,
-            name: site.name.clone(),
-            url: site.url.clone(),
             config,
         };
 
@@ -1878,14 +1874,25 @@ async fn open_player_window(
         .as_millis();
     let label = format!("player-{}-{}", video.id, now);
     let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
-    let window = tauri::WebviewWindowBuilder::new(&app, label, url)
+    let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)
         .min_inner_size(520.0, 292.0)
         .resizable(true)
         .decorations(false)
-        .transparent(true)
-        .visible(false)
+        .visible(false);
+
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.transparent(false);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        builder = builder.transparent(true);
+    }
+
+    let window = builder
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -2358,7 +2365,6 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
             db: Mutex::new(None),
             poster_repair_status: Arc::new(Mutex::new(PosterRepairStatus::default())),
