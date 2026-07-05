@@ -615,7 +615,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', debouncedSearch.trim()].join('|');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', chineseSubFilter ? 'sub' : 'sub-all', ].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
