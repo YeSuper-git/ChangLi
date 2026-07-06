@@ -530,11 +530,8 @@ const ActorDetail: React.FC = () => {
 
   const handleEditContextItem = () => {
     if (!contextMenu) return;
-    const target = contextMenu.type === 'video'
-      ? `/video/${contextMenu.id}?edit=1`
-      : `/series/${contextMenu.id}?edit=1`;
     setContextMenu(null);
-    navigate(target, { state: { from: `/actors/${actor?.id}`, backLabel: '返回演员详情' } });
+    navigate(`/series/${contextMenu.id}?edit=1`, { state: { from: `/actors/${actor?.id}`, backLabel: '返回演员详情' } });
   };
 
   const handleDeleteVideo = async (id: number) => {
