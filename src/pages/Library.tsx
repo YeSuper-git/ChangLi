@@ -214,6 +214,8 @@ const Library: React.FC = () => {
   const [unfinishedFilter, setUnfinishedFilter] = useState(() => searchParams.get('unfinished') === '1');
   const [emptyFilter, setEmptyFilter] = useState(() => searchParams.get('empty') === '1');
   const [chineseSubFilter, setChineseSubFilter] = useState(false);
+  const [ongoingFilter, setOngoingFilter] = useState(false);
+  const [completedFilter, setCompletedFilter] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
   const [tagFilteredSeries, setTagFilteredSeries] = useState<VideoSeries[] | null>(null);
   const [activeActorId, setActiveActorId] = useState<number | null>(() => {
@@ -624,7 +626,7 @@ const Library: React.FC = () => {
   } as CategoryFeatures;
   const isPortrait = scopeAll ? true : currentCategory ? currentCategory.card_layout === 'portrait' : mainCategory === 'anime';
   const categoryDisplayName = scopeAll ? '我的追番' : currentCategory?.name || (mainCategory === 'anime' ? '动漫' : '影视');
-  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', emptyFilter ? 'empty' : 'empty-all', chineseSubFilter ? 'sub' : 'sub-all', ].join('|');
+  const contentMotionKey = [scopeAll ? 'all' : mainCategory, activeTagId ?? 'tag-all', activeActorId ?? 'actor-all', favoriteFilter ? 'fav' : 'fav-all', watchedFilter ? 'watched' : unfinishedFilter ? 'unfinished' : 'watched-all', emptyFilter ? 'empty' : 'empty-all', chineseSubFilter ? 'sub' : 'sub-all', ongoingFilter ? 'ongoing' : completedFilter ? 'completed' : 'status-all', ].join('|');
   const epWord = features.episode || '部';
 
   const filteredSeries = seriesList.filter((series) => {
@@ -640,6 +642,8 @@ const Library: React.FC = () => {
       && (!unfinishedFilter || !watchedIds.has(series.id))
       && (!emptyFilter || series.video_count === 0)
       && (!chineseSubFilter || series.has_chinese_sub === 1)
+      && (!ongoingFilter || series.status !== 'completed')
+      && (!completedFilter || series.status === 'completed')
       && matchesCategory;
   });
 
@@ -820,7 +824,7 @@ const Library: React.FC = () => {
           <div className="changli-filter-row is-expanded">
             {features.tracking ? (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); setOngoingFilter(false); setCompletedFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter && !ongoingFilter && !completedFilter ? 'active' : ''}`}>全部</button>
                 <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
                 <button onClick={() => { setUnfinishedFilter(!unfinishedFilter); setWatchedFilter(false); }} className={`changli-filter-pill ${unfinishedFilter ? 'active' : ''}`}>未看完</button>
                 <button onClick={() => { setWatchedFilter(!watchedFilter); setUnfinishedFilter(false); }} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
@@ -828,13 +832,25 @@ const Library: React.FC = () => {
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
                 )}
+                {features.status && (
+                  <>
+                    <button onClick={() => { setOngoingFilter(!ongoingFilter); setCompletedFilter(false); }} className={`changli-filter-pill ${ongoingFilter ? 'active' : ''}`}>连载中</button>
+                    <button onClick={() => { setCompletedFilter(!completedFilter); setOngoingFilter(false); }} className={`changli-filter-pill ${completedFilter ? 'active' : ''}`}>已完结</button>
+                  </>
+                )}
               </>
             ) : (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter ? 'active' : ''}`}>全部</button>
+                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); setOngoingFilter(false); setCompletedFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter && !ongoingFilter && !completedFilter ? 'active' : ''}`}>全部</button>
                 <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
                 {features.chinese_sub && (
                   <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+                )}
+                {features.status && (
+                  <>
+                    <button onClick={() => { setOngoingFilter(!ongoingFilter); setCompletedFilter(false); }} className={`changli-filter-pill ${ongoingFilter ? 'active' : ''}`}>连载中</button>
+                    <button onClick={() => { setCompletedFilter(!completedFilter); setOngoingFilter(false); }} className={`changli-filter-pill ${completedFilter ? 'active' : ''}`}>已完结</button>
+                  </>
                 )}
               </>
             )}
