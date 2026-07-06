@@ -73,6 +73,13 @@ const Player: React.FC = () => {
   const previewSeqRef = useRef(0);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  const getCurrentVideoRatio = useCallback(() => {
+    const videoW = observedVideoSizeRef.current.width;
+    const videoH = observedVideoSizeRef.current.height;
+    if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return 16 / 9;
+    return Math.max(0.45, Math.min(3.2, videoW / videoH));
+  }, []);
+
   // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
   useEffect(() => {
     document.documentElement.classList.add('changli-player-html');
@@ -436,7 +443,7 @@ const Player: React.FC = () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
 
-      if (aspectResizeLockRef.current || maximized || isFullscreen || isPiP) return;
+      if (aspectResizeLockRef.current || maximized || isFullscreen) return;
       const videoW = observedVideoSizeRef.current.width;
       const videoH = observedVideoSizeRef.current.height;
       if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return;
@@ -449,7 +456,7 @@ const Player: React.FC = () => {
       lastWindowSizeRef.current = { width, height };
       if (!previous) return;
 
-      const ratio = Math.max(0.45, Math.min(3.2, videoW / videoH));
+      const ratio = getCurrentVideoRatio();
       const widthDelta = Math.abs(width - previous.width);
       const heightDelta = Math.abs(height - previous.height);
       const nextWidth = widthDelta >= heightDelta ? width : Math.round(height * ratio);
@@ -464,7 +471,7 @@ const Player: React.FC = () => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
     return () => unlisten?.();
-  }, [isFullscreen, isPiP, playerWindow]);
+  }, [getCurrentVideoRatio, isFullscreen, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
@@ -502,9 +509,10 @@ const Player: React.FC = () => {
 
         // 进入画中画：缩小窗口到右下角并置顶
         const screen = await currentMonitor();
+        const videoRatio = getCurrentVideoRatio();
+        const pipW = videoRatio >= 1 ? 480 : Math.max(270, Math.round(480 * videoRatio));
+        const pipH = videoRatio >= 1 ? Math.max(270, Math.round(480 / videoRatio)) : 480;
         if (screen) {
-          const pipW = 480;
-          const pipH = 270;
           const scale = screen.scaleFactor;
           const screenW = screen.size.width / scale;
           const screenH = screen.size.height / scale;
@@ -515,7 +523,7 @@ const Player: React.FC = () => {
             screenH - pipH - margin,
           ));
         } else {
-          await win.setSize(new LogicalSize(480, 270));
+          await win.setSize(new LogicalSize(pipW, pipH));
         }
         await win.setAlwaysOnTop(true);
         setIsPiP(true);
