@@ -609,8 +609,8 @@ const Settings: React.FC = () => {
             {categories.map((cat) => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
-              const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字', episode: '集数称呼' };
+              const activeFeatures = Object.entries(features).filter(([k, v]) => v && k !== 'episode').map(([k]) => {
+                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
                 return labels[k] || k;
               });
               return (
@@ -618,7 +618,7 @@ const Settings: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900">{cat.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">卡片方向: {layoutLabel}</p>
+                      <p className="text-sm text-gray-500 mt-1">卡片方向: {layoutLabel} · 集数称呼: {features.episode || '部'}</p>
                       {cat.scan_path && (
                         <p className="text-xs text-gray-400 mt-1 truncate">扫描路径: {cat.scan_path}</p>
                       )}
