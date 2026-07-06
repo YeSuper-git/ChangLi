@@ -1145,6 +1145,27 @@ async fn add_video_to_series(
         .await
         .map_err(|e| e.to_string())?;
     video.series_id = Some(series_id);
+
+    // 从文件路径推断季号：检查父目录/祖父目录是否为季节子文件夹
+    if let Some(parent) = video_path.parent() {
+        if let Some(parent_name) = parent.file_name().map(|n| n.to_string_lossy().to_string()) {
+            match scanner::classify_series_subfolder(&parent_name) {
+                scanner::SeriesSubfolderKind::Season(season) => {
+                    video.season = Some(season);
+                }
+                _ => {
+                    // 父目录不是季节文件夹，尝试祖父目录（视频在子子文件夹中）
+                    if let Some(grandparent) = parent.parent() {
+                        if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
+                            if let scanner::SeriesSubfolderKind::Season(season) = scanner::classify_series_subfolder(&gp_name) {
+                                video.season = Some(season);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     let saved = db::add_video(&pool, video)
         .await
         .map_err(|e| e.to_string())?;

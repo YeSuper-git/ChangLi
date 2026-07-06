@@ -158,13 +158,13 @@ pub struct ScanResult {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum SeriesSubfolderKind {
+pub enum SeriesSubfolderKind {
     Season(i32),
     Movie,
     Unknown,
 }
 
-fn classify_series_subfolder(name: &str) -> SeriesSubfolderKind {
+pub fn classify_series_subfolder(name: &str) -> SeriesSubfolderKind {
     let trimmed = name.trim();
     let lower = trimmed.to_lowercase();
 
@@ -1112,4 +1112,21 @@ fn test_parse_adult_filename_chinese_sub() {
     assert!(!r.has_chinese_sub, "STARS-667 should NOT be chinese sub");
 
     println!("All chinese sub tests passed!");
+}
+
+#[cfg(test)]
+mod classify_test {
+    use super::*;
+
+    #[test]
+    fn s3_in_chinese_name_is_season_3() {
+        let name = "超超超超超喜欢你的100个女朋友 S3[01-12]";
+        assert_eq!(classify_series_subfolder(name), SeriesSubfolderKind::Season(3));
+    }
+
+    #[test]
+    fn s3_with_no_brackets() {
+        let name = "超超超超超喜欢你的100个女朋友 S3";
+        assert_eq!(classify_series_subfolder(name), SeriesSubfolderKind::Season(3));
+    }
 }
