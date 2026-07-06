@@ -1013,8 +1013,15 @@ const Library: React.FC = () => {
           <button
             className="changli-menu-item"
             onClick={() => {
+              const id = contextMenu.id;
+              const name = contextMenu.name;
               setContextMenu(null);
-              toggleFavorite(contextMenu.id, 'series').then(() => refreshSeries()).catch(() => {});
+              toggleFavorite(id, 'series').then(() => {
+                refreshSeries();
+                notify({ message: isFav ? `已取消「${name}」的追番` : `已将「${name}」添加到追番`, type: 'success' });
+              }).catch(() => {
+                notify({ message: '操作失败，请稍后重试', type: 'error' });
+              });
             }}
           >
             {isFav ? '取消该追番' : '添加到追番'}
@@ -1022,8 +1029,15 @@ const Library: React.FC = () => {
           <button
             className="changli-menu-item"
             onClick={() => {
+              const id = contextMenu.id;
+              const name = contextMenu.name;
               setContextMenu(null);
-              toggleWatched(contextMenu.id).then(() => refreshSeries()).catch(() => {});
+              toggleWatched(id).then(() => {
+                refreshSeries();
+                notify({ message: isWatched ? `已取消「${name}」的已看完标记` : `已将「${name}」标记为已看完`, type: 'success' });
+              }).catch(() => {
+                notify({ message: '操作失败，请稍后重试', type: 'error' });
+              });
             }}
           >
             {isWatched ? '取消已看完标记' : '标记为已看完'}
