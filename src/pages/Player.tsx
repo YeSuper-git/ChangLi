@@ -418,7 +418,7 @@ const Player: React.FC = () => {
   const handlePlayerWindowDrag = useCallback((event: React.MouseEvent<HTMLElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest('button,select,input,.changli-player-actions,.changli-player-controls,.changli-player-side,.changli-player-badge,.changli-player-center-play')) return;
+    if (target.closest('button,select,input,.changli-player-actions,.changli-player-controls,.changli-player-side,.changli-player-badge,.changli-player-center-play,.changli-player-stage')) return;
     playerWindow.startDragging().catch((error) => console.error('[Player] 拖动窗口失败:', error));
   }, [playerWindow]);
 
