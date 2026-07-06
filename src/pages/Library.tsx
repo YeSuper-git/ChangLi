@@ -822,36 +822,24 @@ const Library: React.FC = () => {
         <div className="changli-filter-group">
           <div className="changli-filter-label">状态</div>
           <div className="changli-filter-row is-expanded">
-            {features.tracking ? (
+            <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); setOngoingFilter(false); setCompletedFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter && !ongoingFilter && !completedFilter ? 'active' : ''}`}>全部</button>
+            {features.tracking && (
+              <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
+            )}
+            {features.watched && (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); setOngoingFilter(false); setCompletedFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter && !ongoingFilter && !completedFilter ? 'active' : ''}`}>全部</button>
-                <button onClick={() => setFavoriteFilter(!favoriteFilter)} className={`changli-filter-pill ${favoriteFilter ? 'active' : ''}`}>已追番</button>
                 <button onClick={() => { setUnfinishedFilter(!unfinishedFilter); setWatchedFilter(false); }} className={`changli-filter-pill ${unfinishedFilter ? 'active' : ''}`}>未看完</button>
                 <button onClick={() => { setWatchedFilter(!watchedFilter); setUnfinishedFilter(false); }} className={`changli-filter-pill ${watchedFilter ? 'active' : ''}`}>已看完</button>
-                <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
-                {features.chinese_sub && (
-                  <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
-                )}
-                {features.status && (
-                  <>
-                    <button onClick={() => { setOngoingFilter(!ongoingFilter); setCompletedFilter(false); }} className={`changli-filter-pill ${ongoingFilter ? 'active' : ''}`}>连载中</button>
-                    <button onClick={() => { setCompletedFilter(!completedFilter); setOngoingFilter(false); }} className={`changli-filter-pill ${completedFilter ? 'active' : ''}`}>已完结</button>
-                  </>
-                )}
               </>
-            ) : (
+            )}
+            <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
+            {features.chinese_sub && (
+              <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
+            )}
+            {features.status && (
               <>
-                <button onClick={() => { setFavoriteFilter(false); setWatchedFilter(false); setUnfinishedFilter(false); setEmptyFilter(false); setChineseSubFilter(false); setOngoingFilter(false); setCompletedFilter(false); }} className={`changli-filter-pill ${!favoriteFilter && !watchedFilter && !unfinishedFilter && !emptyFilter && !chineseSubFilter && !ongoingFilter && !completedFilter ? 'active' : ''}`}>全部</button>
-                <button onClick={() => setEmptyFilter(!emptyFilter)} className={`changli-filter-pill ${emptyFilter ? 'active' : ''}`}>暂无资源</button>
-                {features.chinese_sub && (
-                  <button onClick={() => setChineseSubFilter(!chineseSubFilter)} className={`changli-filter-pill ${chineseSubFilter ? 'active' : ''}`}>中文字幕</button>
-                )}
-                {features.status && (
-                  <>
-                    <button onClick={() => { setOngoingFilter(!ongoingFilter); setCompletedFilter(false); }} className={`changli-filter-pill ${ongoingFilter ? 'active' : ''}`}>连载中</button>
-                    <button onClick={() => { setCompletedFilter(!completedFilter); setOngoingFilter(false); }} className={`changli-filter-pill ${completedFilter ? 'active' : ''}`}>已完结</button>
-                  </>
-                )}
+                <button onClick={() => { setOngoingFilter(!ongoingFilter); setCompletedFilter(false); }} className={`changli-filter-pill ${ongoingFilter ? 'active' : ''}`}>连载中</button>
+                <button onClick={() => { setCompletedFilter(!completedFilter); setOngoingFilter(false); }} className={`changli-filter-pill ${completedFilter ? 'active' : ''}`}>已完结</button>
               </>
             )}
           </div>

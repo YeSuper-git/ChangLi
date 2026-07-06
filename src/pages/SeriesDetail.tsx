@@ -479,6 +479,7 @@ const SeriesDetail: React.FC = () => {
       tags: !isAdult,
       actors: isAdult,
       tracking: !isAdult,
+      watched: !isAdult,
       status: !isAdult,
       chinese_sub: isAdult,
       episode: !isAdult ? '话' : '部',
@@ -883,22 +884,22 @@ const SeriesDetail: React.FC = () => {
                         </button>
                       )}
                       {features.tracking && (
-                        <>
-                          <button
-                            onClick={() => toggleFavorite(series.id, 'series')}
-                            className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                          >
-                            <img src={isFavorite ? favoriteIcon : notFavoriteIcon} alt="追番" className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`} />
-                            <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>{isFavorite ? '已追番' : '追番'}</span>
-                          </button>
-                          <button
-                            onClick={handleToggleWatched}
-                            className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
-                          >
-                            <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
-                            <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
-                          </button>
-                        </>
+                        <button
+                          onClick={() => toggleFavorite(series.id, 'series')}
+                          className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                        >
+                          <img src={isFavorite ? favoriteIcon : notFavoriteIcon} alt="追番" className={`w-5 h-5 ${isFavorite ? 'filter-red' : 'text-gray-400'}`} />
+                          <span className={isFavorite ? 'text-red-500' : 'text-gray-400'}>{isFavorite ? '已追番' : '追番'}</span>
+                        </button>
+                      )}
+                      {features.watched && (
+                        <button
+                          onClick={handleToggleWatched}
+                          className="flex items-center gap-1 px-3 py-1 rounded-full text-sm transition-all hover:bg-gray-100"
+                        >
+                          <img src={watchedIcon} alt="已看完" className={`w-5 h-5 ${isWatched ? 'filter-gold' : 'text-gray-400'}`} />
+                          <span className={isWatched ? 'text-yellow-600' : 'text-gray-400'}>{isWatched ? '已看完' : '看完'}</span>
+                        </button>
                       )}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">

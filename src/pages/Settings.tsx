@@ -208,7 +208,7 @@ const Settings: React.FC = () => {
     key: '',
     name: '',
     card_layout: 'auto' as 'portrait' | 'landscape' | 'auto',
-    features: { tags: true, actors: true, tracking: true, status: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
+    features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
     scan_path: '' as string,
   });
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
@@ -225,7 +225,7 @@ const Settings: React.FC = () => {
 
   const openAddCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
+    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
     setShowCategoryModal(true);
   };
 
@@ -610,7 +610,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([k, v]) => v && k !== 'episode').map(([k]) => {
-                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
+                const labels: Record<string, string> = { tracking: '追番标记', watched: '观影进度', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
                 return labels[k] || k;
               });
               return (
@@ -930,7 +930,8 @@ const Settings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">功能开关</label>
                 <div className="space-y-3">
                   {([
-                    { key: 'tracking' as const, label: '追番/完结', tip: '控制是否支持追番和已完结标记功能' },
+                    { key: 'tracking' as const, label: '追番标记', tip: '控制是否支持追番/收藏功能' },
+                    { key: 'watched' as const, label: '观影进度', tip: '控制是否支持标记已看完/未看完功能' },
                     { key: 'status' as const, label: '连载状态', tip: '控制是否显示连载中/已完结状态' },
                     { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
                     { key: 'actors' as const, label: '演员', tip: '控制是否支持给视频集关联演员' },
