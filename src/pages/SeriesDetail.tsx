@@ -518,7 +518,7 @@ const SeriesDetail: React.FC = () => {
     ? progressReminder
     : orderedVideos.length > 0
       ? ''
-      : '暂无可播放分集';
+      : '暂无可播放选集';
   const episodeCountLabel = formatSeriesEpisodeCountLabel(series, epWord, features.status, true);
 
   const handlePrimaryPlay = async () => {
@@ -968,7 +968,7 @@ const SeriesDetail: React.FC = () => {
       </div>
 
       <div className="changli-section-title">
-        <h2 className="text-xl font-semibold">{features.episode === '话' || features.episode === '集' ? '分集' : '分部'}</h2>
+        <h2 className="text-xl font-semibold">选集</h2>
         <span className="changli-soft-chip">{videos.length} {features.episode || '部'}</span>
       </div>
       {videos.length > 0 ? (
@@ -980,7 +980,7 @@ const SeriesDetail: React.FC = () => {
           fallbackPoster={series?.poster_data_url}
         />
       ) : (
-        <div className="changli-empty-state text-gray-500">暂无分集</div>
+        <div className="changli-empty-state text-gray-500">暂无选集</div>
       )}
 
 
