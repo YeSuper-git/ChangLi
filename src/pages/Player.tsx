@@ -174,6 +174,7 @@ const Player: React.FC = () => {
         try {
           await init({
             ...(mpvPath ? { path: mpvPath } : {}),
+            showMpvOutput: true,
             args: [
               '--vo=gpu-next',
               '--hwdec=d3d11va',
@@ -192,6 +193,7 @@ const Player: React.FC = () => {
           // 不传 path 重试一次（系统 PATH 中的 mpv）
           try {
             await init({
+              showMpvOutput: true,
               args: [
                 '--vo=gpu-next',
                 '--hwdec=d3d11va',
@@ -308,7 +310,8 @@ const Player: React.FC = () => {
         setLoading(false);
       } catch (err) {
         console.error('[Player] 初始化失败:', err);
-        setError('播放器启动失败，请确认视频文件仍然存在');
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setError(`播放器启动失败: ${errMsg}`);
         setLoading(false);
       }
       }); // end mpvOperationLock.then
