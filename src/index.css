@@ -1615,7 +1615,7 @@ body.changli-player-body #root {
   inset: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   color: #f7f7fb;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
