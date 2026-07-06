@@ -54,32 +54,13 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
-    // 根因确认：此前 Windows 路径创建了一个 Tauri WebView 播放壳，再把 mpv --wid
-    // 嵌入到这个 WebView HWND。这个架构在 WebView2/DWM 合成下反复出现“外部悬浮、
-    // 黑屏/无声、无边框无法关闭”：
-    // 1) position_player_window_next_to_main 会把播放壳放到主窗口右侧（不是主窗口内）；
-    // 2) 播放壳 decorations(false) 且前端只渲染空 div，没有真实系统关闭入口；
-    // 3) --wid 嵌入 WebView HWND 已加 attach-parent/ANGLE/不透明黑底仍不稳定。
-    // 因此 Windows 仍使用 mpv 原生窗口兜底：不传 --wid，保留 mpv 自身可关闭窗口。
-    // 用户要求视觉上在原程序窗口内播放：把 mpv 几何位置覆盖到主窗口内容区，
-    // 同时给原生窗口加 --ontop，避免它被 ChangLi 主窗口遮挡。
-    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        let _ = window.close();
-    }
-
-    let mut session = MPV_SESSION
-        .lock()
-        .map_err(|_| anyhow!("mpv session lock poisoned"))?;
-
-    if reuse_existing_session(&mut session, video_path)? {
-        return Ok(());
-    }
-
-    let ipc_path = unique_ipc_path();
-    let geometry = windows_mpv_geometry(app);
-    let new_session =
-        spawn_mpv_with_options(app, None, geometry.as_deref(), &ipc_path, video_path)?;
-    *session = Some(new_session);
+    // mpv 由前端通过 tauri-plugin-mpv 的 init() 管理
+    // Rust 端只负责创建/显示播放器窗口和定位
+    let player_window = get_or_create_player_window(app)?;
+    position_player_window_next_to_main(app, &player_window)?;
+    sync_player_minimize_state(app, &player_window)?;
+    player_window.show()?;
+    player_window.set_focus()?;
     Ok(())
 }
 
@@ -90,17 +71,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     sync_player_minimize_state(app, &player_window)?;
     player_window.show()?;
     player_window.set_focus()?;
-
-    let mut session = MPV_SESSION
-        .lock()
-        .map_err(|_| anyhow!("mpv session lock poisoned"))?;
-
-    if reuse_existing_session(&mut session, video_path)? {
-        return Ok(());
-    }
-
-    let new_session = spawn_mpv(app, &player_window, video_path)?;
-    *session = Some(new_session);
+    // mpv 由前端通过 tauri-plugin-mpv 的 init() 管理，Rust 端不再单独 spawn
     Ok(())
 }
 
@@ -108,7 +79,7 @@ pub fn close_player_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
-    kill_mpv();
+    // mpv 进程由 tauri-plugin-mpv 的 destroy() 管理，Rust 端不再 kill
 }
 
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
@@ -243,16 +214,8 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
 
     let window = builder.build().context("create player window")?;
 
-    window.on_window_event(|event| match event {
-        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
-            // 不立即 kill_mpv()，给前端 destroy() 时间先清理（避免 use-after-free 堆损坏）
-            // 前端 destroy 完成后 mpv 进程自然退出；如果前端没清理，延迟兜底杀掉
-            std::thread::spawn(|| {
-                std::thread::sleep(std::time::Duration::from_millis(1500));
-                kill_mpv();
-            });
-        }
-        _ => {}
+    window.on_window_event(|_event| {
+        // mpv 进程由 tauri-plugin-mpv 管理，窗口事件不再触发 kill
     });
 
     apply_player_window_style(&window)?;

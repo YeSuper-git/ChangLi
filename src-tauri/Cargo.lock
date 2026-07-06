@@ -377,7 +377,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-http",
- "tauri-plugin-libmpv",
+ "tauri-plugin-mpv",
  "tauri-plugin-shell",
  "thiserror 2.0.18",
  "tokio",
@@ -2177,7 +2177,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf"
 dependencies = [
  "gtk-sys",
- "libloading 0.7.4",
+ "libloading",
  "once_cell",
 ]
 
@@ -2204,16 +2204,6 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
-]
-
-[[package]]
-name = "libloading"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -4804,19 +4794,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-libmpv"
-version = "0.3.2"
+name = "tauri-plugin-mpv"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "447798aec64877a1e476c2ebc2360a8374740ccf32fdc31949e4942e3fef903e"
+checksum = "bf8376cbd3bd9010eaede301aba8d8135dd9e8524b385c1afee0bdd66ea5b173"
 dependencies = [
- "base64 0.22.1",
- "indexmap 2.14.0",
  "libc",
- "libloading 0.8.9",
  "log",
- "once_cell",
  "raw-window-handle",
- "scopeguard",
  "serde",
  "serde_json",
  "tauri",

@@ -47,7 +47,7 @@
     "http:allow-fetch-cancel",
     "http:allow-fetch-read-body",
     "http:allow-fetch-send",
-    "libmpv:default",
+    "mpv:default",
     "core:window:allow-set-decorations",
     "core:window:allow-set-resizable",
     "core:window:allow-set-title-bar-style"

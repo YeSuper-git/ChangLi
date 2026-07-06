@@ -2510,7 +2510,7 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_libmpv::init())
+        .plugin(tauri_plugin_mpv::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())

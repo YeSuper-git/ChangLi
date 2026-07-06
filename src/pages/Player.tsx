@@ -7,18 +7,17 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-libmpv-api';
-import type { MpvObservableProperty } from 'tauri-plugin-libmpv-api';
+import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 
 const OBSERVED_PROPERTIES = [
-  ['pause', 'flag'],
-  ['time-pos', 'double', 'none'],
-  ['duration', 'double', 'none'],
-  ['volume', 'double', 'none'],
-  ['speed', 'double', 'none'],
-  ['dwidth', 'int64', 'none'],
-  ['dheight', 'int64', 'none'],
-] as const satisfies MpvObservableProperty[];
+  'pause',
+  'time-pos',
+  'duration',
+  'volume',
+  'speed',
+  'dwidth',
+  'dheight',
+] as const;
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -167,18 +166,17 @@ const Player: React.FC = () => {
 
         // 初始化 mpv
         await init({
-          initialOptions: {
-            'vo': 'gpu-next',
-            'hwdec': 'd3d11va',
-            'gpu-api': 'd3d11',
-            'd3d11-sync-interval': '0',
-            'keep-open': 'yes',
-            'force-window': 'yes',
-            'hwdec-codecs': 'all',
-            'osc': 'no',
-            'osd-level': 0,
-            'video-sync': 'audio',
-          },
+          args: [
+            '--vo=gpu-next',
+            '--hwdec=d3d11va',
+            '--gpu-api=d3d11',
+            '--keep-open=yes',
+            '--force-window=yes',
+            '--hwdec-codecs=all',
+            '--osc=no',
+            '--osd-level=0',
+            '--video-sync=audio',
+          ],
           observedProperties: OBSERVED_PROPERTIES,
         });
 
@@ -187,7 +185,7 @@ const Player: React.FC = () => {
         mpvInitialized.current = true;
 
         // 监听属性变化
-        await observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
+        await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
           if (!isMountedRef.current) return;
           try {
             switch (name) {
@@ -199,25 +197,26 @@ const Player: React.FC = () => {
                 }
                 break;
               case 'time-pos':
-                setCurrentTime(data ?? 0);
+                setCurrentTime((data as number) ?? 0);
                 break;
               case 'duration':
-                setDuration(data ?? 0);
+                setDuration((data as number) ?? 0);
                 break;
               case 'volume':
-                setVolume(data ?? 80);
+                setVolume((data as number) ?? 80);
                 break;
               case 'speed':
-                setSpeed(data ?? 1);
+                setSpeed((data as number) ?? 1);
                 break;
               case 'dwidth':
               case 'dheight':
                 // 后端已按数据库中的视频尺寸创建并立即显示窗口。
                 // 这里仅在 mpv 报告的真实比例与当前窗口比例明显不一致时做一次微调，
                 // 不再负责首次显示，避免 dwidth/dheight 未触发时窗口一直隐藏。
-                if (data && data > 0 && isMountedRef.current) {
-                  if (name === 'dwidth') observedVideoSizeRef.current.width = data as number;
-                  if (name === 'dheight') observedVideoSizeRef.current.height = data as number;
+                if (data && (data as number) > 0 && isMountedRef.current) {
+                  const numData = data as number;
+                  if (name === 'dwidth') observedVideoSizeRef.current.width = numData;
+                  if (name === 'dheight') observedVideoSizeRef.current.height = numData;
                   const videoW = observedVideoSizeRef.current.width;
                   const videoH = observedVideoSizeRef.current.height;
                   if (videoW && videoH && videoW > 0 && videoH > 0) setHasVideoFrame(true);
@@ -299,15 +298,6 @@ const Player: React.FC = () => {
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
-            // 1. 暂停播放，停止产生新的属性变化事件
-            await setProperty('pause', true).catch(() => {});
-            // 2. 停止所有事件上报
-            await command('disable-event', ['all']).catch(() => {});
-            // 3. 发送 quit 命令，让 mpv 事件循环退出
-            await command('quit').catch(() => {});
-            // 4. 等待 mpv 内部线程完全退出（quit 后事件循环需要时间清理）
-            await new Promise((resolve) => setTimeout(resolve, 800));
-            // 5. 安全销毁
             await destroy();
           } catch { /* ignore */ }
           mpvInitialized.current = false;
