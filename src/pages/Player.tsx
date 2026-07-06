@@ -66,6 +66,8 @@ const Player: React.FC = () => {
   const isMountedRef = useRef(true);
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
+  const aspectResizeLockRef = useRef(false);
+  const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewSeqRef = useRef(0);
@@ -431,12 +433,38 @@ const Player: React.FC = () => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
     playerWindow.onResized(async () => {
-      setIsWindowMaximized(await playerWindow.isMaximized());
+      const maximized = await playerWindow.isMaximized();
+      setIsWindowMaximized(maximized);
+
+      if (aspectResizeLockRef.current || maximized || isFullscreen || isPiP) return;
+      const videoW = observedVideoSizeRef.current.width;
+      const videoH = observedVideoSizeRef.current.height;
+      if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return;
+
+      const size = await playerWindow.outerSize();
+      const scale = window.devicePixelRatio || 1;
+      const width = size.width / scale;
+      const height = size.height / scale;
+      const previous = lastWindowSizeRef.current;
+      lastWindowSizeRef.current = { width, height };
+      if (!previous) return;
+
+      const ratio = Math.max(0.45, Math.min(3.2, videoW / videoH));
+      const widthDelta = Math.abs(width - previous.width);
+      const heightDelta = Math.abs(height - previous.height);
+      const nextWidth = widthDelta >= heightDelta ? width : Math.round(height * ratio);
+      const nextHeight = widthDelta >= heightDelta ? Math.round(width / ratio) : height;
+      if (Math.abs(nextWidth - width) < 2 && Math.abs(nextHeight - height) < 2) return;
+
+      aspectResizeLockRef.current = true;
+      lastWindowSizeRef.current = { width: nextWidth, height: nextHeight };
+      await playerWindow.setSize(new LogicalSize(nextWidth, nextHeight)).catch(() => undefined);
+      window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
     return () => unlisten?.();
-  }, [playerWindow]);
+  }, [isFullscreen, isPiP, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
@@ -620,11 +648,21 @@ const Player: React.FC = () => {
   };
 
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    const overFooterControls = Boolean(target.closest('.changli-player-controls'));
     const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    const rightBottomResizeSafeZone = x >= rect.width - 56 && y >= rect.height * 0.8;
     const nearTop = y <= 60;
     const nearBottom = y >= rect.height - 100;
-    if (nearTop) {
+    if (overFooterControls) {
+      setShowHeader(false);
+      setShowFooter(true);
+    } else if (rightBottomResizeSafeZone) {
+      setShowHeader(false);
+      setShowFooter(false);
+    } else if (nearTop) {
       setShowHeader(true);
       setShowFooter(false);
     } else if (nearBottom) {
