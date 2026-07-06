@@ -985,16 +985,16 @@ const Library: React.FC = () => {
             className="changli-menu-item"
             onClick={() => {
               setContextMenu(null);
-              toggleFavorite(contextMenu.id, 'series').then(() => refreshSeries());
+              toggleFavorite(contextMenu.id, 'series').then(() => refreshSeries()).catch(() => {});
             }}
           >
-            {isFav ? '取消追番' : '追番'}
+            {isFav ? '取消该追番' : '添加到追番'}
           </button>
           <button
             className="changli-menu-item"
             onClick={() => {
               setContextMenu(null);
-              toggleWatched(contextMenu.id).then(() => refreshSeries());
+              toggleWatched(contextMenu.id).then(() => refreshSeries()).catch(() => {});
             }}
           >
             {isWatched ? '取消已看完标记' : '标记为已看完'}
