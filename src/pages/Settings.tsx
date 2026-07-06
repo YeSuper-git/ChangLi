@@ -611,7 +611,8 @@ const Settings: React.FC = () => {
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([k, v]) => v && k !== 'episode').map(([k]) => {
                 const labels: Record<string, string> = { tracking: '追番标记', watched: '观影进度', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
-                return labels[k] || k;
+                const colors: Record<string, string> = { tracking: 'bg-blue-50 text-blue-700', watched: 'bg-amber-50 text-amber-700', status: 'bg-emerald-50 text-emerald-700', tags: 'bg-purple-50 text-purple-700', actors: 'bg-pink-50 text-pink-700', chinese_sub: 'bg-orange-50 text-orange-700' };
+                return { label: labels[k] || k, color: colors[k] || 'bg-gray-50 text-gray-700' };
               });
               return (
                 <div key={cat.key} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
@@ -625,7 +626,7 @@ const Settings: React.FC = () => {
                       {activeFeatures.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {activeFeatures.map((f) => (
-                            <span key={f} className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700">{f}</span>
+                            <span key={f.label} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${f.color}`}>{f.label}</span>
                           ))}
                         </div>
                       )}
