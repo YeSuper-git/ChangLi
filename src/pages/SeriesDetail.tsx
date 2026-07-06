@@ -518,7 +518,7 @@ const SeriesDetail: React.FC = () => {
     ? progressReminder
     : orderedVideos.length > 0
       ? ''
-      : '暂无可播放选集';
+      : '暂无可播放资源';
   const episodeCountLabel = formatSeriesEpisodeCountLabel(series, epWord, features.status, true);
 
   const handlePrimaryPlay = async () => {
@@ -980,7 +980,7 @@ const SeriesDetail: React.FC = () => {
           fallbackPoster={series?.poster_data_url}
         />
       ) : (
-        <div className="changli-empty-state text-gray-500">暂无选集</div>
+        <div className="changli-empty-state text-gray-500">暂无资源</div>
       )}
 
 
