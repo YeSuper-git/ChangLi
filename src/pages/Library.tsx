@@ -1190,7 +1190,7 @@ const Library: React.FC = () => {
     {typeSwitchSeriesId !== null && (
       <div className="changli-modal-backdrop" onClick={() => setTypeSwitchSeriesId(null)}>
         <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">切换到</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要切换的分类</h3>
           <div className="space-y-2 mb-4">
             {categories.filter(c => c.key !== mainCategory).map(cat => (
               <button
