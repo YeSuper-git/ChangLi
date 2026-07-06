@@ -2033,15 +2033,16 @@ async fn open_player_window(
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)
         .min_inner_size(520.0, 292.0)
-        // 禁用系统四边/四角自由拉伸，避免单边拉伸造成比例反复校正、黑边和闪屏。
-        // 前端只提供右下角等比例拉伸手柄。
-        .resizable(false)
-        .decorations(false)
+        // 使用透明标题栏：既保留系统级窗口移动/重排能力，又不露出系统标题栏。
+        // 避免 decorations(false) + resizable(true) 组合在 Windows 透明窗口下
+        // 导致 WebView 内容面重排异常、底部控制栏错位。
+        .decorations(true)
+        .title_bar_style(tauri::TitleBarStyle::Transparent)
         .visible(false);
 
-    // libmpv 在 WebView 窗口下方渲染视频层；Windows 上如果 WebView 不透明，
-    // 会出现“有声音但白屏”的遮挡。播放窗口必须保持透明，控制栏自身再绘制深色背景。
-    builder = builder.transparent(true);
+    // 视频层在下方渲染；标题栏透明即可露出视频，正文区域保持不透明，保证
+    // 底部控制栏、进度条、按钮定位稳定，不再出现“底部栏跑到上面”的问题。
+    builder = builder.transparent(false);
 
     let window = builder
         .build()

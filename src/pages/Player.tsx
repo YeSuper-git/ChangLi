@@ -70,6 +70,7 @@ const Player: React.FC = () => {
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
   const aspectResizeLockRef = useRef(false);
+  const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -446,93 +447,44 @@ const Player: React.FC = () => {
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
-      if (!aspectResizeLockRef.current) {
-        const size = await playerWindow.outerSize().catch(() => null);
-        if (size) {
-          const scale = window.devicePixelRatio || 1;
-          lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
-        }
+      const size = await playerWindow.outerSize().catch(() => null);
+      if (size) {
+        const scale = window.devicePixelRatio || 1;
+        lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
       }
+      if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
+      resizeSettleTimerRef.current = window.setTimeout(async () => {
+        if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
+        const current = await playerWindow.outerSize().catch(() => null);
+        if (!current) return;
+        const scale = window.devicePixelRatio || 1;
+        const currentW = current.width / scale;
+        const currentH = current.height / scale;
+        const ratio = getCurrentVideoRatio();
+        const targetH = Math.max(292, Math.round(currentW / ratio));
+        if (Math.abs(targetH - currentH) < 3) return;
+        aspectResizeLockRef.current = true;
+        const targetW = Math.max(520, Math.round(targetH * ratio));
+        lastWindowSizeRef.current = { width: targetW, height: targetH };
+        await playerWindow.setSize(new LogicalSize(targetW, targetH)).catch(() => undefined);
+        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
+      }, 180);
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
-    return () => unlisten?.();
-  }, [playerWindow]);
+    return () => {
+      if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
+      unlisten?.();
+    };
+  }, [getCurrentVideoRatio, isFullscreen, isPiP, playerWindow]);
 
-  const startAspectResize = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
+  const startAspectResize = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
-
-    const startX = event.screenX;
-    const startY = event.screenY;
-    const startSize = await playerWindow.outerSize().catch(() => null);
-    if (!startSize) return;
-
-    const scale = window.devicePixelRatio || 1;
-    const originW = startSize.width / scale;
-    const originH = startSize.height / scale;
-    const ratio = getCurrentVideoRatio();
-    let latestW = originW;
-    let latestH = originH;
-    let applyTimer = 0;
-    let applying = false;
-    let pending = false;
-
-    const applySize = async () => {
-      if (applying) {
-        pending = true;
-        return;
-      }
-      applying = true;
-      aspectResizeLockRef.current = true;
-      const nextW = latestW;
-      const nextH = latestH;
-      lastWindowSizeRef.current = { width: nextW, height: nextH };
-      await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
-      applying = false;
-      if (pending) {
-        pending = false;
-        void applySize();
-      }
-    };
-
-    const scheduleApply = () => {
-      if (applyTimer) return;
-      applyTimer = window.setTimeout(() => {
-        applyTimer = 0;
-        void applySize();
-      }, 48);
-    };
-
-    const onMove = (moveEvent: MouseEvent) => {
-      moveEvent.preventDefault();
-      const dx = (moveEvent.screenX - startX) / scale;
-      const dy = (moveEvent.screenY - startY) / scale;
-      const widthFromX = originW + dx;
-      const widthFromY = (originH + dy) * ratio;
-      const useVertical = Math.abs(dy * ratio) > Math.abs(dx);
-      const desiredW = useVertical ? widthFromY : widthFromX;
-      latestW = Math.max(520, Math.round(desiredW));
-      latestH = Math.max(292, Math.round(latestW / ratio));
-      scheduleApply();
-    };
-
-    const onUp = () => {
-      if (applyTimer) {
-        window.clearTimeout(applyTimer);
-        applyTimer = 0;
-      }
-      void applySize().finally(() => {
-        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 180);
-      });
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp, { once: true });
-  }, [getCurrentVideoRatio, isFullscreen, isWindowMaximized, playerWindow]);
+    playerWindow.setResizable(true).catch(() => undefined);
+    playerWindow.startResizeDragging('SouthEast').catch((error) => console.error('[Player] 右下角拉伸失败:', error));
+  }, [isFullscreen, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
