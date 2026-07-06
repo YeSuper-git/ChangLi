@@ -227,6 +227,18 @@ const Library: React.FC = () => {
   const tagsRef = useRef<HTMLDivElement>(null);
   const actorsRef = useRef<HTMLDivElement>(null);
 
+  // store 更新时清除标签/演员筛选缓存，避免筛选列表和 store 数据不同步
+  const storeSeriesRef = useRef(storeSeries);
+  useEffect(() => {
+    if (storeSeries !== storeSeriesRef.current) {
+      storeSeriesRef.current = storeSeries;
+      tagSeriesCache.clear();
+      actorSeriesCache.clear();
+      if (activeTagId !== null) setTagFilteredSeries(null);
+      if (activeActorId !== null) setActorFilteredSeries(null);
+    }
+  }, [storeSeries, activeTagId, activeActorId]);
+
   useEffect(() => {
     const syncCategoryUpdateState = () => {
       const runnerState = getCategoryUpdateRunnerState();
@@ -308,14 +320,14 @@ const Library: React.FC = () => {
     if (activeTagId !== null && tagFilteredSeries === null) {
       filterByTag(activeTagId);
     }
-  }, [activeTagId]);
+  }, [activeTagId, tagFilteredSeries]);
 
   // 恢复演员筛选
   useEffect(() => {
     if (activeActorId !== null && actorFilteredSeries === null) {
       filterByActor(activeActorId);
     }
-  }, [activeActorId]);
+  }, [activeActorId, actorFilteredSeries]);
 
   const filterByTag = async (tagId: number | null) => {
     if (tagId === null) {
