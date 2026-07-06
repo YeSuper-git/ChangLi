@@ -445,6 +445,20 @@ const Player: React.FC = () => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
 
+    // 用 Tauri outerSize() 同步视口高度，绕过 window.innerHeight 在透明 WebView 下可能返回 0 的问题
+    const syncViewport = async () => {
+      const size = await playerWindow.outerSize().catch(() => null);
+      if (!size) return;
+      const scale = window.devicePixelRatio || 1;
+      const h = `${Math.round(size.height / scale)}px`;
+      document.documentElement.style.height = h;
+      document.body.style.height = h;
+      document.getElementById('root')?.style.setProperty('height', h);
+      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
+      if (el) el.style.height = h;
+    };
+    syncViewport();
+
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
@@ -453,6 +467,7 @@ const Player: React.FC = () => {
         const scale = window.devicePixelRatio || 1;
         lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
       }
+      syncViewport();
       if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       resizeSettleTimerRef.current = window.setTimeout(async () => {
         if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
@@ -504,6 +519,13 @@ const Player: React.FC = () => {
       const nextH = latestH;
       lastWindowSizeRef.current = { width: nextW, height: nextH };
       await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
+      // 拉伸后同步视口高度
+      const h = `${Math.round(nextH)}px`;
+      document.documentElement.style.height = h;
+      document.body.style.height = h;
+      document.getElementById('root')?.style.setProperty('height', h);
+      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
+      if (el) el.style.height = h;
       applying = false;
       if (pending) { pending = false; void applySize(); }
     };

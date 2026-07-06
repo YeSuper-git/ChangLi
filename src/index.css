@@ -1593,6 +1593,19 @@ body.changli-player-body #root {
   background: transparent !important;
 }
 
+html.changli-player-html {
+  height: 100%;
+}
+
+body.changli-player-body {
+  height: 100%;
+  margin: 0;
+}
+
+body.changli-player-body #root {
+  height: 100%;
+}
+
 .changli-player-window {
   --player-rose: #fb5b7b;
   --player-orange: #ff8a4c;
@@ -2512,7 +2525,8 @@ body.changli-player-body .changli-player-window.is-waiting-video::before {
   pointer-events: none;
 }
 
-body.changli-player-body .changli-player-window > * {
+body.changli-player-body .changli-player-window > .changli-player-titlebar,
+body.changli-player-body .changli-player-window > .changli-player-main {
   position: relative;
 }
 
