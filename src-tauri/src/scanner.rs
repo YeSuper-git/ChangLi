@@ -469,6 +469,9 @@ async fn process_directory_videos(
         }
     }
 
+    // 预先计算根目录海报，用于季文件夹无海报时的回退
+    let root_poster = find_folder_poster(dir);
+
     // 按父文件夹分组
     let mut folder_videos: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
     for video_path in &video_files {
@@ -503,7 +506,8 @@ async fn process_directory_videos(
 
         for (index, video_path) in sorted_videos.iter().enumerate() {
             let poster_path = find_poster_for_video(video_path, &image_files)
-                .or_else(|| folder_poster_path.clone());
+                .or_else(|| folder_poster_path.clone())
+                .or_else(|| root_poster.clone());
             match scan_video_file(video_path, poster_path.as_deref()).await {
                 Ok(mut video) => {
                     video.season = season;
