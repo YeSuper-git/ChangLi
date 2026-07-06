@@ -9,6 +9,7 @@ import {
   checkCategoryUpdates,
   switchSeriesTypeTo,
   formatSeriesWatchLabel,
+  formatSeriesEpisodeCountLabel,
   parseCategoryFeatures,
   getTagsByCategory,
   getActorsByCategory,
@@ -918,7 +919,7 @@ const Library: React.FC = () => {
                       </span>
                     )}
                     <div className="absolute bottom-2 right-2 text-white text-xs drop-shadow-lg">
-                      {series.video_count === 0 ? '暂无资源' : series.status === 'completed' || !itemFeatures.status ? `全${series.video_count}${itemEpWord}` : `更新至第${series.video_count}${itemEpWord}`}
+                      {formatSeriesEpisodeCountLabel(series, itemEpWord, itemFeatures.status)}
                     </div>
                   </div>
                   <div className="mt-2">

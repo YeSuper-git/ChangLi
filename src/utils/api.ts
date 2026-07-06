@@ -300,6 +300,21 @@ export function formatSeriesWatchLabel(series: Pick<VideoSeries, 'is_watched' | 
   return `看到第${episode}${epWord}`;
 }
 
+export function isSeriesCompleted(series: Pick<VideoSeries, 'status'>): boolean {
+  return String(series.status || '').trim() === 'completed';
+}
+
+export function formatSeriesEpisodeCountLabel(
+  series: Pick<VideoSeries, 'status' | 'video_count'>,
+  epWord: string,
+  trackingEnabled = true,
+  spaced = false,
+): string {
+  if (series.video_count === 0) return '暂无资源';
+  const count = spaced ? ` ${series.video_count} ${epWord}` : `${series.video_count}${epWord}`;
+  return isSeriesCompleted(series) || !trackingEnabled ? `全${count}` : `更新至第${count}`;
+}
+
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
   return invoke<VideoSeries[]>('get_video_series_list', { sortBy, sortOrder });
 }

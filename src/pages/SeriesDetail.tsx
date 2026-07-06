@@ -37,6 +37,8 @@ import {
   checkSeriesUpdates,
   addVideoToSeries,
   getTagColor,
+  formatSeriesEpisodeCountLabel,
+  isSeriesCompleted,
 } from '../utils/api';
 import type { Actor, SeasonInfo, Tag, Video, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { SmartPoster, videoPosterDataUrl } from '../utils/media';
@@ -59,7 +61,7 @@ function toEditData(series: VideoSeries) {
     title: series.title,
     description: series.description || '',
     poster: series.poster || '',
-    status: series.status === 'completed' ? 'completed' as const : 'ongoing' as const,
+    status: isSeriesCompleted(series) ? 'completed' as const : 'ongoing' as const,
     code: series.code || '',
     has_chinese_sub: series.has_chinese_sub === 1,
   };
@@ -352,6 +354,7 @@ const SeriesDetail: React.FC = () => {
       clearEditQuery(); setUserTouchedSub(false);
       setEditing(false);
       await loadSeries();
+      await refreshSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);
       notify({ message: '保存失败，请检查内容后重试', type: 'error' });
@@ -362,7 +365,7 @@ const SeriesDetail: React.FC = () => {
 
   const handleToggleSeriesStatus = async () => {
     if (!series) return;
-    const nextStatus = series.status === 'completed' ? 'ongoing' : 'completed';
+    const nextStatus = isSeriesCompleted(series) ? 'ongoing' : 'completed';
     try {
       await updateVideoSeries(
         series.id,
@@ -491,6 +494,7 @@ const SeriesDetail: React.FC = () => {
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+  const isCompleted = isSeriesCompleted(series);
   const isWatched = series?.is_watched === 1;
   const epWord = features.episode || '部';
   const lastWatchedEpisode = series.last_watched_episode || 0;
@@ -514,11 +518,7 @@ const SeriesDetail: React.FC = () => {
     : orderedVideos.length > 0
       ? ''
       : '暂无可播放分集';
-  const episodeCountLabel = series.video_count === 0
-    ? '暂无资源'
-    : series.status === 'completed' || !features.status
-    ? `全 ${series.video_count} ${epWord}`
-    : `更新至第 ${series.video_count} ${epWord}`;
+  const episodeCountLabel = formatSeriesEpisodeCountLabel(series, epWord, features.status, true);
 
   const handlePrimaryPlay = async () => {
     if (!series || orderedVideos.length === 0) return;
@@ -733,7 +733,7 @@ const SeriesDetail: React.FC = () => {
                     {features.status && (
                       <div>
                         <div className="text-sm font-medium text-gray-500 mb-2">连载状态</div>
-                        <div className="changli-status-switch" role="group" aria-label="连载状态">
+                        <div className={`changli-status-switch ${editData.status === 'completed' ? 'is-right' : ''}`} role="group" aria-label="连载状态">
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, status: 'ongoing' })}
@@ -750,7 +750,7 @@ const SeriesDetail: React.FC = () => {
                     {editData.code && (
                       <div>
                         <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
-                        <div className="changli-status-switch" role="group" aria-label="中文字幕支持">
+                        <div className={`changli-status-switch ${editData.has_chinese_sub ? 'is-right' : ''}`} role="group" aria-label="中文字幕支持">
                           <button
                             type="button"
                             onClick={() => setEditData({ ...editData, has_chinese_sub: false })}
@@ -901,8 +901,8 @@ const SeriesDetail: React.FC = () => {
                       )}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${series.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                        {series.status === 'completed' ? '已完结' : '连载中'}
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                        {isCompleted ? '已完结' : '连载中'}
                       </span>
                       <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">{episodeCountLabel}</span>
                     </div>
@@ -1013,7 +1013,7 @@ const SeriesDetail: React.FC = () => {
               className="changli-menu-item"
               onClick={handleToggleSeriesStatus}
             >
-              {series.status === 'completed' ? '切换为连载中' : '切换为已完结'}
+              {isCompleted ? '切换为连载中' : '切换为已完结'}
             </button>
           )}
           <button

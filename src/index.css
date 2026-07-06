@@ -729,6 +729,7 @@ body {
 }
 
 .changli-status-switch {
+  position: relative;
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
@@ -738,9 +739,31 @@ body {
   border-radius: 999px;
   background: rgba(246, 247, 251, 0.92);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+
+.changli-status-switch::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 12px) / 2);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fb5b7b, #ff8a4c);
+  box-shadow: 0 10px 22px rgba(251, 91, 123, 0.22);
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
+}
+
+.changli-status-switch.is-right::before {
+  transform: translateX(calc(100% + 4px));
 }
 
 .changli-status-switch button {
+  position: relative;
+  z-index: 1;
   height: 36px;
   border: 0;
   border-radius: 999px;
@@ -749,7 +772,7 @@ body {
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
-  transition: transform 0.18s ease, color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s ease, color 0.22s ease;
 }
 
 .changli-status-switch button:hover {
@@ -757,9 +780,11 @@ body {
 }
 
 .changli-status-switch button.active {
-  background: linear-gradient(135deg, #fb5b7b, #ff8a4c);
   color: #fff;
-  box-shadow: 0 10px 22px rgba(251, 91, 123, 0.22);
+}
+
+.changli-status-switch button:active {
+  transform: scale(0.97);
 }
 
 .changli-window-controls {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { formatSeriesWatchLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
@@ -64,7 +64,7 @@ const Home: React.FC = () => {
             </span>
           )}
           <div className="absolute bottom-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-sm">
-            {series.video_count === 0 ? '暂无资源' : series.status === 'completed' || !isTracking ? `全 ${series.video_count} ${epWord}` : `更新至第${series.video_count}${epWord}`}
+            {formatSeriesEpisodeCountLabel(series, epWord, isTracking, true)}
           </div>
         </div>
         <div className="mt-2 min-w-0">

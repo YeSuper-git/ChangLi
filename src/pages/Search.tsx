@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { getAllCategories, parseCategoryFeatures } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 
@@ -82,7 +82,7 @@ const Search: React.FC = () => {
         type: 'series',
         id: series.id,
         title: series.title,
-        subtitle: `${getCategoryName(series)} · ${series.video_count === 0 ? '暂无资源' : series.status === 'completed' ? `全${series.video_count}${getEpisodeWord(series)}` : `更新至第${series.video_count}${getEpisodeWord(series)}`}`,
+        subtitle: `${getCategoryName(series)} · ${formatSeriesEpisodeCountLabel(series, getEpisodeWord(series))}`,
         series,
       }));
 
