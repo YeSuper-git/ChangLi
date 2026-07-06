@@ -519,8 +519,8 @@ const Library: React.FC = () => {
       if (activeActorId !== null) await filterByActor(activeActorId);
       notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
     } catch (error) {
-      console.error('[Library] 切换类型失败:', error);
-      notify({ message: '切换类型失败，请稍后重试', type: 'error' });
+      console.error('[Library] 切换分类失败:', error);
+      notify({ message: '切换分类失败，请稍后重试', type: 'error' });
       setTypeSwitchConfirm(null);
     }
   };
@@ -1012,7 +1012,7 @@ const Library: React.FC = () => {
               handleSwitchType(contextMenu.id);
             }}
           >
-            切换类型
+            切换分类
           </button>
           <button
             className="changli-menu-item changli-menu-item-danger"
@@ -1212,12 +1212,12 @@ const Library: React.FC = () => {
       </div>
     )}
 
-    {/* 切换类型确认弹窗 */}
+    {/* 切换分类确认弹窗 */}
     {typeSwitchConfirm && (
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            确定切换到「{typeSwitchConfirm.categoryName}」？
+            选择要切换的分类：「{typeSwitchConfirm.categoryName}」
           </p>
           <div className="flex gap-3">
             <button
