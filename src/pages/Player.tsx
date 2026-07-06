@@ -63,6 +63,7 @@ const Player: React.FC = () => {
   // Refs
   const progressBarRef = useRef<HTMLDivElement>(null);
   const draggingProgressRef = useRef(false);
+  const stageDraggedRef = useRef(false);
   const mpvInitialized = useRef(false);
   const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
@@ -146,11 +147,14 @@ const Player: React.FC = () => {
             setLoading(false);
             return;
           }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (!observedVideoSizeRef.current.width || !observedVideoSizeRef.current.height) {
+            setHasVideoFrame(true);
+          }
           if (currentVideo.subtitle) {
             await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
           }
           if (previousPosition > 5) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
             await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
             setCurrentTime(previousPosition);
           }
@@ -292,10 +296,12 @@ const Player: React.FC = () => {
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-      // 通过锁确保 init 完成后再 destroy
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
+            await setProperty('pause', true).catch(() => {});
+            await command('disable-event', ['all']).catch(() => {});
+            await new Promise((resolve) => setTimeout(resolve, 200));
             await destroy();
           } catch { /* ignore */ }
           mpvInitialized.current = false;
@@ -978,7 +984,28 @@ const Player: React.FC = () => {
       )}
 
       <main className="changli-player-main">
-        <div className="changli-player-stage" onClick={togglePlay}>
+        <div
+          className="changli-player-stage"
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            const startX = e.screenX;
+            const startY = e.screenY;
+            stageDraggedRef.current = false;
+            const onMove = (me: MouseEvent) => {
+              if (Math.abs(me.screenX - startX) > 5 || Math.abs(me.screenY - startY) > 5) {
+                stageDraggedRef.current = true;
+                window.removeEventListener('mousemove', onMove);
+                playerWindow.startDragging().catch(() => {});
+              }
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', () => window.removeEventListener('mousemove', onMove), { once: true });
+          }}
+          onClick={() => {
+            if (stageDraggedRef.current) return;
+            togglePlay();
+          }}
+        >
           <div className="changli-player-video-art" />
           {showResumeNotice && (
             <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>

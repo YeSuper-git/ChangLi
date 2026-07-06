@@ -610,7 +610,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', chinese_sub: '中字', episode: '剧集单位' };
+                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字', episode: '剧集单位' };
                 return labels[k] || k;
               });
               return (
@@ -890,15 +890,11 @@ const Settings: React.FC = () => {
               {/* Key 不展示，由系统管理 */}
               <div>
                 <label className="changli-form-label">卡片方向</label>
-                <select
+                <BubbleSelect
                   value={categoryForm.card_layout}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, card_layout: e.target.value as 'portrait' | 'landscape' | 'auto' })}
-                  className="changli-input"
-                >
-                  <option value="auto">自动</option>
-                  <option value="portrait">竖版</option>
-                  <option value="landscape">横版</option>
-                </select>
+                  options={[{ value: 'auto', label: '自动' }, { value: 'portrait', label: '竖版' }, { value: 'landscape', label: '横版' }]}
+                  onChange={(v) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
+                />
               </div>
               <div>
                 <label className="changli-form-label">默认扫描路径</label>
@@ -923,10 +919,10 @@ const Settings: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">功能开关</label>
                 <div className="space-y-3">
                   {([
+                    { key: 'tracking' as const, label: '追番/完结', tip: '控制是否支持追番和已完结标记功能' },
+                    { key: 'status' as const, label: '连载状态', tip: '控制是否显示连载中/已完结状态' },
                     { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
                     { key: 'actors' as const, label: '演员', tip: '控制是否支持给视频集关联演员' },
-                    { key: 'tracking' as const, label: '追番', tip: '控制是否支持追番/已看完功能' },
-                    { key: 'status' as const, label: '连载状态', tip: '控制是否显示连载中/已完结状态' },
                     { key: 'chinese_sub' as const, label: '中文字幕', tip: '控制是否支持中文字幕标记' },
                   ]).map(({ key, label, tip }) => (
                     <div key={key} className="flex items-center justify-between">

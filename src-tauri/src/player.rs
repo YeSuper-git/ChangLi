@@ -244,7 +244,12 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     let window = builder.build().context("create player window")?;
 
     window.on_window_event(|event| match event {
-        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => kill_mpv(),
+        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(800));
+                kill_mpv();
+            });
+        }
         _ => {}
     });
 
