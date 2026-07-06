@@ -444,6 +444,9 @@ const Player: React.FC = () => {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
+    // 初始同步 HTML 高度
+    document.documentElement.style.height = `${window.innerHeight}px`;
+    document.body.style.height = `${window.innerHeight}px`;
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
@@ -452,6 +455,9 @@ const Player: React.FC = () => {
         const scale = window.devicePixelRatio || 1;
         lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
       }
+      // 强制同步 HTML 高度，解决透明 WebView 下 absolute 定位元素错位
+      document.documentElement.style.height = `${window.innerHeight}px`;
+      document.body.style.height = `${window.innerHeight}px`;
       if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       resizeSettleTimerRef.current = window.setTimeout(async () => {
         if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
