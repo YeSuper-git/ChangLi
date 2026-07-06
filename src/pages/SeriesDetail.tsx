@@ -130,9 +130,7 @@ const SeriesDetail: React.FC = () => {
   const [actorNotice, setActorNotice] = useState('');
   const [editOptionsLoaded, setEditOptionsLoaded] = useState(false);
   // 使用后端返回的 poster_orientation 字段，不再动态检测
-  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
-  // 右键菜单
-  const [contextMenu, setContextMenu] = useState<{ videoId: number; videoName: string; x: number; y: number } | null>(null);
+  const { clearPending } = useSecondConfirm();
   const [selectMode, setSelectMode] = useState(false);
   const [selectedEpisodes, setSelectedEpisodes] = useState<Set<number>>(new Set());
   const { pendingKey: episodePendingKey, requestSecondConfirm: episodeSecondConfirm, clearPending: episodeClearPending } = useSecondConfirm();
@@ -198,15 +196,15 @@ const SeriesDetail: React.FC = () => {
     }
   }, [editing, series, editData.code, userTouchedSub]);
 
-  // 点击空白关闭右键菜单
+  // 点击空白关闭海报右键菜单
   useEffect(() => {
-    if (!contextMenu && !posterMenu) return;
-    const close = () => { setContextMenu(null); setPosterMenu(null); clearPending(); };
+    if (!posterMenu) return;
+    const close = () => { setPosterMenu(null); clearPending(); };
     window.addEventListener('click', close);
     return () => {
       window.removeEventListener('click', close);
     };
-  }, [contextMenu, posterMenu, clearPending]);
+  }, [posterMenu, clearPending]);
 
   const loadSeries = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!seriesId) return;
@@ -389,17 +387,6 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleDeleteEpisode = async (videoId: number) => {
-    try {
-      await deleteVideo(videoId);
-      setContextMenu(null);
-      await loadSeries();
-    } catch (error) {
-      console.error('删除分集失败:', error);
-      notify({ message: '删除失败，请稍后重试', type: 'error' });
-    }
-  };
-
   const toggleEpisodeSelect = (videoId: number) => {
     setSelectedEpisodes(prev => {
       const next = new Set(prev);
@@ -456,7 +443,6 @@ const SeriesDetail: React.FC = () => {
     if (editing) return;
     event.preventDefault();
     event.stopPropagation();
-    setContextMenu(null);
     setPosterMenu({ x: event.clientX, y: event.clientY });
   };
 
@@ -999,7 +985,6 @@ const SeriesDetail: React.FC = () => {
         <VideoGrid
           videos={videos}
           posterOrientation={series?.poster_orientation || 'unknown'}
-          onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
           episodeWord={features.episode || '部'}
           fallbackPoster={series?.poster_data_url}
           selectMode={selectMode}
@@ -1053,32 +1038,6 @@ const SeriesDetail: React.FC = () => {
           </button>
         </div>
       )}
-
-      {/* 右键菜单 */}
-      {contextMenu && (
-        <div
-          className="changli-context-menu fixed z-50 py-2 w-fit"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          ref={(node) => {
-            if (node) {
-              const rect = node.getBoundingClientRect();
-              if (rect.right > window.innerWidth) node.style.left = `${contextMenu.x - rect.width}px`;
-              if (rect.bottom > window.innerHeight) node.style.top = `${contextMenu.y - rect.height}px`;
-            }
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-            onClick={() => {
-              requestSecondConfirm(`delete-${contextMenu.videoId}`, () => handleDeleteEpisode(contextMenu.videoId));
-            }}
-          >
-            {pendingKey === `delete-${contextMenu.videoId}` ? '确认删除' : '删除视频'}
-          </button>
-        </div>
-      )}
-
 
       {missingVideos.length > 0 && (
         <div className="changli-modal-backdrop">
@@ -1319,7 +1278,6 @@ function formatLastWatchedEpisodeLabel(episode: number, season: number, epWord: 
 interface VideoGridProps {
   videos: Video[];
   posterOrientation: string;
-  onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
   episodeWord?: string;
   fallbackPoster?: string | null;
   selectMode?: boolean;
@@ -1330,7 +1288,6 @@ interface VideoGridProps {
 const VideoGrid: React.FC<VideoGridProps> = ({
   videos,
   posterOrientation,
-  onContextMenu,
   episodeWord: epWord,
   fallbackPoster,
   selectMode,
@@ -1388,13 +1345,6 @@ const VideoGrid: React.FC<VideoGridProps> = ({
             onToggleSelect(video.id);
           } else {
             openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }));
-          }
-        }}
-        onContextMenu={(e) => {
-          if (selectMode) return;
-          if (onContextMenu) {
-            e.preventDefault();
-            onContextMenu(video.id, video.file_name, e.clientX, e.clientY);
           }
         }}
       >
