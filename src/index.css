@@ -2009,7 +2009,7 @@ body.changli-player-body #root {
 }
 
 .changli-player-controls {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;

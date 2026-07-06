@@ -870,11 +870,11 @@ const Player: React.FC = () => {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          seek(Math.max(0, currentTime - 5));
+          seek(Math.max(0, currentTime - 10));
           break;
         case 'ArrowRight':
           e.preventDefault();
-          seek(Math.min(duration, currentTime + 5));
+          seek(Math.min(duration, currentTime + 10));
           break;
         case 'ArrowUp':
           e.preventDefault();
