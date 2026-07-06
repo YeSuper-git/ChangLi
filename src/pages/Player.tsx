@@ -164,7 +164,7 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu-next',
+            'vo': 'gpu',
             'hwdec': 'd3d11va',
             'keep-open': 'yes',
             'force-window': 'yes',
