@@ -164,15 +164,15 @@ const Player: React.FC = () => {
         // 初始化 mpv
         await init({
           initialOptions: {
-            'vo': 'gpu',
+            'vo': 'gpu-next',
             'hwdec': 'd3d11va',
+            'gpu-api': 'd3d11',
+            'd3d11-sync-interval': '0',
             'keep-open': 'yes',
             'force-window': 'yes',
             'hwdec-codecs': 'all',
-            'gpu-api': 'd3d11',
             'osc': 'no',
             'osd-level': 0,
-            // 防 overlay inject
             'video-sync': 'audio',
           },
           observedProperties: OBSERVED_PROPERTIES,
