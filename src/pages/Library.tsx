@@ -148,7 +148,14 @@ const Library: React.FC = () => {
   useEffect(() => {
     if (dirtyRefreshHandledRef.current) return;
     dirtyRefreshHandledRef.current = true;
-    window.scrollTo(0, 0);
+    // 从 series detail 返回时恢复滚动位置
+    const saved = sessionStorage.getItem('library-scroll-y');
+    if (saved) {
+      sessionStorage.removeItem('library-scroll-y');
+      requestAnimationFrame(() => window.scrollTo(0, Number(saved)));
+    } else {
+      window.scrollTo(0, 0);
+    }
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
@@ -925,6 +932,7 @@ const Library: React.FC = () => {
                 <div
                   key={series.id}
                   onClick={() => { if (!selectMode) {
+                    sessionStorage.setItem('library-scroll-y', String(window.scrollY));
                     const filterSearch = buildFilterSearch();
                     navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}`, seriesSnapshot: series } });
                   }}}
