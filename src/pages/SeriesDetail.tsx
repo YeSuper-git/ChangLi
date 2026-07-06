@@ -27,7 +27,6 @@ import {
   getVideoSeriesDetail,
   removeSeriesActor,
   removeSeriesTag,
-  removeVideoFromSeries,
   saveVideoThumbnail,
   updateVideoSeries,
   toggleWatched,
@@ -134,6 +133,9 @@ const SeriesDetail: React.FC = () => {
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   // 右键菜单
   const [contextMenu, setContextMenu] = useState<{ videoId: number; videoName: string; x: number; y: number } | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedEpisodes, setSelectedEpisodes] = useState<Set<number>>(new Set());
+  const { pendingKey: episodePendingKey, requestSecondConfirm: episodeSecondConfirm, clearPending: episodeClearPending } = useSecondConfirm();
   const [posterMenu, setPosterMenu] = useState<{ x: number; y: number } | null>(null);
   // 管理季
   const [showSeasonManager, setShowSeasonManager] = useState(false);
@@ -387,17 +389,6 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleRemoveEpisode = async (videoId: number) => {
-    try {
-      await removeVideoFromSeries(videoId);
-      setContextMenu(null);
-      await loadSeries();
-    } catch (error) {
-      console.error('移除分集失败:', error);
-      notify({ message: '移除失败，请稍后重试', type: 'error' });
-    }
-  };
-
   const handleDeleteEpisode = async (videoId: number) => {
     try {
       await deleteVideo(videoId);
@@ -406,6 +397,31 @@ const SeriesDetail: React.FC = () => {
     } catch (error) {
       console.error('删除分集失败:', error);
       notify({ message: '删除失败，请稍后重试', type: 'error' });
+    }
+  };
+
+  const toggleEpisodeSelect = (videoId: number) => {
+    setSelectedEpisodes(prev => {
+      const next = new Set(prev);
+      if (next.has(videoId)) next.delete(videoId);
+      else next.add(videoId);
+      return next;
+    });
+  };
+
+  const handleBatchDeleteEpisodes = async () => {
+    if (selectedEpisodes.size === 0) return;
+    try {
+      for (const videoId of selectedEpisodes) {
+        await deleteVideo(videoId);
+      }
+      setSelectedEpisodes(new Set());
+      setSelectMode(false);
+      await loadSeries();
+      await refreshSeries();
+      notify({ message: `已删除 ${selectedEpisodes.size} 个分集`, type: 'success' });
+    } catch (error) {
+      notify({ message: '批量删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -965,7 +981,19 @@ const SeriesDetail: React.FC = () => {
 
       <div className="changli-section-title">
         <h2 className="text-xl font-semibold">选集</h2>
-        <span className="changli-soft-chip">{videos.length} {features.episode || '部'}</span>
+        <div className="flex items-center gap-2">
+          <span className="changli-soft-chip">{videos.length} {features.episode || '部'}</span>
+          {selectMode ? (
+            <>
+              <button className="action-btn action-btn-danger text-xs" disabled={selectedEpisodes.size === 0} onClick={() => episodeSecondConfirm('batch-delete-episodes', handleBatchDeleteEpisodes)}>
+                {episodePendingKey === 'batch-delete-episodes' ? `确认删除 ${selectedEpisodes.size} 个` : `删除 ${selectedEpisodes.size} 个`}
+              </button>
+              <button className="action-btn text-xs" onClick={() => { setSelectMode(false); setSelectedEpisodes(new Set()); episodeClearPending(); }}>取消</button>
+            </>
+          ) : (
+            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>选择</button>
+          )}
+        </div>
       </div>
       {videos.length > 0 ? (
         <VideoGrid
@@ -974,6 +1002,9 @@ const SeriesDetail: React.FC = () => {
           onContextMenu={(videoId, videoName, x, y) => setContextMenu({ videoId, videoName, x, y })}
           episodeWord={features.episode || '部'}
           fallbackPoster={series?.poster_data_url}
+          selectMode={selectMode}
+          selectedEpisodes={selectedEpisodes}
+          onToggleSelect={toggleEpisodeSelect}
         />
       ) : (
         <div className="changli-empty-state text-gray-500">暂无资源</div>
@@ -1037,14 +1068,6 @@ const SeriesDetail: React.FC = () => {
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            onClick={() => {
-              requestSecondConfirm(`remove-${contextMenu.videoId}`, () => handleRemoveEpisode(contextMenu.videoId));
-            }}
-          >
-            {pendingKey === `remove-${contextMenu.videoId}` ? '确认移出' : '移出视频集'}
-          </button>
           <button
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
             onClick={() => {
@@ -1299,6 +1322,9 @@ interface VideoGridProps {
   onContextMenu?: (videoId: number, videoName: string, x: number, y: number) => void;
   episodeWord?: string;
   fallbackPoster?: string | null;
+  selectMode?: boolean;
+  selectedEpisodes?: Set<number>;
+  onToggleSelect?: (videoId: number) => void;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
@@ -1307,6 +1333,9 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   onContextMenu,
   episodeWord: epWord,
   fallbackPoster,
+  selectMode,
+  selectedEpisodes,
+  onToggleSelect,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -1348,13 +1377,21 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   /** 渲染单个视频卡片 */
   const renderVideoCard = (video: Video) => {
     const poster = videoPosterDataUrl(video) || fallbackPoster;
+    const isSelected = selectedEpisodes?.has(video.id) ?? false;
     return (
       <button
         key={video.id}
         type="button"
-        className="card block w-full cursor-pointer overflow-hidden text-left"
-        onClick={() => openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }))}
+        className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''}`}
+        onClick={() => {
+          if (selectMode && onToggleSelect) {
+            onToggleSelect(video.id);
+          } else {
+            openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }));
+          }
+        }}
         onContextMenu={(e) => {
+          if (selectMode) return;
           if (onContextMenu) {
             e.preventDefault();
             onContextMenu(video.id, video.file_name, e.clientX, e.clientY);
@@ -1366,6 +1403,13 @@ const VideoGrid: React.FC<VideoGridProps> = ({
             posterOrientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video'
           } bg-gray-100 overflow-hidden relative rounded-t-xl`}
         >
+          {selectMode && (
+            <div className="absolute top-2 left-2 z-10">
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-gray-300 bg-white/80'}`}>
+                {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+              </div>
+            </div>
+          )}
           <SmartPoster src={poster} alt={video.file_name} posterOrientation={posterOrientation} />
 
         </div>
