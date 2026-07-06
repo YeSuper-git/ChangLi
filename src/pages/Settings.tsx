@@ -932,7 +932,7 @@ const Settings: React.FC = () => {
                 <label className="changli-form-label">功能开关</label>
                 <div className="space-y-3">
                   {([
-                    { key: 'tracking' as const, label: '追番标记', tip: '控制是否支持追番/收藏功能' },
+                    { key: 'tracking' as const, label: '追番标记', tip: '控制是否支持追番标记功能' },
                     { key: 'watched' as const, label: '观影进度', tip: '控制是否支持标记已看完/未看完功能' },
                     { key: 'status' as const, label: '连载状态', tip: '控制是否显示连载中/已完结状态' },
                     { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
