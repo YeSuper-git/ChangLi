@@ -298,7 +298,9 @@ const Player: React.FC = () => {
     };
   }, []);
 
-  // mpv 健康检查：检测播放中 mpv 是否崩溃
+  // mpv 健康检查：只用于日志诊断，不再把短暂 IPC 失败误判成播放崩溃。
+  // 实际故障案例里音频仍在播放，说明 mpv 进程和解码没有退出；旧逻辑连续 3 次
+  // get_property 失败就切到错误页，反而用 WebView 覆盖了视频画面，造成“提示异常后白屏但有声音”。
   useEffect(() => {
     if (!mpvInitialized.current) return;
     let failCount = 0;
@@ -307,16 +309,11 @@ const Player: React.FC = () => {
       try {
         await command('get_property', ['time-pos']);
         failCount = 0;
-      } catch {
+      } catch (err) {
         if (!isMountedRef.current) return;
         failCount++;
-        if (failCount >= 3) {
-          console.error('[Player] mpv 连续无响应，可能已崩溃');
-          if (isMountedRef.current) {
-            setError('播放器异常退出，请重新打开');
-          }
-          mpvInitialized.current = false;
-          window.clearInterval(timer);
+        if (failCount === 3 || failCount % 12 === 0) {
+          console.warn('[Player] mpv IPC 健康检查暂时失败，保持当前播放画面:', err);
         }
       }
     }, 5000);

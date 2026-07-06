@@ -2469,17 +2469,16 @@ body.changli-player-body #root {
 
 /* Player quality and visibility fixes */
 
+html.changli-player-html,
 body.changli-player-body,
-body.changli-player-body html,
-body.changli-player-body #root,
-body.changli-player-body .changli-player-window,
-body.changli-player-body .changli-player-main,
-body.changli-player-body .changli-player-stage {
+body.changli-player-body #root {
   background: transparent !important;
 }
 
-body.changli-player-body {
-  background: transparent !important;
+body.changli-player-body .changli-player-window,
+body.changli-player-body .changli-player-main,
+body.changli-player-body .changli-player-stage {
+  background: #000 !important;
 }
 
 .changli-player-titlebar {
@@ -2597,15 +2596,17 @@ body.changli-player-body {
 }
 
 
-/* Player libmpv visibility hard guard: keep every root layer transparent so native video is not covered. */
+/* Player libmpv visibility hard guard: keep only the WebView root transparent; player chrome keeps a black fallback so the window never turns into a transparent hole. */
 html.changli-player-html,
 html.changli-player-html body,
-html.changli-player-html body #root,
+html.changli-player-html body #root {
+  background: transparent !important;
+}
+
 html.changli-player-html .changli-player-window,
 html.changli-player-html .changli-player-main,
-html.changli-player-html .changli-player-stage,
-html.changli-player-html .changli-player-window::before {
-  background: transparent !important;
+html.changli-player-html .changli-player-stage {
+  background: #000 !important;
 }
 
 html.changli-player-html .changli-player-window::before {
@@ -2613,7 +2614,7 @@ html.changli-player-html .changli-player-window::before {
 }
 
 html.changli-player-html .changli-player-stage {
-  overflow: visible;
+  overflow: hidden;
 }
 
 html.changli-player-html .changli-player-titlebar,
