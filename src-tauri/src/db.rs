@@ -804,7 +804,13 @@ pub async fn update_video_series(
         .ok_or_else(|| anyhow::anyhow!("视频集不存在"))
 }
 
-pub async fn delete_video_series(pool: &SqlitePool, id: i64, _delete_videos: bool) -> Result<()> {
+pub async fn delete_video_series(pool: &SqlitePool, id: i64, delete_videos: bool) -> Result<()> {
+    if delete_videos {
+        sqlx::query("DELETE FROM videos WHERE series_id = ?")
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
     sqlx::query("DELETE FROM video_series WHERE id = ?")
         .bind(id)
         .execute(pool)
