@@ -2009,7 +2009,10 @@ body.changli-player-body #root {
 }
 
 .changli-player-controls {
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 30;
   border-top: 1px solid var(--player-line);
   padding: 8px 16px 10px;
