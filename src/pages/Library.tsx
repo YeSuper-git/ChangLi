@@ -250,6 +250,8 @@ const Library: React.FC = () => {
   }, [categoryOperation]);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [batchSwitchCategoryOpen, setBatchSwitchCategoryOpen] = useState(false);
+  const [batchSwitchConfirm, setBatchSwitchConfirm] = useState<{ categoryName: string; categoryKey: string } | null>(null);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
 
   // 按数量判断是否需要展开按钮（首帧即确定，无跳动）
@@ -683,6 +685,22 @@ const Library: React.FC = () => {
     setBatchDeleteConfirm(true);
   };
 
+  const doBatchSwitch = async () => {
+    if (!batchSwitchConfirm) return;
+    setBatchSwitchConfirm(null);
+    const seriesIds = [...selectedIds].filter(k => k.startsWith('s-')).map(k => parseInt(k.split('-')[1]));
+    clearLibraryFilterCaches();
+    for (const id of seriesIds) {
+      await switchSeriesTypeTo(id, batchSwitchConfirm.categoryKey).catch(() => {});
+    }
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    await refreshSeries();
+    if (activeTagId !== null) await filterByTag(activeTagId);
+    if (activeActorId !== null) await filterByActor(activeActorId);
+    notify({ message: `已将 ${seriesIds.length} 个视频集切换到「${batchSwitchConfirm.categoryName}」`, type: 'success' });
+  };
+
   return (
     <>
     <div className="changli-page changli-library-instant">
@@ -865,6 +883,13 @@ const Library: React.FC = () => {
             <span className="text-sm text-gray-500">已选 {selectedIds.size} 项</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBatchSwitchCategoryOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="action-btn disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              切换分类{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+            </button>
             <button
               onClick={handleBatchDelete}
               disabled={selectedIds.size === 0}
@@ -1228,6 +1253,60 @@ const Library: React.FC = () => {
             </button>
             <button
               onClick={() => setTypeSwitchConfirm(null)}
+              className="action-btn flex-1 text-sm"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 批量切换分类 - 大类选择弹窗 */}
+    {batchSwitchCategoryOpen && (
+      <div className="changli-modal-backdrop" onClick={() => setBatchSwitchCategoryOpen(false)}>
+        <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要切换的分类</h3>
+          <div className="space-y-2 mb-4">
+            {categories.filter(c => c.key !== mainCategory).map(cat => (
+              <button
+                key={cat.key}
+                className="changli-list-option"
+                onClick={() => {
+                  setBatchSwitchCategoryOpen(false);
+                  setBatchSwitchConfirm({ categoryName: cat.name, categoryKey: cat.key });
+                }}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <button
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+            onClick={() => setBatchSwitchCategoryOpen(false)}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* 批量切换分类确认弹窗 */}
+    {batchSwitchConfirm && (
+      <div className="changli-modal-backdrop">
+        <div className="changli-modal-panel">
+          <p className="text-gray-900 text-base mb-6">
+            确定将选中的 {selectedIds.size} 个视频集切换到「{batchSwitchConfirm.categoryName}」？
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={doBatchSwitch}
+              className="action-btn action-btn-primary flex-1 text-sm"
+            >
+              确认
+            </button>
+            <button
+              onClick={() => setBatchSwitchConfirm(null)}
               className="action-btn flex-1 text-sm"
             >
               取消
