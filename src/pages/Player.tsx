@@ -446,49 +446,63 @@ const Player: React.FC = () => {
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
 
     // 用 Tauri outerSize() 同步视口高度，绕过 window.innerHeight 在透明 WebView 下可能返回 0 的问题
-    const syncViewport = async () => {
-      const size = await playerWindow.outerSize().catch(() => null);
-      if (!size) return;
-      const scale = window.devicePixelRatio || 1;
-      const h = `${Math.round(size.height / scale)}px`;
-      document.documentElement.style.height = h;
-      document.body.style.height = h;
-      document.getElementById('root')?.style.setProperty('height', h);
-      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (el) el.style.height = h;
+    const applyViewportHeight = (heightPx: number) => {
+      try {
+        const h = `${Math.round(heightPx)}px`;
+        document.documentElement.style.height = h;
+        document.body.style.height = h;
+        document.getElementById('root')?.style.setProperty('height', h);
+        const el = document.querySelector('.changli-player-window') as HTMLElement | null;
+        if (el) el.style.height = h;
+      } catch { /* ignore */ }
     };
-    syncViewport();
+    playerWindow.outerSize().then((size) => {
+      const scale = window.devicePixelRatio || 1;
+      applyViewportHeight(size.height / scale);
+    }).catch(() => {});
 
+    // debounce onResized：拖拽/拉伸时每帧都触发，合并到 100ms 内只执行一次
+    let resizeDebounceTimer = 0;
     playerWindow.onResized(async () => {
-      const maximized = await playerWindow.isMaximized();
-      setIsWindowMaximized(maximized);
-      const size = await playerWindow.outerSize().catch(() => null);
-      if (size) {
-        const scale = window.devicePixelRatio || 1;
-        lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
-      }
-      syncViewport();
-      if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
-      resizeSettleTimerRef.current = window.setTimeout(async () => {
-        if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
-        const current = await playerWindow.outerSize().catch(() => null);
-        if (!current) return;
-        const scale = window.devicePixelRatio || 1;
-        const currentW = current.width / scale;
-        const currentH = current.height / scale;
-        const ratio = getCurrentVideoRatio();
-        const targetH = Math.max(292, Math.round(currentW / ratio));
-        if (Math.abs(targetH - currentH) < 3) return;
-        aspectResizeLockRef.current = true;
-        const targetW = Math.max(520, Math.round(targetH * ratio));
-        lastWindowSizeRef.current = { width: targetW, height: targetH };
-        await playerWindow.setSize(new LogicalSize(targetW, targetH)).catch(() => undefined);
-        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
-      }, 180);
+      if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
+      resizeDebounceTimer = window.setTimeout(async () => {
+        resizeDebounceTimer = 0;
+        try {
+          const [maximized, size] = await Promise.all([
+            playerWindow.isMaximized().catch(() => false),
+            playerWindow.outerSize().catch(() => null),
+          ]);
+          setIsWindowMaximized(maximized);
+          if (size) {
+            const scale = window.devicePixelRatio || 1;
+            lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
+            applyViewportHeight(size.height / scale);
+          }
+        } catch { /* ignore resize sync errors */ }
+
+        if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
+        resizeSettleTimerRef.current = window.setTimeout(async () => {
+          if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
+          const current = await playerWindow.outerSize().catch(() => null);
+          if (!current) return;
+          const scale = window.devicePixelRatio || 1;
+          const currentW = current.width / scale;
+          const currentH = current.height / scale;
+          const ratio = getCurrentVideoRatio();
+          const targetH = Math.max(292, Math.round(currentW / ratio));
+          if (Math.abs(targetH - currentH) < 3) return;
+          aspectResizeLockRef.current = true;
+          const targetW = Math.max(520, Math.round(targetH * ratio));
+          lastWindowSizeRef.current = { width: targetW, height: targetH };
+          await playerWindow.setSize(new LogicalSize(targetW, targetH)).catch(() => undefined);
+          window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
+        }, 180);
+      }, 100);
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
     return () => {
+      if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
       if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       unlisten?.();
     };
