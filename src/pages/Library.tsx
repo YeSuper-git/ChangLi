@@ -968,7 +968,7 @@ const Library: React.FC = () => {
                       {series.code ? `[${series.code}] ${series.title}` : series.title}
                     </h3>
                     <div className="text-xs text-zinc-500 mt-0.5">
-                      {formatSeriesWatchLabel(series, itemEpWord)}
+                      {series.video_count > 0 ? formatSeriesWatchLabel(series, itemEpWord) : ''}
                     </div>
                   </div>
                 </div>
