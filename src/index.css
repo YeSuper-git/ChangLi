@@ -2691,8 +2691,8 @@ html.changli-player-html .changli-player-stage {
   bottom: 7px;
   width: 10px;
   height: 10px;
-  border-right: 2px solid rgba(255, 255, 255, 0.42);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.42);
+  border-right: 2px solid transparent;
+  border-bottom: 2px solid transparent;
   border-radius: 1px;
 }
 
