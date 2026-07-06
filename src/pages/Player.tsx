@@ -128,7 +128,7 @@ const Player: React.FC = () => {
             await command('loadfile', [currentVideo.file_path, 'replace']);
           } catch (loadErr) {
             console.error('[Player] loadfile 失败:', loadErr);
-            setError('加载视频失败: ' + String(loadErr));
+            setError('加载视频失败，请确认视频文件仍然存在');
             setLoading(false);
             return;
           }
@@ -237,7 +237,7 @@ const Player: React.FC = () => {
           await command('loadfile', [currentVideo.file_path, 'replace']);
         } catch (loadErr) {
           console.error('[Player] loadfile 失败:', loadErr);
-          setError('加载视频失败: ' + String(loadErr));
+          setError('加载视频失败，请确认视频文件仍然存在');
           setLoading(false);
           return;
         }
@@ -257,7 +257,7 @@ const Player: React.FC = () => {
         setLoading(false);
       } catch (err) {
         console.error('[Player] 初始化失败:', err);
-        setError(String(err));
+        setError('播放器启动失败，请确认视频文件仍然存在');
         setLoading(false);
       }
       }); // end mpvOperationLock.then

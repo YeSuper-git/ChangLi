@@ -124,8 +124,8 @@ const Settings: React.FC = () => {
       notify({ message: '海报更新中，可继续使用', type: 'info' });
     } catch (error) {
       console.error('启动批量修复海报失败:', error);
-      setPosterRepairStatus((current) => ({ ...current, status: 'error', error: String(error) }));
-      notify({ message: '启动失败: ' + String(error), type: 'error' });
+      setPosterRepairStatus((current) => ({ ...current, status: 'error', error: '更新失败，请稍后重试' }));
+      notify({ message: '启动失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -195,7 +195,7 @@ const Settings: React.FC = () => {
       await refreshSeries();
     } catch (error) {
       console.error('删除分类视频失败:', error);
-      notify({ message: '删除失败: ' + String(error), type: 'error' });
+      notify({ message: '删除失败，请稍后重试', type: 'error' });
     } finally {
     }
   };
@@ -263,7 +263,7 @@ const Settings: React.FC = () => {
       notify({ message: `扫描完成：添加了 ${result.added} 部，更新了 ${result.updated} 部`, type: 'success' });
     } catch (error) {
       console.error('扫描失败:', error);
-      notify({ message: '扫描失败: ' + String(error), type: 'error' });
+      notify({ message: '扫描失败，请确认文件夹仍然存在并可访问', type: 'error' });
     }
   };
 
@@ -422,7 +422,7 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('检查更新失败:', error);
       setUpdateStatus('检查更新失败');
-      notify({ message: '检查更新失败: ' + String(error), type: 'error' });
+      notify({ message: '检查更新失败，请稍后重试', type: 'error' });
       setTimeout(() => setUpdateStatus(null), 5000);
     }
   };
@@ -477,15 +477,16 @@ const Settings: React.FC = () => {
         </div>
 
         <div className="changli-panel p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500 w-24">海报状态</span>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${posterRepairStatus.status === 'running' ? 'bg-amber-50 text-amber-700' : posterRepairStatus.status === 'success' ? 'bg-emerald-50 text-emerald-700' : posterRepairStatus.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-              {posterRepairStatus.status === 'running' && `更新中，已检查 ${posterRepairStatus.scanned_series} 个视频集，已更新 ${posterRepairStatus.updated_series} 个`}
-              {posterRepairStatus.status === 'success' && `更新成功，已更新 ${posterRepairStatus.updated_series} 个视频集海报`}
-              {posterRepairStatus.status === 'error' && `更新失败：${posterRepairStatus.error || '未知错误'}`}
-              {posterRepairStatus.status === 'idle' && '未开始'}
-            </span>
-          </div>
+          {posterRepairStatus.status !== 'idle' && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 w-24">海报更新进度</span>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${posterRepairStatus.status === 'running' ? 'bg-amber-50 text-amber-700' : posterRepairStatus.status === 'success' ? 'bg-emerald-50 text-emerald-700' : posterRepairStatus.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                {posterRepairStatus.status === 'running' && `更新中，已检查 ${posterRepairStatus.scanned_series} 个视频集，已更新 ${posterRepairStatus.updated_series} 个`}
+                {posterRepairStatus.status === 'success' && `更新成功，已更新 ${posterRepairStatus.updated_series} 个视频集海报`}
+                {posterRepairStatus.status === 'error' && `更新失败：${posterRepairStatus.error || '未知错误'}`}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 w-24">当前模式</span>
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-sm text-gray-800">
@@ -532,7 +533,7 @@ const Settings: React.FC = () => {
                 setGameOverlayState(checked);
                 notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
               } catch (error) {
-                notify({ message: '操作失败: ' + String(error), type: 'error' });
+                notify({ message: '操作失败，请稍后重试', type: 'error' });
               } finally {
                 setGameOverlayLoading(false);
               }

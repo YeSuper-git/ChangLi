@@ -54,7 +54,7 @@ const Actors: React.FC = () => {
       await refreshActors();
     } catch (error) {
       console.error('删除演员失败:', error);
-      notify({ message: '删除演员失败: ' + String(error), type: 'error' });
+      notify({ message: '删除演员失败，请稍后重试', type: 'error' });
     }
   };
 

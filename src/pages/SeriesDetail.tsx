@@ -33,7 +33,6 @@ import {
   toggleWatched,
   toggleChineseSub,
   getAllCategories,
-  rescanSingleSeriesMetadata,
   parseCategoryFeatures,
   checkSeriesUpdates,
   addVideoToSeries,
@@ -139,7 +138,14 @@ const SeriesDetail: React.FC = () => {
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [missingVideos, setMissingVideos] = useState<Video[]>([]);
-  const [updateDialog, setUpdateDialog] = useState<{ newVideos: Video[]; missingVideos: Video[] } | null>(null);
+  const [updateDialog, setUpdateDialog] = useState<{
+    newVideos: Video[];
+    missingVideos: Video[];
+    selectedNewVideos: Set<string>;
+    selectedMissingVideos: Set<number>;
+    renamedVideosCount: number;
+    posterUpdated: boolean;
+  } | null>(null);
   const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
@@ -220,7 +226,7 @@ const SeriesDetail: React.FC = () => {
       seriesDetailCache.set(seriesId, { series: seriesData, videos: seriesVideos, seriesTags: selectedTags, seriesActors: selectedActors });
     } catch (error) {
       console.error('加载视频集失败:', error);
-      notify({ message: '加载视频集失败: ' + String(error), type: 'error' });
+      notify({ message: '加载视频集失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -241,7 +247,7 @@ const SeriesDetail: React.FC = () => {
       setEditOptionsLoaded(true);
     } catch (error) {
       console.error('加载编辑选项失败:', error);
-      notify({ message: '加载编辑选项失败: ' + String(error), type: 'error' });
+      notify({ message: '加载编辑选项失败，请稍后重试', type: 'error' });
     }
   }, [cachedActors, cachedTags, editOptionsLoaded]);
 
@@ -296,7 +302,7 @@ const SeriesDetail: React.FC = () => {
       setCreatingTag(false);
     } catch (error) {
       console.error('新建标签失败:', error);
-      notify({ message: `新建标签失败：${String(error)}`, type: 'error' });
+      notify({ message: '新建标签失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -320,7 +326,7 @@ const SeriesDetail: React.FC = () => {
       setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
       console.error('新建演员失败:', error);
-      notify({ message: `新建演员失败：${String(error)}`, type: 'error' });
+      notify({ message: '新建演员失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -341,16 +347,14 @@ const SeriesDetail: React.FC = () => {
     }
     setSaving(true);
     try {
-      console.log('[Save] has_chinese_sub:', editData.has_chinese_sub, '→ sending:', editData.has_chinese_sub ? 1 : 0);
-      const result = await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
-      console.log('[Save] returned has_chinese_sub:', result.has_chinese_sub);
+      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
       await syncSeriesRelations();
       clearEditQuery(); setUserTouchedSub(false);
       setEditing(false);
       await loadSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);
-      notify({ message: '保存失败: ' + String(error), type: 'error' });
+      notify({ message: '保存失败，请检查内容后重试', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -363,7 +367,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('移除分集失败:', error);
-      notify({ message: '移除失败: ' + String(error), type: 'error' });
+      notify({ message: '移除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -374,7 +378,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('删除分集失败:', error);
-      notify({ message: '删除失败: ' + String(error), type: 'error' });
+      notify({ message: '删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -400,7 +404,7 @@ const SeriesDetail: React.FC = () => {
       await loadSeries();
     } catch (error) {
       console.error('删除季失败:', error);
-      notify({ message: '删除季失败: ' + String(error), type: 'error' });
+      notify({ message: '删除季失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -501,7 +505,7 @@ const SeriesDetail: React.FC = () => {
       if (target) await openPlayerWindow(target.id);
     } catch (error) {
       console.error('[SeriesDetail] 播放入口失败:', error);
-      notify({ message: '打开播放失败: ' + String(error), type: 'error' });
+      notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' });
     }
   };
 
@@ -526,50 +530,101 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const buildUpdateNotifyParts = (params: {
+    added?: number;
+    skippedNew?: number;
+    removed?: number;
+    keptMissing?: number;
+    renamed?: number;
+    posterUpdated?: boolean;
+  }) => {
+    const parts: string[] = [];
+    if ((params.added || 0) > 0) parts.push(`已添加 ${params.added} 个新发现的视频`);
+    if ((params.skippedNew || 0) > 0) parts.push(`已跳过 ${params.skippedNew} 个新发现的视频`);
+    if ((params.removed || 0) > 0) parts.push(`已移除 ${params.removed} 个本地已删除的视频记录`);
+    if ((params.keptMissing || 0) > 0) parts.push(`已保留 ${params.keptMissing} 个本地已删除的视频记录`);
+    if ((params.renamed || 0) > 0) parts.push(`已同步 ${params.renamed} 个视频文件名变化`);
+    if (params.posterUpdated) parts.push('已补全视频集海报');
+    return parts;
+  };
+
+  const toggleUpdateNewVideo = (filePath: string) => {
+    setUpdateDialog(prev => {
+      if (!prev) return prev;
+      const selectedNewVideos = new Set(prev.selectedNewVideos);
+      if (selectedNewVideos.has(filePath)) selectedNewVideos.delete(filePath);
+      else selectedNewVideos.add(filePath);
+      return { ...prev, selectedNewVideos };
+    });
+  };
+
+  const toggleUpdateMissingVideo = (videoId: number) => {
+    setUpdateDialog(prev => {
+      if (!prev) return prev;
+      const selectedMissingVideos = new Set(prev.selectedMissingVideos);
+      if (selectedMissingVideos.has(videoId)) selectedMissingVideos.delete(videoId);
+      else selectedMissingVideos.add(videoId);
+      return { ...prev, selectedMissingVideos };
+    });
+  };
+
   const handleCheckUpdates = async () => {
     if (!series) return;
     try {
       const result = await checkSeriesUpdates(series.id);
       if (result.new_videos.length === 0 && result.missing_videos.length === 0) {
-        notify({ message: '无更新', type: 'info' });
-        // 仍然执行元数据更新
-        await rescanSingleSeriesMetadata(series.id);
         seriesDetailCache.delete(series.id);
         await loadSeries();
         await refreshSeries();
+        const parts = buildUpdateNotifyParts({
+          renamed: result.renamed_videos_count,
+          posterUpdated: result.poster_updated,
+        });
+        notify({ message: parts.length > 0 ? parts.join('，') : '没有发现新增或本地已删除的视频', type: 'info' });
         return;
       }
-      setUpdateDialog({ newVideos: result.new_videos, missingVideos: result.missing_videos });
+      setUpdateDialog({
+        newVideos: result.new_videos,
+        missingVideos: result.missing_videos,
+        selectedNewVideos: new Set(result.new_videos.map(video => video.file_path)),
+        selectedMissingVideos: new Set(result.missing_videos.map(video => video.id)),
+        renamedVideosCount: result.renamed_videos_count,
+        posterUpdated: result.poster_updated,
+      });
     } catch (error) {
       console.error('[SeriesDetail] 检查更新失败:', error);
-      notify({ message: '检查更新失败: ' + String(error), type: 'error' });
+      notify({ message: '检查更新失败，请确认本地文件夹仍然存在', type: 'error' });
     }
   };
 
   const handleConfirmUpdates = async () => {
     if (!updateDialog || !series) return;
-    const { newVideos, missingVideos: missVids } = updateDialog;
+    const { newVideos, missingVideos: missVids, selectedNewVideos, selectedMissingVideos, renamedVideosCount, posterUpdated } = updateDialog;
     setUpdateDialog(null);
+    const selectedNew = newVideos.filter(video => selectedNewVideos.has(video.file_path));
+    const selectedMissing = missVids.filter(video => selectedMissingVideos.has(video.id));
     try {
-      // 添加新发现的视频
-      for (const video of newVideos) {
+      for (const video of selectedNew) {
         await addVideoToSeries(series.id, video.file_path);
       }
-      // 移除本地已删除的视频记录
-      for (const video of missVids) {
+      for (const video of selectedMissing) {
         await deleteVideo(video.id);
       }
-      await rescanSingleSeriesMetadata(series.id);
       seriesDetailCache.delete(series.id);
       await loadSeries();
       await refreshSeries();
-      const parts: string[] = [];
-      if (newVideos.length > 0) parts.push(`添加 ${newVideos.length} 个新发现的视频`);
-      if (missVids.length > 0) parts.push(`移除 ${missVids.length} 个本地已删除的视频记录`);
-      notify({ message: parts.join('，'), type: 'success' });
+      const parts = buildUpdateNotifyParts({
+        added: selectedNew.length,
+        skippedNew: newVideos.length - selectedNew.length,
+        removed: selectedMissing.length,
+        keptMissing: missVids.length - selectedMissing.length,
+        renamed: renamedVideosCount,
+        posterUpdated,
+      });
+      notify({ message: parts.length > 0 ? parts.join('，') : '更新完成', type: 'success' });
     } catch (error) {
       console.error('[SeriesDetail] 更新失败:', error);
-      notify({ message: '更新失败: ' + String(error), type: 'error' });
+      notify({ message: '更新失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -585,8 +640,8 @@ const SeriesDetail: React.FC = () => {
       await refreshSeries();
       notify({ message: '已删除本地不存在的分集记录', type: 'success' });
     } catch (error) {
-      console.error('[SeriesDetail] 删除缺失分集失败:', error);
-      notify({ message: '删除缺失分集失败: ' + String(error), type: 'error' });
+      console.error('[SeriesDetail] 移除本地已删除分集失败:', error);
+      notify({ message: '移除本地已删除分集失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -1003,27 +1058,39 @@ const SeriesDetail: React.FC = () => {
             <div className="changli-modal-body max-h-80 overflow-y-auto">
               {updateDialog.newVideos.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">新发现视频 ({updateDialog.newVideos.length})</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">新发现视频（已选 {updateDialog.newVideos.filter(video => updateDialog.selectedNewVideos.has(video.file_path)).length} / 共 {updateDialog.newVideos.length}）</h3>
                   <div className="space-y-2">
-                    {updateDialog.newVideos.map((video, idx) => (
-                      <div key={idx} className="rounded-2xl border border-green-100 bg-green-50/50 p-3">
-                        <div className="text-sm font-semibold text-gray-900">{video.file_name}</div>
-                        <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
-                      </div>
-                    ))}
+                    {updateDialog.newVideos.map((video) => {
+                      const checked = updateDialog.selectedNewVideos.has(video.file_path);
+                      return (
+                        <div key={video.file_path} className={`rounded-2xl border p-3 flex items-start gap-3 cursor-pointer transition-opacity ${checked ? 'border-green-100 bg-green-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleUpdateNewVideo(video.file_path)}>
+                          <input type="checkbox" checked={checked} onChange={() => toggleUpdateNewVideo(video.file_path)} className="mt-1 w-4 h-4 rounded accent-green-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-gray-900">{video.file_name}</div>
+                            <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
               {updateDialog.missingVideos.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频 ({updateDialog.missingVideos.length})</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">本地已删除视频（已选 {updateDialog.missingVideos.filter(video => updateDialog.selectedMissingVideos.has(video.id)).length} / 共 {updateDialog.missingVideos.length}）</h3>
                   <div className="space-y-2">
-                    {updateDialog.missingVideos.map((video) => (
-                      <div key={video.id} className="rounded-2xl border border-red-100 bg-red-50/50 p-3">
-                        <div className="text-sm font-semibold text-gray-900">{video.episode_number ? `第${video.episode_number}${epWord}` : video.file_name}</div>
-                        <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
-                      </div>
-                    ))}
+                    {updateDialog.missingVideos.map((video) => {
+                      const checked = updateDialog.selectedMissingVideos.has(video.id);
+                      return (
+                        <div key={video.id} className={`rounded-2xl border p-3 flex items-start gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-100 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleUpdateMissingVideo(video.id)}>
+                          <input type="checkbox" checked={checked} onChange={() => toggleUpdateMissingVideo(video.id)} className="mt-1 w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-gray-900">{video.episode_number ? `第${video.episode_number}${epWord}` : video.file_name}</div>
+                            <div className="mt-1 break-all text-xs text-gray-400">{video.file_path}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1250,7 +1317,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         key={video.id}
         type="button"
         className="card block w-full cursor-pointer overflow-hidden text-left"
-        onClick={() => openPlayerWindow(video.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
+        onClick={() => openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }))}
         onContextMenu={(e) => {
           if (onContextMenu) {
             e.preventDefault();

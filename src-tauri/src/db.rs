@@ -3307,6 +3307,8 @@ pub async fn disable_preset_template(pool: &SqlitePool, key: &str) -> Result<()>
 pub struct SeriesUpdateResult {
     pub new_videos: Vec<Video>,
     pub missing_videos: Vec<Video>,
+    pub renamed_videos_count: i64,
+    pub poster_updated: bool,
 }
 
 /// 检测单个视频集的更新：新增分集 + 丢失分集（仅检测，不修改数据库）
@@ -3320,7 +3322,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
     let (_id, title, folder_path, display_type, code) = match row {
         Some(r) => r,
-        None => return Ok(SeriesUpdateResult { new_videos: vec![], missing_videos: vec![] }),
+        None => return Ok(SeriesUpdateResult { new_videos: vec![], missing_videos: vec![], renamed_videos_count: 0, poster_updated: false }),
     };
 
     let folder_path_buf = resolve_series_folder(
@@ -3351,6 +3353,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
     })
     .unwrap_or(false);
 
+    let mut poster_updated = false;
     if series_poster_missing && folder_path_std.is_dir() {
         if let Some(series_poster) = crate::scanner::find_folder_poster(folder_path_std) {
             let series_poster_base64 =
@@ -3363,6 +3366,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
                 Some("landscape"),
             )
             .await?;
+            poster_updated = true;
         }
     }
 
@@ -3382,7 +3386,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
     // 扫描文件夹获取当前视频。检查更新只做资源差异检测；但字幕文件名升级
     // （JUR-472 → JUR-472-C / JUR-472-AI → JUR-472-AI-C）按同一视频处理并更新路径，避免误报新增+丢失。
-    let new_videos = if folder_path_std.is_dir() {
+    let (new_videos, renamed_videos_count) = if folder_path_std.is_dir() {
         let mut scanned_new: Vec<Video> = crate::scanner::scan_directory_video_index(&source)
             .await?
             .into_iter()
@@ -3395,6 +3399,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
             .collect();
 
         let mut remaining_new = Vec::new();
+        let mut renamed_videos_count: i64 = 0;
         let mut renamed_old_paths = std::collections::HashSet::new();
         for scanned in scanned_new.drain(..) {
             let identity = crate::scanner::adult_rename_identity(&scanned.file_name);
@@ -3439,6 +3444,7 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
                         .await;
                 }
 
+                renamed_videos_count += 1;
                 renamed_old_paths.insert(existing.file_path);
                 existing_paths.insert(scanned.file_path.clone());
             } else {
@@ -3447,12 +3453,12 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
         }
 
         missing_videos.retain(|v| !renamed_old_paths.contains(&v.file_path));
-        remaining_new
+        (remaining_new, renamed_videos_count)
     } else {
-        vec![]
+        (vec![], 0)
     };
 
-    Ok(SeriesUpdateResult { new_videos, missing_videos })
+    Ok(SeriesUpdateResult { new_videos, missing_videos, renamed_videos_count, poster_updated })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3465,6 +3471,7 @@ pub struct SeriesUpdateSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SeriesInfo {
+    pub id: Option<i64>,
     pub name: String,
     pub video_count: usize,
 }
@@ -3710,6 +3717,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 "SELECT COUNT(*) FROM videos WHERE series_id = ?")
                 .bind(id).fetch_one(pool).await.unwrap_or(0);
             missing_series.push(SeriesInfo {
+                id: Some(*id),
                 name: title.clone(),
                 video_count: video_count as usize,
             });
@@ -3961,7 +3969,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 }
                 new_folders.sort_by(|a, b| a.0.cmp(&b.0));
                 new_folders.dedup_by(|a, b| a.0 == b.0);
-                new_folders.into_iter().map(|(name, video_count)| SeriesInfo { name, video_count }).collect()
+                new_folders.into_iter().map(|(name, video_count)| SeriesInfo { id: None, name, video_count }).collect()
             } else {
                 vec![]
             }

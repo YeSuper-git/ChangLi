@@ -47,6 +47,7 @@ const Library: React.FC = () => {
   const [scanConfirm, setScanConfirm] = useState(false);
   const [categoryUpdateResult, setCategoryUpdateResult] = useState<CategoryUpdateResult | null>(null);
   // 检查更新选中状态：new_series: Set<name>, series_updates: Map<series_id, {selected: bool, newVideos: Set<filePath>, missingVideos: Set<id>}>
+  const getMissingSeriesKey = (series: { id?: number | null; name: string }) => series.id != null ? `id:${series.id}` : `name:${series.name}`;
   // 切换单个新发现视频集的选中状态
   const toggleNewSeries = (name: string) => {
     setUpdateSelection(prev => {
@@ -96,12 +97,12 @@ const Library: React.FC = () => {
     });
   };
   // 切换单个已移除视频集的选中
-  const toggleMissingSeries = (name: string) => {
+  const toggleMissingSeries = (key: string) => {
     setUpdateSelection(prev => {
       if (!prev) return prev;
       const next = { ...prev, missingSeries: new Set(prev.missingSeries) };
-      if (next.missingSeries.has(name)) next.missingSeries.delete(name);
-      else next.missingSeries.add(name);
+      if (next.missingSeries.has(key)) next.missingSeries.delete(key);
+      else next.missingSeries.add(key);
       return next;
     });
   };
@@ -400,7 +401,7 @@ const Library: React.FC = () => {
           }
         } catch (error) {
           console.error('[Library] 导入失败:', error);
-          notify({ message: '导入失败: ' + String(error), type: 'error' });
+          notify({ message: '导入失败，请确认文件夹仍然存在并可访问', type: 'error' });
         } finally {
           setScanning(false);
         }
@@ -425,7 +426,7 @@ const Library: React.FC = () => {
       }
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
-      notify({ message: '删除视频集失败: ' + String(error), type: 'error' });
+      notify({ message: '删除视频集失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -450,7 +451,7 @@ const Library: React.FC = () => {
       await openSeriesInFileManager(seriesId);
     } catch (err) {
       console.error('[Library] 打开视频集源文件位置失败:', err);
-      notify({ message: String(err || '打开源文件位置失败'), type: 'info' });
+      notify({ message: '打开源文件位置失败，请确认文件夹仍然存在', type: 'error' });
     }
   };
 
@@ -463,10 +464,10 @@ const Library: React.FC = () => {
       await refreshSeries();
       if (activeTagId !== null) await filterByTag(activeTagId);
       if (activeActorId !== null) await filterByActor(activeActorId);
-      notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Library] 检查更新失败:', error);
-      notify({ message: '重新扫描失败: ' + String(error), type: 'info' });
+      notify({ message: '重新识别失败，请确认本地文件夹仍然存在', type: 'error' });
     }
   };
 
@@ -493,7 +494,7 @@ const Library: React.FC = () => {
       notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
     } catch (error) {
       console.error('[Library] 切换类型失败:', error);
-      notify({ message: '切换类型失败: ' + String(error), type: 'info' });
+      notify({ message: '切换类型失败，请稍后重试', type: 'error' });
       setTypeSwitchConfirm(null);
     }
   };
@@ -503,6 +504,15 @@ const Library: React.FC = () => {
     setCategoryScanning(true);
     try {
       const result = await checkCategoryUpdates(mainCategory);
+      const hasChanges = result.new_series.length > 0
+        || result.missing_series.length > 0
+        || result.series_updates.some(su => su.new_videos.length > 0 || su.missing_videos.length > 0);
+      if (!hasChanges) {
+        setCategoryUpdateResult(null);
+        setUpdateSelection(null);
+        notify({ message: '没有发现新增或本地已删除的资源', type: 'info' });
+        return;
+      }
       setCategoryUpdateResult(result);
       setUpdateSelection({
         newSeries: new Set(result.new_series.map(s => s.name)),
@@ -511,11 +521,11 @@ const Library: React.FC = () => {
           newVideos: new Set(su.new_videos.map(v => v.file_path)),
           missingVideos: new Set(su.missing_videos.map(v => v.id)),
         }])),
-        missingSeries: new Set(result.missing_series.map(s => s.name)),
+        missingSeries: new Set(result.missing_series.map(s => getMissingSeriesKey(s))),
       });
     } catch (error) {
       console.error('[Library] 检查更新失败:', error);
-      notify({ message: '检查更新失败: ' + String(error), type: 'info' });
+      notify({ message: '检查更新失败，请确认本地文件夹仍然存在', type: 'error' });
     } finally {
       setCategoryScanning(false);
     }
@@ -548,11 +558,12 @@ const Library: React.FC = () => {
         }
       }
       // 3. 处理选中的已移除视频集
-      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name));
+      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(getMissingSeriesKey(s)));
       for (const info of selectedMissingSeries) {
-        // 找到对应的 series_id
-        // 已移除视频集不在 series_updates 里
-        // 已移除视频集不在 series_updates 里，需要从 store 找
+        if (info.id != null) {
+          await deleteVideoSeries(info.id, true);
+          continue;
+        }
         const seriesInStore = seriesList.find(s => s.title === info.name || s.folder_path?.includes(info.name));
         if (seriesInStore) {
           await deleteVideoSeries(seriesInStore.id, true);
@@ -572,10 +583,11 @@ const Library: React.FC = () => {
       }
       if (totalNewEps > 0) parts.push(`添加 ${totalNewEps} 个新发现的视频`);
       if (totalMissEps > 0) parts.push(`移除 ${totalMissEps} 个本地已删除的视频记录`);
+      if (selectedMissingSeries.length > 0) parts.push(`移除 ${selectedMissingSeries.length} 个本地已删除的视频集`);
       notify({ message: parts.length > 0 ? parts.join('，') : '更新完成', type: 'success' });
     } catch (error) {
       console.error('[Library] 更新失败:', error);
-      notify({ message: '更新失败: ' + String(error), type: 'error' });
+      notify({ message: '更新失败，请稍后重试', type: 'error' });
     } finally {
       setCategoryScanning(false);
     }
@@ -1127,13 +1139,14 @@ const Library: React.FC = () => {
             {/* 已移除视频集 */}
             {categoryUpdateResult.missing_series.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频集 ({categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(s.name)).length}/{categoryUpdateResult.missing_series.length})</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">已移除视频集 ({categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(getMissingSeriesKey(s))).length}/{categoryUpdateResult.missing_series.length})</h3>
                 <div className="space-y-2">
-                  {categoryUpdateResult.missing_series.map((s, idx) => {
-                    const checked = updateSelection.missingSeries.has(s.name);
+                  {categoryUpdateResult.missing_series.map((s) => {
+                    const key = getMissingSeriesKey(s);
+                    const checked = updateSelection.missingSeries.has(key);
                     return (
-                      <div key={idx} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleMissingSeries(s.name)}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleMissingSeries(s.name)} className="w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
+                      <div key={key} className={`rounded-2xl border p-3 flex items-center gap-3 cursor-pointer transition-opacity ${checked ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-gray-50/50 opacity-50'}`} onClick={() => toggleMissingSeries(key)}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleMissingSeries(key)} className="w-4 h-4 rounded accent-red-500 flex-shrink-0" onClick={e => e.stopPropagation()} />
                         <div>
                           <div className="text-sm font-semibold text-gray-900">{s.name} <span className="text-xs font-normal text-gray-500">{s.video_count} 个视频</span></div>
                           <div className="text-xs text-gray-400">本地文件夹已不存在</div>

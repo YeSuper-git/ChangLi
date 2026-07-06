@@ -20,14 +20,11 @@ const Downloads: React.FC = () => {
 
   const loadDownloads = async () => {
     try {
-      console.log('[Downloads] 开始加载下载列表...');
       const downloadsList = await getDownloads();
-      console.log('[Downloads] getDownloads 返回:', downloadsList.length, '条');
       setDownloads(downloadsList);
     } catch (error) {
       console.error('[Downloads] 加载下载列表失败:', error);
     } finally {
-      console.log('[Downloads] 设置 loading = false');
       setLoading(false);
     }
   };
@@ -38,14 +35,12 @@ const Downloads: React.FC = () => {
     setAdding(true);
     setAddError(null);
     try {
-      console.log('[Downloads] 添加下载:', magnetInput.substring(0, 50) + '...');
       await addDownload(magnetInput.trim());
-      console.log('[Downloads] 添加下载成功');
       setMagnetInput('');
       loadDownloads();
     } catch (error) {
       console.error('[Downloads] 添加下载失败:', error);
-      setAddError(String(error));
+      setAddError('添加下载失败，请检查链接后重试');
     } finally {
       setAdding(false);
     }
@@ -53,9 +48,7 @@ const Downloads: React.FC = () => {
 
   const handlePause = async (id: number) => {
     try {
-      console.log('[Downloads] 暂停下载, id:', id);
       await pauseDownload(id);
-      console.log('[Downloads] 暂停成功, 刷新列表');
       loadDownloads();
     } catch (error) {
       console.error('[Downloads] 暂停下载失败:', error);
@@ -64,9 +57,7 @@ const Downloads: React.FC = () => {
 
   const handleResume = async (id: number) => {
     try {
-      console.log('[Downloads] 恢复下载, id:', id);
       await resumeDownload(id);
-      console.log('[Downloads] 恢复成功, 刷新列表');
       loadDownloads();
     } catch (error) {
       console.error('[Downloads] 恢复下载失败:', error);
@@ -75,9 +66,7 @@ const Downloads: React.FC = () => {
 
   const handleRemove = async (id: number) => {
     try {
-      console.log('[Downloads] 删除下载, id:', id);
       await removeDownload(id);
-      console.log('[Downloads] 删除成功, 刷新列表');
       loadDownloads();
     } catch (error) {
       console.error('[Downloads] 删除下载失败:', error);

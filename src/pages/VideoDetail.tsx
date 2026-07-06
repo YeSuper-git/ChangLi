@@ -218,7 +218,7 @@ const VideoDetail: React.FC = () => {
       await loadVideo(video.id, { forceEditing: false });
     } catch (error) {
       console.error('保存失败:', error);
-      notify({ message: `保存失败：${String(error)}`, type: 'error' });
+      notify({ message: '保存失败，请检查内容后重试', type: 'error' });
     }
   };
 
@@ -238,7 +238,7 @@ const VideoDetail: React.FC = () => {
       }
     } catch (error) {
       console.error('选择海报失败:', error);
-      notify({ message: `选择海报失败：${String(error)}`, type: 'error' });
+      notify({ message: '选择海报失败，请确认图片文件仍然存在', type: 'error' });
     }
   };
 
@@ -272,7 +272,7 @@ const VideoDetail: React.FC = () => {
       setCreatingTag(false);
     } catch (error) {
       console.error('新建标签失败:', error);
-      notify({ message: `新建标签失败：${String(error)}`, type: 'error' });
+      notify({ message: '新建标签失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -298,7 +298,7 @@ const VideoDetail: React.FC = () => {
       setActorNotice('演员已新建并选中，稍后可去演员中补充海报、生日、简介等信息。');
     } catch (error) {
       console.error('新建演员失败:', error);
-      notify({ message: `新建演员失败：${String(error)}`, type: 'error' });
+      notify({ message: '新建演员失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -471,7 +471,7 @@ const VideoDetail: React.FC = () => {
         <div className="space-y-6">
           <button
             type="button"
-            onClick={() => openPlayerWindow(video.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
+            onClick={() => openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }))}
             className="block w-full rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-6 py-4 text-center font-semibold text-white shadow-lg shadow-gray-900/15 transition-transform duration-200 hover:-translate-y-0.5"
           >
             ▶️ 播放视频
@@ -496,7 +496,7 @@ const VideoDetail: React.FC = () => {
                   <button
                     key={episode.id}
                     type="button"
-                    onClick={() => openPlayerWindow(episode.id).catch((error) => notify({ message: '打开播放失败: ' + String(error), type: 'error' }))}
+                    onClick={() => openPlayerWindow(episode.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }))}
                     className={`block w-full p-2 rounded-lg text-left text-sm ${episode.id === video.id ? 'bg-gradient-to-r from-[#fb5b7b] to-[#ff8a4c] text-white' : 'bg-gray-50 text-gray-700 hover:text-rose-600'}`}
                   >
                     <span>{episode.file_name}</span>

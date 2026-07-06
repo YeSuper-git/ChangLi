@@ -124,7 +124,6 @@ const ActorDetail: React.FC = () => {
     try {
       if (options.scrollToTop) window.scrollTo(0, 0);
       if (!options.silent) setLoading(true);
-      console.log('[Actor] 开始加载演员详情, actorId:', actorId);
       const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),
         getActorResources(actorId),
@@ -133,8 +132,6 @@ const ActorDetail: React.FC = () => {
         getActorPhotos(actorId),
         getAllActorFields(),
       ]);
-      console.log('[Actor] getActor 返回:', actorData ? `name: ${actorData.name}, photo: ${actorData.photo || '无'}` : 'null');
-      console.log('[Actor] getActorResources 返回:', resourcesData.length, '条');
       setActor(actorData);
       setResources(resourcesData);
       setPeriods(periodsData);
@@ -406,7 +403,6 @@ const ActorDetail: React.FC = () => {
 
   const doAddWork = async (selectedPeriodId: number | undefined) => {
     try {
-      console.log('[ActorDetail] 打开文件夹选择器...');
       const selected = await open({
         directory: true,
         multiple: false,
@@ -414,10 +410,8 @@ const ActorDetail: React.FC = () => {
       });
       
       if (selected && actor) {
-        console.log('[ActorDetail] 选择的文件夹:', selected);
         setAddingWork(true);
         try {
-          console.log('[ActorDetail] 开始扫描视频...');
           const result = await scanVideosForActor(selected as string, actor.id, selectedPeriodId);
           
           // 刷新资源列表
@@ -494,7 +488,7 @@ const ActorDetail: React.FC = () => {
       notify({ message: periodId === undefined ? '已归入演员名时期' : '已分配到指定时期', type: 'success' });
     } catch (error) {
       console.error('[Actor] 分配时期失败:', error);
-      notify({ message: '分配时期失败: ' + String(error), type: 'info' });
+      notify({ message: '分配失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -550,7 +544,7 @@ const ActorDetail: React.FC = () => {
       if (actor) loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 删除视频失败:', error);
-      notify({ message: '删除失败: ' + String(error), type: 'error' });
+      notify({ message: '删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -561,7 +555,7 @@ const ActorDetail: React.FC = () => {
       if (actor) loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 删除视频集失败:', error);
-      notify({ message: '删除失败: ' + String(error), type: 'error' });
+      notify({ message: '删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -570,10 +564,10 @@ const ActorDetail: React.FC = () => {
       const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
       if (actor) loadActor(actor.id);
-      notify({ message: matched ? '元数据更新成功' : '未匹配到格式，未更新', type: matched ? 'success' : 'info' });
+      notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
-      console.error('[Actor] 重新扫描元数据失败:', error);
-      notify({ message: '重新扫描失败: ' + String(error), type: 'info' });
+      console.error('[Actor] 重新识别信息失败:', error);
+      notify({ message: '重新识别失败，请确认文件夹仍然存在', type: 'error' });
     }
   };
 
@@ -674,7 +668,7 @@ const ActorDetail: React.FC = () => {
       notify({ message: '时期已删除，作品已归入演员名时期', type: 'info' });
     } catch (error) {
       console.error('[Actor] 删除时期失败:', error);
-      notify({ message: '删除时期失败: ' + String(error), type: 'info' });
+      notify({ message: '删除时期失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -1420,7 +1414,7 @@ const ActorDetail: React.FC = () => {
               className="changli-menu-item"
               onClick={() => handleRescanMetadata(contextMenu.id)}
             >
-              重新扫描元数据
+              重新识别信息
             </button>
           )}
           <button
