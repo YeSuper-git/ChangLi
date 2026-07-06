@@ -8,6 +8,7 @@ import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
+import { resolveResource } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -165,7 +166,9 @@ const Player: React.FC = () => {
         }
 
         // 初始化 mpv
+        const mpvPath = await resolveResource('mpv/mpv.exe').catch(() => undefined);
         await init({
+          ...(mpvPath ? { path: mpvPath } : {}),
           args: [
             '--vo=gpu-next',
             '--hwdec=d3d11va',
