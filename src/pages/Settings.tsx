@@ -890,15 +890,11 @@ const Settings: React.FC = () => {
               {/* Key 不展示，由系统管理 */}
               <div>
                 <label className="changli-form-label">卡片方向</label>
-                <select
+                <BubbleSelect
                   value={categoryForm.card_layout}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, card_layout: e.target.value as 'portrait' | 'landscape' | 'auto' })}
-                  className="changli-input"
-                >
-                  <option value="auto">自动</option>
-                  <option value="portrait">竖版</option>
-                  <option value="landscape">横版</option>
-                </select>
+                  options={[{ value: 'auto', label: '自动' }, { value: 'portrait', label: '竖版' }, { value: 'landscape', label: '横版' }]}
+                  onChange={(v) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
+                />
               </div>
               <div>
                 <label className="changli-form-label">默认扫描路径</label>
