@@ -610,7 +610,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字', episode: '剧集单位' };
+                const labels: Record<string, string> = { tracking: '追番/完结', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字', episode: '集数称呼' };
                 return labels[k] || k;
               });
               return (
@@ -897,6 +897,17 @@ const Settings: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="changli-form-label">集数称呼</label>
+                <BubbleSelect
+                  value={categoryForm.features.episode || '部'}
+                  options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
+                  onChange={(v) => setCategoryForm({
+                    ...categoryForm,
+                    features: { ...categoryForm.features, episode: v }
+                  })}
+                />
+              </div>
+              <div>
                 <label className="changli-form-label">默认扫描路径</label>
                 <div className="flex gap-2">
                   <input
@@ -943,24 +954,6 @@ const Settings: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">剧集单位</span>
-                    <div className="flex items-center gap-2">
-                      <BubbleSelect
-                        value={categoryForm.features.episode || '部'}
-                        options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
-                        onChange={(v) => setCategoryForm({
-                          ...categoryForm,
-                          features: { ...categoryForm.features, episode: v }
-                        })}
-                        dropUp
-                      />
-                      <span className="group relative">
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-xs cursor-help">?</span>
-                        <span className="changli-tooltip absolute bottom-full right-0 mb-2 px-3 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">控制视频集的单位描述</span>
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
