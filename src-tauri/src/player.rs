@@ -244,7 +244,14 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     let window = builder.build().context("create player window")?;
 
     window.on_window_event(|event| match event {
-        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => kill_mpv(),
+        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+            // 不立即 kill_mpv()，给前端 destroy() 时间先清理（避免 use-after-free 堆损坏）
+            // 前端 destroy 完成后 mpv 进程自然退出；如果前端没清理，延迟兜底杀掉
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_millis(800));
+                kill_mpv();
+            });
+        }
         _ => {}
     });
 

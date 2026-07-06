@@ -294,13 +294,21 @@ const Player: React.FC = () => {
   }, [id]);
 
   // 组件卸载时清理 mpv — 通过锁串行化，避免和 init 竞态
+  // 关键：先停止 mpv 活动（暂停+停止事件处理），等回调队列排空后再 destroy，
+  // 避免 tauri-plugin-libmpv 的 use-after-free 导致堆损坏闪退
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-      // 通过锁确保 init 完成后再 destroy
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
+            // 1. 先暂停，减少新的属性变化回调
+            await setProperty('pause', true).catch(() => {});
+            // 2. 停止事件上报，让已 spawn 的异步回调完成
+            await command('disable-event', ['all']).catch(() => {});
+            // 3. 等待回调队列排空（插件 spawn 的 async task 通常 <100ms 完成）
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            // 4. 安全销毁
             await destroy();
           } catch { /* ignore */ }
           mpvInitialized.current = false;
