@@ -908,9 +908,6 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
-                  {series.description || '暂无简介，快来给长离介绍一下吧'}
-                </p>
                 <div className="mb-4 space-y-3">
                   {features.tags && (
                     <div>
@@ -942,6 +939,9 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
+                <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
+                  {series.description || '暂无简介，快来给长离介绍一下吧'}
+                </p>
                 <div className="mt-5 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
