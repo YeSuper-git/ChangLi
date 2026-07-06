@@ -146,11 +146,16 @@ const Player: React.FC = () => {
             setLoading(false);
             return;
           }
+          // 等待 mpv 解码出帧，避免切集黑屏有声
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          // 兜底：如果 dwidth/dheight 没触发（同分辨率视频），确保黑底消失
+          if (!observedVideoSizeRef.current.width || !observedVideoSizeRef.current.height) {
+            setHasVideoFrame(true);
+          }
           if (currentVideo.subtitle) {
             await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
           }
           if (previousPosition > 5) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
             await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
             setCurrentTime(previousPosition);
           }
