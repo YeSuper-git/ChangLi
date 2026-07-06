@@ -1598,10 +1598,11 @@ body.changli-player-body #root {
   --player-orange: #ff8a4c;
   --player-line: rgba(255, 255, 255, 0.09);
   --player-muted: #9ca3af;
-  position: relative;
+  position: fixed;
+  inset: 0;
   display: block;
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
   overflow: hidden;
   background: transparent;
   color: #f7f7fb;
@@ -1996,11 +1997,11 @@ body.changli-player-body #root {
 }
 
 .changli-player-controls {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 5;
+  z-index: 30;
   border-top: 1px solid var(--player-line);
   padding: 8px 16px 10px;
   background: rgba(17, 18, 23, 0.94);

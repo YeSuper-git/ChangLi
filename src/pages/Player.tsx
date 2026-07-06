@@ -473,33 +473,61 @@ const Player: React.FC = () => {
     const originW = startSize.width / scale;
     const originH = startSize.height / scale;
     const ratio = getCurrentVideoRatio();
-    let frame = 0;
     let latestW = originW;
     let latestH = originH;
+    let applyTimer = 0;
+    let applying = false;
+    let pending = false;
 
-    const applySize = () => {
-      frame = 0;
+    const applySize = async () => {
+      if (applying) {
+        pending = true;
+        return;
+      }
+      applying = true;
       aspectResizeLockRef.current = true;
-      lastWindowSizeRef.current = { width: latestW, height: latestH };
-      playerWindow.setSize(new LogicalSize(latestW, latestH)).catch(() => undefined);
+      const nextW = latestW;
+      const nextH = latestH;
+      lastWindowSizeRef.current = { width: nextW, height: nextH };
+      await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
+      applying = false;
+      if (pending) {
+        pending = false;
+        void applySize();
+      }
+    };
+
+    const scheduleApply = () => {
+      if (applyTimer) return;
+      applyTimer = window.setTimeout(() => {
+        applyTimer = 0;
+        void applySize();
+      }, 48);
     };
 
     const onMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
       const dx = (moveEvent.screenX - startX) / scale;
       const dy = (moveEvent.screenY - startY) / scale;
-      const byWidth = originW + dx;
-      const byHeight = (originH + dy) * ratio;
-      latestW = Math.max(520, Math.round(Math.max(byWidth, byHeight)));
+      const widthFromX = originW + dx;
+      const widthFromY = (originH + dy) * ratio;
+      const useVertical = Math.abs(dy * ratio) > Math.abs(dx);
+      const desiredW = useVertical ? widthFromY : widthFromX;
+      latestW = Math.max(520, Math.round(desiredW));
       latestH = Math.max(292, Math.round(latestW / ratio));
-      if (!frame) frame = window.requestAnimationFrame(applySize);
+      scheduleApply();
     };
 
     const onUp = () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      applySize();
+      if (applyTimer) {
+        window.clearTimeout(applyTimer);
+        applyTimer = 0;
+      }
+      void applySize().finally(() => {
+        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 180);
+      });
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      window.setTimeout(() => { aspectResizeLockRef.current = false; }, 160);
     };
 
     window.addEventListener('mousemove', onMove);
