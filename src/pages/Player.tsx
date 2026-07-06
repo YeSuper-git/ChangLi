@@ -299,9 +299,15 @@ const Player: React.FC = () => {
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
+            // 1. 暂停播放，停止产生新的属性变化事件
             await setProperty('pause', true).catch(() => {});
+            // 2. 停止所有事件上报
             await command('disable-event', ['all']).catch(() => {});
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            // 3. 发送 quit 命令，让 mpv 事件循环退出
+            await command('quit').catch(() => {});
+            // 4. 等待 mpv 内部线程完全退出（quit 后事件循环需要时间清理）
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            // 5. 安全销毁
             await destroy();
           } catch { /* ignore */ }
           mpvInitialized.current = false;
