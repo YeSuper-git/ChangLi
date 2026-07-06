@@ -51,6 +51,7 @@ const Player: React.FC = () => {
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // 悬浮预览
@@ -102,6 +103,7 @@ const Player: React.FC = () => {
         try {
           setLoading(!mpvInitialized.current);
           setError('');
+          setHasVideoFrame(false);
 
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
@@ -211,6 +213,9 @@ const Player: React.FC = () => {
                 if (data && data > 0 && isMountedRef.current) {
                   if (name === 'dwidth') observedVideoSizeRef.current.width = data as number;
                   if (name === 'dheight') observedVideoSizeRef.current.height = data as number;
+                  const videoW = observedVideoSizeRef.current.width;
+                  const videoH = observedVideoSizeRef.current.height;
+                  if (videoW && videoH && videoW > 0 && videoH > 0) setHasVideoFrame(true);
                 }
                 if (!windowRatioAdjustedRef.current && isMountedRef.current) {
                   const videoW = observedVideoSizeRef.current.width;
@@ -441,36 +446,65 @@ const Player: React.FC = () => {
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
-
-      if (aspectResizeLockRef.current || maximized || isFullscreen) return;
-      const videoW = observedVideoSizeRef.current.width;
-      const videoH = observedVideoSizeRef.current.height;
-      if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return;
-
-      const size = await playerWindow.outerSize();
-      const scale = window.devicePixelRatio || 1;
-      const width = size.width / scale;
-      const height = size.height / scale;
-      const previous = lastWindowSizeRef.current;
-      lastWindowSizeRef.current = { width, height };
-      if (!previous) return;
-
-      const ratio = getCurrentVideoRatio();
-      const widthDelta = Math.abs(width - previous.width);
-      const heightDelta = Math.abs(height - previous.height);
-      const nextWidth = widthDelta >= heightDelta ? width : Math.round(height * ratio);
-      const nextHeight = widthDelta >= heightDelta ? Math.round(width / ratio) : height;
-      if (Math.abs(nextWidth - width) < 2 && Math.abs(nextHeight - height) < 2) return;
-
-      aspectResizeLockRef.current = true;
-      lastWindowSizeRef.current = { width: nextWidth, height: nextHeight };
-      await playerWindow.setSize(new LogicalSize(nextWidth, nextHeight)).catch(() => undefined);
-      window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
+      if (!aspectResizeLockRef.current) {
+        const size = await playerWindow.outerSize().catch(() => null);
+        if (size) {
+          const scale = window.devicePixelRatio || 1;
+          lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
+        }
+      }
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
     return () => unlisten?.();
-  }, [getCurrentVideoRatio, isFullscreen, playerWindow]);
+  }, [playerWindow]);
+
+  const startAspectResize = useCallback(async (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (isFullscreen || isWindowMaximized) return;
+
+    const startX = event.screenX;
+    const startY = event.screenY;
+    const startSize = await playerWindow.outerSize().catch(() => null);
+    if (!startSize) return;
+
+    const scale = window.devicePixelRatio || 1;
+    const originW = startSize.width / scale;
+    const originH = startSize.height / scale;
+    const ratio = getCurrentVideoRatio();
+    let frame = 0;
+    let latestW = originW;
+    let latestH = originH;
+
+    const applySize = () => {
+      frame = 0;
+      aspectResizeLockRef.current = true;
+      lastWindowSizeRef.current = { width: latestW, height: latestH };
+      playerWindow.setSize(new LogicalSize(latestW, latestH)).catch(() => undefined);
+    };
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const dx = (moveEvent.screenX - startX) / scale;
+      const dy = (moveEvent.screenY - startY) / scale;
+      const byWidth = originW + dx;
+      const byHeight = (originH + dy) * ratio;
+      latestW = Math.max(520, Math.round(Math.max(byWidth, byHeight)));
+      latestH = Math.max(292, Math.round(latestW / ratio));
+      if (!frame) frame = window.requestAnimationFrame(applySize);
+    };
+
+    const onUp = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      applySize();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.setTimeout(() => { aspectResizeLockRef.current = false; }, 160);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp, { once: true });
+  }, [getCurrentVideoRatio, isFullscreen, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
@@ -851,7 +885,7 @@ const Player: React.FC = () => {
 
   return (
     <section
-      className={`changli-player-window ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${isFullscreen && !cursorVisible ? 'cursor-hidden' : ''}`}
+      className={`changli-player-window ${hasVideoFrame ? 'has-video-frame' : 'is-waiting-video'} ${isFullscreen ? 'is-fullscreen' : ''} ${isPiP ? 'is-pip' : ''} ${isFullscreen && !cursorVisible ? 'cursor-hidden' : ''}`}
       onMouseDown={handlePlayerWindowDrag}
       onMouseMove={handlePlayerMouseMove}
       onMouseLeave={() => { if (isPlaying) { setShowHeader(false); setShowFooter(false); } }}
@@ -1020,6 +1054,13 @@ const Player: React.FC = () => {
           </div>
         </div>
       </footer>
+      {!isFullscreen && !isWindowMaximized && (
+        <div
+          className="changli-player-resize-grip"
+          onMouseDown={startAspectResize}
+          aria-label="按视频比例拉伸播放器"
+        />
+      )}
     </section>
   );
 };

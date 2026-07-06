@@ -2033,7 +2033,9 @@ async fn open_player_window(
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)
         .min_inner_size(520.0, 292.0)
-        .resizable(true)
+        // 禁用系统四边/四角自由拉伸，避免单边拉伸造成比例反复校正、黑边和闪屏。
+        // 前端只提供右下角等比例拉伸手柄。
+        .resizable(false)
         .decorations(false)
         .visible(false);
 
