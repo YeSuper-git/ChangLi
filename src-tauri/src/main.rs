@@ -1166,6 +1166,22 @@ async fn add_video_to_series(
             }
         }
     }
+
+    // 文件名提取不到集数时，分配下一个集数序号
+    if video.episode_number.is_none() {
+        let season_val = video.season.unwrap_or(0);
+        let max_ep: Option<i32> = sqlx::query_scalar(
+            "SELECT MAX(episode_number) FROM videos WHERE series_id = ? AND COALESCE(season, 0) = ? AND episode_number IS NOT NULL",
+        )
+        .bind(series_id)
+        .bind(season_val)
+        .fetch_optional(&pool)
+        .await
+        .ok()
+        .flatten();
+        video.episode_number = Some(max_ep.unwrap_or(0) + 1);
+    }
+
     let saved = db::add_video(&pool, video)
         .await
         .map_err(|e| e.to_string())?;
@@ -1194,6 +1210,40 @@ async fn add_videos_to_series(
             .await
             .map_err(|e| e.to_string())?;
         video.series_id = Some(series_id);
+
+        // 从文件路径推断季号
+        if let Some(parent) = video_path.parent() {
+            if let Some(parent_name) = parent.file_name().map(|n| n.to_string_lossy().to_string()) {
+                match scanner::classify_series_subfolder(&parent_name) {
+                    scanner::SeriesSubfolderKind::Season(season) => { video.season = Some(season); }
+                    _ => {
+                        if let Some(grandparent) = parent.parent() {
+                            if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
+                                if let scanner::SeriesSubfolderKind::Season(season) = scanner::classify_series_subfolder(&gp_name) {
+                                    video.season = Some(season);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 文件名提取不到集数时，分配下一个集数序号
+        if video.episode_number.is_none() {
+            let season_val = video.season.unwrap_or(0);
+            let max_ep: Option<i32> = sqlx::query_scalar(
+                "SELECT MAX(episode_number) FROM videos WHERE series_id = ? AND COALESCE(season, 0) = ? AND episode_number IS NOT NULL",
+            )
+            .bind(series_id)
+            .bind(season_val)
+            .fetch_optional(&pool)
+            .await
+            .ok()
+            .flatten();
+            video.episode_number = Some(max_ep.unwrap_or(0) + 1);
+        }
+
         videos.push(video);
     }
     if videos.is_empty() {
