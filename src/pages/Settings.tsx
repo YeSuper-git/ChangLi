@@ -610,7 +610,7 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => {
-                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', chinese_sub: '中字', episode: '剧集单位' };
+                const labels: Record<string, string> = { tags: '标签', actors: '演员', tracking: '追番', status: '连载', chinese_sub: '中字', episode: '剧集单位' };
                 return labels[k] || k;
               });
               return (
