@@ -264,6 +264,10 @@ export async function deleteVideo(id: number): Promise<void> {
   }
 }
 
+export async function deleteVideosBatch(ids: number[]): Promise<void> {
+  return invoke('delete_videos_batch', { ids });
+}
+
 export interface VideoSeries {
   id: number;
   title: string;
@@ -330,6 +334,10 @@ export async function deleteVideoSeries(id: number, deleteVideos: boolean): Prom
   return invoke('delete_video_series', { id, deleteVideos });
 }
 
+export async function deleteVideoSeriesBatch(ids: number[]): Promise<void> {
+  return invoke('delete_video_series_batch', { ids });
+}
+
 export async function openSeriesInFileManager(seriesId: number): Promise<void> {
   return invoke('open_series_in_file_manager', { seriesId });
 }
@@ -344,6 +352,10 @@ export async function switchSeriesTypeTo(seriesId: number, categoryKey: string):
 
 export async function addVideoToSeries(seriesId: number, path: string): Promise<Video> {
   return invoke<Video>('add_video_to_series', { seriesId, path });
+}
+
+export async function addVideosToSeries(seriesId: number, paths: string[]): Promise<Video[]> {
+  return invoke<Video[]>('add_videos_to_series', { seriesId, paths });
 }
 
 export async function removeVideoFromSeries(videoId: number): Promise<Video> {
@@ -454,6 +466,7 @@ export interface SeriesInfo {
   id?: number | null;
   name: string;
   video_count: number;
+  folder_path?: string | null;
 }
 
 export interface CategoryUpdateResult {
@@ -464,6 +477,10 @@ export interface CategoryUpdateResult {
 
 export async function checkCategoryUpdates(categoryKey: string): Promise<CategoryUpdateResult> {
   return invoke<CategoryUpdateResult>('check_category_updates', { categoryKey });
+}
+
+export async function addCategorySeriesByPaths(categoryKey: string, paths: string[]): Promise<void> {
+  return invoke('add_category_series_by_paths', { categoryKey, paths });
 }
 
 // 演员相关

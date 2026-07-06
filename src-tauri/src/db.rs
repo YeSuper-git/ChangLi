@@ -3474,6 +3474,7 @@ pub struct SeriesInfo {
     pub id: Option<i64>,
     pub name: String,
     pub video_count: usize,
+    pub folder_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3680,6 +3681,28 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     let mut existing_base_names: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut existing_codes: std::collections::HashSet<String> = std::collections::HashSet::new();
 
+    // 全库去重集合：分类 A 的目录移动到分类 B 后，分类 A 再检查时不能把已归属分类 B 的视频集误报为新增。
+    let all_series_list = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
+        "SELECT title, folder_path, code FROM video_series"
+    )
+    .fetch_all(pool)
+    .await?;
+    for (title, folder_path, code) in &all_series_list {
+        existing_base_names.insert(title.clone());
+        if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
+            existing_folder_paths.insert(path.to_string());
+            let folder_name = std::path::Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| title.clone());
+            existing_base_names.insert(folder_name.clone());
+            existing_base_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
+        }
+        if let Some(code) = code.as_deref().filter(|code| !code.trim().is_empty()) {
+            existing_codes.insert(code.to_uppercase());
+        }
+    }
+
     for (id, title, folder_path, display_type, code) in &series_list {
         let resolved_folder = resolve_series_folder(
             pool,
@@ -3720,6 +3743,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 id: Some(*id),
                 name: title.clone(),
                 video_count: video_count as usize,
+                folder_path: folder_path.clone(),
             });
             continue;
         }
@@ -3748,7 +3772,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         if let Some(ref scan_path) = category.scan_path {
             let path = std::path::Path::new(scan_path);
             if path.is_dir() {
-                let mut new_folders = Vec::new();
+                let mut new_folders: Vec<(String, usize, String)> = Vec::new();
 
                 // 分类配置决定检查更新时如何理解目录结构：
                 //   actors=true  → 匹配演员目录，演员目录下继续识别时期
@@ -3786,7 +3810,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 let normalized_db_paths: std::collections::HashSet<String> =
                     existing_folder_paths.iter().map(|p| normalize(p)).collect();
 
-                let collect_new = |parent: &std::path::Path| -> Vec<(String, usize)> {
+                let collect_new = |parent: &std::path::Path| -> Vec<(String, usize, String)> {
                     let mut result = Vec::new();
                     if let Ok(entries) = std::fs::read_dir(parent) {
                         for entry in entries.filter_map(|e| e.ok()) {
@@ -3810,7 +3834,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                         .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
                                         .count())
                                     .unwrap_or(0);
-                                result.push((name, count));
+                                result.push((name, count, fps));
                             }
                         }
                     }
@@ -3836,9 +3860,9 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     pool: &SqlitePool,
                     actor_path: &std::path::Path,
                     collect_new: &F,
-                ) -> Vec<(String, usize)>
+                ) -> Vec<(String, usize, String)>
                 where
-                    F: Fn(&std::path::Path) -> Vec<(String, usize)>,
+                    F: Fn(&std::path::Path) -> Vec<(String, usize, String)>,
                 {
                     let name = actor_path.file_name()
                         .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -3877,9 +3901,9 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     actor_labels: &std::collections::HashSet<String>,
                     tag_names: &std::collections::HashSet<String>,
                     collect_new: &F,
-                ) -> Vec<(String, usize)>
+                ) -> Vec<(String, usize, String)>
                 where
-                    F: Fn(&std::path::Path) -> Vec<(String, usize)>,
+                    F: Fn(&std::path::Path) -> Vec<(String, usize, String)>,
                 {
                     if !actors_enabled && !tags_enabled {
                         // 分类没开演员/标签：下一层就是视频集；车牌/中字格式由 scan_category 新增时解析
@@ -3927,7 +3951,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                     .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
                                     .count())
                                 .unwrap_or(0);
-                            new_folders.push((root_name, count));
+                            new_folders.push((root_name, count, path.to_string_lossy().to_string()));
                         }
                     }
                 }
@@ -3969,7 +3993,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 }
                 new_folders.sort_by(|a, b| a.0.cmp(&b.0));
                 new_folders.dedup_by(|a, b| a.0 == b.0);
-                new_folders.into_iter().map(|(name, video_count)| SeriesInfo { id: None, name, video_count }).collect()
+                new_folders.into_iter().map(|(name, video_count, folder_path)| SeriesInfo { id: None, name, video_count, folder_path: Some(folder_path) }).collect()
             } else {
                 vec![]
             }

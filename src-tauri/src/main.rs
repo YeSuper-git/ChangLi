@@ -1069,6 +1069,43 @@ async fn delete_video_series(
 }
 
 #[tauri::command]
+async fn delete_video_series_batch(
+    state: State<'_, AppState>,
+    ids: Vec<i64>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    for id in ids {
+        db::delete_video_series(&pool, id, true)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_videos_batch(
+    state: State<'_, AppState>,
+    ids: Vec<i64>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    for id in ids {
+        sqlx::query("DELETE FROM videos WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    tx.commit().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn switch_series_type(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -1114,6 +1151,124 @@ async fn add_video_to_series(
     db::set_video_series(&pool, saved.id, Some(series_id), saved.episode_number)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_videos_to_series(
+    state: State<'_, AppState>,
+    series_id: i64,
+    paths: Vec<String>,
+) -> Result<Vec<db::Video>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let mut videos = Vec::new();
+    for path in paths {
+        let video_path = Path::new(&path);
+        if !video_path.is_file() || !scanner::is_video_file(video_path) {
+            continue;
+        }
+        let mut video = scanner::scan_video_file(video_path, None)
+            .await
+            .map_err(|e| e.to_string())?;
+        video.series_id = Some(series_id);
+        videos.push(video);
+    }
+    if videos.is_empty() {
+        return Ok(Vec::new());
+    }
+    db::add_videos_batch(&pool, videos, Some(series_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_category_series_by_paths(
+    state: State<'_, AppState>,
+    category_key: String,
+    paths: Vec<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    for folder in paths {
+        let folder_path = Path::new(&folder);
+        if !folder_path.is_dir() {
+            continue;
+        }
+        let folder_name = folder_path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if folder_name.is_empty() {
+            continue;
+        }
+        let scan_result = scanner::scan_directory(&folder)
+            .await
+            .map_err(|e| e.to_string())?;
+        let poster = scanner::find_folder_poster(folder_path);
+        let poster_base64 = poster
+            .as_deref()
+            .and_then(|p| scanner::generate_thumbnail_base64(Path::new(p)));
+
+        let series = if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            existing
+        } else {
+            let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
+            let series = db::add_video_series(
+                &pool,
+                &series_title,
+                Some(&folder),
+                poster.as_deref(),
+                Some("landscape"),
+                Some("ongoing"),
+                poster_base64.as_deref(),
+                Some(&category_key),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            if let Some(c) = code {
+                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
+                    .bind(&c)
+                    .bind(has_chinese_sub)
+                    .bind(series.id)
+                    .execute(&pool)
+                    .await;
+            }
+            series
+        };
+
+        db::add_videos_batch(&pool, scan_result.videos, Some(series.id))
+            .await
+            .map_err(|e| e.to_string())?;
+        let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+
+        if let Some(parent) = folder_path.parent() {
+            if let Some(parent_name) = parent.file_name().map(|s| s.to_string_lossy().to_string()) {
+                if let Ok(Some(tag)) = db::get_tag_by_name(&pool, parent_name.trim()).await {
+                    let _ = db::add_series_tag(&pool, series.id, tag.id).await;
+                }
+                if let Ok(Some(actor)) = db::get_actor_by_name_or_jp(&pool, parent_name.trim()).await {
+                    let _ = db::add_series_actor(&pool, series.id, actor.id, None, None).await;
+                } else if let Some(grand) = parent.parent() {
+                    if let Some(actor_name) = grand.file_name().map(|s| s.to_string_lossy().to_string()) {
+                        if let Ok(Some(actor)) = db::get_actor_by_name_or_jp(&pool, actor_name.trim()).await {
+                            let periods = db::get_actor_periods(&pool, actor.id).await.unwrap_or_default();
+                            let period_id = periods.into_iter().find(|p| p.name == parent_name).map(|p| p.id);
+                            let _ = db::add_series_actor(&pool, series.id, actor.id, None, period_id).await;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1882,15 +2037,9 @@ async fn open_player_window(
         .decorations(false)
         .visible(false);
 
-    #[cfg(target_os = "windows")]
-    {
-        builder = builder.transparent(false);
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        builder = builder.transparent(true);
-    }
+    // libmpv 在 WebView 窗口下方渲染视频层；Windows 上如果 WebView 不透明，
+    // 会出现“有声音但白屏”的遮挡。播放窗口必须保持透明，控制栏自身再绘制深色背景。
+    builder = builder.transparent(true);
 
     let window = builder
         .build()
@@ -2418,9 +2567,13 @@ fn main() {
             get_video_series_detail,
             update_video_series,
             delete_video_series,
+            delete_video_series_batch,
+            delete_videos_batch,
             switch_series_type,
             switch_series_type_to,
             add_video_to_series,
+            add_videos_to_series,
+            add_category_series_by_paths,
             remove_video_from_series,
             get_actors,
             get_actors_by_category,

@@ -10,11 +10,8 @@ import {
   switchSeriesTypeTo,
   formatSeriesWatchLabel,
   parseCategoryFeatures,
-  scanCategory,
   getTagsByCategory,
   getActorsByCategory,
-  addVideoToSeries,
-  deleteVideo,
   getTagColor,
   toggleWatched,
   openSeriesInFileManager,
@@ -27,6 +24,11 @@ import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
+import {
+  getCategoryUpdateRunnerState,
+  runCategoryUpdateTask,
+  subscribeCategoryUpdateRunner,
+} from '../utils/categoryUpdateRunner';
 
 
 const categoryFilterCache = new Map<string, { tags: Tag[]; actors: Actor[] }>();
@@ -44,6 +46,7 @@ const Library: React.FC = () => {
   const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty, toggleFavorite } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
+  const [categoryOperation, setCategoryOperation] = useState<'checking' | 'updating' | null>(() => getCategoryUpdateRunnerState().operation);
   const [scanConfirm, setScanConfirm] = useState(false);
   const [categoryUpdateResult, setCategoryUpdateResult] = useState<CategoryUpdateResult | null>(null);
   // 检查更新选中状态：new_series: Set<name>, series_updates: Map<series_id, {selected: bool, newVideos: Set<filePath>, missingVideos: Set<id>}>
@@ -222,6 +225,16 @@ const Library: React.FC = () => {
   const [actorExpanded, setActorExpanded] = useState(false);
   const tagsRef = useRef<HTMLDivElement>(null);
   const actorsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const syncCategoryUpdateState = () => {
+      const runnerState = getCategoryUpdateRunnerState();
+      setCategoryOperation(prev => runnerState.operation || (prev === 'checking' ? 'checking' : null));
+      setCategoryScanning(prev => Boolean(runnerState.operation) || (categoryOperation === 'checking' ? prev : false));
+    };
+    syncCategoryUpdateState();
+    return subscribeCategoryUpdateRunner(syncCategoryUpdateState);
+  }, [categoryOperation]);
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
@@ -502,6 +515,7 @@ const Library: React.FC = () => {
   const handleCategoryScan = async () => {
     setScanConfirm(false);
     setCategoryScanning(true);
+    setCategoryOperation('checking');
     try {
       const result = await checkCategoryUpdates(mainCategory);
       const hasChanges = result.new_series.length > 0
@@ -528,69 +542,29 @@ const Library: React.FC = () => {
       notify({ message: '检查更新失败，请确认本地文件夹仍然存在', type: 'error' });
     } finally {
       setCategoryScanning(false);
+      setCategoryOperation(null);
     }
   };
 
-  const handleConfirmCategoryUpdates = async () => {
+  const handleConfirmCategoryUpdates = () => {
     if (!categoryUpdateResult || !updateSelection) return;
-    setCategoryScanning(true);
+    clearLibraryFilterCaches();
+    const result = categoryUpdateResult;
+    const selection = {
+      newSeriesNames: Array.from(updateSelection.newSeries),
+      seriesUpdates: Array.from(updateSelection.seriesUpdates.entries()).map(([seriesId, value]) => ({
+        seriesId,
+        selected: value.selected,
+        newVideoPaths: Array.from(value.newVideos),
+        missingVideoIds: Array.from(value.missingVideos),
+      })),
+      missingSeriesKeys: Array.from(updateSelection.missingSeries),
+    };
     setCategoryUpdateResult(null);
-    try {
-      // 1. 处理选中的新发现视频集
-      const selectedNewSeries = categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name));
-      if (categoryUpdateResult.new_series.filter(s => updateSelection.newSeries.has(s.name)).length > 0) {
-        clearLibraryFilterCaches();
-        await scanCategory(mainCategory);
-      }
-      // 2. 处理每个视频集的选中变更
-      for (const su of categoryUpdateResult.series_updates) {
-        const suSel = updateSelection.seriesUpdates.get(su.series_id);
-        if (!suSel || !suSel.selected) continue;
-        for (const video of su.new_videos) {
-          if (suSel.newVideos.has(video.file_path)) {
-            await addVideoToSeries(su.series_id, video.file_path);
-          }
-        }
-        for (const video of su.missing_videos) {
-          if (suSel.missingVideos.has(video.id)) {
-            await deleteVideo(video.id);
-          }
-        }
-      }
-      // 3. 处理选中的已移除视频集
-      const selectedMissingSeries = categoryUpdateResult.missing_series.filter(s => updateSelection.missingSeries.has(getMissingSeriesKey(s)));
-      for (const info of selectedMissingSeries) {
-        if (info.id != null) {
-          await deleteVideoSeries(info.id, true);
-          continue;
-        }
-        const seriesInStore = seriesList.find(s => s.title === info.name || s.folder_path?.includes(info.name));
-        if (seriesInStore) {
-          await deleteVideoSeries(seriesInStore.id, true);
-        }
-      }
-      await refreshSeries();
-      if (activeTagId !== null) await filterByTag(activeTagId);
-      if (activeActorId !== null) await filterByActor(activeActorId);
-      const parts: string[] = [];
-      if (selectedNewSeries.length > 0) parts.push(`添加 ${selectedNewSeries.length} 个新发现的视频集`);
-      let totalNewEps = 0, totalMissEps = 0;
-      for (const su of categoryUpdateResult.series_updates) {
-        const suSel = updateSelection.seriesUpdates.get(su.series_id);
-        if (!suSel || !suSel.selected) continue;
-        totalNewEps += su.new_videos.filter(v => suSel.newVideos.has(v.file_path)).length;
-        totalMissEps += su.missing_videos.filter(v => suSel.missingVideos.has(v.id)).length;
-      }
-      if (totalNewEps > 0) parts.push(`添加 ${totalNewEps} 个新发现的视频`);
-      if (totalMissEps > 0) parts.push(`移除 ${totalMissEps} 个本地已删除的视频记录`);
-      if (selectedMissingSeries.length > 0) parts.push(`移除 ${selectedMissingSeries.length} 个本地已删除的视频集`);
-      notify({ message: parts.length > 0 ? parts.join('，') : '更新完成', type: 'success' });
-    } catch (error) {
-      console.error('[Library] 更新失败:', error);
-      notify({ message: '更新失败，请稍后重试', type: 'error' });
-    } finally {
-      setCategoryScanning(false);
-    }
+    setUpdateSelection(null);
+    setCategoryScanning(true);
+    setCategoryOperation('updating');
+    void runCategoryUpdateTask(mainCategory, result, selection);
   };
 
   const handleTagClick = (tagId: number | null) => {
@@ -740,7 +714,7 @@ const Library: React.FC = () => {
               disabled={categoryScanning}
               className="action-btn action-btn-primary disabled:opacity-50"
             >
-              {categoryScanning ? '检查中...' : '全量检查更新'}
+              {categoryOperation === 'updating' ? '更新中...' : categoryScanning ? '检查中...' : '全量检查更新'}
             </button>
           )}
           <button

@@ -26,7 +26,7 @@ export const StaticImagePlaceholder: React.FC<PlaceholderProps> = ({ kind, class
       className={`w-full h-full flex items-center justify-center ${className}`}
       aria-label={isVideo ? '视频封面占位图' : '演员头像占位图'}
     >
-      {isVideo ? <img src={brandIcon} alt="ChangLi" className="w-12 h-12 object-contain opacity-40" /> : <div className="text-5xl">👤</div>}
+      {isVideo ? <img src={brandIcon} alt="ChangLi" className="w-12 h-12 rounded-xl object-contain opacity-40" /> : <div className="text-5xl">👤</div>}
     </div>
   );
 };

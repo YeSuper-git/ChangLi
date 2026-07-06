@@ -1562,6 +1562,7 @@ body.player-window-document,
 }
 
 /* ChangLi Player */
+html.changli-player-html,
 body.changli-player-body,
 body.changli-player-body #root {
   background: transparent !important;
