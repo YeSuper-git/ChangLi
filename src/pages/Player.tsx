@@ -145,6 +145,9 @@ const Player: React.FC = () => {
             console.error('[Player] loadfile 失败:', loadErr);
             setError('加载视频失败，请确认视频文件仍然存在');
             setLoading(false);
+            setTimeout(() => {
+              getCurrentWindow().close().catch(() => {});
+            }, 2000);
             return;
           }
           await new Promise((resolve) => setTimeout(resolve, 300));
@@ -292,6 +295,9 @@ const Player: React.FC = () => {
           console.error('[Player] loadfile 失败:', loadErr);
           setError('加载视频失败，请确认视频文件仍然存在');
           setLoading(false);
+          setTimeout(() => {
+            getCurrentWindow().close().catch(() => {});
+          }, 2000);
           return;
         }
         if (currentVideo.subtitle) {
