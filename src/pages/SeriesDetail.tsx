@@ -538,6 +538,7 @@ const SeriesDetail: React.FC = () => {
     try {
       await toggleWatched(series.id);
       setSeries(prev => prev ? { ...prev, is_watched: prev.is_watched === 1 ? 0 : 1 } : prev);
+      await refreshSeries();
     } catch (error) {
       console.error('切换已看完状态失败:', error);
     }
