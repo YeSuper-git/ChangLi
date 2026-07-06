@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures, toggleFavorite, toggleWatched, rescanSingleSeriesMetadata, openSeriesInFileManager, switchSeriesTypeTo, deleteVideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
+import { notify } from '../utils/notify';
+import { useSecondConfirm } from '../utils/useSecondConfirm';
 
 type SearchItem =
   | { type: 'series'; id: number; title: string; subtitle: string; series: VideoSeries }
@@ -35,6 +37,11 @@ const Search: React.FC = () => {
   const [results, setResults] = useState<SearchItem[]>([]);
   
   const [searched, setSearched] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ type: 'series'; id: number; name: string; x: number; y: number } | null>(null);
+  const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
+  const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
+  const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
+  const { favorites, watchedIds, refreshSeries } = useLibraryStore();
 
   // 加载大类配置
   useEffect(() => {
@@ -119,6 +126,78 @@ const Search: React.FC = () => {
     handleSearch(keyword);
   };
 
+  const openContextMenu = (event: React.MouseEvent, type: 'series', id: number, name: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ type, id, name, x: event.clientX, y: event.clientY });
+  };
+
+  const handleEditContextItem = () => {
+    if (!contextMenu) return;
+    const target = `/series/${contextMenu.id}?edit=1`;
+    setContextMenu(null);
+    clearPending();
+    navigate(target, { state: { from: '/search', backLabel: '返回搜索' } });
+  };
+
+  const handleOpenSeriesInFileManager = async (seriesId: number) => {
+    setContextMenu(null);
+    try {
+      await openSeriesInFileManager(seriesId);
+    } catch (err) {
+      notify({ message: '打开源文件位置失败，请确认文件夹仍然存在', type: 'error' });
+    }
+  };
+
+  const handleRescanMetadata = async (seriesId: number) => {
+    try {
+      const matched = await rescanSingleSeriesMetadata(seriesId);
+      setContextMenu(null);
+      clearPending();
+      await refreshSeries();
+      notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
+    } catch (error) {
+      notify({ message: '重新识别失败，请确认本地文件夹仍然存在', type: 'error' });
+    }
+  };
+
+  const handleSwitchType = async (seriesId: number) => {
+    setTypeSwitchSeriesId(seriesId);
+  };
+
+  const handleSwitchTypeTo = async (seriesId: number, categoryKey: string, categoryName: string) => {
+    setTypeSwitchConfirm({ seriesId, categoryName, categoryKey });
+    setTypeSwitchSeriesId(null);
+    setContextMenu(null);
+    clearPending();
+  };
+
+  const doSwitchType = async () => {
+    if (!typeSwitchConfirm) return;
+    try {
+      await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
+      setTypeSwitchConfirm(null);
+      await refreshSeries();
+      notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
+    } catch (error) {
+      notify({ message: '切换分类失败，请稍后重试', type: 'error' });
+      setTypeSwitchConfirm(null);
+    }
+  };
+
+  const handleDeleteSeries = async (seriesId: number) => {
+    try {
+      await deleteVideoSeries(seriesId, true);
+      setContextMenu(null);
+      clearPending();
+      await refreshSeries();
+      setResults(results.filter(r => !(r.type === 'series' && r.id === seriesId)));
+      notify({ message: '视频集已删除', type: 'success' });
+    } catch (error) {
+      notify({ message: '删除失败，请稍后重试', type: 'error' });
+    }
+  };
+
   return (
     <div className="changli-page">
       <div className="changli-page-header">
@@ -162,7 +241,7 @@ const Search: React.FC = () => {
                     ? 'aspect-[3/4]'
                     : 'aspect-video';
                 return (
-                  <Link key={`${item.type}-${item.id}`} to={target} className="card flex flex-col no-underline group overflow-hidden">
+                  <Link key={`${item.type}-${item.id}`} to={target} className="card flex flex-col no-underline group overflow-hidden" onContextMenu={item.type === 'series' ? (e) => openContextMenu(e, 'series', item.id, item.title) : undefined}>
                     <div className={`relative w-full ${aspectClass} bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-xl overflow-hidden flex items-center justify-center`}>
                       {item.type === 'actor' ? (
                         imageDataUrl ? (
@@ -201,6 +280,95 @@ const Search: React.FC = () => {
         <div className="changli-empty-state">
           <p className="text-gray-500 text-lg">在右上角或这里输入关键词，支持模糊搜索视频和演员</p>
         </div>
+      )}
+
+      {/* 右键菜单 */}
+      {contextMenu && (() => {
+        const series = storeSeries.find(s => s.id === contextMenu.id);
+        const isFav = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
+        const isWatched = series ? watchedIds.has(series.id) : false;
+        return (
+        <div
+          className="changli-context-menu fixed z-50 py-2 w-fit"
+          style={{ left: contextMenu.x + 160 > window.innerWidth ? contextMenu.x - 160 : contextMenu.x, top: contextMenu.y + 200 > window.innerHeight ? contextMenu.y - 200 : contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button className="changli-menu-item" onClick={handleEditContextItem}>编辑</button>
+          <button className="changli-menu-item" onClick={() => handleOpenSeriesInFileManager(contextMenu.id)}>以文件资源管理器打开</button>
+          <button className="changli-menu-item" onClick={() => {
+            const id = contextMenu.id;
+            const name = contextMenu.name;
+            setContextMenu(null);
+            toggleFavorite(id, 'series').then(() => {
+              refreshSeries();
+              notify({ message: isFav ? `已取消「${name}」的追番` : `已将「${name}」添加到追番`, type: 'success' });
+            }).catch(() => { notify({ message: '操作失败，请稍后重试', type: 'error' }); });
+          }}>{isFav ? '取消该追番' : '添加到追番'}</button>
+          <button className="changli-menu-item" onClick={() => {
+            const id = contextMenu.id;
+            const name = contextMenu.name;
+            setContextMenu(null);
+            toggleWatched(id).then(() => {
+              refreshSeries();
+              notify({ message: isWatched ? `已取消「${name}」的已看完标记` : `已将「${name}」标记为已看完`, type: 'success' });
+            }).catch(() => { notify({ message: '操作失败，请稍后重试', type: 'error' }); });
+          }}>{isWatched ? '取消已看完标记' : '标记为已看完'}</button>
+          <button className="changli-menu-item" onClick={() => handleRescanMetadata(contextMenu.id)}>检查更新</button>
+          <button className="changli-menu-item" onClick={() => handleSwitchType(contextMenu.id)}>切换分类</button>
+          <button className="changli-menu-item changli-menu-item-danger" onClick={() => {
+            const key = `${contextMenu.type}-${contextMenu.id}`;
+            requestSecondConfirm(key, () => handleDeleteSeries(contextMenu.id));
+          }}>{pendingKey === `${contextMenu.type}-${contextMenu.id}` ? '再次点击确认删除' : '删除'}</button>
+        </div>
+        );
+      })()}
+
+      {/* 切换分类选择弹窗 */}
+      {typeSwitchSeriesId !== null && (() => {
+        const filteredCats = categories.filter(c => c.key !== (storeSeries.find(s => s.id === typeSwitchSeriesId)?.display_type || ''));
+        return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setTypeSwitchSeriesId(null)}>
+          <div className="changli-modal-panel" onClick={e => e.stopPropagation()}>
+            <div className="changli-modal-header">
+              <h2 className="changli-heading-lg">选择要切换的分类</h2>
+            </div>
+            <div className="changli-modal-body">
+              <div className="flex flex-wrap gap-2">
+                {filteredCats.map(cat => (
+                  <button key={cat.key} className="changli-bubble" onClick={() => handleSwitchTypeTo(typeSwitchSeriesId, cat.key, cat.name)}>{cat.name}</button>
+                ))}
+                {filteredCats.length === 0 && <p className="text-gray-400 text-sm">没有其他分类可切换</p>}
+              </div>
+            </div>
+            <div className="changli-modal-footer">
+              <button className="action-btn" onClick={() => setTypeSwitchSeriesId(null)}>取消</button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* 切换分类确认弹窗 */}
+      {typeSwitchConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setTypeSwitchConfirm(null)}>
+          <div className="changli-modal-panel" onClick={e => e.stopPropagation()}>
+            <div className="changli-modal-header">
+              <h2 className="changli-heading-lg">确认切换分类</h2>
+            </div>
+            <div className="changli-modal-body">
+              <p className="text-gray-600">确定要切换到「{typeSwitchConfirm.categoryName}」吗？</p>
+            </div>
+            <div className="changli-modal-footer">
+              <button className="action-btn" onClick={() => setTypeSwitchConfirm(null)}>取消</button>
+              <button className="action-btn action-btn-primary" onClick={doSwitchType}>确认</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 关闭右键菜单的遮罩 */}
+      {contextMenu && (
+        <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); clearPending(); }} />
       )}
     </div>
   );
