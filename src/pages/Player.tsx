@@ -166,22 +166,50 @@ const Player: React.FC = () => {
         }
 
         // 初始化 mpv
-        const mpvPath = await resolveResource('mpv/mpv.exe').catch(() => undefined);
-        await init({
-          ...(mpvPath ? { path: mpvPath } : {}),
-          args: [
-            '--vo=gpu-next',
-            '--hwdec=d3d11va',
-            '--gpu-api=d3d11',
-            '--keep-open=yes',
-            '--force-window=yes',
-            '--hwdec-codecs=all',
-            '--osc=no',
-            '--osd-level=0',
-            '--video-sync=audio',
-          ],
-          observedProperties: OBSERVED_PROPERTIES,
+        const mpvPath = await resolveResource('mpv/mpv.exe').catch((e) => {
+          console.warn('[Player] resolveResource mpv failed:', e);
+          return undefined;
         });
+        console.log('[Player] mpvPath:', mpvPath);
+        try {
+          await init({
+            ...(mpvPath ? { path: mpvPath } : {}),
+            args: [
+              '--vo=gpu-next',
+              '--hwdec=d3d11va',
+              '--gpu-api=d3d11',
+              '--keep-open=yes',
+              '--force-window=yes',
+              '--hwdec-codecs=all',
+              '--osc=no',
+              '--osd-level=0',
+              '--video-sync=audio',
+            ],
+            observedProperties: OBSERVED_PROPERTIES,
+          });
+        } catch (initErr) {
+          console.error('[Player] init 失败:', initErr);
+          // 不传 path 重试一次（系统 PATH 中的 mpv）
+          try {
+            await init({
+              args: [
+                '--vo=gpu-next',
+                '--hwdec=d3d11va',
+                '--gpu-api=d3d11',
+                '--keep-open=yes',
+                '--force-window=yes',
+                '--hwdec-codecs=all',
+                '--osc=no',
+                '--osd-level=0',
+                '--video-sync=audio',
+              ],
+              observedProperties: OBSERVED_PROPERTIES,
+            });
+          } catch (retryErr) {
+            console.error('[Player] init 重试失败:', retryErr);
+            throw retryErr;
+          }
+        }
 
         await setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 }).catch(() => undefined);
 
