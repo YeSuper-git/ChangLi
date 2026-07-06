@@ -2551,28 +2551,25 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         }
     }
 
-    if display_type.as_deref() == Some("adult") {
-        if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
-            let code = info.code;
-            let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
-            let new_title = info.title.unwrap_or_else(|| folder_name.clone());
+    // 番号检测：不限 display_type，任何分类只要文件夹名匹配番号格式都识别
+    if let Some(info) = crate::scanner::parse_adult_filename(&folder_name) {
+        let code = info.code;
+        let has_chinese_sub: i32 = if info.has_chinese_sub { 1 } else { 0 };
+        let new_title = info.title.unwrap_or_else(|| folder_name.clone());
 
-            sqlx::query(
-                "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
-            )
-            .bind(&code)
-            .bind(has_chinese_sub)
-            .bind(&new_title)
-            .bind(&poster)
-            .bind(&poster_base64)
-            .bind(id)
-            .execute(pool)
-            .await?;
+        sqlx::query(
+            "UPDATE video_series SET code = ?, has_chinese_sub = ?, title = ?, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ? AND (code IS NULL OR code = '')"
+        )
+        .bind(&code)
+        .bind(has_chinese_sub)
+        .bind(&new_title)
+        .bind(&poster)
+        .bind(&poster_base64)
+        .bind(id)
+        .execute(pool)
+        .await?;
 
-            Ok(true)
-        } else {
-            Ok(poster_updated || found_video_files)
-        }
+        Ok(true)
     } else {
         sqlx::query(
             "UPDATE video_series SET title = ?, code = NULL, has_chinese_sub = 0, poster = COALESCE(?, poster), poster_base64 = COALESCE(?, poster_base64) WHERE id = ?"
