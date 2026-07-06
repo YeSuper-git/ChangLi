@@ -57,9 +57,11 @@ const Player: React.FC = () => {
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverX, setHoverX] = useState(0);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [draggingTime, setDraggingTime] = useState<number | null>(null);
   
   // Refs
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const draggingProgressRef = useRef(false);
   const mpvInitialized = useRef(false);
   const mpvOperationLock = useRef(Promise.resolve());
   const isPlayingRef = useRef(false);
@@ -550,13 +552,19 @@ const Player: React.FC = () => {
     if (!isPiP) return;
     togglePiP();
   }, [isPiP, togglePiP]);
-  const handleProgressBarHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || !duration) return;
-
+  const getProgressTimeFromClientX = useCallback((clientX: number) => {
+    if (!progressBarRef.current || !duration) return null;
     const rect = progressBarRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percent = x / rect.width;
-    const time = percent * duration;
+    const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+    const percent = rect.width > 0 ? x / rect.width : 0;
+    return { time: percent * duration, x };
+  }, [duration]);
+
+  const handleProgressBarHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (draggingProgressRef.current) return;
+    const progress = getProgressTimeFromClientX(e.clientX);
+    if (!progress) return;
+    const { time, x } = progress;
 
     setHoverTime(time);
     setHoverX(x);
@@ -618,7 +626,7 @@ const Player: React.FC = () => {
         }
       }
     }, 300);
-  }, [currentVideo, duration]);
+  }, [currentVideo, duration, getProgressTimeFromClientX]);
 
   // 进度条鼠标离开
   const handleProgressBarLeave = useCallback(() => {
@@ -631,17 +639,56 @@ const Player: React.FC = () => {
     setThumbnailUrl(null);
   }, []);
 
-  // 进度条点击
-  const handleProgressBarClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || !duration) return;
-    
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percent = x / rect.width;
-    const time = percent * duration;
-    
-    seek(time);
-  }, [duration, seek]);
+  // 进度条拖拽
+  const handleProgressPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const progress = getProgressTimeFromClientX(e.clientX);
+    if (!progress) return;
+    e.preventDefault();
+    e.stopPropagation();
+    draggingProgressRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDraggingTime(progress.time);
+    setCurrentTime(progress.time);
+    seek(progress.time);
+  }, [getProgressTimeFromClientX, seek]);
+
+  const handleProgressPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingProgressRef.current) return;
+    const progress = getProgressTimeFromClientX(e.clientX);
+    if (!progress) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingTime(progress.time);
+    setCurrentTime(progress.time);
+  }, [getProgressTimeFromClientX]);
+
+  const finishProgressDrag = useCallback((clientX: number) => {
+    if (!draggingProgressRef.current) return;
+    const progress = getProgressTimeFromClientX(clientX);
+    draggingProgressRef.current = false;
+    setDraggingTime(null);
+    if (progress) {
+      setCurrentTime(progress.time);
+      seek(progress.time);
+    }
+  }, [getProgressTimeFromClientX, seek]);
+
+  const handleProgressPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    finishProgressDrag(e.clientX);
+  }, [finishProgressDrag]);
+
+  const handleProgressPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    draggingProgressRef.current = false;
+    setDraggingTime(null);
+  }, []);
 
   // 格式化时间
   const formatTime = (seconds: number): string => {
@@ -770,8 +817,9 @@ const Player: React.FC = () => {
   const activeEpisodeLabel = activeEpisode?.episode_number
     ? `${activeEpisode.season && activeEpisode.season > 0 && activeEpisode.season !== 999 ? `第${activeEpisode.season}季 ` : ''}第${activeEpisode.episode_number}${episodeWord}`
     : activeEpisode?.file_name || '正在播放';
-  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
-  const currentTimeText = formatTime(currentTime);
+  const displayTime = draggingTime ?? currentTime;
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (displayTime / duration) * 100)) : 0;
+  const currentTimeText = formatTime(displayTime);
   const durationText = duration > 0 ? formatTime(duration) : '--:--';
   const nextEpisode = activeIndex >= 0 ? sortedEpisodes[activeIndex + 1] : null;
   const seasonSummary = activeEpisode?.season && activeEpisode.season > 0 && activeEpisode.season !== 999
@@ -917,7 +965,10 @@ const Player: React.FC = () => {
           <div
             ref={progressBarRef}
             className="changli-player-bar"
-            onClick={handleProgressBarClick}
+            onPointerDown={handleProgressPointerDown}
+            onPointerMove={handleProgressPointerMove}
+            onPointerUp={handleProgressPointerUp}
+            onPointerCancel={handleProgressPointerCancel}
             onMouseMove={handleProgressBarHover}
             onMouseLeave={handleProgressBarLeave}
           >

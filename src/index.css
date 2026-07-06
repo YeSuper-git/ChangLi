@@ -2011,6 +2011,8 @@ body.changli-player-body #root {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
 }
 
 .changli-player-bar > span {

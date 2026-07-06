@@ -360,6 +360,30 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
+  const handleToggleSeriesStatus = async () => {
+    if (!series) return;
+    const nextStatus = series.status === 'completed' ? 'ongoing' : 'completed';
+    try {
+      await updateVideoSeries(
+        series.id,
+        series.title,
+        series.description || '',
+        series.poster || '',
+        series.poster_orientation,
+        nextStatus,
+        series.code || undefined,
+        series.has_chinese_sub ?? undefined,
+      );
+      setPosterMenu(null);
+      await loadSeries({ silent: true });
+      await refreshSeries();
+      notify({ message: nextStatus === 'completed' ? '已切换为已完结' : '已切换为连载中', type: 'success' });
+    } catch (error) {
+      console.error('切换连载状态失败:', error);
+      notify({ message: '切换连载状态失败，请稍后重试', type: 'error' });
+    }
+  };
+
   const handleRemoveEpisode = async (videoId: number) => {
     try {
       await removeVideoFromSeries(videoId);
@@ -682,12 +706,15 @@ const SeriesDetail: React.FC = () => {
           <div className="flex-1">
             {editing ? (
               <div className="space-y-4">
-                <input
-                  value={editData.title}
-                  onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                  className="search-input"
-                  placeholder="标题"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">标题</label>
+                  <input
+                    value={editData.title}
+                    onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                    className="search-input"
+                    placeholder="请添加标题"
+                  />
+                </div>
                 {(editData.code || features.status) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {editData.code && (
@@ -820,12 +847,15 @@ const SeriesDetail: React.FC = () => {
                     )}
                   </div>
                 )}
-                <textarea
-                  value={editData.description}
-                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                  className="search-input min-h-[120px]"
-                  placeholder="简介"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-2">简介</label>
+                  <textarea
+                    value={editData.description}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                    className="search-input min-h-[120px]"
+                    placeholder="暂无简介，快来给长离介绍一下吧"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
@@ -879,7 +909,7 @@ const SeriesDetail: React.FC = () => {
                   </div>
                 </div>
                 <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
-                  {series.description || '暂无简介'}
+                  {series.description || '暂无简介，快来给长离介绍一下吧'}
                 </p>
                 <div className="mb-4 space-y-3">
                   {features.tags && (
@@ -978,6 +1008,14 @@ const SeriesDetail: React.FC = () => {
           >
             管理季
           </button>
+          {features.status && (
+            <button
+              className="changli-menu-item"
+              onClick={handleToggleSeriesStatus}
+            >
+              {series.status === 'completed' ? '切换为连载中' : '切换为已完结'}
+            </button>
+          )}
           <button
             className="changli-menu-item"
             onClick={() => { setPosterMenu(null); handleCheckUpdates(); }}
