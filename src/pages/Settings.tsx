@@ -889,25 +889,6 @@ const Settings: React.FC = () => {
               </div>
               {/* Key 不展示，由系统管理 */}
               <div>
-                <label className="changli-form-label">卡片方向</label>
-                <BubbleSelect
-                  value={categoryForm.card_layout}
-                  options={[{ value: 'auto', label: '自动' }, { value: 'portrait', label: '竖版' }, { value: 'landscape', label: '横版' }]}
-                  onChange={(v) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
-                />
-              </div>
-              <div>
-                <label className="changli-form-label">集数称呼</label>
-                <BubbleSelect
-                  value={categoryForm.features.episode || '部'}
-                  options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
-                  onChange={(v) => setCategoryForm({
-                    ...categoryForm,
-                    features: { ...categoryForm.features, episode: v }
-                  })}
-                />
-              </div>
-              <div>
                 <label className="changli-form-label">默认扫描路径</label>
                 <div className="flex gap-2">
                   <input
@@ -924,6 +905,27 @@ const Settings: React.FC = () => {
                   >
                     选择文件夹
                   </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="changli-form-label whitespace-nowrap mb-0">卡片方向</label>
+                  <BubbleSelect
+                    value={categoryForm.card_layout}
+                    options={[{ value: 'auto', label: '自动' }, { value: 'portrait', label: '竖版' }, { value: 'landscape', label: '横版' }]}
+                    onChange={(v) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="changli-form-label whitespace-nowrap mb-0">集数称呼</label>
+                  <BubbleSelect
+                    value={categoryForm.features.episode || '部'}
+                    options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
+                    onChange={(v) => setCategoryForm({
+                      ...categoryForm,
+                      features: { ...categoryForm.features, episode: v }
+                    })}
+                  />
                 </div>
               </div>
               <div>
