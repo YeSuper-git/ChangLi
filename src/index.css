@@ -2331,6 +2331,9 @@ body.changli-player-body #root {
 }
 
 .changli-player-window.is-pip .changli-player-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -2344,12 +2347,39 @@ body.changli-player-body #root {
   transform: none;
 }
 
-.changli-player-window.is-pip .changli-player-progress,
 .changli-player-window.is-pip .changli-player-right-controls {
   display: none;
 }
 
+.changli-player-window.is-pip .changli-player-progress {
+  order: 2;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0;
+}
+
+.changli-player-window.is-pip .changli-player-progress > span {
+  display: none;
+}
+
+.changli-player-window.is-pip .changli-player-bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.changli-player-window.is-pip .changli-player-bar > i {
+  width: 11px;
+  height: 11px;
+  box-shadow: 0 0 0 4px rgba(251, 91, 123, 0.18);
+}
+
+.changli-player-window.is-pip .changli-player-preview {
+  display: none;
+}
+
 .changli-player-window.is-pip .changli-player-bottom {
+  order: 1;
   justify-content: center;
   margin-top: 0;
 }
@@ -2357,6 +2387,12 @@ body.changli-player-body #root {
 .changli-player-window.is-pip .changli-player-round {
   width: 36px;
   height: 36px;
+}
+
+.changli-player-window.is-pip .changli-player-round.speed-pip {
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 
 .changli-player-loading {
@@ -2525,7 +2561,7 @@ body.changli-player-body {
 }
 
 .changli-player-window.is-pip {
-  grid-template-rows: minmax(0, 1fr) 52px;
+  grid-template-rows: minmax(0, 1fr) 66px;
 }
 
 .changli-player-window.is-pip .changli-player-controls {

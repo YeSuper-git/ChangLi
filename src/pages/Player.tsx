@@ -542,7 +542,7 @@ const Player: React.FC = () => {
     } catch (err) {
       console.error('[Player] 切换画中画失败:', err);
     }
-  }, [isFullscreen, isPiP]);
+  }, [getCurrentVideoRatio, isFullscreen, isPiP]);
 
   // 视频边距：选集面板现在是覆盖式，不再需要调整视频边距
 
@@ -939,6 +939,11 @@ const Player: React.FC = () => {
             <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seek(Math.max(0, currentTime - 10))}><span className="back-icon" /></button>
             <button type="button" className="changli-player-round next" aria-label="下一集" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}><span className="next-icon" /></button>
             <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
+            {isPiP && (
+              <button type="button" className="changli-player-round speed-pip" aria-label="切换小窗倍速" onClick={() => changeSpeed(speed === 2 ? 1 : 2)}>
+                {speed === 2 ? '2X' : '1X'}
+              </button>
+            )}
           </div>
 
           <div className="changli-player-right-controls">
