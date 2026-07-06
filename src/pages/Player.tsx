@@ -444,9 +444,18 @@ const Player: React.FC = () => {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
-    // 初始同步 HTML 高度
-    document.documentElement.style.height = `${window.innerHeight}px`;
-    document.body.style.height = `${window.innerHeight}px`;
+
+    // 关键：Windows 透明无边框 WebView 下 100vh/100% 不可靠，
+    // 用 JS 直接把根容器高度设为窗口真实 innerHeight
+    const syncHeight = () => {
+      const h = `${window.innerHeight}px`;
+      document.documentElement.style.height = h;
+      document.body.style.height = h;
+      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
+      if (el) el.style.height = h;
+    };
+    syncHeight();
+
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
@@ -455,9 +464,7 @@ const Player: React.FC = () => {
         const scale = window.devicePixelRatio || 1;
         lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
       }
-      // 强制同步 HTML 高度，解决透明 WebView 下 absolute 定位元素错位
-      document.documentElement.style.height = `${window.innerHeight}px`;
-      document.body.style.height = `${window.innerHeight}px`;
+      syncHeight();
       if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       resizeSettleTimerRef.current = window.setTimeout(async () => {
         if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
@@ -488,9 +495,63 @@ const Player: React.FC = () => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
-    playerWindow.setResizable(true).catch(() => undefined);
-    playerWindow.startResizeDragging('SouthEast').catch((error) => console.error('[Player] 右下角拉伸失败:', error));
-  }, [isFullscreen, isWindowMaximized, playerWindow]);
+
+    // 自定义 JS 实现右下角等比拉伸，不依赖系统级 startResizeDragging
+    const startX = event.screenX;
+    const startY = event.screenY;
+    const startW = lastWindowSizeRef.current?.width || window.innerWidth;
+    const startH = lastWindowSizeRef.current?.height || window.innerHeight;
+    const ratio = getCurrentVideoRatio();
+    let applyTimer = 0;
+    let applying = false;
+    let pending = false;
+    let latestW = startW;
+    let latestH = startH;
+
+    const applySize = async () => {
+      if (applying) { pending = true; return; }
+      applying = true;
+      aspectResizeLockRef.current = true;
+      const nextW = latestW;
+      const nextH = latestH;
+      lastWindowSizeRef.current = { width: nextW, height: nextH };
+      await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
+      // 拉伸后同步高度
+      const h = `${window.innerHeight}px`;
+      document.documentElement.style.height = h;
+      document.body.style.height = h;
+      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
+      if (el) el.style.height = h;
+      applying = false;
+      if (pending) { pending = false; void applySize(); }
+    };
+
+    const onMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const dx = (moveEvent.screenX - startX);
+      const dy = (moveEvent.screenY - startY);
+      const widthFromX = startW + dx;
+      const widthFromY = (startH + dy) * ratio;
+      const useVertical = Math.abs(dy * ratio) > Math.abs(dx);
+      const desiredW = useVertical ? widthFromY : widthFromX;
+      latestW = Math.max(520, Math.round(desiredW));
+      latestH = Math.max(292, Math.round(latestW / ratio));
+      if (applyTimer) return;
+      applyTimer = window.setTimeout(() => { applyTimer = 0; void applySize(); }, 32);
+    };
+
+    const onUp = () => {
+      if (applyTimer) { window.clearTimeout(applyTimer); applyTimer = 0; }
+      void applySize().finally(() => {
+        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
+      });
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp, { once: true });
+  }, [getCurrentVideoRatio, isFullscreen, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     runPlayerWindowAction(async () => {
