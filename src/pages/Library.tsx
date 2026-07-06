@@ -1217,7 +1217,7 @@ const Library: React.FC = () => {
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            选择要切换的分类：「{typeSwitchConfirm.categoryName}」
+            确定切换到「{typeSwitchConfirm.categoryName}」？
           </p>
           <div className="flex gap-3">
             <button
