@@ -661,7 +661,15 @@ pub async fn add_video_series(
         .execute(pool)
         .await?;
     if let Some(path) = folder_path {
-        if let Some(series) = get_video_series_by_folder_path(pool, path).await? {
+        if let Some(mut series) = get_video_series_by_folder_path(pool, path).await? {
+            // 如果已存在但分类已不同，更新到新分类
+            if let Some(dt) = display_type {
+                if series.display_type.as_deref() != Some(dt) {
+                    sqlx::query("UPDATE video_series SET display_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                        .bind(dt).bind(series.id).execute(pool).await?;
+                    series.display_type = Some(dt.to_string());
+                }
+            }
             return Ok(series);
         }
     }
