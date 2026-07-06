@@ -3928,6 +3928,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             // 分类开了演员/标签时，匹配不到就跳过，不再误报为新视频集
                         }
                     }
+                    // 如果没有匹配到任何演员/标签子目录，尝试直接在当前目录找视频集
+                    if result.is_empty() {
+                        result.extend(collect_new(parent));
+                    }
                     result
                 }
 
