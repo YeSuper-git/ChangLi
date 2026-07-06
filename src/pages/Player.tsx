@@ -969,7 +969,30 @@ const Player: React.FC = () => {
       )}
 
       <main className="changli-player-main">
-        <div className="changli-player-stage" onClick={togglePlay}>
+        <div
+          className="changli-player-stage"
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            const startX = e.screenX;
+            const startY = e.screenY;
+            let moved = false;
+            const onMove = (me: MouseEvent) => {
+              if (Math.abs(me.screenX - startX) > 5 || Math.abs(me.screenY - startY) > 5) {
+                moved = true;
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                playerWindow.startDragging().catch(() => {});
+              }
+            };
+            const onUp = () => {
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+              if (!moved) togglePlay();
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp, { once: true });
+          }}
+        >
           <div className="changli-player-video-art" />
           {showResumeNotice && (
             <div className="changli-player-resume-notice">继续观看 · 已看到{activeEpisodeLabel}</div>

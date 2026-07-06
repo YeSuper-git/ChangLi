@@ -1896,7 +1896,7 @@ body.changli-player-body #root {
 
 .changli-player-side {
   position: absolute;
-  top: 0;
+  top: -42px;
   right: 0;
   bottom: 0;
   display: flex;
@@ -1917,7 +1917,7 @@ body.changli-player-body #root {
 
 .changli-player-hover-zone {
   position: absolute;
-  top: 0;
+  top: -42px;
   right: 0;
   bottom: 20%;
   width: 32px;
