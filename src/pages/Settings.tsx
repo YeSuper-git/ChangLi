@@ -929,7 +929,7 @@ const Settings: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">功能开关</label>
+                <label className="changli-form-label">功能开关</label>
                 <div className="space-y-3">
                   {([
                     { key: 'tracking' as const, label: '追番标记', tip: '控制是否支持追番/收藏功能' },
