@@ -3939,12 +3939,9 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 continue;
                             }
 
-                            // 分类开了演员/标签时，匹配不到就跳过，不再误报为新视频集
+                            // 匹配不上标签/演员的文件夹，也尝试当视频集扫描
+                            result.extend(collect_new(&p));
                         }
-                    }
-                    // 如果没有匹配到任何演员/标签子目录，尝试直接在当前目录找视频集
-                    if result.is_empty() {
-                        result.extend(collect_new(parent));
                     }
                     result
                 }
