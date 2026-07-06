@@ -445,17 +445,6 @@ const Player: React.FC = () => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
 
-    // 关键：Windows 透明无边框 WebView 下 100vh/100% 不可靠，
-    // 用 JS 直接把根容器高度设为窗口真实 innerHeight
-    const syncHeight = () => {
-      const h = `${window.innerHeight}px`;
-      document.documentElement.style.height = h;
-      document.body.style.height = h;
-      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (el) el.style.height = h;
-    };
-    syncHeight();
-
     playerWindow.onResized(async () => {
       const maximized = await playerWindow.isMaximized();
       setIsWindowMaximized(maximized);
@@ -464,7 +453,6 @@ const Player: React.FC = () => {
         const scale = window.devicePixelRatio || 1;
         lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
       }
-      syncHeight();
       if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       resizeSettleTimerRef.current = window.setTimeout(async () => {
         if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
@@ -516,12 +504,6 @@ const Player: React.FC = () => {
       const nextH = latestH;
       lastWindowSizeRef.current = { width: nextW, height: nextH };
       await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
-      // 拉伸后同步高度
-      const h = `${window.innerHeight}px`;
-      document.documentElement.style.height = h;
-      document.body.style.height = h;
-      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (el) el.style.height = h;
       applying = false;
       if (pending) { pending = false; void applySize(); }
     };

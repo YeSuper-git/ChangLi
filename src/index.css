@@ -1600,9 +1600,8 @@ body.changli-player-body #root {
   --player-muted: #9ca3af;
   position: fixed;
   inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: transparent;
   color: #f7f7fb;
@@ -1809,12 +1808,12 @@ body.changli-player-body #root {
 }
 
 .changli-player-main {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1;
+  min-height: 0;
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  min-height: 0;
 }
 
 .changli-player-stage {
@@ -1997,10 +1996,7 @@ body.changli-player-body #root {
 }
 
 .changli-player-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex-shrink: 0;
   z-index: 30;
   border-top: 1px solid var(--player-line);
   padding: 8px 16px 10px;
