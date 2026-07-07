@@ -1811,28 +1811,11 @@ body.changli-player-body #root {
 .changli-player-winbtn[aria-label="关闭"] span::before { transform: rotate(45deg); }
 .changli-player-winbtn[aria-label="关闭"] span::after { transform: rotate(-45deg); }
 
-/* 置顶按钮：图钉图标（Solar pin linear 风格） */
-.changli-player-winbtn[aria-label="置顶"] span::before {
-  content: "";
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border: 1.6px solid currentColor;
-  border-radius: 50% 50% 50% 0;
-  top: 1px;
-  left: 2.5px;
-  transform: rotate(-45deg);
-}
-.changli-player-winbtn[aria-label="置顶"] span::after {
-  content: "";
-  position: absolute;
-  width: 1.5px;
-  height: 5px;
-  background: currentColor;
-  bottom: 0.5px;
-  left: 5.25px;
-  transform: rotate(0deg);
-  border-radius: 999px;
+/* 置顶按钮：SVG 图标 */
+.changli-player-winbtn[aria-label="置顶"] span { display: none; }
+.changli-player-winbtn[aria-label="置顶"] svg {
+  display: block;
+  margin: auto;
 }
 .changli-player-winbtn[aria-label="置顶"].is-pinned {
   color: var(--player-rose, #fb5b7b);
@@ -2642,6 +2625,29 @@ body.changli-player-body .changli-player-window > .changli-player-main {
 }
 
 .changli-player-pip-actions button.active {
+  color: var(--player-rose, #fb5b7b);
+  background: rgba(251, 91, 123, 0.18);
+}
+
+.changli-player-pip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  width: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f2f4fb;
+  cursor: pointer;
+  padding: 0;
+}
+
+.changli-player-pip-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.changli-player-pip-btn.active {
   color: var(--player-rose, #fb5b7b);
   background: rgba(251, 91, 123, 0.18);
 }
