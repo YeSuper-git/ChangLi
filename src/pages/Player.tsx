@@ -8,7 +8,7 @@ import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
-import { resolveResource } from '@tauri-apps/api/path';
+import { resolveResource, resourceDir } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -168,11 +168,23 @@ const Player: React.FC = () => {
           return;
         }
 
-        // 初始化 mpv
-        const mpvPath = await resolveResource('mpv/mpv.exe').catch((e) => {
-          console.warn('[Player] resolveResource mpv failed:', e);
-          return undefined;
-        });
+        // 初始化 mpv — 尝试多种方式定位 mpv.exe
+        let mpvPath: string | undefined;
+        try {
+          mpvPath = await resolveResource('resources/mpv/mpv.exe');
+        } catch { /* ignore */ }
+        if (!mpvPath) {
+          try {
+            mpvPath = await resolveResource('mpv/mpv.exe');
+          } catch { /* ignore */ }
+        }
+        if (!mpvPath) {
+          try {
+            const rd = await resourceDir();
+            const sep = rd.includes('\\') ? '\\' : '/';
+            mpvPath = `${rd}resources${sep}mpv${sep}mpv.exe`;
+          } catch { /* ignore */ }
+        }
         console.log('[Player] mpvPath:', mpvPath);
         try {
           await init({
