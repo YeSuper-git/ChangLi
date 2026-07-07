@@ -984,7 +984,7 @@ const SeriesDetail: React.FC = () => {
       {videos.length > 0 ? (
         <VideoGrid
           videos={videos}
-          posterOrientation={series?.poster_orientation || 'unknown'}
+          posterOrientation="landscape"
           episodeWord={features.episode || '部'}
           fallbackPoster={series?.poster_data_url}
           selectMode={selectMode}
