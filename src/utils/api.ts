@@ -848,6 +848,17 @@ export async function getPlayHistory(): Promise<PlayHistory[]> {
   }
 }
 
+/** 轻量级 video_id → series_id 映射（只查两列，不加载全量视频数据） */
+export async function getVideoSeriesMap(): Promise<Map<number, number>> {
+  try {
+    const result = await invoke<[number, number][]>('get_video_series_map');
+    return new Map(result);
+  } catch (err) {
+    console.error('[API] getVideoSeriesMap 失败:', err);
+    return new Map();
+  }
+}
+
 
 export async function getRecentWatchItems(limit?: number): Promise<RecentWatchItem[]> {
   try {

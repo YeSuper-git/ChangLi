@@ -1866,6 +1866,20 @@ pub async fn get_play_history(pool: &SqlitePool) -> Result<Vec<PlayHistory>> {
     Ok(history)
 }
 
+/// 返回 video_id → series_id 的轻量映射（只查两列，用于首页排序）
+pub async fn get_video_series_map(pool: &SqlitePool) -> Result<Vec<(i64, i64)>> {
+    let rows = sqlx::query("SELECT id, series_id FROM videos WHERE series_id IS NOT NULL")
+        .fetch_all(pool)
+        .await?;
+
+    let map = rows
+        .iter()
+        .map(|row| (row.get::<i64, _>("id"), row.get::<i64, _>("series_id")))
+        .collect();
+
+    Ok(map)
+}
+
 pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec<RecentWatchItem>> {
     let rows = sqlx::query(
         "SELECT ph.id AS history_id, ph.last_position, ph.total_duration, ph.play_count, ph.last_played,

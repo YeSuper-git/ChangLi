@@ -2194,6 +2194,15 @@ async fn get_play_history(state: State<'_, AppState>) -> Result<Vec<db::PlayHist
 }
 
 #[tauri::command]
+async fn get_video_series_map(state: State<'_, AppState>) -> Result<Vec<(i64, i64)>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_map(&pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_recent_watch_items(
     state: State<'_, AppState>,
     limit: Option<i64>,
@@ -2680,6 +2689,7 @@ fn main() {
             check_category_updates,
             update_play_history,
             get_play_history,
+            get_video_series_map,
             get_recent_watch_items,
             update_watch_progress,
             get_watch_progress,
