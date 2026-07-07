@@ -12,7 +12,7 @@ import { resolveResource, resourceDir } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
   'pause',
-  // 'time-pos',  // 暂时移除验证稳定性
+  'time-pos',
   'duration',
   'volume',
   'speed',
