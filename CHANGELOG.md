@@ -1,3 +1,14 @@
+## v1.8.31 (2026-07-07)
+
+### 核心修复
+- mpv 改为 --wid 嵌入模式，消除双窗口 Vulkan Swapchain 竞争导致的 ntdll 崩溃
+- Rust 新增 get_player_hwnd 命令，前端获取 HWND 后传给 mpv
+- 删除 --force-window=yes（覆盖 --wid 导致 mpv 自己建窗的根因）
+- 删除 onResized 中的 settle timer setSize 逻辑（mpv 作为 child window 自行处理 WM_SIZE）
+
+### 变更
+- 小窗置顶按钮 SVG 放大至 18px，与关闭按钮大小一致
+
 ## v1.8.30 (2026-07-07)
 
 ### 修复
