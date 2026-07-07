@@ -86,6 +86,23 @@ pub fn close_player_window(app: &AppHandle) {
     }
 }
 
+/// 返回播放器窗口的 HWND（十进制），供前端 init mpv 时传 --wid=
+#[tauri::command]
+pub fn get_player_hwnd(app: AppHandle) -> Result<u64, String> {
+    use raw_window_handle::HasWindowHandle;
+    let window = app
+        .get_webview_window(PLAYER_WINDOW_LABEL)
+        .ok_or_else(|| "player window not found".to_string())?;
+    let raw = window
+        .window_handle()
+        .map_err(|e| format!("get window handle: {}", e))?
+        .as_raw();
+    match raw {
+        raw_window_handle::RawWindowHandle::Win32(h) => Ok(h.hwnd.get() as u64),
+        _ => Err("not windows".to_string()),
+    }
+}
+
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_) => {

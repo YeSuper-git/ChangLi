@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getCurrentWindow, currentMonitor, Window } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
-// convertFileSrc removed — FFmpeg preview uses invoke instead
+import { invoke } from '@tauri-apps/api/core';
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
@@ -78,7 +78,6 @@ const Player: React.FC = () => {
   const windowRatioAdjustedRef = useRef(false);
   const aspectResizeLockRef = useRef(false);
   const windowDraggingRef = useRef(false);
-  const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   // preview refs removed — using usePreviewThumb hook
@@ -191,6 +190,17 @@ const Player: React.FC = () => {
           } catch { /* ignore */ }
         }
         console.log('[Player] mpvPath:', mpvPath);
+
+        // 获取播放器窗口 HWND，用于 --wid 嵌入
+        let playerWid: string | undefined;
+        try {
+          const hwnd = await invoke<number>('get_player_hwnd');
+          playerWid = String(hwnd);
+          console.log('[Player] player HWND:', playerWid);
+        } catch (e) {
+          console.warn('[Player] get_player_hwnd failed:', e);
+        }
+
         try {
           await init({
             ...(mpvPath ? { path: mpvPath } : {}),
@@ -200,12 +210,13 @@ const Player: React.FC = () => {
               '--hwdec=d3d11va',
               '--gpu-api=d3d11',
               '--keep-open=yes',
-              '--force-window=yes',
+              '--force-window=no',
               '--hwdec-codecs=all',
               '--osc=no',
               '--osd-level=0',
               '--video-sync=audio',
               '--log-file=mpv.log',
+              ...(playerWid ? [`--wid=${playerWid}`] : []),
             ],
             observedProperties: OBSERVED_PROPERTIES,
           });
@@ -220,12 +231,13 @@ const Player: React.FC = () => {
                 '--hwdec=d3d11va',
                 '--gpu-api=d3d11',
                 '--keep-open=yes',
-                '--force-window=yes',
+                '--force-window=no',
                 '--hwdec-codecs=all',
                 '--osc=no',
                 '--osd-level=0',
                 '--video-sync=audio',
                 '--log-file=mpv.log',
+                ...(playerWid ? [`--wid=${playerWid}`] : []),
               ],
               observedProperties: OBSERVED_PROPERTIES,
             });
@@ -534,14 +546,12 @@ const Player: React.FC = () => {
       applyViewportHeight(size.height / scale);
     }).catch(() => {});
 
-    // debounce onResized：拖拽/拉伸时每帧都触发，合并到 100ms 内只执行一次
+    // debounce onResized：只同步视口高度和最大化状态，不再调 setSize（mpv --wid 嵌入后自行处理 WM_SIZE）
     let resizeDebounceTimer = 0;
     playerWindow.onResized(async () => {
-      if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen) return;
       if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
       resizeDebounceTimer = window.setTimeout(async () => {
         resizeDebounceTimer = 0;
-        if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen) return;
         try {
           const [maximized, size] = await Promise.all([
             playerWindow.isMaximized().catch(() => false),
@@ -554,31 +564,12 @@ const Player: React.FC = () => {
             applyViewportHeight(size.height / scale);
           }
         } catch { /* ignore resize sync errors */ }
-
-        if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
-        resizeSettleTimerRef.current = window.setTimeout(async () => {
-          if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
-          const current = await playerWindow.outerSize().catch(() => null);
-          if (!current) return;
-          const scale = window.devicePixelRatio || 1;
-          const currentW = current.width / scale;
-          const currentH = current.height / scale;
-          const ratio = getCurrentVideoRatio();
-          const targetH = Math.max(292, Math.round(currentW / ratio));
-          if (Math.abs(targetH - currentH) < 3) return;
-          aspectResizeLockRef.current = true;
-          const targetW = Math.max(520, Math.round(targetH * ratio));
-          lastWindowSizeRef.current = { width: targetW, height: targetH };
-          await playerWindow.setSize(new LogicalSize(targetW, targetH)).catch(() => undefined);
-          window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
-        }, 180);
       }, 100);
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Player] 监听窗口大小失败:', error));
     return () => {
       if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
-      if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
       unlisten?.();
     };
   }, [getCurrentVideoRatio, isFullscreen, isPiP, playerWindow]);

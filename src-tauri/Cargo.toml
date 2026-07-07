@@ -36,6 +36,7 @@ image = { version = "0.25", default-features = false, features = ["png", "bmp", 
 base64 = "0.22"
 tauri-plugin-mpv = "0.5.2"
 lru = "0.12"
+raw-window-handle = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }

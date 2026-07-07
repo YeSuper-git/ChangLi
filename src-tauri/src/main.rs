@@ -2741,6 +2741,7 @@ fn main() {
             disable_preset_template_cmd,
             set_game_overlay_disabled,
             get_game_overlay_disabled,
+            player::get_player_hwnd,
             preview::thumbnail_service::get_preview_thumb,
             preview::thumbnail_service::clear_preview_cache,
         ])
