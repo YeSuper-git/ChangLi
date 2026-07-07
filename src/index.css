@@ -2642,10 +2642,10 @@ body.changli-player-body .changli-player-window > .changli-player-main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.055);
   color: #c8ceda;
   cursor: pointer;
