@@ -2,6 +2,20 @@
 export const currentVersion = "1.8.38";
 export const changelogData = [
   {
+    "version": "1.8.41",
+    "date": "2026-07-08",
+    "changes": [
+      {
+        "category": "修复",
+        "items": [
+          "移除首页 getVideos() 调用，解决全库视频加载阻塞 UI 导致卡死",
+          "禁用 FFmpeg 缩略图预抽，改用 hover 时实时抽取（避免 CPU 占满）",
+          "分类和追番排序暂回退为 created_at"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.40",
     "date": "2026-07-08",
     "changes": [
