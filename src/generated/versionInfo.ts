@@ -2,6 +2,18 @@
 export const currentVersion = "1.8.42";
 export const changelogData = [
   {
+    "version": "1.8.44",
+    "date": "2026-07-08",
+    "changes": [
+      {
+        "category": "修复",
+        "items": [
+          "修复 mpv 路径解析：改用 resourceDir() 替代 resolveResource"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.42",
     "date": "2026-07-08",
     "changes": [
