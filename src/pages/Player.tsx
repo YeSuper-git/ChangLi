@@ -25,6 +25,7 @@ const Player: React.FC = () => {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(Boolean(id));
+  const [autoPlayCountdown, setAutoPlayCountdown] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
   const [series, setSeries] = useState<VideoSeries | null>(null);
@@ -993,6 +994,32 @@ const Player: React.FC = () => {
   const seasonSummary = activeEpisode?.season && activeEpisode.season > 0 && activeEpisode.season !== 999
     ? `第${activeEpisode.season}季 · ${sortedEpisodes.length}${episodeWord} · 当前${activeEpisodeLabel.replace(/^第\d+季 /, '')}`
     : `${sortedEpisodes.length || 1}${episodeWord} · 当前${activeEpisodeLabel}`;
+  // 自动播放下一集：最后15秒通知，倒计时结束后自动播放
+  useEffect(() => {
+    if (!nextEpisode || duration <= 0) {
+      setAutoPlayCountdown(null);
+      return;
+    }
+    const remaining = duration - currentTime;
+    if (remaining > 0 && remaining <= 15 && autoPlayCountdown === null) {
+      setAutoPlayCountdown(15);
+    }
+  }, [currentTime, duration, nextEpisode]);
+
+  useEffect(() => {
+    if (autoPlayCountdown === null || autoPlayCountdown <= 0) {
+      if (autoPlayCountdown === 0 && nextEpisode) {
+        playEpisode(nextEpisode);
+        setAutoPlayCountdown(null);
+      }
+      return;
+    }
+    const timer = setTimeout(() => setAutoPlayCountdown((c) => (c !== null ? c - 1 : null)), 1000);
+    return () => clearTimeout(timer);
+  }, [autoPlayCountdown, nextEpisode]);
+
+  const cancelAutoPlay = () => setAutoPlayCountdown(null);
+
   const playEpisode = (episode: Video | null) => {
     if (!episode || episode.id === currentVideo?.id) return;
     navigate(`/player/${episode.id}`, { replace: true });
@@ -1181,6 +1208,14 @@ const Player: React.FC = () => {
           </div>
           <span>{durationText}</span>
         </div>
+
+        {/* 自动播放下一集通知 */}
+        {autoPlayCountdown !== null && autoPlayCountdown > 0 && nextEpisode && (
+          <div className="changli-player-autoplay-notice">
+            <span>{autoPlayCountdown}秒后自动播放下一集：{nextEpisode.episode_number ? `第${nextEpisode.episode_number}话` : nextEpisode.file_name}</span>
+            <button type="button" onClick={cancelAutoPlay}>取消</button>
+          </div>
+        )}
 
         <div className="changli-player-bottom">
           <div className="changli-player-left-controls">
