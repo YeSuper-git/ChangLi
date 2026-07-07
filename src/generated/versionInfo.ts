@@ -2,6 +2,18 @@
 export const currentVersion = "1.8.45";
 export const changelogData = [
   {
+    "version": "1.8.45",
+    "date": "2026-07-08",
+    "changes": [
+      {
+        "category": "修复",
+        "items": [
+          "修复 mpv 路径拼接缺少尾部分隔符"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.44",
     "date": "2026-07-08",
     "changes": [
