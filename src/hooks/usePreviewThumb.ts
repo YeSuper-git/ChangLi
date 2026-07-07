@@ -35,9 +35,9 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
   const cacheRef = useRef<Map<number, string>>(new Map());
   const currentFileId = useRef<string>('');
 
-  // 打开视频时触发预抽，切换视频时取消旧任务
+  // 打开视频时触发预抽（暂时禁用：FFmpeg 批量预抽占满 CPU 导致卡顿）
   useEffect(() => {
-    // 地雷1修复：取消旧视频的预抽
+    // 取消旧视频的预抽
     if (currentFileId.current && currentFileId.current !== fileId) {
       invoke('abort_prebuild_cmd', { fileId: currentFileId.current }).catch(() => {});
     }
@@ -46,19 +46,11 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
     cacheRef.current.clear();
     thumbDirRef.current = null;
 
-    if (!fileId || !filePath || !duration || duration <= 0) return;
-
-    invoke<string>('prebuild_thumbnails', {
-      fileId,
-      filePath,
-      duration,
-      intervalSec: 5,
-    }).then((dir) => {
-      thumbDirRef.current = dir;
-    }).catch(() => {});
+    // TODO: 预抽需要限制并发和 CPU 优先级，暂时禁用
+    // if (!fileId || !filePath || !duration || duration <= 0) return;
+    // invoke<string>('prebuild_thumbnails', { ... })
 
     return () => {
-      // 组件卸载时取消预抽
       invoke('abort_prebuild_cmd', { fileId }).catch(() => {});
     };
   }, [fileId, filePath, duration]);
