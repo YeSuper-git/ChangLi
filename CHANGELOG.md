@@ -1,3 +1,9 @@
+## v1.8.32 (2026-07-07)
+
+### 修复
+- 移除 on_window_event(Destroyed) 中的 destroy() 调用，IPC 通道在窗口销毁时已断开，强行调用导致 ntdll 堆损坏
+- mpv 清理由前端 useEffect cleanup 的 destroy() 负责，确保在 IPC 仍可用时执行
+
 ## v1.8.31 (2026-07-07)
 
 ### 核心修复
