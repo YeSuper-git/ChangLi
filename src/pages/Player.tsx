@@ -76,8 +76,6 @@ const Player: React.FC = () => {
   const isMountedRef = useRef(true);
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
-  const aspectResizeLockRef = useRef(false);
-  const windowDraggingRef = useRef(false);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   // preview refs removed — using usePreviewThumb hook
@@ -579,12 +577,7 @@ const Player: React.FC = () => {
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
 
-    // 拉伸期间完全屏蔽 onResized 的 IPC 调用，防止堆损坏
-    windowDraggingRef.current = true;
-
     // 自定义 JS 实现右下角等比拉伸
-    // 关键：拖拽过程中只做 DOM 操作（同步视口高度），不调用 setSize IPC
-    // 松手后一次性调用 setSize，避免大量 IPC 导致堆损坏
     const startX = event.screenX;
     const startY = event.screenY;
     const startW = lastWindowSizeRef.current?.width || window.innerWidth;
@@ -620,14 +613,9 @@ const Player: React.FC = () => {
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      // 松手后一次性设置窗口大小（唯一一次 IPC）
-      aspectResizeLockRef.current = true;
+      // 松手后一次性设置窗口大小
       playerWindow.setSize(new LogicalSize(latestW, latestH)).catch(() => undefined).finally(() => {
         syncViewport(latestH);
-        window.setTimeout(() => {
-          aspectResizeLockRef.current = false;
-          window.setTimeout(() => { windowDraggingRef.current = false; }, 200);
-        }, 120);
       });
     };
 
