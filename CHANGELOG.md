@@ -1,3 +1,10 @@
+## v1.8.37 (2026-07-07)
+
+### 修复
+- 方案1: mpv 降级为纯软件渲染 (--vo=gpu, --hwdec=no, --vd-lavc-threads=1)
+- 方案2: 前端 cleanup 先发 quit 再等 500ms 再 destroy，避免 GPU 资源清理冲突
+- 方案3: Rust 侧窗口销毁延迟 600ms，先 hide 再 destroy
+
 ## v1.8.36 (2026-07-07)
 
 ### 修复
