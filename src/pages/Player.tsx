@@ -10,6 +10,7 @@ import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { resourceDir } from '@tauri-apps/api/path';
+import { notify } from '../utils/notify';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -213,6 +214,7 @@ const Player: React.FC = () => {
         }
 
         console.log('[Player] final mpvPath:', mpvPath);
+        notify({ message: `mpvPath: ${mpvPath || 'undefined'}`, type: mpvPath ? 'info' : 'error' });
 
         // 获取播放器窗口 HWND，用于 --wid 嵌入
         let playerWid: string | undefined;
