@@ -12,7 +12,7 @@ import { resolveResource, resourceDir } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
   'pause',
-  'time-pos',
+  // 'time-pos',  // 暂时移除验证稳定性
   'duration',
   'volume',
   'speed',
@@ -194,14 +194,15 @@ const Player: React.FC = () => {
             showMpvOutput: true,
             args: [
               '--vo=gpu-next',
-              '--hwdec=auto-safe',
-              '--gpu-api=vulkan',
+              '--hwdec=d3d11va',
+              '--gpu-api=d3d11',
               '--keep-open=yes',
               '--force-window=yes',
               '--hwdec-codecs=all',
               '--osc=no',
               '--osd-level=0',
               '--video-sync=audio',
+              '--log-file=mpv.log',
             ],
             observedProperties: OBSERVED_PROPERTIES,
           });
@@ -213,14 +214,15 @@ const Player: React.FC = () => {
               showMpvOutput: true,
               args: [
                 '--vo=gpu-next',
-                '--hwdec=auto-safe',
-                '--gpu-api=vulkan',
+                '--hwdec=d3d11va',
+                '--gpu-api=d3d11',
                 '--keep-open=yes',
                 '--force-window=yes',
                 '--hwdec-codecs=all',
                 '--osc=no',
                 '--osd-level=0',
                 '--video-sync=audio',
+                '--log-file=mpv.log',
               ],
               observedProperties: OBSERVED_PROPERTIES,
             });

@@ -12,6 +12,7 @@ use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_mpv::MpvExt;
 
 const PLAYER_WINDOW_LABEL: &str = "player";
 const PLAYER_OFFSET_X: f64 = 40.0;
@@ -76,10 +77,13 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
+    // 先杀 mpv 进程，再关窗口
+    if let Err(e) = app.mpv().destroy(PLAYER_WINDOW_LABEL) {
+        eprintln!("[player] destroy mpv failed: {}", e);
+    }
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
-    // mpv 进程由 tauri-plugin-mpv 的 destroy() 管理，Rust 端不再 kill
 }
 
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
@@ -213,9 +217,14 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     }
 
     let window = builder.build().context("create player window")?;
-
-    window.on_window_event(|_event| {
-        // mpv 进程由 tauri-plugin-mpv 管理，窗口事件不再触发 kill
+    let app_handle = window.app_handle().clone();
+    let window_label = window.label().to_string();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Destroyed = event {
+            if let Err(e) = app_handle.mpv().destroy(&window_label) {
+                eprintln!("[player] on_destroy destroy mpv failed: {}", e);
+            }
+        }
     });
 
     apply_player_window_style(&window)?;
