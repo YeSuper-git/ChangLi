@@ -1,7 +1,4 @@
-use base64::Engine;
-use lru::LruCache;
 use serde::Serialize;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -11,7 +8,6 @@ use tauri::Manager;
 pub enum ThumbnailError {
     FfmpegNotFound,
     DecodeFailed,
-    Timeout,
     IoError(String),
 }
 
@@ -20,7 +16,6 @@ impl std::fmt::Display for ThumbnailError {
         match self {
             Self::FfmpegNotFound => write!(f, "ffmpeg not found"),
             Self::DecodeFailed => write!(f, "decode failed"),
-            Self::Timeout => write!(f, "timeout"),
             Self::IoError(e) => write!(f, "io error: {}", e),
         }
     }
@@ -28,44 +23,33 @@ impl std::fmt::Display for ThumbnailError {
 
 impl std::error::Error for ThumbnailError {}
 
-type CacheKey = (String, u32); // (file_id, time_bucket)
+// 缓存目录路径（内存缓存，避免重复计算）
+static CACHE_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-struct ThumbnailCache {
-    cache: LruCache<CacheKey, String>,
+fn thumbnail_cache_dir(app: &AppHandle) -> PathBuf {
+    let mut guard = CACHE_DIR.lock().unwrap();
+    if let Some(ref dir) = *guard {
+        return dir.clone();
+    }
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("thumbnails");
+    std::fs::create_dir_all(&dir).ok();
+    *guard = Some(dir.clone());
+    dir
 }
 
-impl ThumbnailCache {
-    fn new() -> Self {
-        Self {
-            cache: LruCache::new(NonZeroUsize::new(1000).unwrap()),
-        }
-    }
-
-    fn get(&mut self, key: &CacheKey) -> Option<String> {
-        self.cache.get(key).cloned()
-    }
-
-    fn put(&mut self, key: CacheKey, value: String) {
-        self.cache.put(key, value);
-    }
-
-    fn clear(&mut self) {
-        self.cache.clear();
-    }
-}
-
-static CACHE: Mutex<Option<ThumbnailCache>> = Mutex::new(None);
-
-fn get_cache() -> std::sync::MutexGuard<'static, Option<ThumbnailCache>> {
-    CACHE.lock().unwrap()
-}
-
-fn time_bucket(time: f64) -> u32 {
-    (time / 2.0).floor() as u32
+fn video_hash(path: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    path.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
-    // Try resources/ffmpeg/ffmpeg.exe first
     if let Ok(resource_dir) = app.path().resource_dir() {
         let candidates = if cfg!(target_os = "windows") {
             vec![
@@ -87,6 +71,79 @@ fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
+/// 预构建缩略图：打开视频时调用，异步后台批量抽帧存文件
+/// 返回缓存目录路径，前端用 convertFileSrc(thumb_dir/{index}.jpg) 加载
+#[tauri::command]
+pub async fn prebuild_thumbnails(
+    app: AppHandle,
+    file_id: String,
+    file_path: String,
+    duration: f64,
+    interval_sec: f64,
+) -> Result<String, ThumbnailError> {
+    let ffmpeg = ffmpeg_path(&app).ok_or(ThumbnailError::FfmpegNotFound)?;
+    let cache_dir = thumbnail_cache_dir(&app).join(&file_id);
+    std::fs::create_dir_all(&cache_dir).map_err(|e| ThumbnailError::IoError(e.to_string()))?;
+
+    // 检查是否已完成（存在 marker 文件）
+    let marker = cache_dir.join(".done");
+    if marker.exists() {
+        return Ok(cache_dir.to_string_lossy().to_string());
+    }
+
+    let cache_dir_str = cache_dir.to_string_lossy().to_string();
+    let ffmpeg_str = ffmpeg.to_string_lossy().to_string();
+    let file_path_clone = file_path.clone();
+
+    // Phase 1: 先抽当前位置附近 + 首尾段（快速可用）
+    // Phase 2: 后台抽完整个视频
+    let cache_dir_clone = cache_dir.clone();
+    tokio::task::spawn_blocking(move || {
+        let total_thumbs = (duration / interval_sec).ceil() as u32;
+        let step = interval_sec;
+
+        for i in 0..total_thumbs {
+            let t = (i as f64) * step;
+            if t > duration + 1.0 {
+                break;
+            }
+            let out_path = format!("{}/{}.jpg", cache_dir_str, i);
+            if std::path::Path::new(&out_path).exists() {
+                continue;
+            }
+            let _ = std::process::Command::new(&ffmpeg_str)
+                .args([
+                    "-ss",
+                    &format!("{:.1}", t),
+                    "-i",
+                    &file_path_clone,
+                    "-frames:v",
+                    "1",
+                    "-vf",
+                    "scale=320:-1:flags=fast_bilinear",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-q:v",
+                    "5",
+                    "-f",
+                    "image2",
+                    "-c:v",
+                    "mjpeg",
+                    "-y",
+                    &out_path,
+                ])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        }
+        // 标记完成
+        std::fs::write(cache_dir_clone.join(".done"), "").ok();
+    });
+
+    Ok(cache_dir.to_string_lossy().to_string())
+}
+
+/// 获取单帧缩略图（预抽未完成时的兜底，实时抽一张）
 #[tauri::command]
 pub async fn get_preview_thumb(
     app: AppHandle,
@@ -94,40 +151,37 @@ pub async fn get_preview_thumb(
     file_path: String,
     time: f64,
 ) -> Result<String, ThumbnailError> {
-    let bucket = time_bucket(time);
-    let key = (file_id.clone(), bucket);
+    let ffmpeg = ffmpeg_path(&app).ok_or(ThumbnailError::FfmpegNotFound)?;
+    let cache_dir = thumbnail_cache_dir(&app).join(&file_id);
 
-    // Check cache
-    {
-        let mut cache_guard = get_cache();
-        let cache = cache_guard.get_or_insert_with(ThumbnailCache::new);
-        if let Some(cached) = cache.get(&key) {
-            return Ok(cached.clone());
-        }
+    // 先检查预抽缓存是否存在
+    let idx = (time / 5.0).floor() as u32;
+    let cached_path = cache_dir.join(format!("{}.jpg", idx));
+    if cached_path.exists() {
+        return Ok(cached_path.to_string_lossy().to_string());
     }
 
-    // Find ffmpeg
-    let ffmpeg = ffmpeg_path(&app).ok_or(ThumbnailError::FfmpegNotFound)?;
-
-    // Run ffmpeg in blocking thread
+    // 兜底：实时抽一张
     let file_path_clone = file_path.clone();
     let result = tokio::task::spawn_blocking(move || {
         let output = std::process::Command::new(&ffmpeg)
             .args([
                 "-ss",
-                &format!("{:.3}", time),
+                &format!("{:.1}", time),
                 "-i",
                 &file_path_clone,
-                "-vf",
-                "scale=160:-2:flags=fast_bilinear",
                 "-frames:v",
                 "1",
+                "-vf",
+                "scale=320:-1:flags=fast_bilinear",
+                "-pix_fmt",
+                "yuv420p",
                 "-q:v",
-                "3",
+                "5",
                 "-f",
-                "image2pipe:1",
+                "image2",
                 "-c:v",
-                "png",
+                "mjpeg",
                 "-y",
                 "-",
             ])
@@ -136,8 +190,13 @@ pub async fn get_preview_thumb(
             .output();
 
         match output {
-            Ok(o) if o.status.success() && !o.stdout.is_empty() => Ok(o.stdout),
-            Ok(o) if o.status.success() => Err(ThumbnailError::DecodeFailed),
+            Ok(o) if o.status.success() && !o.stdout.is_empty() => {
+                // 保存到缓存目录
+                std::fs::create_dir_all(&cache_dir).ok();
+                let out_path = format!("{}/{}.jpg", cache_dir.display(), idx);
+                std::fs::write(&out_path, &o.stdout).ok();
+                Ok(out_path)
+            }
             Ok(_) => Err(ThumbnailError::DecodeFailed),
             Err(e) => Err(ThumbnailError::IoError(e.to_string())),
         }
@@ -145,27 +204,26 @@ pub async fn get_preview_thumb(
     .await;
 
     match result {
-        Ok(Ok(png_bytes)) => {
-            let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
-            // Store in cache
-            {
-                let mut cache_guard = get_cache();
-                let cache = cache_guard.get_or_insert_with(ThumbnailCache::new);
-                cache.put(key, b64.clone());
-            }
-            Ok(b64)
-        }
-        Ok(Err(ThumbnailError::DecodeFailed)) => Ok(String::new()),
+        Ok(Ok(path)) => Ok(path),
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(ThumbnailError::IoError(join_err.to_string())),
     }
 }
 
+/// 获取缩略图缓存目录路径
 #[tauri::command]
-pub async fn clear_preview_cache() -> Result<(), String> {
-    let mut cache_guard = get_cache();
-    if let Some(cache) = cache_guard.as_mut() {
-        cache.clear();
+pub fn get_thumb_cache_dir(app: AppHandle, file_id: String) -> String {
+    thumbnail_cache_dir(&app)
+        .join(&file_id)
+        .to_string_lossy()
+        .to_string()
+}
+
+#[tauri::command]
+pub async fn clear_preview_cache(app: AppHandle) -> Result<(), String> {
+    let dir = thumbnail_cache_dir(&app);
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
