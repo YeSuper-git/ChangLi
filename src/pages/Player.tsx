@@ -9,7 +9,7 @@ import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
-import { resolveResource, resourceDir } from '@tauri-apps/api/path';
+import { resourceDir } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -171,22 +171,16 @@ const Player: React.FC = () => {
           return;
         }
 
-        // 初始化 mpv — 尝试多种方式定位 mpv.exe
+        // 初始化 mpv — 用 resourceDir() 手动拼路径（resolveResource 在 Tauri 2 有时返回空）
         let mpvPath: string | undefined;
         try {
-          mpvPath = await resolveResource('resources/mpv/mpv.exe');
-        } catch { /* ignore */ }
-        if (!mpvPath) {
-          try {
-            mpvPath = await resolveResource('mpv/mpv.exe');
-          } catch { /* ignore */ }
-        }
-        if (!mpvPath) {
-          try {
-            const rd = await resourceDir();
-            const sep = rd.includes('\\') ? '\\' : '/';
-            mpvPath = `${rd}resources${sep}mpv${sep}mpv.exe`;
-          } catch { /* ignore */ }
+          const rd = await resourceDir();
+          // resourceDir() 返回 "...\\resources\\"，mpv.exe 在 "...\\resources\\mpv\\mpv.exe"
+          const candidate = `${rd}mpv${rd.includes('\\') ? '\\' : '/'}mpv.exe`;
+          console.log('[Player] mpv candidate:', candidate);
+          mpvPath = candidate;
+        } catch (e) {
+          console.warn('[Player] resourceDir failed:', e);
         }
         console.log('[Player] mpvPath:', mpvPath);
 
