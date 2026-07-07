@@ -243,11 +243,11 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     // 禁用输入法注入：防止微信输入法等第三方 IME 的全局钩子注入到播放器窗口
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, IACE_IGNORENOCONTEXT};
+        use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, IACE_IGNORENOCONTEXT, HIMC};
         if let Ok(handle) = window.hwnd() {
             let hwnd = windows::Win32::Foundation::HWND(handle.0);
             unsafe {
-                let _ = ImmAssociateContextEx(hwnd, None, IACE_IGNORENOCONTEXT);
+                let _ = ImmAssociateContextEx(hwnd, HIMC(std::ptr::null_mut()), IACE_IGNORENOCONTEXT);
             }
         }
     }
