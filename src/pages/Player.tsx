@@ -50,6 +50,7 @@ const Player: React.FC = () => {
   const [showResumeNotice, setShowResumeNotice] = useState(false);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,6 +72,7 @@ const Player: React.FC = () => {
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
   const aspectResizeLockRef = useRef(false);
+  const windowDraggingRef = useRef(false);
   const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
@@ -499,6 +501,14 @@ const Player: React.FC = () => {
     }, '最大化');
   }, [isFullscreen, playerWindow, runPlayerWindowAction]);
 
+  const handleToggleAlwaysOnTop = useCallback(() => {
+    runPlayerWindowAction(async () => {
+      const next = !isAlwaysOnTop;
+      await playerWindow.setAlwaysOnTop(next);
+      setIsAlwaysOnTop(next);
+    }, '置顶');
+  }, [isAlwaysOnTop, playerWindow, runPlayerWindowAction]);
+
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     playerWindow.isMaximized().then(setIsWindowMaximized).catch((error) => console.error('[Player] 获取最大化状态失败:', error));
@@ -522,11 +532,11 @@ const Player: React.FC = () => {
     // debounce onResized：拖拽/拉伸时每帧都触发，合并到 100ms 内只执行一次
     let resizeDebounceTimer = 0;
     playerWindow.onResized(async () => {
-      if (aspectResizeLockRef.current || isFullscreen) return;
+      if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen) return;
       if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
       resizeDebounceTimer = window.setTimeout(async () => {
         resizeDebounceTimer = 0;
-        if (aspectResizeLockRef.current || isFullscreen) return;
+        if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen) return;
         try {
           const [maximized, size] = await Promise.all([
             playerWindow.isMaximized().catch(() => false),
@@ -542,7 +552,7 @@ const Player: React.FC = () => {
 
         if (resizeSettleTimerRef.current) window.clearTimeout(resizeSettleTimerRef.current);
         resizeSettleTimerRef.current = window.setTimeout(async () => {
-          if (aspectResizeLockRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
+          if (aspectResizeLockRef.current || windowDraggingRef.current || isFullscreen || isPiP || await playerWindow.isMaximized().catch(() => false)) return;
           const current = await playerWindow.outerSize().catch(() => null);
           if (!current) return;
           const scale = window.devicePixelRatio || 1;
@@ -572,6 +582,9 @@ const Player: React.FC = () => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
+
+    // 拉伸期间完全屏蔽 onResized 的 IPC 调用，防止堆损坏
+    windowDraggingRef.current = true;
 
     // 自定义 JS 实现右下角等比拉伸，不依赖系统级 startResizeDragging
     const startX = event.screenX;
@@ -621,7 +634,11 @@ const Player: React.FC = () => {
     const onUp = () => {
       if (applyTimer) { window.clearTimeout(applyTimer); applyTimer = 0; }
       void applySize().finally(() => {
-        window.setTimeout(() => { aspectResizeLockRef.current = false; }, 120);
+        window.setTimeout(() => {
+          aspectResizeLockRef.current = false;
+          // 延迟释放拖拽标记，等 onResized 事件完全消退
+          window.setTimeout(() => { windowDraggingRef.current = false; }, 200);
+        }, 120);
       });
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
@@ -684,10 +701,12 @@ const Player: React.FC = () => {
           await win.setSize(new LogicalSize(pipW, pipH));
         }
         await win.setAlwaysOnTop(true);
+        setIsAlwaysOnTop(true);
         setIsPiP(true);
       } else {
         // 退出画中画：恢复窗口
         await win.setAlwaysOnTop(false);
+        setIsAlwaysOnTop(false);
         if (pipOriginalState.current) {
           await win.setSize(pipOriginalState.current.size);
           await win.setPosition(pipOriginalState.current.position);
@@ -1025,6 +1044,7 @@ const Player: React.FC = () => {
         </div>
         <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
           <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}><span /></button>
+          <button type="button" className={`changli-player-winbtn ${isAlwaysOnTop ? 'is-pinned' : ''}`} aria-label="置顶" onClick={handleToggleAlwaysOnTop}><span /></button>
           <button type="button" className={`changli-player-winbtn ${isWindowMaximized ? 'is-maximized' : ''}`} aria-label="最大化" onClick={handlePlayerToggleMaximize}><span /></button>
           <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}><span /></button>
         </div>
@@ -1033,6 +1053,7 @@ const Player: React.FC = () => {
       {isPiP && (
         <div className="changli-player-pip-actions" onMouseDown={stopWindowButtonMouseDown}>
           <button type="button" onClick={closePiP}>退出小窗</button>
+          <button type="button" className={isAlwaysOnTop ? 'active' : ''} onClick={handleToggleAlwaysOnTop}>置顶</button>
           <button type="button" className="close" onClick={handlePlayerClose} aria-label="关闭播放器">×</button>
         </div>
       )}
