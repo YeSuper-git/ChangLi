@@ -2,12 +2,13 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getCurrentWindow, currentMonitor, Window } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
-import { convertFileSrc } from '@tauri-apps/api/core';
+// convertFileSrc removed — FFmpeg preview uses invoke instead
 import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } from '../utils/api';
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
+import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { resolveResource, resourceDir } from '@tauri-apps/api/path';
 
 const OBSERVED_PROPERTIES = [
@@ -36,6 +37,13 @@ const Player: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // FFmpeg preview hook — must be before callbacks that reference it
+  const { thumbnailUrl, hoverTime, hoverX, onHover: previewOnHover, onLeave: previewOnLeave } = usePreviewThumb({
+    fileId: currentVideo ? String(currentVideo.id) : '',
+    filePath: currentVideo?.file_path || '',
+    duration,
+  });
   const [volume, setVolume] = useState(() => {
     try { return parseInt(localStorage.getItem('changli-player-volume') || '80', 10) || 80; } catch { return 80; }
   });
@@ -56,10 +64,6 @@ const Player: React.FC = () => {
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // 悬浮预览
-  const [hoverTime, setHoverTime] = useState<number | null>(null);
-  const [hoverX, setHoverX] = useState(0);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [draggingTime, setDraggingTime] = useState<number | null>(null);
   
   // Refs
@@ -77,9 +81,7 @@ const Player: React.FC = () => {
   const resizeSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewSeqRef = useRef(0);
-  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  // preview refs removed — using usePreviewThumb hook
 
   const getCurrentVideoRatio = useCallback(() => {
     const videoW = observedVideoSizeRef.current.width;
@@ -731,82 +733,16 @@ const Player: React.FC = () => {
 
   const handleProgressBarHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (draggingProgressRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
     const progress = getProgressTimeFromClientX(e.clientX);
     if (!progress) return;
-    const { time, x } = progress;
-
-    setHoverTime(time);
-    setHoverX(x);
-
-    // 防抖生成预览帧：只更新悬停缩略图，不能 seek 主播放器。
-    if (previewTimerRef.current) {
-      clearTimeout(previewTimerRef.current);
-    }
-    const seq = ++previewSeqRef.current;
-    previewTimerRef.current = setTimeout(async () => {
-      try {
-        if (!currentVideo?.file_path) return;
-        let video = previewVideoRef.current;
-        if (!video || video.dataset.src !== currentVideo.file_path) {
-          video = document.createElement('video');
-          video.dataset.src = currentVideo.file_path;
-          video.src = convertFileSrc(currentVideo.file_path);
-          video.muted = true;
-          video.preload = 'auto';
-          // 不设 crossOrigin — 本地文件用 Tauri asset protocol 不支持 CORS
-          previewVideoRef.current = video;
-        }
-        if (video.readyState < 1) {
-          await new Promise<void>((resolve, reject) => {
-            const cleanup = () => {
-              video?.removeEventListener('loadedmetadata', onLoaded);
-              video?.removeEventListener('error', onError);
-            };
-            const onLoaded = () => { cleanup(); resolve(); };
-            const onError = () => { cleanup(); reject(new Error('preview metadata load failed')); };
-            video?.addEventListener('loadedmetadata', onLoaded, { once: true });
-            video?.addEventListener('error', onError, { once: true });
-          });
-        }
-        video.currentTime = Math.min(Math.max(time, 0), Math.max((video.duration || duration) - 0.1, 0));
-        await new Promise<void>((resolve, reject) => {
-          const cleanup = () => {
-            video?.removeEventListener('seeked', onSeeked);
-            video?.removeEventListener('error', onError);
-          };
-          const onSeeked = () => { cleanup(); resolve(); };
-          const onError = () => { cleanup(); reject(new Error('preview seek failed')); };
-          video?.addEventListener('seeked', onSeeked, { once: true });
-          video?.addEventListener('error', onError, { once: true });
-        });
-        if (seq !== previewSeqRef.current) return;
-        const canvas = document.createElement('canvas');
-        const width = video.videoWidth || 160;
-        const height = video.videoHeight || 90;
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d')?.drawImage(video, 0, 0, width, height);
-        if (seq !== previewSeqRef.current) return;
-        setThumbnailUrl(canvas.toDataURL('image/jpeg', 0.72));
-      } catch {
-        // 预览帧失败时退回当前视频缩略图，但不影响主播放器进度。
-        if (seq === previewSeqRef.current) {
-          setThumbnailUrl(currentVideo?.thumbnail_data_url || null);
-        }
-      }
-    }, 300);
-  }, [currentVideo, duration, getProgressTimeFromClientX]);
+    previewOnHover(e.clientX, rect, progress.time);
+  }, [getProgressTimeFromClientX, previewOnHover]);
 
   // 进度条鼠标离开
   const handleProgressBarLeave = useCallback(() => {
-    if (previewTimerRef.current) {
-      clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = null;
-    }
-    previewSeqRef.current++;
-    setHoverTime(null);
-    setThumbnailUrl(null);
-  }, []);
+    previewOnLeave();
+  }, [previewOnLeave]);
 
   // 进度条拖拽
   const handleProgressPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {

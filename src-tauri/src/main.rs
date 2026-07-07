@@ -6,6 +6,7 @@ mod downloader;
 mod migrations;
 mod parser;
 mod player;
+mod preview;
 mod scanner;
 mod site_config;
 mod storage;
@@ -2740,6 +2741,8 @@ fn main() {
             disable_preset_template_cmd,
             set_game_overlay_disabled,
             get_game_overlay_disabled,
+            preview::thumbnail_service::get_preview_thumb,
+            preview::thumbnail_service::clear_preview_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
