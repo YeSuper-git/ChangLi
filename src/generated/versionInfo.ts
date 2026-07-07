@@ -2,6 +2,18 @@
 export const currentVersion = "1.8.38";
 export const changelogData = [
   {
+    "version": "1.8.40",
+    "date": "2026-07-08",
+    "changes": [
+      {
+        "category": "修复",
+        "items": [
+          "移除 --vd-lavc-threads=1 限制，恢复多线程软解，解决 4K HEVC 极端卡顿"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.38",
     "date": "2026-07-08",
     "changes": [
