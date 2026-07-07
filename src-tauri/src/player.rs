@@ -77,10 +77,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-    // 先杀 mpv 进程，再关窗口
-    if let Err(e) = app.mpv().destroy(PLAYER_WINDOW_LABEL) {
-        eprintln!("[player] destroy mpv failed: {}", e);
-    }
+    // destroy 由 on_window_event(Destroyed) 统一处理，避免双重 kill 竞争
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.close();
     }
