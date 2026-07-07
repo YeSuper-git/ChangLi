@@ -171,19 +171,47 @@ const Player: React.FC = () => {
           return;
         }
 
-        // 初始化 mpv — 用 resourceDir() 手动拼路径（resolveResource 在 Tauri 2 有时返回空）
+        // 初始化 mpv — 多种方式定位 mpv.exe
         let mpvPath: string | undefined;
+
+        // 方式1: resourceDir() 拼接
         try {
           const rd = await resourceDir();
           const sep = rd.includes('\\') ? '\\' : '/';
-          // 确保尾部分隔符
           const base = rd.endsWith(sep) ? rd : `${rd}${sep}`;
-          mpvPath = `${base}mpv${sep}mpv.exe`;
-          console.log('[Player] mpvPath:', mpvPath);
+          const candidate = `${base}mpv${sep}mpv.exe`;
+          console.log('[Player] resourceDir:', rd, '→ candidate:', candidate);
+          mpvPath = candidate;
         } catch (e) {
           console.warn('[Player] resourceDir failed:', e);
         }
-        console.log('[Player] mpvPath:', mpvPath);
+
+        // 方式2: resolveResource (Tauri 2 内置)
+        if (!mpvPath) {
+          try {
+            const { resolveResource } = await import('@tauri-apps/api/path');
+            mpvPath = await resolveResource('resources/mpv/mpv.exe');
+            console.log('[Player] resolveResource:', mpvPath);
+          } catch (e) {
+            console.warn('[Player] resolveResource failed:', e);
+          }
+        }
+
+        // 方式3: 直接用 app exe 所在目录拼接
+        if (!mpvPath) {
+          try {
+            const { appDir } = await import('@tauri-apps/api/path');
+            const ad = await appDir();
+            const sep = ad.includes('\\') ? '\\' : '/';
+            const base = ad.endsWith(sep) ? ad : `${ad}${sep}`;
+            mpvPath = `${base}resources${sep}mpv${sep}mpv.exe`;
+            console.log('[Player] appDir fallback:', mpvPath);
+          } catch (e) {
+            console.warn('[Player] appDir failed:', e);
+          }
+        }
+
+        console.log('[Player] final mpvPath:', mpvPath);
 
         // 获取播放器窗口 HWND，用于 --wid 嵌入
         let playerWid: string | undefined;
