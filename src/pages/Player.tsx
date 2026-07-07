@@ -9,8 +9,6 @@ import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
-import { resourceDir } from '@tauri-apps/api/path';
-import { notify } from '../utils/notify';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -172,49 +170,16 @@ const Player: React.FC = () => {
           return;
         }
 
-        // 初始化 mpv — 多种方式定位 mpv.exe
+        // 初始化 mpv — 用 Rust 后端查找 mpv.exe（检查实际文件是否存在）
         let mpvPath: string | undefined;
-
-        // 方式1: resourceDir() 拼接
         try {
-          const rd = await resourceDir();
-          const sep = rd.includes('\\') ? '\\' : '/';
-          const base = rd.endsWith(sep) ? rd : `${rd}${sep}`;
-          const candidate = `${base}mpv${sep}mpv.exe`;
-          console.log('[Player] resourceDir:', rd, '→ candidate:', candidate);
-          mpvPath = candidate;
+          mpvPath = await invoke<string>('find_mpv_path');
+          console.log('[Player] find_mpv_path:', mpvPath);
         } catch (e) {
-          console.warn('[Player] resourceDir failed:', e);
+          console.error('[Player] find_mpv_path failed:', e);
+          // 后端找不到，报错给用户
+          throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
         }
-
-        // 方式2: resolveResource (Tauri 2 内置)
-        if (!mpvPath) {
-          try {
-            const { resolveResource } = await import('@tauri-apps/api/path');
-            mpvPath = await resolveResource('resources/mpv/mpv.exe');
-            console.log('[Player] resolveResource:', mpvPath);
-          } catch (e) {
-            console.warn('[Player] resolveResource failed:', e);
-          }
-        }
-
-        // 方式3: 直接用安装目录拼接（resourceDir 可能不是安装目录）
-        if (!mpvPath) {
-          try {
-            // 从 resourceDir 向上找安装目录
-            const rd = await resourceDir();
-            const sep = rd.includes('\\') ? '\\' : '/';
-            // resourceDir 通常是 "...\\resources\\"，安装目录是上一层
-            const installDir = rd.replace(new RegExp(`resources${sep.replace('\\', '\\\\')}?$`), '');
-            mpvPath = `${installDir}resources${sep}mpv${sep}mpv.exe`;
-            console.log('[Player] installDir fallback:', mpvPath);
-          } catch (e) {
-            console.warn('[Player] installDir fallback failed:', e);
-          }
-        }
-
-        console.log('[Player] final mpvPath:', mpvPath);
-        window.alert(`[调试] mpvPath: ${mpvPath || 'undefined'}\nresourceDir结果见控制台`);
 
         // 获取播放器窗口 HWND，用于 --wid 嵌入
         let playerWid: string | undefined;

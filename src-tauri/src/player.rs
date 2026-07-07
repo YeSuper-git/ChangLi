@@ -91,6 +91,37 @@ pub fn close_player_window(app: &AppHandle) {
     });
 }
 
+/// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
+#[tauri::command]
+pub fn find_mpv_path() -> Result<String, String> {
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("获取 exe 路径失败: {}", e))?
+        .parent()
+        .ok_or("无法获取 exe 目录")?
+        .to_path_buf();
+
+    // 可能的 mpv.exe 路径
+    let candidates = vec![
+        exe_dir.join("resources").join("mpv").join("mpv.exe"),
+        exe_dir.join("mpv").join("mpv.exe"),
+        exe_dir.join("resources").join("mpv").join("mpv.com"),
+    ];
+
+    for candidate in &candidates {
+        if candidate.exists() {
+            let path = candidate.to_string_lossy().to_string();
+            eprintln!("[player] find_mpv_path: found {}", path);
+            return Ok(path);
+        }
+    }
+
+    // 都没找到，返回第一个候选路径（让插件报更有意义的错误）
+    let fallback = candidates[0].to_string_lossy().to_string();
+    eprintln!("[player] find_mpv_path: not found, fallback to {}", fallback);
+    Err(format!("mpv.exe 未找到，已尝试: {}",
+        candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")))
+}
+
 /// 返回播放器窗口的 HWND（十进制），供前端 init mpv 时传 --wid=
 #[tauri::command]
 pub fn get_player_hwnd(app: AppHandle) -> Result<u64, String> {

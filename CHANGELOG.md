@@ -1,3 +1,9 @@
+## v1.8.49 (2026-07-08)
+
+### 修复
+- mpv 路径查找改用 Rust 后端 find_mpv_path 命令，用 std::env::current_exe 定位安装目录
+- 移除前端 resolveResource/resourceDir 不可靠的路径猜测
+
 ## v1.8.48 (2026-07-08)
 
 ### 调试
