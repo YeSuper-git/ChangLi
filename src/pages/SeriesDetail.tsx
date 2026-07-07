@@ -398,16 +398,20 @@ const SeriesDetail: React.FC = () => {
 
   const handleBatchDeleteEpisodes = async () => {
     if (selectedEpisodes.size === 0) return;
+    const idsToDelete = [...selectedEpisodes];
+    const count = idsToDelete.length;
+    // 乐观更新：立即从本地移除
+    setVideos(prev => prev.filter(v => !selectedEpisodes.has(v.id)));
+    setSelectedEpisodes(new Set());
+    setSelectMode(false);
     try {
-      for (const videoId of selectedEpisodes) {
-        await deleteVideo(videoId);
-      }
-      setSelectedEpisodes(new Set());
-      setSelectMode(false);
-      await loadSeries();
-      await refreshSeries();
-      notify({ message: `已删除 ${selectedEpisodes.size} 个分集`, type: 'success' });
+      await Promise.all(idsToDelete.map(id => deleteVideo(id)));
+      // 后台同步
+      refreshSeries().catch(() => {});
+      notify({ message: `已删除 ${count} 个分集`, type: 'success' });
     } catch (error) {
+      // 失败时重新加载恢复
+      await loadSeries();
       notify({ message: '批量删除失败，请稍后重试', type: 'error' });
     }
   };
@@ -534,11 +538,16 @@ const SeriesDetail: React.FC = () => {
 
   const handleToggleWatched = async () => {
     if (!series) return;
+    const wasWatched = series.is_watched === 1;
+    // 乐观更新本地状态
+    setSeries(prev => prev ? { ...prev, is_watched: wasWatched ? 0 : 1 } : prev);
     try {
       await toggleWatched(series.id);
-      setSeries(prev => prev ? { ...prev, is_watched: prev.is_watched === 1 ? 0 : 1 } : prev);
-      await refreshSeries();
+      // 后台静默同步 store
+      refreshSeries().catch(() => {});
     } catch (error) {
+      // 回滚
+      setSeries(prev => prev ? { ...prev, is_watched: wasWatched ? 1 : 0 } : prev);
       console.error('切换已看完状态失败:', error);
     }
   };

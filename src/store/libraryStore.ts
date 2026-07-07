@@ -148,11 +148,23 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   toggleFavorite: async (id: number, type: 'video' | 'series') => {
+    const { favorites } = get();
+    // 乐观更新：先改本地状态
+    const isCurrentlyFav = favorites.some(f => f.id === id && (type === 'series' ? 'video_count' in f : !('video_count' in f)));
+    if (isCurrentlyFav) {
+      set({ favorites: favorites.filter(f => !(f.id === id && (type === 'series' ? 'video_count' in f : !('video_count' in f)))) });
+    }
     try {
       await apiToggleFavorite(id, type);
-      // Reload favorites after toggling
-      await get().loadFavorites();
+      // 后台静默同步
+      get().loadFavorites().catch(() => {});
     } catch (error) {
+      // 失败则回滚
+      if (!isCurrentlyFav) {
+        set({ favorites: favorites.filter(f => f.id !== id) });
+      } else {
+        set({ favorites });
+      }
       console.error('[LibraryStore] toggleFavorite failed:', error);
     }
   },
