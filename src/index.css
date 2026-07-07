@@ -2654,43 +2654,28 @@ body.changli-player-body .changli-player-window > .changli-player-main {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.changli-player-pip-actions button.close {
-  width: 26px;
-  padding: 0;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.changli-player-pip-actions button.close:hover {
-  background: linear-gradient(135deg, var(--player-rose), var(--player-orange));
-}
-
-.changli-player-pip-actions button.active {
-  color: var(--player-rose, #fb5b7b);
-  background: rgba(251, 91, 123, 0.18);
-}
-
-.changli-player-pip-btn {
+.changli-player-pip-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
   width: 26px;
+  height: 26px;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #f2f4fb;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #c8ceda;
   cursor: pointer;
   padding: 0;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
-.changli-player-pip-btn:hover {
+.changli-player-pip-icon:hover {
+  color: #fff;
   background: rgba(255, 255, 255, 0.12);
 }
 
-.changli-player-pip-btn.active {
+.changli-player-pip-icon.active {
   color: var(--player-rose, #fb5b7b);
-  background: rgba(251, 91, 123, 0.18);
 }
 
 .changli-player-window.is-pip {
