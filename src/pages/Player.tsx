@@ -194,8 +194,8 @@ const Player: React.FC = () => {
             showMpvOutput: true,
             args: [
               '--vo=gpu-next',
-              '--hwdec=d3d11va',
-              '--gpu-api=d3d11',
+              '--hwdec=auto-safe',
+              '--gpu-api=vulkan',
               '--keep-open=yes',
               '--force-window=yes',
               '--hwdec-codecs=all',
@@ -213,8 +213,8 @@ const Player: React.FC = () => {
               showMpvOutput: true,
               args: [
                 '--vo=gpu-next',
-                '--hwdec=d3d11va',
-                '--gpu-api=d3d11',
+                '--hwdec=auto-safe',
+                '--gpu-api=vulkan',
                 '--keep-open=yes',
                 '--force-window=yes',
                 '--hwdec-codecs=all',
@@ -586,62 +586,53 @@ const Player: React.FC = () => {
     // 拉伸期间完全屏蔽 onResized 的 IPC 调用，防止堆损坏
     windowDraggingRef.current = true;
 
-    // 自定义 JS 实现右下角等比拉伸，不依赖系统级 startResizeDragging
+    // 自定义 JS 实现右下角等比拉伸
+    // 关键：拖拽过程中只做 DOM 操作（同步视口高度），不调用 setSize IPC
+    // 松手后一次性调用 setSize，避免大量 IPC 导致堆损坏
     const startX = event.screenX;
     const startY = event.screenY;
     const startW = lastWindowSizeRef.current?.width || window.innerWidth;
     const startH = lastWindowSizeRef.current?.height || window.innerHeight;
     const ratio = getCurrentVideoRatio();
-    let applyTimer = 0;
-    let applying = false;
-    let pending = false;
     let latestW = startW;
     let latestH = startH;
 
-    const applySize = async () => {
-      if (applying) { pending = true; return; }
-      applying = true;
-      aspectResizeLockRef.current = true;
-      const nextW = latestW;
-      const nextH = latestH;
-      lastWindowSizeRef.current = { width: nextW, height: nextH };
-      await playerWindow.setSize(new LogicalSize(nextW, nextH)).catch(() => undefined);
-      // 拉伸后同步视口高度
-      const h = `${Math.round(nextH)}px`;
-      document.documentElement.style.height = h;
-      document.body.style.height = h;
-      document.getElementById('root')?.style.setProperty('height', h);
+    const syncViewport = (h: number) => {
+      const hStr = `${Math.round(h)}px`;
+      document.documentElement.style.height = hStr;
+      document.body.style.height = hStr;
+      document.getElementById('root')?.style.setProperty('height', hStr);
       const el = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (el) el.style.height = h;
-      applying = false;
-      if (pending) { pending = false; void applySize(); }
+      if (el) el.style.height = hStr;
     };
 
     const onMove = (moveEvent: MouseEvent) => {
       moveEvent.preventDefault();
-      const dx = (moveEvent.screenX - startX);
-      const dy = (moveEvent.screenY - startY);
+      const dx = moveEvent.screenX - startX;
+      const dy = moveEvent.screenY - startY;
       const widthFromX = startW + dx;
       const widthFromY = (startH + dy) * ratio;
       const useVertical = Math.abs(dy * ratio) > Math.abs(dx);
       const desiredW = useVertical ? widthFromY : widthFromX;
       latestW = Math.max(520, Math.round(desiredW));
       latestH = Math.max(292, Math.round(latestW / ratio));
-      if (applyTimer) return;
-      applyTimer = window.setTimeout(() => { applyTimer = 0; void applySize(); }, 32);
+      // 只同步视口高度，不调用 setSize
+      syncViewport(latestH);
+      lastWindowSizeRef.current = { width: latestW, height: latestH };
     };
 
     const onUp = () => {
-      if (applyTimer) { window.clearTimeout(applyTimer); applyTimer = 0; }
-      void applySize().finally(() => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      // 松手后一次性设置窗口大小（唯一一次 IPC）
+      aspectResizeLockRef.current = true;
+      playerWindow.setSize(new LogicalSize(latestW, latestH)).catch(() => undefined).finally(() => {
+        syncViewport(latestH);
         window.setTimeout(() => {
           aspectResizeLockRef.current = false;
-          // 延迟释放拖拽标记，等 onResized 事件完全消退
           window.setTimeout(() => { windowDraggingRef.current = false; }, 200);
         }, 120);
       });
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
     };
 
     window.addEventListener('mousemove', onMove);
