@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import type { VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, parseCategoryFeatures } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures, PlayHistory } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
@@ -10,6 +10,7 @@ import FloatingActions from '../components/FloatingActions';
 const Home: React.FC = () => {
   const { actors, series: storeSeries, favorites, refreshSeries } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
   const hotActorsRef = useRef<HTMLDivElement>(null);
 
   const scrollHotActors = (direction: 'left' | 'right') => {
@@ -24,7 +25,36 @@ const Home: React.FC = () => {
     getAllCategories()
       .then(setCategories)
       .catch((err) => console.error('[Home] 加载大类配置失败:', err));
+    getPlayHistory()
+      .then(setPlayHistory)
+      .catch(() => {});
   }, []);
+
+  // 按最近观看时间排序分类
+  const sortedCategories = useMemo(() => {
+    if (playHistory.length === 0) return categories;
+    // video_id → category_key 映射
+    const videoToCategory = new Map<number, string>();
+    for (const s of storeSeries) {
+      videoToCategory.set(s.id, s.display_type || (s.has_actor ? 'adult' : 'anime'));
+    }
+    // category_key → 最近观看时间
+    const catLastWatched = new Map<string, number>();
+    for (const h of playHistory) {
+      const catKey = videoToCategory.get(h.video_id);
+      if (catKey) {
+        const t = new Date(h.last_played).getTime();
+        if (!catLastWatched.has(catKey) || t > catLastWatched.get(catKey)!) {
+          catLastWatched.set(catKey, t);
+        }
+      }
+    }
+    return [...categories].sort((a, b) => {
+      const ta = catLastWatched.get(a.key) ?? -1;
+      const tb = catLastWatched.get(b.key) ?? -1;
+      return tb - ta;
+    });
+  }, [categories, playHistory, storeSeries]);
 
   const seriesList = [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -124,7 +154,7 @@ const Home: React.FC = () => {
           )}
         </section>
 
-        {categories.length > 0 ? categories.map((cat) => {
+        {sortedCategories.length > 0 ? sortedCategories.map((cat) => {
           const features = parseCategoryFeatures(cat.features);
           const catSeries = seriesList.filter(s => s.display_type === cat.key || (!s.display_type && !s.has_actor && cat.key === 'anime') || (s.has_actor && cat.key === 'adult'));
           const isPortrait = cat.card_layout === 'portrait';
