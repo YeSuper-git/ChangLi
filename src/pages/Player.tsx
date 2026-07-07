@@ -522,11 +522,11 @@ const Player: React.FC = () => {
     // debounce onResized：拖拽/拉伸时每帧都触发，合并到 100ms 内只执行一次
     let resizeDebounceTimer = 0;
     playerWindow.onResized(async () => {
-      if (aspectResizeLockRef.current) return;
+      if (aspectResizeLockRef.current || isFullscreen) return;
       if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
       resizeDebounceTimer = window.setTimeout(async () => {
         resizeDebounceTimer = 0;
-        if (aspectResizeLockRef.current) return;
+        if (aspectResizeLockRef.current || isFullscreen) return;
         try {
           const [maximized, size] = await Promise.all([
             playerWindow.isMaximized().catch(() => false),
