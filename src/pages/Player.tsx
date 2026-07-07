@@ -1071,6 +1071,9 @@ const Player: React.FC = () => {
             if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
             setEpisodeListExpanded(true);
           }}
+          onMouseLeave={() => {
+            episodeHoverTimerRef.current = setTimeout(() => setEpisodeListExpanded(false), 300);
+          }}
         />
         <aside
           className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}
