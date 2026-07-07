@@ -538,7 +538,10 @@ fn file_stem_lower(path: &Path) -> String {
 }
 
 fn same_dir(a: &Path, b: &Path) -> bool {
-    a == b || a.to_string_lossy().trim_end_matches('/') == b.to_string_lossy().trim_end_matches('/')
+    let normalize = |p: &Path| -> String {
+        p.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_string()
+    };
+    normalize(a) == normalize(b)
 }
 
 fn fixed_episode_from_path(path: &Path) -> Option<i32> {
