@@ -450,17 +450,12 @@ const Library: React.FC = () => {
 
 
   const handleDeleteSeries = async (id: number) => {
+    setContextMenu(null);
+    clearPending();
     try {
       clearLibraryFilterCaches();
       await deleteVideoSeries(id, true);
-      setContextMenu(null);
-      await refreshSeries();
-      if (activeTagId !== null) {
-        await filterByTag(activeTagId);
-      }
-      if (activeActorId !== null) {
-        await filterByActor(activeActorId);
-      }
+      refreshSeries().catch(() => {});
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
       notify({ message: '删除视频集失败，请稍后重试', type: 'error' });
@@ -493,14 +488,12 @@ const Library: React.FC = () => {
   };
 
   const handleRescanMetadata = async (seriesId: number) => {
+    setContextMenu(null);
+    clearPending();
     try {
       clearLibraryFilterCaches();
       const matched = await rescanSingleSeriesMetadata(seriesId);
-      setContextMenu(null);
-      clearPending();
-      await refreshSeries();
-      if (activeTagId !== null) await filterByTag(activeTagId);
-      if (activeActorId !== null) await filterByActor(activeActorId);
+      refreshSeries().catch(() => {});
       notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Library] 检查更新失败:', error);
@@ -521,18 +514,16 @@ const Library: React.FC = () => {
 
   const doSwitchType = async () => {
     if (!typeSwitchConfirm) return;
+    const name = typeSwitchConfirm.categoryName;
+    setTypeSwitchConfirm(null);
     try {
       clearLibraryFilterCaches();
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
-      setTypeSwitchConfirm(null);
-      await refreshSeries();
-      if (activeTagId !== null) await filterByTag(activeTagId);
-      if (activeActorId !== null) await filterByActor(activeActorId);
-      notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
+      refreshSeries().catch(() => {});
+      notify({ message: `已切换到${name}`, type: 'success' });
     } catch (error) {
       console.error('[Library] 切换分类失败:', error);
       notify({ message: '切换分类失败，请稍后重试', type: 'error' });
-      setTypeSwitchConfirm(null);
     }
   };
 
@@ -673,22 +664,16 @@ const Library: React.FC = () => {
 
   const doBatchDelete = async () => {
     setBatchDeleteConfirm(false);
-    for (const key of selectedIds) {
-      const [type, idStr] = key.split('-');
-      const id = parseInt(idStr);
-      if (type === 's') {
-        clearLibraryFilterCaches();
-        await deleteVideoSeries(id, true);
-      }
-    }
+    const seriesIds = [...selectedIds].filter(k => k.startsWith('s-')).map(k => parseInt(k.split('-')[1]));
+    // 乐观更新：立即从本地移除
     setSelectedIds(new Set());
     setSelectMode(false);
-    await refreshSeries();
-    if (activeTagId !== null) {
-      await filterByTag(activeTagId);
-    }
-    if (activeActorId !== null) {
-      await filterByActor(activeActorId);
+    clearLibraryFilterCaches();
+    try {
+      await Promise.all(seriesIds.map(id => deleteVideoSeries(id, true)));
+      refreshSeries().catch(() => {});
+    } catch (error) {
+      refreshSeries().catch(() => {});
     }
   };
 
@@ -698,18 +683,20 @@ const Library: React.FC = () => {
 
   const doBatchSwitch = async () => {
     if (!batchSwitchConfirm) return;
+    const name = batchSwitchConfirm.categoryName;
+    const count = [...selectedIds].filter(k => k.startsWith('s-')).length;
     setBatchSwitchConfirm(null);
-    const seriesIds = [...selectedIds].filter(k => k.startsWith('s-')).map(k => parseInt(k.split('-')[1]));
-    clearLibraryFilterCaches();
-    for (const id of seriesIds) {
-      await switchSeriesTypeTo(id, batchSwitchConfirm.categoryKey).catch(() => {});
-    }
     setSelectedIds(new Set());
     setSelectMode(false);
-    await refreshSeries();
-    if (activeTagId !== null) await filterByTag(activeTagId);
-    if (activeActorId !== null) await filterByActor(activeActorId);
-    notify({ message: `已将 ${seriesIds.length} 个视频集切换到「${batchSwitchConfirm.categoryName}」`, type: 'success' });
+    clearLibraryFilterCaches();
+    const seriesIds = [...selectedIds].filter(k => k.startsWith('s-')).map(k => parseInt(k.split('-')[1]));
+    try {
+      await Promise.all(seriesIds.map(id => switchSeriesTypeTo(id, batchSwitchConfirm.categoryKey).catch(() => {})));
+      refreshSeries().catch(() => {});
+    } catch (error) {
+      refreshSeries().catch(() => {});
+    }
+    notify({ message: `已将 ${count} 个视频集切换到「${name}」`, type: 'success' });
   };
 
   return (

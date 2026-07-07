@@ -151,10 +151,10 @@ const Search: React.FC = () => {
 
   const handleRescanMetadata = async (seriesId: number) => {
     try {
-      const matched = await rescanSingleSeriesMetadata(seriesId);
       setContextMenu(null);
       clearPending();
-      await refreshSeries();
+      const matched = await rescanSingleSeriesMetadata(seriesId);
+      refreshSeries().catch(() => {});
       notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
       notify({ message: '重新识别失败，请确认本地文件夹仍然存在', type: 'error' });
@@ -174,24 +174,25 @@ const Search: React.FC = () => {
 
   const doSwitchType = async () => {
     if (!typeSwitchConfirm) return;
+    const name = typeSwitchConfirm.categoryName;
+    setTypeSwitchConfirm(null);
     try {
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
-      setTypeSwitchConfirm(null);
-      await refreshSeries();
-      notify({ message: `已切换到${typeSwitchConfirm.categoryName}`, type: 'success' });
+      refreshSeries().catch(() => {});
+      notify({ message: `已切换到${name}`, type: 'success' });
     } catch (error) {
       notify({ message: '切换分类失败，请稍后重试', type: 'error' });
-      setTypeSwitchConfirm(null);
     }
   };
 
   const handleDeleteSeries = async (seriesId: number) => {
+    // 乐观更新：立即从结果中移除
+    setResults(prev => prev.filter(r => !(r.type === 'series' && r.id === seriesId)));
+    setContextMenu(null);
+    clearPending();
     try {
       await deleteVideoSeries(seriesId, true);
-      setContextMenu(null);
-      clearPending();
-      await refreshSeries();
-      setResults(results.filter(r => !(r.type === 'series' && r.id === seriesId)));
+      refreshSeries().catch(() => {});
       notify({ message: '视频集已删除', type: 'success' });
     } catch (error) {
       notify({ message: '删除失败，请稍后重试', type: 'error' });

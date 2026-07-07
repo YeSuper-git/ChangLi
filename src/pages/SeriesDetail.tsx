@@ -366,6 +366,10 @@ const SeriesDetail: React.FC = () => {
   const handleToggleSeriesStatus = async () => {
     if (!series) return;
     const nextStatus = isSeriesCompleted(series) ? 'ongoing' : 'completed';
+    // 乐观更新
+    setSeries(prev => prev ? { ...prev, status: nextStatus } : prev);
+    setPosterMenu(null);
+    notify({ message: nextStatus === 'completed' ? '已切换为已完结' : '已切换为连载中', type: 'success' });
     try {
       await updateVideoSeries(
         series.id,
@@ -377,11 +381,11 @@ const SeriesDetail: React.FC = () => {
         series.code || undefined,
         series.has_chinese_sub ?? undefined,
       );
-      setPosterMenu(null);
-      await loadSeries({ silent: true });
-      await refreshSeries();
-      notify({ message: nextStatus === 'completed' ? '已切换为已完结' : '已切换为连载中', type: 'success' });
+      loadSeries({ silent: true }).catch(() => {});
+      refreshSeries().catch(() => {});
     } catch (error) {
+      // 回滚
+      setSeries(prev => prev ? { ...prev, status: series.status } : prev);
       console.error('切换连载状态失败:', error);
       notify({ message: '切换连载状态失败，请稍后重试', type: 'error' });
     }
@@ -554,11 +558,13 @@ const SeriesDetail: React.FC = () => {
 
   const handleToggleChineseSub = async () => {
     if (!series) return;
+    const wasChineseSub = series.has_chinese_sub === 1;
+    setSeries(prev => prev ? { ...prev, has_chinese_sub: wasChineseSub ? 0 : 1 } : prev);
     try {
       await toggleChineseSub(series.id);
-      setSeries(prev => prev ? { ...prev, has_chinese_sub: prev.has_chinese_sub === 1 ? 0 : 1 } : prev);
-      await refreshSeries();
+      refreshSeries().catch(() => {});
     } catch (error) {
+      setSeries(prev => prev ? { ...prev, has_chinese_sub: wasChineseSub ? 1 : 0 } : prev);
       console.error('切换中文字幕状态失败:', error);
     }
   };
