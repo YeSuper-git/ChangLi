@@ -231,16 +231,8 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     }
 
     let window = builder.build().context("create player window")?;
-    let app_handle = window.app_handle().clone();
-    let window_label = window.label().to_string();
-    window.on_window_event(move |event| {
-        if let WindowEvent::Destroyed = event {
-            if let Err(e) = app_handle.mpv().destroy(&window_label) {
-                eprintln!("[player] on_destroy destroy mpv failed: {}", e);
-            }
-        }
-    });
-
+    // 不在 on_window_event 里调 destroy() — Destroyed 时 IPC 通道可能已断，
+    // 强行调用会导致 ntdll 堆损坏。mpv 清理由前端 useEffect cleanup 的 destroy() 负责。
     apply_player_window_style(&window)?;
     Ok(window)
 }
