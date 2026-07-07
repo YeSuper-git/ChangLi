@@ -77,10 +77,18 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-    // destroy 由 on_window_event(Destroyed) 统一处理，避免双重 kill 竞争
+    // 先隐藏窗口让用户感知不到延迟，再延迟销毁避免 GPU 清理冲突
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        let _ = window.close();
+        let _ = window.hide();
     }
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(600));
+        if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
+            let _ = window.destroy();
+            eprintln!("[player] Player window destroyed after delay.");
+        }
+    });
 }
 
 /// 返回播放器窗口的 HWND（十进制），供前端 init mpv 时传 --wid=

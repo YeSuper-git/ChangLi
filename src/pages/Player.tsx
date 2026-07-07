@@ -205,12 +205,14 @@ const Player: React.FC = () => {
             ...(mpvPath ? { path: mpvPath } : {}),
             showMpvOutput: true,
             args: [
-              '--vo=gpu-next',
-              '--hwdec=d3d11va',
+              '--vo=gpu',
+              '--hwdec=no',
               '--gpu-api=d3d11',
+              '--gpu-context=d3d11',
+              '--vd-lavc-threads=1',
+              '--gapless=no',
               '--keep-open=yes',
               '--force-window=no',
-              '--hwdec-codecs=all',
               '--osc=no',
               '--osd-level=0',
               '--video-sync=audio',
@@ -226,12 +228,14 @@ const Player: React.FC = () => {
             await init({
               showMpvOutput: true,
               args: [
-                '--vo=gpu-next',
-                '--hwdec=d3d11va',
+                '--vo=gpu',
+                '--hwdec=no',
                 '--gpu-api=d3d11',
+                '--gpu-context=d3d11',
+                '--vd-lavc-threads=1',
+                '--gapless=no',
                 '--keep-open=yes',
                 '--force-window=no',
-                '--hwdec-codecs=all',
                 '--osc=no',
                 '--osd-level=0',
                 '--video-sync=audio',
@@ -365,14 +369,19 @@ const Player: React.FC = () => {
     };
   }, [id]);
 
-  // 组件卸载时清理 mpv — 通过锁串行化，避免和 init 竞态
+  // 组件卸载时清理 mpv — 延迟 destroy，等 mpv 完全退出后再销毁窗口
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
-            await destroy();
+            // 1. 发送 quit 让 mpv 优雅退出
+            await command('quit').catch(() => {});
+            // 2. 等待 mpv uninit 全周期完成
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // 3. 清理插件状态
+            await destroy().catch(() => {});
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }
