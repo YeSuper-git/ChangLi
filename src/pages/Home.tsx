@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import type { VideoSeries, Category, CategoryFeatures, PlayHistory, Video } from '../utils/api';
-import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, getVideos, parseCategoryFeatures } from '../utils/api';
+import type { VideoSeries, Category, CategoryFeatures, PlayHistory } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
@@ -11,7 +11,6 @@ const Home: React.FC = () => {
   const { actors, series: storeSeries, favorites, refreshSeries } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
   const hotActorsRef = useRef<HTMLDivElement>(null);
 
   const scrollHotActors = (direction: 'left' | 'right') => {
@@ -28,9 +27,6 @@ const Home: React.FC = () => {
       .catch((err) => console.error('[Home] 加载大类配置失败:', err));
     getPlayHistory()
       .then(setPlayHistory)
-      .catch(() => {});
-    getVideos()
-      .then(setVideos)
       .catch(() => {});
   }, []);
 
@@ -60,39 +56,7 @@ const Home: React.FC = () => {
     });
   }, [categories, playHistory, storeSeries]);
 
-  // video_id → series_id 映射 + series_id → 最近观看时间
-  const seriesLastWatched = useMemo(() => {
-    const map = new Map<number, number>();
-    if (playHistory.length === 0 || videos.length === 0) return map;
-    // video_id → series_id
-    const videoToSeries = new Map<number, number>();
-    for (const v of videos) {
-      if (v.series_id) videoToSeries.set(v.id, v.series_id);
-    }
-    // series_id → 最近观看时间
-    for (const h of playHistory) {
-      const sid = videoToSeries.get(h.video_id);
-      if (sid) {
-        const t = new Date(h.last_played).getTime();
-        if (!map.has(sid) || t > map.get(sid)!) {
-          map.set(sid, t);
-        }
-      }
-    }
-    return map;
-  }, [playHistory, videos]);
-
   const seriesList = [...storeSeries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  // 追番按最近观看排序
-  const sortedFavorites = useMemo(() => {
-    if (seriesLastWatched.size === 0) return favorites;
-    return [...favorites].sort((a, b) => {
-      const ta = seriesLastWatched.get(a.id) ?? -1;
-      const tb = seriesLastWatched.get(b.id) ?? -1;
-      return tb - ta;
-    });
-  }, [favorites, seriesLastWatched]);
 
   const getCategoryFeatures = (series: VideoSeries): CategoryFeatures => {
     const cat = categories.find(c => c.key === series.display_type);
@@ -183,7 +147,7 @@ const Home: React.FC = () => {
           </div>
           {favorites.length > 0 ? (
             <div className="changli-auto-grid-series changli-home-one-row changli-home-one-row-series">
-              {sortedFavorites.slice(0, 10).map((item) => renderSeriesCard(item as VideoSeries, { aspectClass: 'aspect-[3/4]' }))}
+              {favorites.slice(0, 10).map((item) => renderSeriesCard(item as VideoSeries, { aspectClass: 'aspect-[3/4]' }))}
             </div>
           ) : (
             <div className="changli-empty-state text-gray-500">暂无追番</div>
@@ -192,14 +156,7 @@ const Home: React.FC = () => {
 
         {sortedCategories.length > 0 ? sortedCategories.map((cat) => {
           const features = parseCategoryFeatures(cat.features);
-          const catSeries = seriesList
-            .filter(s => s.display_type === cat.key || (!s.display_type && !s.has_actor && cat.key === 'anime') || (s.has_actor && cat.key === 'adult'))
-            .sort((a, b) => {
-              const ta = seriesLastWatched.get(a.id) ?? -1;
-              const tb = seriesLastWatched.get(b.id) ?? -1;
-              if (ta !== tb) return tb - ta;
-              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-            });
+          const catSeries = seriesList.filter(s => s.display_type === cat.key || (!s.display_type && !s.has_actor && cat.key === 'anime') || (s.has_actor && cat.key === 'adult'));
           const isPortrait = cat.card_layout === 'portrait';
           const aspectClass = isPortrait ? 'aspect-[3/4]' : 'aspect-video';
           const epWord = features.episode || '部';
