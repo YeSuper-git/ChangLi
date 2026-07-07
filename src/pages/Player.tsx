@@ -214,7 +214,7 @@ const Player: React.FC = () => {
         }
 
         console.log('[Player] final mpvPath:', mpvPath);
-        notify({ message: `mpvPath: ${mpvPath || 'undefined'}`, type: mpvPath ? 'info' : 'error' });
+        window.alert(`[调试] mpvPath: ${mpvPath || 'undefined'}\nresourceDir结果见控制台`);
 
         // 获取播放器窗口 HWND，用于 --wid 嵌入
         let playerWid: string | undefined;
