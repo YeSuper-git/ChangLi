@@ -175,10 +175,11 @@ const Player: React.FC = () => {
         let mpvPath: string | undefined;
         try {
           const rd = await resourceDir();
-          // resourceDir() 返回 "...\\resources\\"，mpv.exe 在 "...\\resources\\mpv\\mpv.exe"
-          const candidate = `${rd}mpv${rd.includes('\\') ? '\\' : '/'}mpv.exe`;
-          console.log('[Player] mpv candidate:', candidate);
-          mpvPath = candidate;
+          const sep = rd.includes('\\') ? '\\' : '/';
+          // 确保尾部分隔符
+          const base = rd.endsWith(sep) ? rd : `${rd}${sep}`;
+          mpvPath = `${base}mpv${sep}mpv.exe`;
+          console.log('[Player] mpvPath:', mpvPath);
         } catch (e) {
           console.warn('[Player] resourceDir failed:', e);
         }
