@@ -18,8 +18,10 @@ interface UsePreviewThumbReturn {
 /**
  * 缩略图预览 hook（PotPlayer 风格）
  * - 打开视频时触发 prebuild_thumbnails 后台预抽帧
- * - hover 时直接用 <img src=asset://...> 加载缓存文件
+ * - hover 时直接用 asset: 协议加载缓存文件
  * - 预抽未完成时兜底调 get_preview_thumb 实时抽一张
+ * - 视频关闭/切换时 abort 旧任务（地雷1修复）
+ * - 前端缓存带时间戳防止 asset 缓存失效（地雷3修复）
  */
 export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbOptions): UsePreviewThumbReturn {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -28,16 +30,23 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
   const debounceTimer = useRef(0);
   const seqRef = useRef(0);
   const thumbDirRef = useRef<string | null>(null);
-  const prebuildDone = useRef(false);
-  // 前端缓存：index → asset URL
+  const prebuildVersion = useRef(0);
+  // 前端缓存：index → asset URL（带版本号）
   const cacheRef = useRef<Map<number, string>>(new Map());
+  const currentFileId = useRef<string>('');
 
-  // 打开视频时触发预抽
+  // 打开视频时触发预抽，切换视频时取消旧任务
   useEffect(() => {
-    if (!fileId || !filePath || !duration || duration <= 0) return;
-    prebuildDone.current = false;
+    // 地雷1修复：取消旧视频的预抽
+    if (currentFileId.current && currentFileId.current !== fileId) {
+      invoke('abort_prebuild_cmd', { fileId: currentFileId.current }).catch(() => {});
+    }
+    currentFileId.current = fileId;
+    prebuildVersion.current++;
     cacheRef.current.clear();
     thumbDirRef.current = null;
+
+    if (!fileId || !filePath || !duration || duration <= 0) return;
 
     invoke<string>('prebuild_thumbnails', {
       fileId,
@@ -46,9 +55,12 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
       intervalSec: 5,
     }).then((dir) => {
       thumbDirRef.current = dir;
-      // 预抽是异步的，标记完成需要等一下
-      // 但前端可以直接开始用 asset 协议加载（文件存在就显示）
     }).catch(() => {});
+
+    return () => {
+      // 组件卸载时取消预抽
+      invoke('abort_prebuild_cmd', { fileId }).catch(() => {});
+    };
   }, [fileId, filePath, duration]);
 
   const onHover = useCallback((clientX: number, progressRect: DOMRect, time: number) => {
@@ -62,6 +74,7 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
 
       const idx = Math.floor(time / 5);
       const thumbDir = thumbDirRef.current;
+      const ver = prebuildVersion.current;
 
       // 1. 先检查前端缓存
       if (cacheRef.current.has(idx)) {
@@ -69,11 +82,10 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
         return;
       }
 
-      // 2. 如果预抽目录已知，尝试用 asset 协议加载
+      // 2. 如果预抽目录已知，用 asset 协议加载
       if (thumbDir) {
-        const assetUrl = convertFileSrc(`${thumbDir}/${idx}.jpg`);
-        // 先设置 URL，让 <img> 尝试加载
-        // 如果文件不存在（预抽未完成），img 会 onerror
+        // 地雷3修复：URL 带版本号，防止 asset 缓存失效
+        const assetUrl = `${convertFileSrc(`${thumbDir}/${idx}.jpg`)}?v=${ver}`;
         cacheRef.current.set(idx, assetUrl);
         setThumbnailUrl(assetUrl);
         return;
@@ -88,7 +100,7 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
         });
         if (seqRef.current !== mySeq) return;
         if (path) {
-          const assetUrl = convertFileSrc(path);
+          const assetUrl = `${convertFileSrc(path)}?v=${ver}`;
           cacheRef.current.set(idx, assetUrl);
           setThumbnailUrl(assetUrl);
         } else {

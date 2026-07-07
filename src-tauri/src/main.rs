@@ -2745,6 +2745,7 @@ fn main() {
             preview::thumbnail_service::get_preview_thumb,
             preview::thumbnail_service::prebuild_thumbnails,
             preview::thumbnail_service::get_thumb_cache_dir,
+            preview::thumbnail_service::abort_prebuild_cmd,
             preview::thumbnail_service::clear_preview_cache,
         ])
         .run(tauri::generate_context!())

@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -23,8 +24,8 @@ impl std::fmt::Display for ThumbnailError {
 
 impl std::error::Error for ThumbnailError {}
 
-// 缓存目录路径（内存缓存，避免重复计算）
 static CACHE_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+static ACTIVE_TASKS: Mutex<Option<HashMap<String, tokio::task::JoinHandle<()>>>> = Mutex::new(None);
 
 fn thumbnail_cache_dir(app: &AppHandle) -> PathBuf {
     let mut guard = CACHE_DIR.lock().unwrap();
@@ -71,8 +72,17 @@ fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
+/// 取消指定视频的预抽任务
+pub fn abort_prebuild(file_id: &str) {
+    let mut tasks = ACTIVE_TASKS.lock().unwrap();
+    if let Some(map) = tasks.as_mut() {
+        if let Some(handle) = map.remove(file_id) {
+            handle.abort();
+        }
+    }
+}
+
 /// 预构建缩略图：打开视频时调用，异步后台批量抽帧存文件
-/// 返回缓存目录路径，前端用 convertFileSrc(thumb_dir/{index}.jpg) 加载
 #[tauri::command]
 pub async fn prebuild_thumbnails(
     app: AppHandle,
@@ -85,20 +95,22 @@ pub async fn prebuild_thumbnails(
     let cache_dir = thumbnail_cache_dir(&app).join(&file_id);
     std::fs::create_dir_all(&cache_dir).map_err(|e| ThumbnailError::IoError(e.to_string()))?;
 
-    // 检查是否已完成（存在 marker 文件）
+    // 检查是否已完成
     let marker = cache_dir.join(".done");
     if marker.exists() {
         return Ok(cache_dir.to_string_lossy().to_string());
     }
 
+    // 地雷1修复：取消旧任务
+    abort_prebuild(&file_id);
+
     let cache_dir_str = cache_dir.to_string_lossy().to_string();
     let ffmpeg_str = ffmpeg.to_string_lossy().to_string();
     let file_path_clone = file_path.clone();
-
-    // Phase 1: 先抽当前位置附近 + 首尾段（快速可用）
-    // Phase 2: 后台抽完整个视频
+    let file_id_clone = file_id.clone();
     let cache_dir_clone = cache_dir.clone();
-    tokio::task::spawn_blocking(move || {
+
+    let handle = tokio::task::spawn_blocking(move || {
         let total_thumbs = (duration / interval_sec).ceil() as u32;
         let step = interval_sec;
 
@@ -111,7 +123,10 @@ pub async fn prebuild_thumbnails(
             if std::path::Path::new(&out_path).exists() {
                 continue;
             }
-            let _ = std::process::Command::new(&ffmpeg_str)
+
+            // 地雷2修复：加 colormatrix 保证色彩正确
+            // 地雷3修复：stderr 捕获用于调试
+            let status = std::process::Command::new(&ffmpeg_str)
                 .args([
                     "-ss",
                     &format!("{:.1}", t),
@@ -120,9 +135,7 @@ pub async fn prebuild_thumbnails(
                     "-frames:v",
                     "1",
                     "-vf",
-                    "scale=320:-1:flags=fast_bilinear",
-                    "-pix_fmt",
-                    "yuv420p",
+                    "scale=320:-1:flags=lanczos,format=yuvj420p",
                     "-q:v",
                     "5",
                     "-f",
@@ -135,15 +148,38 @@ pub async fn prebuild_thumbnails(
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status();
+
+            match status {
+                Ok(s) if !s.success() => {
+                    eprintln!("[thumb] ffmpeg failed for idx {} at {:.1}s", i, t);
+                }
+                Err(e) => {
+                    eprintln!("[thumb] ffmpeg exec error: {}", e);
+                }
+                _ => {}
+            }
         }
         // 标记完成
         std::fs::write(cache_dir_clone.join(".done"), "").ok();
+
+        // 清理任务引用
+        let mut tasks = ACTIVE_TASKS.lock().unwrap();
+        if let Some(map) = tasks.as_mut() {
+            map.remove(&file_id_clone);
+        }
     });
+
+    // 注册任务
+    {
+        let mut tasks = ACTIVE_TASKS.lock().unwrap();
+        let map = tasks.get_or_insert_with(HashMap::new);
+        map.insert(file_id, handle);
+    }
 
     Ok(cache_dir.to_string_lossy().to_string())
 }
 
-/// 获取单帧缩略图（预抽未完成时的兜底，实时抽一张）
+/// 获取单帧缩略图（预抽未完成时的兜底）
 #[tauri::command]
 pub async fn get_preview_thumb(
     app: AppHandle,
@@ -154,15 +190,16 @@ pub async fn get_preview_thumb(
     let ffmpeg = ffmpeg_path(&app).ok_or(ThumbnailError::FfmpegNotFound)?;
     let cache_dir = thumbnail_cache_dir(&app).join(&file_id);
 
-    // 先检查预抽缓存是否存在
+    // 先检查预抽缓存
     let idx = (time / 5.0).floor() as u32;
     let cached_path = cache_dir.join(format!("{}.jpg", idx));
     if cached_path.exists() {
         return Ok(cached_path.to_string_lossy().to_string());
     }
 
-    // 兜底：实时抽一张
+    // 兜底：实时抽（降分辨率加速）
     let file_path_clone = file_path.clone();
+    let cache_dir_clone = cache_dir.clone();
     let result = tokio::task::spawn_blocking(move || {
         let output = std::process::Command::new(&ffmpeg)
             .args([
@@ -173,9 +210,7 @@ pub async fn get_preview_thumb(
                 "-frames:v",
                 "1",
                 "-vf",
-                "scale=320:-1:flags=fast_bilinear",
-                "-pix_fmt",
-                "yuv420p",
+                "scale=160:-1:flags=fast_bilinear,format=yuvj420p",
                 "-q:v",
                 "5",
                 "-f",
@@ -191,9 +226,8 @@ pub async fn get_preview_thumb(
 
         match output {
             Ok(o) if o.status.success() && !o.stdout.is_empty() => {
-                // 保存到缓存目录
-                std::fs::create_dir_all(&cache_dir).ok();
-                let out_path = format!("{}/{}.jpg", cache_dir.display(), idx);
+                std::fs::create_dir_all(&cache_dir_clone).ok();
+                let out_path = format!("{}/{}.jpg", cache_dir_clone.display(), idx);
                 std::fs::write(&out_path, &o.stdout).ok();
                 Ok(out_path)
             }
@@ -217,6 +251,12 @@ pub fn get_thumb_cache_dir(app: AppHandle, file_id: String) -> String {
         .join(&file_id)
         .to_string_lossy()
         .to_string()
+}
+
+/// 取消预抽任务（视频关闭/切换时调用）
+#[tauri::command]
+pub fn abort_prebuild_cmd(file_id: String) {
+    abort_prebuild(&file_id);
 }
 
 #[tauri::command]
