@@ -1036,8 +1036,8 @@ const Player: React.FC = () => {
           <div className="changli-player-title">{displayTitle} - {activeEpisodeLabel}</div>
         </div>
         <div className="changli-player-actions" onMouseDown={stopWindowButtonMouseDown}>
-          <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}><span /></button>
           <button type="button" className={`changli-player-winbtn ${isAlwaysOnTop ? 'is-pinned' : ''}`} aria-label="置顶" onClick={handleToggleAlwaysOnTop}><span /></button>
+          <button type="button" className="changli-player-winbtn" aria-label="最小化" onClick={handlePlayerMinimize}><span /></button>
           <button type="button" className={`changli-player-winbtn ${isWindowMaximized ? 'is-maximized' : ''}`} aria-label="最大化" onClick={handlePlayerToggleMaximize}><span /></button>
           <button type="button" className="changli-player-winbtn close" aria-label="关闭" onClick={handlePlayerClose}><span /></button>
         </div>
@@ -1045,8 +1045,8 @@ const Player: React.FC = () => {
 
       {isPiP && (
         <div className="changli-player-pip-actions" onMouseDown={stopWindowButtonMouseDown}>
-          <button type="button" onClick={closePiP}>退出小窗</button>
           <button type="button" className={isAlwaysOnTop ? 'active' : ''} onClick={handleToggleAlwaysOnTop}>置顶</button>
+          <button type="button" onClick={closePiP}>退出小窗</button>
           <button type="button" className="close" onClick={handlePlayerClose} aria-label="关闭播放器">×</button>
         </div>
       )}
