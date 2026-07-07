@@ -1,3 +1,9 @@
+## v1.8.34 (2026-07-07)
+
+### 变更
+- 清理死代码：移除 windowDraggingRef 和 aspectResizeLockRef 及相关逻辑
+- 小窗置顶图标改回 Solar pin linear，SVG 尺寸放大至 26px
+
 ## v1.8.33 (2026-07-07)
 
 ### 变更
