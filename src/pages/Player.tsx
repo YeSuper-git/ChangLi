@@ -197,17 +197,18 @@ const Player: React.FC = () => {
           }
         }
 
-        // 方式3: 直接用 app exe 所在目录拼接
+        // 方式3: 直接用安装目录拼接（resourceDir 可能不是安装目录）
         if (!mpvPath) {
           try {
-            const { appDir } = await import('@tauri-apps/api/path');
-            const ad = await appDir();
-            const sep = ad.includes('\\') ? '\\' : '/';
-            const base = ad.endsWith(sep) ? ad : `${ad}${sep}`;
-            mpvPath = `${base}resources${sep}mpv${sep}mpv.exe`;
-            console.log('[Player] appDir fallback:', mpvPath);
+            // 从 resourceDir 向上找安装目录
+            const rd = await resourceDir();
+            const sep = rd.includes('\\') ? '\\' : '/';
+            // resourceDir 通常是 "...\\resources\\"，安装目录是上一层
+            const installDir = rd.replace(new RegExp(`resources${sep.replace('\\', '\\\\')}?$`), '');
+            mpvPath = `${installDir}resources${sep}mpv${sep}mpv.exe`;
+            console.log('[Player] installDir fallback:', mpvPath);
           } catch (e) {
-            console.warn('[Player] appDir failed:', e);
+            console.warn('[Player] installDir fallback failed:', e);
           }
         }
 
