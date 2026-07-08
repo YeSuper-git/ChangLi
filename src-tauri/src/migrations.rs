@@ -24,7 +24,6 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     create_indexes(pool).await?;
     add_column_if_not_exists(pool, "categories", "scan_path", "TEXT")
         .await?;
-    seed_default_categories(pool).await?;
     // 回填历史空 display_type：动漫类（scan_path 含 '动漫' 或 key='anime' 的分类下）
     execute(
         pool,
@@ -960,6 +959,7 @@ async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
         ("photo", "照片", "text", 4, 1),
         ("birthday", "生日", "date", 5, 1),
         ("height", "身高", "text", 6, 1),
+        ("weight", "体重", "text", 7, 1),
         ("bio", "简介", "text", 9, 1),
     ];
 

@@ -24,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors');
+  const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
 
   const navItems = [
     { path: '/', label: '首页' },
@@ -103,9 +104,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="w-full px-4 sm:px-5">
           <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4">
             <div className="flex items-center gap-8 min-w-0">
+              {/* macOS 原生红绿灯由 Tauri titleBarStyle: overlay 提供，导航栏左侧留空 */}
+              {isMac && <div className="w-[50px] flex-shrink-0" />}
               <Link to="/" className="changli-wordmark flex items-center gap-3 text-xl font-bold text-gray-900 no-underline">
                 <img src={appIcon} alt="长离" className="h-9 w-9 rounded-xl shadow-sm ring-1 ring-black/5" />
-                <span>长离</span>
+                {!isMac && <span>长离</span>}
               </Link>
               <div className="flex flex-wrap gap-2">
                 {navItems.map((item) => (
@@ -155,15 +158,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" title="设置">
                   <img src={settingsIcon} alt="" className="w-[14px] h-[14px]" />
                 </button>
-                <button type="button" onClick={handleMinimize} aria-label="最小化" title="最小化">
-                  <span className="control-icon minimize-icon" aria-hidden="true" />
-                </button>
-                <button type="button" onClick={handleToggleMaximize} aria-label="最大化" className={isMaximized ? 'is-maximized' : ''} title="最大化">
-                  <span className="control-icon maximize-icon" aria-hidden="true" />
-                </button>
-                <button type="button" onClick={handleClose} aria-label="关闭" className="close" title="关闭">
-                  <span className="control-icon close-icon" aria-hidden="true" />
-                </button>
+                {/* Windows 窗口控制按钮 */}
+                {!isMac && (
+                  <>
+                    <button type="button" onClick={handleMinimize} aria-label="最小化" title="最小化">
+                      <span className="control-icon minimize-icon" aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={handleToggleMaximize} aria-label="最大化" className={isMaximized ? 'is-maximized' : ''} title="最大化">
+                      <span className="control-icon maximize-icon" aria-hidden="true" />
+                    </button>
+                    <button type="button" onClick={handleClose} aria-label="关闭" className="close" title="关闭">
+                      <span className="control-icon close-icon" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

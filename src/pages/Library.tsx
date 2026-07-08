@@ -730,29 +730,37 @@ const Library: React.FC = () => {
             </h1>
           ))}
           {categories.length === 0 && (
-            <>
-              <h1 className="changli-heading-xl cursor-pointer transition-all">动漫</h1>
-              <h1 className="text-2xl font-bold cursor-pointer transition-all text-gray-400">影视</h1>
-            </>
+            <h1 className="text-3xl font-bold text-gray-400">暂无分类</h1>
           )}
         </div>
         <div className="flex gap-3">
-          {!scopeAll && currentCategory?.scan_path && (
+          {categories.length === 0 ? (
             <button
-              onClick={() => setScanConfirm(true)}
-              disabled={categoryScanning}
-              className="action-btn action-btn-primary disabled:opacity-50"
+              onClick={() => navigate('/settings?openCategoryModal=true')}
+              className="action-btn action-btn-primary"
             >
-              {categoryOperation === 'updating' ? '更新中...' : categoryScanning ? '检查中...' : '全量检查更新'}
+              新建分类
             </button>
+          ) : (
+            <>
+              {!scopeAll && currentCategory?.scan_path && (
+                <button
+                  onClick={() => setScanConfirm(true)}
+                  disabled={categoryScanning}
+                  className="action-btn action-btn-primary disabled:opacity-50"
+                >
+                  {categoryOperation === 'updating' ? '更新中...' : categoryScanning ? '检查中...' : '全量检查更新'}
+                </button>
+              )}
+              <button
+                onClick={importPath}
+                disabled={scanning}
+                className="action-btn action-btn-primary disabled:opacity-50"
+              >
+                {scanning ? '添加中...' : '添加'}
+              </button>
+            </>
           )}
-          <button
-            onClick={importPath}
-            disabled={scanning}
-            className="action-btn action-btn-primary disabled:opacity-50"
-          >
-            {scanning ? '添加中...' : '添加'}
-          </button>
         </div>
       </div>
 

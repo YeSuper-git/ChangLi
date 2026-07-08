@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -229,11 +230,19 @@ const Settings: React.FC = () => {
   };
 
 
+  const [searchParams] = useSearchParams();
   const openAddCategory = () => {
     setEditingCategory(null);
     setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
     setShowCategoryModal(true);
   };
+
+  // 从其他页面跳转过来时自动打开新增分类弹窗
+  useEffect(() => {
+    if (searchParams.get('openCategoryModal') === 'true') {
+      openAddCategory();
+    }
+  }, []);
 
   const openEditCategory = (cat: Category) => {
     setEditingCategory(cat);
@@ -381,12 +390,20 @@ const Settings: React.FC = () => {
 
   const handleSaveField = async () => {
     try {
+      const label = fieldForm.field_label.trim();
       const optionsStr = fieldForm.field_type === 'select' ? JSON.stringify(fieldForm.options) : null;
       if (editingField) {
         await updateActorField(fieldForm.field_key, fieldForm.field_label, fieldForm.field_type, optionsStr, null, fieldForm.enabled);
       } else {
-        const autoKey = fieldForm.field_label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || Date.now().toString(36);
-        await createActorField(autoKey, fieldForm.field_label, fieldForm.field_type, optionsStr, null);
+        // 彩蛋：输入"三围"或"罩杯"自动解锁对应扩展字段
+        const easterEggMap: Record<string, string> = { '三围': 'measurements', '罩杯': 'cup_size', '身高': 'height', '体重': 'weight', '生日': 'birthday' };
+        const matchedKey = easterEggMap[label];
+        if (matchedKey) {
+          await enablePresetTemplate(matchedKey);
+        } else {
+          const autoKey = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || Date.now().toString(36);
+          await createActorField(autoKey, fieldForm.field_label, fieldForm.field_type, optionsStr, null);
+        }
       }
       setShowFieldModal(false);
       loadActorFields();
@@ -397,6 +414,11 @@ const Settings: React.FC = () => {
 
   const handleDeleteField = async (fieldKey: string) => {
     try {
+      // 如果是扩展预设字段，同时禁用预设
+      const extensionKeys = ['measurements', 'cup_size'];
+      if (extensionKeys.includes(fieldKey)) {
+        await disablePresetTemplate(fieldKey);
+      }
       await deleteActorField(fieldKey);
       loadActorFields();
     } catch (error) {
@@ -745,12 +767,7 @@ const Settings: React.FC = () => {
             <p className="text-sm text-gray-500 mt-1">自定义演员详情页显示的信息</p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => { loadPresetTemplates(); setShowPresetModal(true); }}
-              className="action-btn"
-            >
-              扩展系统预设
-            </button>
+            {/* 扩展系统预设已隐藏为彩蛋：新增字段时输入"三围"或"罩杯"自动解锁 */}
           </div>
         </div>
 
@@ -1108,9 +1125,7 @@ const Settings: React.FC = () => {
       {fieldContextMenu && (
         <div className="fixed z-50 bg-white border rounded-xl shadow-xl py-2 w-fit" style={{ left: fieldContextMenu.x + 160 > window.innerWidth ? fieldContextMenu.x - 160 : fieldContextMenu.x, top: fieldContextMenu.y + 200 > window.innerHeight ? fieldContextMenu.y - 200 : fieldContextMenu.y }}>
           <button onClick={() => { openEditField(actorFields.find(f => f.field_key === fieldContextMenu.key)!); setFieldContextMenu(null); }} className="changli-menu-item">编辑</button>
-          {!isPresetField(fieldContextMenu.key) && (
-            <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="changli-menu-item changli-menu-item-danger">删除</button>
-          )}
+          <button onClick={() => { setDeleteFieldConfirm(fieldContextMenu.key); setFieldContextMenu(null); }} className="changli-menu-item changli-menu-item-danger">删除</button>
         </div>
       )}
 

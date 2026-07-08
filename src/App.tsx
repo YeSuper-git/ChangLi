@@ -41,12 +41,15 @@ function App() {
 
     const initDatabase = async () => {
       try {
+        console.log('[App] calling init_db...');
         await invoke('init_db');
+        console.log('[App] init_db done, calling loadAll...');
         setDbReady(true);
         await loadAll();
-      } catch (err) {
-        console.error('[App] 数据库初始化失败:', err);
-        setError('初始化失败，请重启应用后再试');
+        console.log('[App] loadAll done');
+      } catch (err: any) {
+        console.error('[App] 初始化失败:', err, JSON.stringify(err));
+        setError(`初始化失败: ${err?.message || err || 'unknown'}`);
       }
     };
     initDatabase();

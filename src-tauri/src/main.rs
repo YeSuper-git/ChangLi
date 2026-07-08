@@ -48,6 +48,9 @@ struct AppState {
     poster_repair_status: Arc<Mutex<PosterRepairStatus>>,
 }
 
+// 防止并发初始化的全局锁
+static INIT_LOCK: Mutex<()> = Mutex::const_new(());
+
 // 初始化数据库（如果已在 setup 中初始化则直接返回）
 #[tauri::command]
 async fn init_db(state: State<'_, AppState>) -> Result<(), String> {
@@ -59,8 +62,23 @@ async fn init_db(state: State<'_, AppState>) -> Result<(), String> {
             return Ok(());
         }
     }
+    // 用全局锁防止并发初始化
+    let _init_guard = INIT_LOCK.lock().await;
+    // double-check：拿到锁后再检查一次
+    {
+        let guard = state.db.lock().await;
+        if guard.is_some() {
+            eprintln!("[ChangLi] 数据库已在后台初始化完成，跳过重复初始化");
+            return Ok(());
+        }
+    }
     // 如果后台尚未完成，等待并执行初始化
-    let db = db::init_database().await.map_err(|e| e.to_string())?;
+    eprintln!("[ChangLi] init_db: 开始初始化...");
+    let db = db::init_database().await.map_err(|e| {
+        eprintln!("[ChangLi] init_db 失败: {}", e);
+        e.to_string()
+    })?;
+    eprintln!("[ChangLi] init_db: 初始化成功");
     let mut guard = state.db.lock().await;
     if guard.is_none() {
         *guard = Some(db);
@@ -2601,14 +2619,48 @@ fn main() {
             poster_repair_status: Arc::new(Mutex::new(PosterRepairStatus::default())),
         })
         .setup(|app| {
+            // 创建主窗口
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::WebviewUrl;
+                use tauri::WebviewWindowBuilder;
+                let _window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("长离")
+                    .inner_size(1280.0, 800.0)
+                    .min_inner_size(800.0, 600.0)
+                    .resizable(true)
+                    .fullscreen(false)
+                    .decorations(true)
+                    .transparent(true)
+                    .hidden_title(true)
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .traffic_light_position(tauri::LogicalPosition::new(14, 32))
+                    .center()
+                    .build()
+                    .expect("failed to create main window");
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                use tauri::WebviewUrl;
+                use tauri::WebviewWindowBuilder;
+                let _window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("长离")
+                    .inner_size(1280.0, 800.0)
+                    .min_inner_size(800.0, 600.0)
+                    .resizable(true)
+                    .fullscreen(false)
+                    .transparent(true)
+                    .decorations(false)
+                    .center()
+                    .build()
+                    .expect("failed to create main window");
+            }
+
             if let Some(window) = app.get_webview_window("main") {
-                window.center()?;
-                // 启动时短暂置顶一次用于拉到最前方，随后立即取消，避免程序长期始终置顶。
                 window.set_always_on_top(true)?;
                 window.set_focus()?;
                 window.set_always_on_top(false)?;
             }
-            // 禁用 Windows Game DVR，防止 NVIDIA/游戏加加把播放器识别为游戏
             player::disable_game_dvr();
             Ok(())
         })
