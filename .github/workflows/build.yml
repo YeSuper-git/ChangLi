@@ -266,6 +266,19 @@ jobs:
           includeUpdaterJson: false
           args: --bundles dmg
 
+      - name: Upload macOS DMG to release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG=$(ls src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
+          if [ -n "$DMG" ]; then
+            cp "$DMG" "ChangLi_${{ steps.version.outputs.version }}_aarch64.dmg"
+            gh release upload "v${{ steps.version.outputs.version }}" "ChangLi_${{ steps.version.outputs.version }}_aarch64.dmg" --clobber
+          else
+            echo "No DMG found, skipping release upload"
+          fi
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v5
         with:
