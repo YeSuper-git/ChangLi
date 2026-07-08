@@ -515,7 +515,8 @@ const Settings: React.FC = () => {
       </section>
 
 
-      {/* 游戏覆盖 */}
+      {/* 游戏覆盖 — 仅 Windows */}
+      {(navigator.platform.includes('Win') || navigator.userAgent.includes('Windows')) && (
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -549,6 +550,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </section>
+      )}
 
 
       {/* 网站管理 */}
