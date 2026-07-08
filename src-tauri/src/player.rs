@@ -94,11 +94,20 @@ pub fn close_player_window(app: &AppHandle) {
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
 #[tauri::command]
 pub fn find_mpv_path() -> Result<String, String> {
-    let exe_dir = std::env::current_exe()
-        .map_err(|e| format!("获取 exe 路径失败: {}", e))?
+    let exe_path = std::env::current_exe()
+        .map_err(|e| format!("获取 exe 路径失败: {}", e))?;
+    let mut exe_dir = exe_path
         .parent()
         .ok_or("无法获取 exe 目录")?
         .to_path_buf();
+
+    // 去掉 Windows 长路径前缀 \\?\
+    let exe_dir_str = exe_dir.to_string_lossy().to_string();
+    if exe_dir_str.starts_with("\\\\?\\") {
+        exe_dir = std::path::PathBuf::from(&exe_dir_str[4..]);
+    }
+
+    eprintln!("[player] find_mpv_path: exe_dir = {}", exe_dir.display());
 
     // 可能的 mpv.exe 路径
     let candidates = vec![
@@ -108,6 +117,7 @@ pub fn find_mpv_path() -> Result<String, String> {
     ];
 
     for candidate in &candidates {
+        eprintln!("[player] find_mpv_path: checking {} → exists={}", candidate.display(), candidate.exists());
         if candidate.exists() {
             let path = candidate.to_string_lossy().to_string();
             eprintln!("[player] find_mpv_path: found {}", path);
@@ -115,9 +125,6 @@ pub fn find_mpv_path() -> Result<String, String> {
         }
     }
 
-    // 都没找到，返回第一个候选路径（让插件报更有意义的错误）
-    let fallback = candidates[0].to_string_lossy().to_string();
-    eprintln!("[player] find_mpv_path: not found, fallback to {}", fallback);
     Err(format!("mpv.exe 未找到，已尝试: {}",
         candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")))
 }
