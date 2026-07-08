@@ -190,7 +190,7 @@ const ActorDetail: React.FC = () => {
                       inputMode="numeric"
                       value={mParts[idx]}
                       onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-6"
+                      className="w-12 px-1.5 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-5"
                     />
                     <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
                       <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
