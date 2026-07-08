@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -231,6 +231,7 @@ const Settings: React.FC = () => {
 
 
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const openAddCategory = () => {
     setEditingCategory(null);
     setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
@@ -266,6 +267,10 @@ const Settings: React.FC = () => {
       }
       setShowCategoryModal(false);
       await loadCategories();
+      // 如果是从视频页跳转过来的，保存后返回视频页
+      if (searchParams.get('openCategoryModal') === 'true') {
+        navigate('/library');
+      }
     } catch (error) {
       console.error('保存分类失败:', error);
     }

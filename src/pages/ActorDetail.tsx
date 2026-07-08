@@ -180,21 +180,21 @@ const ActorDetail: React.FC = () => {
           const mParts = (editForm.measurements || '').split('-');
           while (mParts.length < 3) mParts.push('');
           return (
-            <div className="flex gap-1 items-center">
+            <div className="flex gap-2 items-center">
               {[0, 1, 2].map((idx) => (
                 <React.Fragment key={idx}>
-                  <span className="text-gray-500 text-[10px]">{['B', 'W', 'H'][idx]}</span>
+                  <span className="text-gray-500 text-sm">{['B', 'W', 'H'][idx]}</span>
                   <div className="relative inline-flex">
                     <input
                       type="text"
                       inputMode="numeric"
                       value={mParts[idx]}
                       onChange={(e) => handleMeasureChange(idx, e.target.value)}
-                      className="w-10 px-0.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-xs pr-4"
+                      className="w-14 px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-rose-300 focus:ring-4 focus:ring-rose-100 text-center text-sm pr-6"
                     />
-                    <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-0">
-                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[8px] px-0.5" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
-                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[8px] px-0.5" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.max(cur - 1, 0); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▼</button>
+                    <div className="absolute right-0.5 top-0 bottom-0 flex flex-col justify-center gap-0">
+                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.min(cur + 1, 150); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▲</button>
+                      <button type="button" tabIndex={-1} className="text-gray-400 hover:text-gray-700 leading-none text-[10px]" onClick={() => { const cur = parseInt(mParts[idx], 10) || 0; const v = Math.max(cur - 1, 0); const parts2 = (editForm.measurements || '').split('-'); while (parts2.length < 3) parts2.push(''); parts2[idx] = String(v); setEditForm({ ...editForm, measurements: parts2.join('-') }); }}>▼</button>
                     </div>
                   </div>
                 </React.Fragment>
@@ -1029,7 +1029,7 @@ const ActorDetail: React.FC = () => {
               {actorFields.length > 0 ? (
                 <div className="changli-auto-grid-compact">
                   {actorFields.filter(f => f.enabled && f.field_key !== 'name' && f.field_key !== 'bio').map(field => (
-                    <div key={field.field_key}>
+                    <div key={field.field_key} data-field={field.field_key}>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{field.field_label}</label>
                       {renderDynamicField(field)}
                     </div>

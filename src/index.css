@@ -193,7 +193,7 @@ html.is-macos .changli-topbar {
 
 .changli-auto-grid-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -202,10 +202,16 @@ html.is-macos .changli-topbar {
   overflow: visible;
   position: relative;
   z-index: 0;
+  min-width: 0;
 }
 
 .changli-auto-grid-compact > div:focus-within {
   z-index: 10;
+}
+
+/* 三围字段跨两列 */
+.changli-auto-grid-compact > div[data-field="measurements"] {
+  grid-column: span 2;
 }
 
 .changli-auto-grid-info {

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures, PlayHistory } from '../utils/api';
 import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, getVideoSeriesMap, parseCategoryFeatures } from '../utils/api';
 import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
-import loadingIcon from '../assets/icons/loading.svg';
 import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
 
@@ -213,16 +212,7 @@ const Home: React.FC = () => {
               )}
             </section>
           );
-        }) : (
-          <section className="mb-16">
-            <div className="changli-section-title">
-              <h2 className="text-2xl font-bold text-gray-900">正在加载内容</h2>
-            </div>
-            <div className="changli-empty-state text-gray-500">
-              <img src={loadingIcon} alt="加载中" className="mx-auto h-6 w-6 animate-spin" />
-            </div>
-          </section>
-        )}
+        }) : null}
 
         <section>
           <div className="changli-section-title">
