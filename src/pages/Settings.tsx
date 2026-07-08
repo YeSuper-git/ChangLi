@@ -344,22 +344,6 @@ const Settings: React.FC = () => {
     return () => window.removeEventListener('click', close);
   }, [fieldContextMenu]);
 
-  const _loadPresetTemplates = async () => {
-    try {
-      const templates = await getExtensionPresetTemplates();
-      setPresetTemplates(templates);
-      const allTemplates = await getPresetTemplates();
-      setAllPresetTemplates(allTemplates);
-      const map: Record<string, boolean> = {};
-      for (const t of templates) {
-        map[t.key] = actorFields.some(f => f.field_key === t.key && f.enabled);
-      }
-      setPresetEnabledMap(map);
-    } catch (error) {
-      console.error('加载预设模板失败:', error);
-    }
-  };
-
   const loadActorFields = async () => {
     try {
       const list = await getAllActorFields();
