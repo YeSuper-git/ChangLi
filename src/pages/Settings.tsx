@@ -344,7 +344,7 @@ const Settings: React.FC = () => {
     return () => window.removeEventListener('click', close);
   }, [fieldContextMenu]);
 
-  const loadPresetTemplates = async () => {
+  const _loadPresetTemplates = async () => {
     try {
       const templates = await getExtensionPresetTemplates();
       setPresetTemplates(templates);
