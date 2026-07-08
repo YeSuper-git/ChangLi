@@ -38,11 +38,17 @@ const compareVersions = (a: string, b: string) => {
   return 0;
 };
 
-const findWindowsInstaller = (release: GitHubRelease) => (
-  release.assets.find((asset) => /x64-setup\.exe$/i.test(asset.name)) ||
-  release.assets.find((asset) => /\.exe$/i.test(asset.name)) ||
-  release.assets.find((asset) => /\.msi$/i.test(asset.name))
-);
+const findPlatformInstaller = (release: GitHubRelease) => {
+  const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
+  if (isMac) {
+    return release.assets.find((asset) => /\.dmg$/i.test(asset.name));
+  }
+  return (
+    release.assets.find((asset) => /x64-setup\.exe$/i.test(asset.name)) ||
+    release.assets.find((asset) => /\.exe$/i.test(asset.name)) ||
+    release.assets.find((asset) => /\.msi$/i.test(asset.name))
+  );
+};
 
 const Settings: React.FC = () => {
   const [sites, setSites] = useState<Site[]>([]);
@@ -413,7 +419,7 @@ const Settings: React.FC = () => {
         return;
       }
 
-      const installer = findWindowsInstaller(release);
+      const installer = findPlatformInstaller(release);
       const downloadUrl = installer?.browser_download_url || release.html_url;
 
       setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer) });
