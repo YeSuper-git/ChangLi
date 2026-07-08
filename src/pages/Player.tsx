@@ -181,15 +181,19 @@ const Player: React.FC = () => {
           throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
         }
 
-        // 获取播放器窗口 HWND，用于 --wid 嵌入
+        // 获取播放器窗口原生句柄，用于 --wid 嵌入
         let playerWid: string | undefined;
         try {
-          const hwnd = await invoke<number>('get_player_hwnd');
-          playerWid = String(hwnd);
-          console.log('[Player] player HWND:', playerWid);
+          const wid = await invoke<number>('get_player_wid');
+          playerWid = String(wid);
+          console.log('[Player] player WID:', playerWid);
         } catch (e) {
-          console.warn('[Player] get_player_hwnd failed:', e);
+          console.warn('[Player] get_player_wid failed:', e);
         }
+
+        // 平台检测
+        const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
+        const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
         try {
           await init({
@@ -197,9 +201,8 @@ const Player: React.FC = () => {
             showMpvOutput: true,
             args: [
               '--vo=gpu',
-              '--hwdec=no',
-              '--gpu-api=d3d11',
-              '--gpu-context=d3d11',
+              isMac ? '--hwdec=auto-safe' : '--hwdec=no',
+              ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
               '--keep-open=yes',
               '--force-window=no',
               '--osc=no',
@@ -218,9 +221,8 @@ const Player: React.FC = () => {
               showMpvOutput: true,
               args: [
                 '--vo=gpu',
-                '--hwdec=no',
-                '--gpu-api=d3d11',
-                '--gpu-context=d3d11',
+                isMac ? '--hwdec=auto-safe' : '--hwdec=no',
+                ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
                 '--keep-open=yes',
                 '--force-window=no',
                 '--osc=no',

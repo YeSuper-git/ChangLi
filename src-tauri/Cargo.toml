@@ -38,7 +38,7 @@ tauri-plugin-mpv = "0.5.2"
 lru = "0.12"
 raw-window-handle = "0.6"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_Ime", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.55"
 

@@ -37,8 +37,32 @@ fn candidate_mpv_paths(app: &AppHandle) -> Vec<PathBuf> {
     }
 
     if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join("mpv").join("mpv.exe"));
-        candidates.push(resource_dir.join("resources").join("mpv").join("mpv.exe"));
+        #[cfg(target_os = "windows")]
+        {
+            candidates.push(resource_dir.join("mpv").join("mpv.exe"));
+            candidates.push(resource_dir.join("resources").join("mpv").join("mpv.exe"));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            candidates.push(resource_dir.join("mpv").join("mpv"));
+            candidates.push(resource_dir.join("mpv").join("mpv.exe"));
+        }
+        #[cfg(target_os = "linux")]
+        {
+            candidates.push(resource_dir.join("mpv").join("mpv"));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(PathBuf::from("/opt/homebrew/bin/mpv"));
+        candidates.push(PathBuf::from("/usr/local/bin/mpv"));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        candidates.push(PathBuf::from("/usr/bin/mpv"));
+        candidates.push(PathBuf::from("/usr/local/bin/mpv"));
     }
 
     candidates
@@ -77,18 +101,31 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-    // 先隐藏窗口让用户感知不到延迟，再延迟销毁避免 GPU 清理冲突
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         let _ = window.hide();
     }
-    let app_handle = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(600));
-        if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: 延迟销毁避免 GPU 清理冲突
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(600));
+            if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
+                let _ = window.destroy();
+                eprintln!("[player] Player window destroyed after delay.");
+            }
+        });
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // macOS/Linux: 直接销毁
+        if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
             let _ = window.destroy();
-            eprintln!("[player] Player window destroyed after delay.");
+            eprintln!("[player] Player window destroyed.");
         }
-    });
+    }
 }
 
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
@@ -109,12 +146,27 @@ pub fn find_mpv_path() -> Result<String, String> {
 
     eprintln!("[player] find_mpv_path: exe_dir = {}", exe_dir.display());
 
-    // 可能的 mpv.exe 路径
-    let candidates = vec![
-        exe_dir.join("resources").join("mpv").join("mpv.exe"),
-        exe_dir.join("mpv").join("mpv.exe"),
-        exe_dir.join("resources").join("mpv").join("mpv.com"),
-    ];
+    // 可能的 mpv 路径（分平台）
+    let mut candidates = vec![];
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push(exe_dir.join("resources").join("mpv").join("mpv.exe"));
+        candidates.push(exe_dir.join("mpv").join("mpv.exe"));
+        candidates.push(exe_dir.join("resources").join("mpv").join("mpv.com"));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(exe_dir.join("../Resources/mpv/mpv"));
+        candidates.push(exe_dir.join("mpv/mpv"));
+        candidates.push(PathBuf::from("/opt/homebrew/bin/mpv"));
+        candidates.push(PathBuf::from("/usr/local/bin/mpv"));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        candidates.push(exe_dir.join("mpv/mpv"));
+        candidates.push(PathBuf::from("/usr/bin/mpv"));
+        candidates.push(PathBuf::from("/usr/local/bin/mpv"));
+    }
 
     for candidate in &candidates {
         eprintln!("[player] find_mpv_path: checking {} → exists={}", candidate.display(), candidate.exists());
@@ -129,9 +181,9 @@ pub fn find_mpv_path() -> Result<String, String> {
         candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")))
 }
 
-/// 返回播放器窗口的 HWND（十进制），供前端 init mpv 时传 --wid=
+/// 返回播放器窗口的原生句柄（十进制），供前端 init mpv 时传 --wid=
 #[tauri::command]
-pub fn get_player_hwnd(app: AppHandle) -> Result<u64, String> {
+pub fn get_player_wid(app: AppHandle) -> Result<u64, String> {
     use raw_window_handle::HasWindowHandle;
     let window = app
         .get_webview_window(PLAYER_WINDOW_LABEL)
@@ -141,8 +193,11 @@ pub fn get_player_hwnd(app: AppHandle) -> Result<u64, String> {
         .map_err(|e| format!("get window handle: {}", e))?
         .as_raw();
     match raw {
+        #[cfg(target_os = "windows")]
         raw_window_handle::RawWindowHandle::Win32(h) => Ok(h.hwnd.get() as u64),
-        _ => Err("not windows".to_string()),
+        #[cfg(target_os = "macos")]
+        raw_window_handle::RawWindowHandle::AppKit(h) => Ok(h.ns_view.as_ptr() as u64),
+        _ => Err(format!("unsupported platform: {:?}", raw)),
     }
 }
 
