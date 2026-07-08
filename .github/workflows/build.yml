@@ -221,3 +221,54 @@ jobs:
           name: ChangLi_${{ steps.version.outputs.version }}_x64-setup
           path: dist-artifacts/*.exe
           if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 'lts/*'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install mpv via Homebrew
+        run: |
+          brew install mpv
+          mkdir -p src-tauri/resources/mpv
+          cp $(which mpv) src-tauri/resources/mpv/mpv
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "v__VERSION__"
+          releaseBody: "ChangLi v__VERSION__ (macOS)"
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: false
+          args: --bundles dmg
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ChangLi_${{ steps.version.outputs.version }}_aarch64-macos
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
