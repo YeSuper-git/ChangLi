@@ -468,6 +468,12 @@ const Settings: React.FC = () => {
     setPendingUpdate(null);
     setUpdateStatus(update.hasInstaller ? `正在打开 v${update.version} 安装包下载链接` : `正在打开 v${update.version} 发布页面`);
     await openExternal(update.url);
+    notify({ 
+      message: update.hasInstaller 
+        ? `已在浏览器中打开下载链接，下载完成后请手动安装` 
+        : `已在浏览器中打开发布页面，请手动下载更新`, 
+      type: 'info' 
+    });
     setTimeout(() => setUpdateStatus(null), 8000);
   };
 
