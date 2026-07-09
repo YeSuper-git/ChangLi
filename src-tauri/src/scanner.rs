@@ -139,7 +139,8 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
 /// 例如 "xxxx 1-3" → "xxxx", "xxxx 1-25" → "xxxx", "xxxx" → "xxxx"
 pub fn strip_episode_suffix(name: &str) -> String {
     let trimmed = name.trim();
-    // 匹配末尾 " 数字-数字季?" 或 " 数字集" 等模式
+    // 匹配末尾 " 数字-数字季?" 或 " 数字集" 等模式（支持有空格和无空格）
+    // 1) 先尝试有空格: "xxx 1-2季"
     if let Some(pos) = trimmed.rfind(' ') {
         let suffix = &trimmed[pos + 1..];
         let clean_suffix = suffix.trim_end_matches('季');
@@ -147,6 +148,28 @@ pub fn strip_episode_suffix(name: &str) -> String {
             && clean_suffix.contains('-')
         {
             return trimmed[..pos].to_string();
+        }
+    }
+    // 2) 再尝试无空格: "xxx1-2季" / "xxx1-3季"
+    // 从末尾找 "数字-数字季" 模式
+    let chars: Vec<char> = trimmed.chars().collect();
+    let len = chars.len();
+    if len >= 4 {
+        // 从末尾往前找，跳过 "季"
+        let mut end = len;
+        if end > 0 && chars[end - 1] == '季' {
+            end -= 1;
+        }
+        // 往前读数字和横杠
+ let mut start = end;
+        while start > 0 && (chars[start - 1].is_ascii_digit() || chars[start - 1] == '-') {
+            start -= 1;
+        }
+        if start < end && start > 0 {
+            let suffix: String = chars[start..end].iter().collect();
+            if suffix.contains('-') && suffix.chars().all(|c| c.is_ascii_digit() || c == '-') {
+                return chars[..start].iter().collect();
+            }
         }
     }
     trimmed.to_string()
