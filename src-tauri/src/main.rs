@@ -2680,7 +2680,15 @@ async fn cancel_update_download(state: State<'_, AppState>) -> Result<(), String
 
 #[tauri::command]
 async fn install_update(file_path: String) -> Result<(), String> {
-    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))
+    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))?;
+    // 延迟清理安装包（给安装程序时间读取文件）
+    let path = std::path::PathBuf::from(&file_path);
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        let _ = std::fs::remove_file(&path);
+        eprintln!("[ChangLi] 已清理安装包: {}", path.display());
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -2746,18 +2754,26 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
         .ok_or_else(|| format!("无法解析最新版本地址: {final_url}"))?
         .to_string();
     let version = tag.trim_start_matches('v');
-    let installer_name = format!("ChangLi_{version}_x64-setup.exe");
+    let exe_name = format!("ChangLi_{version}_x64-setup.exe");
+    let dmg_name = format!("ChangLi_{version}_aarch64.dmg");
     let html_url = format!("https://github.com/{REPO}/releases/tag/{tag}");
-    let download_url = format!("https://github.com/{REPO}/releases/download/{tag}/{installer_name}");
+    let exe_url = format!("https://github.com/{REPO}/releases/download/{tag}/{exe_name}");
+    let dmg_url = format!("https://github.com/{REPO}/releases/download/{tag}/{dmg_name}");
 
     Ok(LatestReleaseInfo {
         tag_name: tag,
         html_url,
         body: None,
-        assets: vec![ReleaseAssetInfo {
-            name: installer_name,
-            browser_download_url: download_url,
-        }],
+        assets: vec![
+            ReleaseAssetInfo {
+                name: exe_name,
+                browser_download_url: exe_url,
+            },
+            ReleaseAssetInfo {
+                name: dmg_name,
+                browser_download_url: dmg_url,
+            },
+        ],
     })
 }
 

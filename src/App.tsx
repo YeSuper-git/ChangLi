@@ -77,9 +77,10 @@ function App() {
         const latestVersion = tagName.replace(/^v/, '');
         
         if (latestVersion && latestVersion !== currentVersion) {
-          const installer = release.assets?.find((a: any) => 
-            a.name.endsWith('.dmg') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
-          );
+          const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
+          const installer = isMac
+            ? release.assets?.find((a: any) => a.name.endsWith('.dmg'))
+            : release.assets?.find((a: any) => a.name.endsWith('.exe')) || release.assets?.find((a: any) => a.name.endsWith('.msi'));
           const downloadUrl = installer?.browser_download_url || release.html_url;
           setAutoUpdateInfo({ version: latestVersion, body: release.body, url: downloadUrl, fileName: installer?.name });
         }
