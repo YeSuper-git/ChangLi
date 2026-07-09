@@ -3854,7 +3854,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
             base_to_series.entry(folder_base).or_insert((*id, title.clone(), fp.clone()));
         }
     }
-    let renamed_series: std::cell::RefCell<Vec<(i64, String, String, String)>> = std::cell::RefCell::new(Vec::new());
+    let renamed_series: std::sync::Mutex<Vec<(i64, String, String, String)>> = std::sync::Mutex::new(Vec::new());
 
     eprintln!("[check_updates] category={} existing_base_names={:?} current_category_names={:?} existing_folder_paths_count={} base_to_series_count={}",
         category_key, existing_base_names, current_category_names, existing_folder_paths.len(), base_to_series.len());
@@ -3994,7 +3994,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
                                     if *old_title != name {
                                         eprintln!("[check_updates] 检测到改名: {} -> {}", old_title, name);
-                                        renamed_series.borrow_mut().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                        renamed_series.lock().unwrap().push((*sid, old_title.clone(), name.clone(), fps.clone()));
                                     }
                                 }
                                 eprintln!("[check_updates] 跳过(base名称已存在): name={} base={}", name, base);
@@ -4184,7 +4184,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
                                     if *old_title != name {
                                         eprintln!("[check_updates] 检测到改名(非标签): {} -> {}", old_title, name);
-                                        renamed_series.borrow_mut().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                        renamed_series.lock().unwrap().push((*sid, old_title.clone(), name.clone(), fps.clone()));
                                     }
                                 }
                                 continue;
@@ -4223,7 +4223,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     };
 
     // 批量更新重命名的视频集
-    let renamed_series = renamed_series.into_inner();
+    let renamed_series = renamed_series.into_inner().unwrap();
     for (sid, _old_title, new_title, new_path) in &renamed_series {
         eprintln!("[check_updates] 自动更新视频集: id={} new_title={} new_path={}", sid, new_title, new_path);
         let _ = sqlx::query("UPDATE video_series SET title = ?, folder_path = ? WHERE id = ?")
