@@ -138,7 +138,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       },
       // 演员库
       {
-        page: '/actors',
+        page: 'current',  // 不跳转，等待用户点击导航栏
         title: '前往演员库',
         content: '点击导航栏的「演员」进入演员库 →',
         highlight: '[data-tutorial="nav-actors"]',
