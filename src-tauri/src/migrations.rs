@@ -31,6 +31,7 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         "backfill empty display_type to anime",
     ).await?;
     seed_default_actor_fields(pool).await?;
+    seed_tutorial_data(pool).await?;
     // Remove stale 'name' field from actor_fields (task #1)
     execute(pool, "DELETE FROM actor_fields WHERE field_key = 'name'", "delete name from actor_fields").await?;
     // 回填历史分类 features 中缺失的 status 字段
@@ -954,13 +955,9 @@ async fn seed_default_actor_fields(pool: &SqlitePool) -> Result<()> {
     }
 
     let default_fields = [
-        ("japanese_name", "日本名", "text", 2, 1),
-        ("alias", "别名", "text", 3, 1),
-        ("photo", "照片", "text", 4, 1),
-        ("birthday", "生日", "date", 5, 1),
-        ("height", "身高", "text", 6, 1),
-        ("weight", "体重", "text", 7, 1),
-        ("bio", "简介", "text", 9, 1),
+        ("birthday", "生日", "date", 1, 1),
+        ("height", "身高", "text", 2, 1),
+        ("weight", "体重", "text", 3, 1),
     ];
 
     for (key, label, ftype, order, enabled) in &default_fields {
@@ -1043,6 +1040,113 @@ async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
+
+/// 首次安装时预置教程示例数据：一个分类、一个演员、两个标签、一个视频集
+async fn seed_tutorial_data(pool: &SqlitePool) -> Result<()> {
+    // 只在数据库完全为空时执行
+    let cat_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM categories")
+        .fetch_one(pool)
+        .await?;
+    let actor_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM actors")
+        .fetch_one(pool)
+        .await?;
+    let tag_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tags")
+        .fetch_one(pool)
+        .await?;
+
+    if cat_count > 0 || actor_count > 0 || tag_count > 0 {
+        return Ok(());
+    }
+
+    // 创建示例分类
+    let features = r#"{"tags":true,"actors":true,"tracking":true,"watched":true,"status":true,"chinese_sub":true,"episode":"话"}"#;
+    sqlx::query(
+        "INSERT INTO categories (key, name, card_layout, features, sort_order) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind("example")
+    .bind("示例分类")
+    .bind("auto")
+    .bind(features)
+    .bind(1)
+    .execute(pool)
+    .await
+    .context("seed tutorial category")?;
+
+    // 创建示例演员
+    sqlx::query("INSERT INTO actors (name, bio, birthday, height, weight) VALUES (?, ?, ?, ?, ?)")
+        .bind("示例演员")
+        .bind("这是一位示例演员，你可以编辑个人信息、添加海报、关联作品。")
+        .bind("1990-01-01")
+        .bind("165cm")
+        .bind("50kg")
+        .execute(pool)
+        .await
+        .context("seed tutorial actor")?;
+
+    // 获取演员 ID
+    let actor_id: i64 = sqlx::query_scalar("SELECT id FROM actors WHERE name = '示例演员'")
+        .fetch_one(pool)
+        .await?;
+
+    // 创建示例标签
+    for tag_name in &["动作", "科幻"] {
+        sqlx::query("INSERT INTO tags (name) VALUES (?)")
+            .bind(tag_name)
+            .execute(pool)
+            .await
+            .with_context(|| format!("seed tutorial tag {tag_name}"))?;
+    }
+
+    // 获取标签 ID
+    let tag1_id: i64 = sqlx::query_scalar("SELECT id FROM tags WHERE name = '动作'")
+        .fetch_one(pool)
+        .await?;
+    let tag2_id: i64 = sqlx::query_scalar("SELECT id FROM tags WHERE name = '科幻'")
+        .fetch_one(pool)
+        .await?;
+
+    // 创建示例视频集
+    sqlx::query(
+        "INSERT INTO video_series (title, display_type, created_at) VALUES (?, ?, datetime('now'))"
+    )
+    .bind("示例视频集")
+    .bind("example")
+    .execute(pool)
+    .await
+    .context("seed tutorial video series")?;
+
+    // 获取视频集 ID
+    let series_id: i64 = sqlx::query_scalar("SELECT id FROM video_series WHERE title = '示例视频集'")
+        .fetch_one(pool)
+        .await?;
+
+    // 关联演员
+    sqlx::query("INSERT INTO series_actors (series_id, actor_id) VALUES (?, ?)")
+        .bind(series_id)
+        .bind(actor_id)
+        .execute(pool)
+        .await
+        .context("seed tutorial series-actor relation")?;
+
+    // 关联标签
+    for tag_id in &[tag1_id, tag2_id] {
+        sqlx::query("INSERT INTO series_tags (series_id, tag_id) VALUES (?, ?)")
+            .bind(series_id)
+            .bind(tag_id)
+            .execute(pool)
+            .await
+            .context("seed tutorial series-tag relation")?;
+    }
+
+    // 关联分类
+    sqlx::query("UPDATE video_series SET display_type = 'example' WHERE id = ?")
+        .bind(series_id)
+        .execute(pool)
+        .await
+        .context("seed tutorial series-category relation")?;
+
+    Ok(())
+}
 
 async fn execute(pool: &SqlitePool, sql: &str, action: &str) -> Result<()> {
     sqlx::query(sql)

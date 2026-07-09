@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -60,6 +60,8 @@ const Settings: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   const [newTagName, setNewTagName] = useState('');
+  const [editingTag, setEditingTag] = useState<{ id: number; name: string } | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState('');
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
@@ -182,6 +184,22 @@ const Settings: React.FC = () => {
       loadTags();
     } catch (error) {
       console.error('删除标签失败:', error);
+    }
+  };
+
+  const handleSaveTagEdit = async () => {
+    if (!editingTag) return;
+    const newName = editingTagValue.trim();
+    if (!newName || newName === editingTag.name) {
+      setEditingTag(null);
+      return;
+    }
+    try {
+      await updateTag(editingTag.id, newName);
+      setEditingTag(null);
+      loadTags();
+    } catch (error) {
+      console.error('更新标签失败:', error);
     }
   };
 
@@ -338,7 +356,7 @@ const Settings: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [gameOverlayDisabled, setGameOverlayState] = useState(false);
   const [gameOverlayLoading, setGameOverlayLoading] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean } | null>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
@@ -433,7 +451,7 @@ const Settings: React.FC = () => {
       const installer = findPlatformInstaller(release);
       const downloadUrl = installer?.browser_download_url || release.html_url;
 
-      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer) });
+      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer), body: release.body || undefined });
       setUpdateStatus(`发现新版本 v${latestVersion}`);
       notify({ message: `检测到最新版本 v${latestVersion}`, type: 'info' });
     } catch (error) {
@@ -466,6 +484,24 @@ const Settings: React.FC = () => {
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">设置</h1>
       </div>
+
+      {/* 功能导览 */}
+      <section className="mb-8">
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <span className="group-open:rotate-90 transition-transform">▶</span>
+            功能导览
+          </summary>
+          <div className="mt-3 p-4 bg-gray-50 rounded-xl text-sm text-gray-600 space-y-2">
+            <p><strong>数据存储</strong>：管理视频数据目录和海报缓存</p>
+            <p><strong>网站配置</strong>：添加视频源站点</p>
+            <p><strong>标签管理</strong>：创建和管理视频标签，用于分类筛选</p>
+            <p><strong>演员配置</strong>：自定义演员详情页显示的字段（输入"三围"或"罩杯"可解锁隐藏字段）</p>
+            <p><strong>分类管理</strong>：创建和配置视频分类，设置卡片样式和功能开关</p>
+            <p><strong>检查更新</strong>：查看最新版本并下载更新</p>
+          </div>
+        </details>
+      </section>
 
       {/* 数据存储 */}
       <section className="mb-12">
@@ -609,7 +645,7 @@ const Settings: React.FC = () => {
 
 
       {/* 分类配置 */}
-      <section className="mb-12">
+      <section className="mb-12" data-tutorial="settings-categories">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">分类配置</h2>
@@ -697,7 +733,7 @@ const Settings: React.FC = () => {
 
 
       {/* 标签管理 */}
-      <section className="mb-12">
+      <section className="mb-12" data-tutorial="settings-tags">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">标签管理</h2>
@@ -731,7 +767,31 @@ const Settings: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             {tags.map((tag) => (
               <div key={tag.id} className={`inline-flex items-center gap-2 px-4 py-2 ${getTagColor(tag.id).bg} rounded-full`}>
-                <span className="text-sm text-gray-800">{tag.name}</span>
+                {editingTag?.id === tag.id ? (
+                  <input
+                    type="text"
+                    value={editingTagValue}
+                    onChange={(e) => setEditingTagValue(e.target.value)}
+                    onBlur={handleSaveTagEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTagEdit();
+                      if (e.key === 'Escape') setEditingTag(null);
+                    }}
+                    className="bg-transparent border-none outline-none text-sm text-gray-800 w-20"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="text-sm text-gray-800 cursor-pointer select-none"
+                    onDoubleClick={() => {
+                      setEditingTag(tag);
+                      setEditingTagValue(tag.name);
+                    }}
+                    title="双击编辑标签名称"
+                  >
+                    {tag.name}
+                  </span>
+                )}
                 <button
                   onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
                   className="text-gray-400 hover:text-red-500"
@@ -749,7 +809,7 @@ const Settings: React.FC = () => {
 
 
       {/* 演员配置 */}
-      <section className="mb-12">
+      <section className="mb-12" data-tutorial="settings-actors">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">演员配置</h2>
@@ -889,7 +949,7 @@ const Settings: React.FC = () => {
       {/* 分类编辑/新增弹窗 */}
       {showCategoryModal && (
         <div className="changli-modal-backdrop">
-          <div className="changli-modal-panel max-h-[90vh] !w-[min(100%,520px)] overflow-y-auto">
+          <div className="changli-modal-panel max-h-[90vh] !w-[min(100%,520px)] overflow-y-auto" data-tutorial="category-modal">
             <h2 className="changli-modal-title">{editingCategory ? '编辑分类' : '新增分类'}</h2>
             <div className="space-y-4">
               <div>
@@ -977,7 +1037,12 @@ const Settings: React.FC = () => {
             </div>
             <div className="flex gap-4 mt-8">
               <button
-                onClick={() => setShowCategoryModal(false)}
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  if (searchParams.get('openCategoryModal') === 'true') {
+                    navigate('/library');
+                  }
+                }}
                 className="action-btn flex-1"
               >
                 取消
@@ -1234,10 +1299,20 @@ const Settings: React.FC = () => {
             <h2 className="text-xl font-semibold">关于</h2>
             <p className="text-sm text-gray-500 mt-1">当前版本：v{currentVersion}</p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center" data-tutorial="settings-about">
             {updateStatus && (
               <span className="text-sm text-gray-500">{updateStatus}</span>
             )}
+            <button
+              onClick={() => {
+                localStorage.removeItem('changli_onboarding_done');
+                navigate('/');
+                window.location.reload();
+              }}
+              className="action-btn"
+            >
+              新手引导
+            </button>
             <button
               onClick={handleCheckUpdate}
               disabled={updateStatus === '检查中...'}
@@ -1309,7 +1384,19 @@ const Settings: React.FC = () => {
       <ConfirmDialog
         open={!!pendingUpdate}
         title="检测到新版本"
-        message={pendingUpdate ? `检测到最新版本 v${pendingUpdate.version}，是否跳转下载更新？` : ''}
+        message={pendingUpdate ? (
+          <div>
+            <p className="mb-3">检测到最新版本 v{pendingUpdate.version}，是否跳转下载更新？</p>
+            {pendingUpdate.body && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
+                <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
+                <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                  {pendingUpdate.body}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : ''}
         confirmText="是，下载更新"
         cancelText="取消"
         onConfirm={handleConfirmUpdateDownload}

@@ -373,6 +373,14 @@ export async function addVideosToSeries(seriesId: number, paths: string[]): Prom
   return invoke<Video[]>('add_videos_to_series', { seriesId, paths });
 }
 
+export async function createEmptyVideoSeries(title: string, displayType?: string): Promise<VideoSeries> {
+  return invoke<VideoSeries>('create_empty_video_series', { title, displayType });
+}
+
+export async function updateVideoEpisodeNumbers(updates: [number, number][]): Promise<void> {
+  return invoke('update_video_episode_numbers', { updates });
+}
+
 export async function removeVideoFromSeries(videoId: number): Promise<Video> {
   return invoke<Video>('remove_video_from_series', { videoId });
 }
@@ -650,6 +658,15 @@ export async function deleteTag(id: number): Promise<void> {
     await invoke('delete_tag', { id });
   } catch (err) {
     console.error('[API] deleteTag 失败:', err);
+    throw err;
+  }
+}
+
+export async function updateTag(id: number, name: string): Promise<void> {
+  try {
+    await invoke('update_tag', { id, name });
+  } catch (err) {
+    console.error('[API] updateTag 失败:', err);
     throw err;
   }
 }

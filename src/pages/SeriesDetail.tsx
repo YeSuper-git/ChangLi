@@ -35,6 +35,8 @@ import {
   parseCategoryFeatures,
   checkSeriesUpdates,
   addVideoToSeries,
+  addVideosToSeries,
+  updateVideoEpisodeNumbers,
   getTagColor,
   formatSeriesEpisodeCountLabel,
   isSeriesCompleted,
@@ -400,6 +402,67 @@ const SeriesDetail: React.FC = () => {
     });
   };
 
+  // 添加视频 - 打开文件选择器
+  const handleAddEpisodes = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: '视频文件', extensions: ['mp4', 'mkv', 'avi', 'wmv', 'flv', 'mov', 'webm', 'm4v', 'ts', 'rmvb', 'rm'] }],
+      });
+      if (!selected || (Array.isArray(selected) && selected.length === 0)) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      if (!series) return;
+      // 按文件名排序
+      paths.sort((a, b) => {
+        const nameA = a.split(/[/\\]/).pop() || '';
+        const nameB = b.split(/[/\\]/).pop() || '';
+        return nameA.localeCompare(nameB, undefined, { numeric: true });
+      });
+      await addVideosToSeries(series.id, paths);
+      // 重新加载视频列表
+      const [, newVideos] = await getVideoSeriesDetail(series.id);
+      setVideos(newVideos);
+      notify({ message: `已添加 ${paths.length} 个分集`, type: 'success' });
+    } catch (error) {
+      console.error('添加视频失败:', error);
+      notify({ message: '添加视频失败', type: 'error' });
+    }
+  };
+
+  // 保存分集排序
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const handleSaveEpisodeOrder = async () => {
+    try {
+      // 按当前顺序更新集数
+      const updates: [number, number][] = videos.map((v, i) => [v.id, i + 1]);
+      await updateVideoEpisodeNumbers(updates);
+      setSelectMode(false);
+      setSelectedEpisodes(new Set());
+      notify({ message: '排序已保存', type: 'success' });
+    } catch (error) {
+      console.error('保存排序失败:', error);
+      notify({ message: '保存排序失败', type: 'error' });
+    }
+  };
+
+  // 拖动排序
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const newVideos = [...videos];
+    const [removed] = newVideos.splice(draggedIndex, 1);
+    newVideos.splice(index, 0, removed);
+    setVideos(newVideos);
+    setDraggedIndex(index);
+  };
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
   const handleBatchDeleteEpisodes = async () => {
     if (selectedEpisodes.size === 0) return;
     const idsToDelete = [...selectedEpisodes];
@@ -697,7 +760,7 @@ const SeriesDetail: React.FC = () => {
         </button>
       </div>
 
-      <div className="changli-detail-hero changli-panel p-6 mb-8">
+      <div className="changli-detail-hero changli-panel p-6 mb-8" data-tutorial="series-hero">
         <div className="flex gap-6">
           <div className={`w-80 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm ring-1 ring-black/5 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
             <div
@@ -933,7 +996,7 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   )}
                   {features.actors && (
-                    <div>
+                    <div data-tutorial="series-actors">
                       <span className="text-sm font-medium text-gray-500 mr-2">演员：</span>
                       {seriesActors.length > 0 ? seriesActors.map((actor) => (
                         <Link
@@ -980,19 +1043,23 @@ const SeriesDetail: React.FC = () => {
         </div>
       </div>
 
+      <div data-tutorial="series-episodes">
       <div className="changli-section-title">
         <h2 className="text-xl font-semibold">选集</h2>
         <div className="flex items-center gap-2">
-          <span className="changli-soft-chip">{videos.length} {features.episode || '部'}</span>
+          {!selectMode && (
+            <button className="action-btn text-xs" onClick={handleAddEpisodes}>添加视频</button>
+          )}
           {selectMode ? (
             <>
               <button className="action-btn action-btn-danger text-xs" disabled={selectedEpisodes.size === 0} onClick={() => episodeSecondConfirm('batch-delete-episodes', handleBatchDeleteEpisodes)}>
                 {episodePendingKey === 'batch-delete-episodes' ? `确认删除 ${selectedEpisodes.size} 个` : `删除 ${selectedEpisodes.size} 个`}
               </button>
               <button className="action-btn text-xs" onClick={() => { setSelectMode(false); setSelectedEpisodes(new Set()); episodeClearPending(); }}>取消</button>
+              <button className="action-btn action-btn-primary text-xs" onClick={handleSaveEpisodeOrder}>保存排序</button>
             </>
           ) : (
-            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>选择</button>
+            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>编辑</button>
           )}
         </div>
       </div>
@@ -1005,10 +1072,15 @@ const SeriesDetail: React.FC = () => {
           selectMode={selectMode}
           selectedEpisodes={selectedEpisodes}
           onToggleSelect={toggleEpisodeSelect}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          draggedIndex={draggedIndex}
         />
       ) : (
         <div className="changli-empty-state text-gray-500">暂无资源</div>
       )}
+      </div>
 
 
       {/* 海报右键菜单 */}
@@ -1292,12 +1364,16 @@ function formatLastWatchedEpisodeLabel(episode: number, season: number, epWord: 
 
 interface VideoGridProps {
   videos: Video[];
-  posterOrientation: string;
+  posterOrientation?: string;
   episodeWord?: string;
   fallbackPoster?: string | null;
   selectMode?: boolean;
   selectedEpisodes?: Set<number>;
-  onToggleSelect?: (videoId: number) => void;
+  onToggleSelect?: (id: number) => void;
+  onDragStart?: (index: number) => void;
+  onDragOver?: (e: React.DragEvent, index: number) => void;
+  onDragEnd?: () => void;
+  draggedIndex?: number | null;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
@@ -1308,6 +1384,10 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   selectMode,
   selectedEpisodes,
   onToggleSelect,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  draggedIndex,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -1354,7 +1434,11 @@ const VideoGrid: React.FC<VideoGridProps> = ({
       <button
         key={video.id}
         type="button"
-        className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''}`}
+        draggable={selectMode}
+        onDragStart={() => onDragStart?.(videos.indexOf(video))}
+        onDragOver={(e) => onDragOver?.(e, videos.indexOf(video))}
+        onDragEnd={() => onDragEnd?.()}
+        className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''} ${draggedIndex === videos.indexOf(video) ? 'opacity-50' : ''}`}
         onClick={() => {
           if (selectMode && onToggleSelect) {
             onToggleSelect(video.id);

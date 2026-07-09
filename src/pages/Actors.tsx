@@ -79,12 +79,13 @@ const Actors: React.FC = () => {
 
   return (
     <>
-    <div className="changli-page">
+    <div className="changli-page" data-tutorial="actors-content">
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">演员库</h1>
         <button
           onClick={() => setShowAddModal(true)}
           className="action-btn action-btn-primary"
+          data-tutorial="add-actor"
         >
           添加演员
         </button>
@@ -140,16 +141,21 @@ const Actors: React.FC = () => {
         </div>
       ) : (
         <div className="changli-empty-state">
-          <p className="text-gray-500 text-lg mb-4">
-            {searchTerm ? '没有找到匹配的演员' : '暂无演员数据'}
+          <p className="text-gray-500 text-lg mb-2">
+            {searchTerm ? '没有找到匹配的演员' : '暂无演员'}
           </p>
           {!searchTerm && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="action-btn action-btn-primary"
-            >
-              添加第一个演员
-            </button>
+            <>
+              <p className="text-gray-400 text-sm mb-6">
+                演员信息会从视频元数据中自动提取，也可手动添加
+              </p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="action-btn action-btn-primary"
+              >
+                添加第一个演员
+              </button>
+            </>
           )}
         </div>
       )}
@@ -185,7 +191,7 @@ const Actors: React.FC = () => {
       {/* 添加演员弹窗 */}
       {showAddModal && (
         <div className="changli-modal-backdrop">
-          <div className="changli-modal-panel">
+          <div className="changli-modal-panel" data-tutorial="add-actor-modal">
             <h2 className="changli-modal-title">添加演员</h2>
             <div className="space-y-4">
               <div>
@@ -213,6 +219,7 @@ const Actors: React.FC = () => {
               <button
                 onClick={() => setShowAddModal(false)}
                 className="action-btn flex-1"
+                data-tutorial="cancel-add-actor"
               >
                 取消
               </button>

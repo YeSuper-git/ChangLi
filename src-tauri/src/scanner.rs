@@ -139,11 +139,12 @@ pub const IMAGE_EXTENSIONS: &[&str] = &[
 /// 例如 "xxxx 1-3" → "xxxx", "xxxx 1-25" → "xxxx", "xxxx" → "xxxx"
 pub fn strip_episode_suffix(name: &str) -> String {
     let trimmed = name.trim();
-    // 匹配末尾 " 数字-数字" 或 " 数字集" 等模式
+    // 匹配末尾 " 数字-数字季?" 或 " 数字集" 等模式
     if let Some(pos) = trimmed.rfind(' ') {
         let suffix = &trimmed[pos + 1..];
-        if suffix.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '集' || c == '话')
-            && suffix.contains('-')
+        let clean_suffix = suffix.trim_end_matches('季');
+        if clean_suffix.chars().all(|c| c.is_ascii_digit() || c == '-')
+            && clean_suffix.contains('-')
         {
             return trimmed[..pos].to_string();
         }
@@ -197,6 +198,15 @@ pub fn classify_series_subfolder(name: &str) -> SeriesSubfolderKind {
         if let Some(caps) = re.captures(&lower) {
             if let Some(season) = caps.get(2).and_then(|m| m.as_str().parse::<i32>().ok()) {
                 return SeriesSubfolderKind::Season(season);
+            }
+        }
+    }
+
+    // 1-2季、1-3季 等范围格式：取最后一个数字作为总季数
+    if let Ok(re) = regex::Regex::new(r"(\d+)\s*[-~]\s*(\d+)\s*季") {
+        if let Some(caps) = re.captures(trimmed) {
+            if let Some(end_season) = caps.get(2).and_then(|m| m.as_str().parse::<i32>().ok()) {
+                return SeriesSubfolderKind::Season(end_season);
             }
         }
     }
@@ -681,6 +691,24 @@ fn find_poster_for_folder(
         }
     }
 
+    // 策略3.5：查找名为 poster、cover、folder 的图片
+    for name in &["poster", "cover", "folder"] {
+        for image_path in image_files {
+            if let Some(image_parent) = image_path.parent() {
+                if same_dir(image_parent, folder) {
+                    let image_stem = image_path
+                        .file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_lowercase();
+                    if image_stem == *name {
+                        return Some(image_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
     // 策略4：查找文件名包含车牌的图片（如 START-191-C.jpg 匹配车牌 START-191）
     if let Some(info) = parse_adult_filename(folder_name) {
         let code_lower = info.code.to_lowercase();
@@ -781,7 +809,8 @@ pub fn extract_episode_from_filename(filename: &str) -> Option<i32> {
 
     // 常见的集数格式
     let patterns = [
-        r"(?i)ep?\s*(\d+)",      // EP01, E01, ep01
+        r"(?i)s\d+e(\d+)",        // S01E01, S1E01（标准季集格式，优先匹配）
+        r"(?i)ep?\s*(\d+)",       // EP01, E01, ep01
         r"(?i)第\s*(\d+)\s*[集话]", // 第01集, 第01话
         r"(?i)\[(\d+)\]",           // [01]
         r"(?i)_(\d+)_",             // _01_
@@ -928,9 +957,15 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
     // 检查车牌后的中文字幕标记：支持 JUR-472-C、JUR-472-CH、JUR-472C、JUR-472ch，
     // 也支持 JUR-472-AI-C / JUR-472-AI-CH 这种中间带版本标记的命名。
     let marker_part = after_code.split('[').next().unwrap_or(after_code);
-    let has_chinese_sub = marker_part
+    let has_c_marker = marker_part
         .split(|ch: char| ch == '-' || ch == '_' || ch.is_whitespace())
         .any(|token| token.eq_ignore_ascii_case("c") || token.eq_ignore_ascii_case("ch"));
+
+    // 检查方括号中是否包含 [中文]、[字幕] 等中文字幕标记
+    let has_bracket_sub = after_code.to_lowercase().contains("[中文]")
+        || after_code.to_lowercase().contains("[字幕]");
+
+    let has_chinese_sub = has_c_marker || has_bracket_sub;
 
     // 提取 [] 中的标题
     let rest = after_code;

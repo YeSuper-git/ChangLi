@@ -16,6 +16,7 @@ import {
   getTagColor,
   toggleWatched,
   openSeriesInFileManager,
+  createEmptyVideoSeries,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -23,6 +24,7 @@ import { SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ScanLogicModal, { isScanLogicSeen, markScanLogicSeen } from '../components/ScanLogicModal';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
 import {
@@ -46,10 +48,23 @@ const Library: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty, toggleFavorite } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
+  const [showNewSeriesModal, setShowNewSeriesModal] = useState(false);
+  const [newSeriesTitle, setNewSeriesTitle] = useState('');
+  const [creatingSeries, setCreatingSeries] = useState(false);
   const [categoryScanning, setCategoryScanning] = useState(false);
   const [categoryOperation, setCategoryOperation] = useState<'checking' | 'updating' | null>(() => getCategoryUpdateRunnerState().operation);
   const [scanConfirm, setScanConfirm] = useState(false);
+  const [showScanLogicModal, setShowScanLogicModal] = useState(false);
+  const [addButtonContextMenu, setAddButtonContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [categoryUpdateResult, setCategoryUpdateResult] = useState<CategoryUpdateResult | null>(null);
+
+  // 点击外部关闭添加按钮右键菜单
+  useEffect(() => {
+    if (!addButtonContextMenu) return;
+    const close = () => setAddButtonContextMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [addButtonContextMenu]);
   // 检查更新选中状态：new_series: Set<name>, series_updates: Map<series_id, {selected: bool, newVideos: Set<filePath>, missingVideos: Set<id>}>
   const getMissingSeriesKey = (series: { id?: number | null; name: string }) => series.id != null ? `id:${series.id}` : `name:${series.name}`;
   // 切换单个新发现视频集的选中状态
@@ -505,6 +520,24 @@ const Library: React.FC = () => {
     setTypeSwitchSeriesId(seriesId);
   };
 
+  const handleCreateSeries = async () => {
+    if (!newSeriesTitle.trim() || creatingSeries) return;
+    setCreatingSeries(true);
+    try {
+      const series = await createEmptyVideoSeries(newSeriesTitle.trim(), mainCategory);
+      setShowNewSeriesModal(false);
+      setNewSeriesTitle('');
+      refreshSeries().catch(() => {});
+      notify({ message: `已创建「${newSeriesTitle.trim()}」`, type: 'success' });
+      navigate(`/series/${series.id}`);
+    } catch (error) {
+      console.error('[Library] 创建视频集失败:', error);
+      notify({ message: '创建视频集失败', type: 'error' });
+    } finally {
+      setCreatingSeries(false);
+    }
+  };
+
   const handleSwitchTypeTo = async (seriesId: number, categoryKey: string, categoryName: string) => {
     setTypeSwitchConfirm({ seriesId, categoryName, categoryKey });
     setTypeSwitchSeriesId(null);
@@ -520,10 +553,10 @@ const Library: React.FC = () => {
       clearLibraryFilterCaches();
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
       refreshSeries().catch(() => {});
-      notify({ message: `已切换到${name}`, type: 'success' });
+      notify({ message: `已移动到「${name}」`, type: 'success' });
     } catch (error) {
-      console.error('[Library] 切换分类失败:', error);
-      notify({ message: '切换分类失败，请稍后重试', type: 'error' });
+      console.error('[Library] 移动分类失败:', error);
+      notify({ message: '移动分类失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -696,13 +729,13 @@ const Library: React.FC = () => {
     } catch (error) {
       refreshSeries().catch(() => {});
     }
-    notify({ message: `已将 ${count} 个视频集切换到「${name}」`, type: 'success' });
+    notify({ message: `已将 ${count} 个视频集移动到「${name}」`, type: 'success' });
   };
 
   return (
     <>
     <div className="changli-page changli-library-instant">
-      <div className="changli-page-header">
+      <div className="changli-page-header" data-tutorial="library-categories">
         <div className="flex items-center gap-4">
           {scopeAll && (
             <h1 className="changli-heading-xl cursor-default transition-all">我的追番</h1>
@@ -738,33 +771,48 @@ const Library: React.FC = () => {
             <button
               onClick={() => navigate('/settings?openCategoryModal=true')}
               className="action-btn action-btn-primary"
+              title="在设置中创建新分类"
+              data-tutorial="new-category"
             >
               新建分类
             </button>
           ) : (
-            <>
-              {!scopeAll && currentCategory?.scan_path && (
+            <div className="flex gap-2" data-tutorial="action-buttons">
+              {!scopeAll && (
                 <button
                   onClick={() => setScanConfirm(true)}
-                  disabled={categoryScanning}
-                  className="action-btn action-btn-primary disabled:opacity-50"
+                  disabled={categoryScanning || !currentCategory?.scan_path}
+                  className={`action-btn disabled:opacity-50 ${currentCategory?.scan_path ? 'action-btn-primary' : 'action-btn-secondary'}`}
+                  title={currentCategory?.scan_path ? '扫描文件夹检查新视频和移除的视频' : '当前分类未配置扫描路径，如需使用请前往设置 → 分类配置进行设置'}
+                  data-tutorial="scan-update"
                 >
                   {categoryOperation === 'updating' ? '更新中...' : categoryScanning ? '检查中...' : '全量检查更新'}
                 </button>
               )}
               <button
-                onClick={importPath}
+                onClick={() => {
+                  if (!isScanLogicSeen()) {
+                    setShowScanLogicModal(true);
+                  } else {
+                    importPath();
+                  }
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setAddButtonContextMenu({ x: e.clientX, y: e.clientY });
+                }}
                 disabled={scanning}
                 className="action-btn action-btn-primary disabled:opacity-50"
+                data-tutorial="add-videos"
               >
                 {scanning ? '添加中...' : '添加'}
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="changli-filter-panel mb-8">
+      <div className="changli-filter-panel mb-8" data-tutorial="library-filters">
         {features.tags && (
           <>
             <div className="changli-filter-group">
@@ -780,6 +828,9 @@ const Library: React.FC = () => {
                     {tag.name}
                   </button>
                 ))}
+                {tags.length === 0 && (
+                  <span className="text-gray-400 text-xs ml-2">标签从文件夹名自动识别</span>
+                )}
               </div>
               {tagsNeedsExpand && (
                 <button
@@ -858,6 +909,12 @@ const Library: React.FC = () => {
             className="search-input flex-1"
           />
           <button
+            onClick={() => setShowNewSeriesModal(true)}
+            className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 hover:-translate-y-0.5 transition-all"
+          >
+            新增视频集
+          </button>
+          <button
             onClick={() => {
               if (selectMode) {
                 setSelectMode(false);
@@ -894,7 +951,7 @@ const Library: React.FC = () => {
               disabled={selectedIds.size === 0}
               className="action-btn disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              切换分类{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              移动到其他分类{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
             </button>
             <button
               onClick={handleBatchDelete}
@@ -915,7 +972,7 @@ const Library: React.FC = () => {
 
       <div key={contentMotionKey} className="changli-library-content-motion">
       {filteredSeries.length > 0 && (
-        <div className="mb-12">
+        <div className="mb-12" data-tutorial="library-grid">
           <div className={`auto-rows-max ${scopeAll ? 'changli-auto-grid-mixed' : isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video'}`}>
             {filteredSeries.map((series) => {
               const itemCategory = getSeriesCategory(series);
@@ -926,6 +983,7 @@ const Library: React.FC = () => {
               return (
                 <div
                   key={series.id}
+                  data-tutorial={series.id === 1 ? 'video-card' : undefined}
                   onClick={() => { if (!selectMode) {
                     sessionStorage.setItem('library-scroll-y', String(window.scrollY));
                     const filterSearch = buildFilterSearch();
@@ -1058,7 +1116,7 @@ const Library: React.FC = () => {
               handleSwitchType(contextMenu.id);
             }}
           >
-            切换分类
+            移动到其他分类
           </button>
           <button
             className="changli-menu-item changli-menu-item-danger"
@@ -1232,11 +1290,11 @@ const Library: React.FC = () => {
       </div>
     )}
 
-    {/* 切换类型 - 大类选择弹窗 */}
+    {/* 移动到其他分类 - 大类选择弹窗 */}
     {typeSwitchSeriesId !== null && (
-      <div className="changli-modal-backdrop" onClick={() => setTypeSwitchSeriesId(null)}>
+      <div className="changli-modal-backdrop" onClick={() => { setTypeSwitchSeriesId(null); setContextMenu(null); }}>
         <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要切换的分类</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要移动到哪个分类</h3>
           <div className="space-y-2 mb-4">
             {categories.filter(c => c.key !== mainCategory).map(cat => (
               <button
@@ -1250,7 +1308,7 @@ const Library: React.FC = () => {
           </div>
           <button
             className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
-            onClick={() => setTypeSwitchSeriesId(null)}
+            onClick={() => { setTypeSwitchSeriesId(null); setContextMenu(null); }}
           >
             取消
           </button>
@@ -1263,7 +1321,7 @@ const Library: React.FC = () => {
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            确定切换到「{typeSwitchConfirm.categoryName}」？
+            确定移动到「{typeSwitchConfirm.categoryName}」？
           </p>
           <div className="flex gap-3">
             <button
@@ -1287,7 +1345,7 @@ const Library: React.FC = () => {
     {batchSwitchCategoryOpen && (
       <div className="changli-modal-backdrop" onClick={() => setBatchSwitchCategoryOpen(false)}>
         <div className="changli-modal-panel !w-[min(100%,360px)]" onClick={e => e.stopPropagation()}>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要切换的分类</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">选择要移动到哪个分类</h3>
           <div className="space-y-2 mb-4">
             {categories.filter(c => c.key !== mainCategory).map(cat => (
               <button
@@ -1317,7 +1375,7 @@ const Library: React.FC = () => {
       <div className="changli-modal-backdrop">
         <div className="changli-modal-panel">
           <p className="text-gray-900 text-base mb-6">
-            确定将选中的 {selectedIds.size} 个视频集切换到「{batchSwitchConfirm.categoryName}」？
+            确定将选中的 {selectedIds.size} 个视频集移动到「{batchSwitchConfirm.categoryName}」？
           </p>
           <div className="flex gap-3">
             <button
@@ -1338,6 +1396,78 @@ const Library: React.FC = () => {
     )}
 
     <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新" />
+
+    {showNewSeriesModal && (
+      <div className="changli-modal-backdrop">
+        <div className="changli-panel changli-modal" style={{ maxWidth: 420 }}>
+          <h2 className="text-lg font-semibold mb-4">新增视频集</h2>
+          <input
+            type="text"
+            value={newSeriesTitle}
+            onChange={(e) => setNewSeriesTitle(e.target.value)}
+            placeholder="请输入视频集标题"
+            className="search-input w-full mb-4"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newSeriesTitle.trim() && !creatingSeries) {
+                handleCreateSeries();
+              }
+            }}
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={handleCreateSeries}
+              disabled={!newSeriesTitle.trim() || creatingSeries}
+              className="action-btn action-btn-primary flex-1 text-sm"
+            >
+              {creatingSeries ? '创建中...' : '创建'}
+            </button>
+            <button
+              onClick={() => { setShowNewSeriesModal(false); setNewSeriesTitle(''); }}
+              className="action-btn flex-1 text-sm"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* 添加按钮右键菜单 */}
+    {addButtonContextMenu && (() => {
+      const menuWidth = 120;
+      const menuHeight = 40;
+      const x = addButtonContextMenu.x + menuWidth > window.innerWidth ? addButtonContextMenu.x - menuWidth : addButtonContextMenu.x;
+      const y = addButtonContextMenu.y + menuHeight > window.innerHeight ? addButtonContextMenu.y - menuHeight : addButtonContextMenu.y;
+      return (
+      <div
+        className="fixed z-[10001] bg-white rounded-xl shadow-xl border border-gray-100 py-1 min-w-[120px]"
+        style={{ left: x, top: y }}
+      >
+        <button
+          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          onClick={() => {
+            setAddButtonContextMenu(null);
+            setShowScanLogicModal(true);
+          }}
+        >
+          识别逻辑
+        </button>
+      </div>
+      );
+    })()}
+
+    {/* 识别逻辑说明弹窗 */}
+    <ScanLogicModal
+      open={showScanLogicModal}
+      onClose={() => setShowScanLogicModal(false)}
+      onConfirm={() => {
+        markScanLogicSeen();
+        setShowScanLogicModal(false);
+        importPath();
+      }}
+    />
+
     </>
   );
 };

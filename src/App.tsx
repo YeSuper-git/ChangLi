@@ -3,6 +3,7 @@ import { BrowserRouter as Router, MemoryRouter, Routes, Route, useLocation, useN
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Layout from './components/Layout';
+import { OnboardingTutorial } from './components/OnboardingTutorial';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Downloads from './pages/Downloads';
@@ -15,6 +16,8 @@ import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
 import { useLibraryStore } from './store/libraryStore';
 import ToastProvider from './components/ToastProvider';
+import { checkLatestRelease } from './utils/api';
+import { currentVersion } from './generated/versionInfo';
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -23,6 +26,7 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadAll = useLibraryStore((s) => s.loadAll);
+  const [autoUpdateInfo, setAutoUpdateInfo] = useState<{ version: string; body?: string; url: string } | null>(null);
 
   useEffect(() => {
     const preventBrowserContextMenu = (event: MouseEvent) => {
@@ -54,6 +58,35 @@ function App() {
     };
     initDatabase();
   }, [isPlayerWindow, loadAll]);
+
+  // 启动时后台自动检查更新
+  useEffect(() => {
+    if (isPlayerWindow || !dbReady) return;
+    
+    const autoCheckUpdate = async () => {
+      try {
+        // 等待 5 秒后再检查，避免影响启动速度
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        const release = await checkLatestRelease() as any;
+        const tagName = release.tag_name || '';
+        const latestVersion = tagName.replace(/^v/, '');
+        
+        if (latestVersion && latestVersion !== currentVersion) {
+          const installer = release.assets?.find((a: any) => 
+            a.name.endsWith('.dmg') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
+          );
+          const downloadUrl = installer?.browser_download_url || release.html_url;
+          setAutoUpdateInfo({ version: latestVersion, body: release.body, url: downloadUrl });
+        }
+      } catch (error) {
+        // 静默失败，不影响用户体验
+        console.log('[App] 自动检查更新失败:', error);
+      }
+    };
+    
+    autoCheckUpdate();
+  }, [isPlayerWindow, dbReady]);
 
   if (isPlayerWindow) {
     return (
@@ -140,6 +173,47 @@ function App() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
+      <OnboardingTutorial />
+      
+      {/* 自动检查更新弹窗 */}
+      {autoUpdateInfo && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60">
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-h-[80vh] flex flex-col">
+            <div className="p-6 pb-4">
+              <h3 className="text-lg font-bold text-gray-900">发现新版本 v{autoUpdateInfo.version}</h3>
+            </div>
+            <div className="px-6 overflow-y-auto flex-1">
+              <p className="text-sm text-gray-600 mb-3">是否跳转下载更新？</p>
+              {autoUpdateInfo.body && (
+                <div className="p-3 bg-gray-50 rounded-lg mb-4">
+                  <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
+                  <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                    {autoUpdateInfo.body}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-6 pt-4 flex gap-3 justify-end border-t border-gray-100">
+              <button 
+                onClick={() => setAutoUpdateInfo(null)} 
+                className="action-btn text-sm px-4 py-1.5"
+              >
+                暂不更新
+              </button>
+              <button 
+                onClick={async () => {
+                  const url = autoUpdateInfo.url;
+                  setAutoUpdateInfo(null);
+                  window.open(url, '_blank');
+                }} 
+                className="action-btn action-btn-primary text-sm px-4 py-1.5"
+              >
+                下载更新
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Router>
   );
 }

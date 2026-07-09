@@ -29,7 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { path: '/', label: '首页' },
     { path: '/library', label: '视频' },
-    { path: '/actors', label: '演员' },
+    { path: '/actors', label: '演员', tutorial: 'nav-actors' },
     { path: '/downloads', label: '下载' },
   ];
 
@@ -115,6 +115,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link
                     key={item.path}
                     to={item.path}
+                    data-tutorial={item.tutorial}
                     className={`nav-link ${
                       location.pathname === item.path ? 'active' : ''
                     }`}
@@ -155,7 +156,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <span className="control-icon search-icon" aria-hidden="true" />
                   </button>
                 )}
-                <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" title="设置">
+                <button type="button" onClick={() => navigate('/settings')} aria-label="打开设置" title="设置" data-tutorial="go-settings">
                   <img src={settingsIcon} alt="" className="w-[14px] h-[14px]" />
                 </button>
                 {/* Windows 窗口控制按钮 */}

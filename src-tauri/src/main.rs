@@ -1274,6 +1274,35 @@ async fn add_videos_to_series(
 }
 
 #[tauri::command]
+async fn create_empty_video_series(
+    state: State<'_, AppState>,
+    title: String,
+    display_type: Option<String>,
+) -> Result<db::VideoSeries, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::create_empty_video_series(&pool, &title, display_type.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_video_episode_numbers(
+    state: State<'_, AppState>,
+    updates: Vec<(i64, i32)>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_video_episode_numbers(&pool, &updates)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn add_category_series_by_paths(
     state: State<'_, AppState>,
     category_key: String,
@@ -1847,6 +1876,21 @@ async fn delete_tag(state: State<'_, AppState>, id: i64) -> Result<(), String> {
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::delete_tag(&pool, id).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_tag(state: State<'_, AppState>, id: i64, name: String) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    sqlx::query("UPDATE tags SET name = ? WHERE id = ?")
+        .bind(&name)
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -2707,6 +2751,8 @@ fn main() {
             switch_series_type_to,
             add_video_to_series,
             add_videos_to_series,
+            create_empty_video_series,
+            update_video_episode_numbers,
             add_category_series_by_paths,
             remove_video_from_series,
             get_actors,
@@ -2721,6 +2767,7 @@ fn main() {
             get_tags_by_category,
             add_tag,
             delete_tag,
+            update_tag,
             get_resource_tags,
             add_resource_tag,
             remove_resource_tag,

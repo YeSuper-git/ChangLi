@@ -139,8 +139,8 @@ const Home: React.FC = () => {
 
   return (
     <>
-      <div className="changli-page">
-        <section className="changli-detail-hero changli-panel mb-12 overflow-hidden p-7">
+      <div className="changli-page" data-tutorial="home-main">
+        <section className="changli-detail-hero changli-panel mb-12 overflow-hidden p-7" data-tutorial="home-hero">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="changli-heading-xl mb-3">今天想看什么</h1>
@@ -149,7 +149,7 @@ const Home: React.FC = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/library" className="action-btn action-btn-primary">进入视频库</Link>
+              <Link to="/library" className="action-btn action-btn-primary" data-tutorial="go-library">进入视频库</Link>
               <Link to="/actors" className="action-btn">演员库</Link>
             </div>
           </div>
@@ -169,7 +169,7 @@ const Home: React.FC = () => {
           </div>
         </section>
 
-        <section className="mb-16">
+        <section className="mb-16" data-tutorial="home-favorites">
           <div className="changli-section-title">
             <h2 className="text-2xl font-bold text-gray-900">我的追番</h2>
             <Link to="/library?favorite=1&scope=all" className="changli-section-link">查看全部 ›</Link>
@@ -198,7 +198,7 @@ const Home: React.FC = () => {
           const epWord = features.episode || '部';
 
           return (
-            <section key={cat.key} className="mb-16">
+            <section key={cat.key} className="mb-16" data-tutorial="home-example-category">
               <div className="changli-section-title">
                 <h2 className="text-2xl font-bold text-gray-900">我的{cat.name}</h2>
                 <Link to={`/library?cat=${cat.key}`} className="changli-section-link">查看全部 ›</Link>

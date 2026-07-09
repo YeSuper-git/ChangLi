@@ -679,6 +679,44 @@ pub async fn add_video_series(
     Ok(series_from_row(&row))
 }
 
+/// Create an empty video series with no folder_path (user-created, unaffected by scan).
+pub async fn create_empty_video_series(
+    pool: &SqlitePool,
+    title: &str,
+    display_type: Option<&str>,
+) -> Result<VideoSeries> {
+    sqlx::query(
+        "INSERT INTO video_series (title, folder_path, poster_orientation, status, display_type) VALUES (?, NULL, 'landscape', 'ongoing', COALESCE(?, ''))"
+    )
+    .bind(title)
+    .bind(display_type)
+    .execute(pool)
+    .await?;
+    let row = sqlx::query(
+        "SELECT video_series.*, 0 AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, 0 AS has_actor FROM video_series WHERE id = last_insert_rowid()"
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(series_from_row(&row))
+}
+
+/// Batch update episode numbers for videos (used for drag-and-drop reorder).
+pub async fn update_video_episode_numbers(
+    pool: &SqlitePool,
+    updates: &[(i64, i32)],
+) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    for (video_id, episode_number) in updates {
+        sqlx::query("UPDATE videos SET episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(episode_number)
+            .bind(video_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn get_video_series_by_folder_path(
     pool: &SqlitePool,
     folder_path: &str,
@@ -1437,6 +1475,7 @@ pub async fn get_resource_actors(pool: &SqlitePool, resource_id: i64) -> Result<
 }
 
 pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec<Video>> {
+    // 1. 查有视频的作品
     let rows = sqlx::query(
         "SELECT DISTINCT v.*, s.title AS series_title, s.poster AS series_poster, s.poster_base64 AS series_poster_base64, s.has_chinese_sub AS series_has_chinese_sub, s.code AS series_code
          FROM videos v
@@ -1451,7 +1490,63 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.iter().map(video_from_row).collect())
+    let mut results: Vec<Video> = rows.iter().map(video_from_row).collect();
+
+    // 2. 查空视频集（关联了演员但没有视频的视频集）
+    let existing_series_ids: std::collections::HashSet<i64> = results.iter()
+        .filter_map(|v| v.series_id)
+        .collect();
+
+    let empty_series = sqlx::query(
+        "SELECT s.id, s.title, s.poster, s.poster_base64, s.display_type, s.created_at
+         FROM video_series s
+         JOIN series_actors sa ON sa.series_id = s.id
+         WHERE sa.actor_id = ? AND NOT EXISTS (SELECT 1 FROM videos v WHERE v.series_id = s.id)"
+    )
+    .bind(actor_id)
+    .fetch_all(pool)
+    .await?;
+
+    for row in empty_series {
+        let series_id: i64 = row.get("id");
+        if existing_series_ids.contains(&series_id) { continue; }
+        let title: String = row.get("title");
+        let poster: Option<String> = row.get("poster");
+        let poster_base64: Option<String> = row.get("poster_base64");
+        let created_at: String = row.get("created_at");
+        let poster_data_url = poster_base64.clone().map(|b| format!("data:image/jpeg;base64,{}", b));
+        results.push(Video {
+            id: 0,
+            series_id: Some(series_id),
+            file_name: title.clone(),
+            file_path: String::new(),
+            file_size: None,
+            duration: None,
+            episode_number: None,
+            season: None,
+            subtitle: None,
+            thumbnail: poster.clone(),
+            thumbnail_base64: poster_base64.clone(),
+            thumbnail_data_url: poster_data_url.clone(),
+            series_title: Some(title),
+            series_poster_data_url: poster_data_url,
+            description: None,
+            poster_orientation: None,
+            created_at,
+            is_favorite: None,
+            series_has_chinese_sub: None,
+            series_code: None,
+            width: None,
+            height: None,
+            resolution: None,
+            source_site: None,
+            metadata: None,
+        });
+    }
+
+    // 按时间排序
+    results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(results)
 }
 
 /// 返回演员参演作品的时期映射：work_key -> period_id
@@ -3706,27 +3801,46 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
     let mut existing_base_names: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut existing_codes: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    // 全库去重集合：分类 A 的目录移动到分类 B 后，分类 A 再检查时不能把已归属分类 B 的视频集误报为新增。
-    let all_series_list = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
-        "SELECT title, folder_path, code FROM video_series"
+    // 全库去重集合：只排除当前分类下的视频集，其他分类的视频集应该可以被归入当前分类
+    // 建立名称到 display_type 的映射，用于判断是否属于当前分类
+    let all_series_with_type = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>)>(
+        "SELECT title, folder_path, code, display_type FROM video_series"
     )
     .fetch_all(pool)
     .await?;
-    for (title, folder_path, code) in &all_series_list {
-        existing_base_names.insert(title.clone());
-        if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
-            existing_folder_paths.insert(path.to_string());
-            let folder_name = std::path::Path::new(path)
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| title.clone());
-            existing_base_names.insert(folder_name.clone());
-            existing_base_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
+    // 只有当前分类的视频集才加入 existing_base_names 做去重
+    // 其他分类的视频集不加入，这样 collect_new 就能把它们识别为"新视频集"并归入当前分类
+    let mut current_category_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (title, folder_path, code, display_type) in &all_series_with_type {
+        let is_current = display_type.as_deref() == Some(category_key)
+            || display_type.as_deref().map(|d| d.is_empty()).unwrap_or(false)
+            || (display_type.is_none() && category_key == "anime");
+        if is_current {
+            existing_base_names.insert(title.clone());
+            current_category_names.insert(title.clone());
+            if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
+                existing_folder_paths.insert(path.to_string());
+                let folder_name = std::path::Path::new(path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| title.clone());
+                existing_base_names.insert(folder_name.clone());
+                current_category_names.insert(folder_name.clone());
+                existing_base_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
+                current_category_names.insert(crate::scanner::strip_episode_suffix(&folder_name));
+            }
+        } else {
+            // 其他分类的视频集：路径加入 existing_folder_paths 防止重复扫描，但名称不加入 existing_base_names
+            if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
+                existing_folder_paths.insert(path.to_string());
+            }
         }
         if let Some(code) = code.as_deref().filter(|code| !code.trim().is_empty()) {
             existing_codes.insert(code.to_uppercase());
         }
     }
+    eprintln!("[check_updates] category={} existing_base_names={:?} current_category_names={:?} existing_folder_paths_count={}",
+        category_key, existing_base_names, current_category_names, existing_folder_paths.len());
 
     for (id, title, folder_path, display_type, code) in &series_list {
         let resolved_folder = resolve_series_folder(
@@ -3843,16 +3957,27 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             if !p.is_dir() { continue; }
                             let fps = p.to_string_lossy().to_string();
                             // 1) 规范化路径比较
-                            if normalized_db_paths.contains(&normalize(&fps)) { continue; }
+                            if normalized_db_paths.contains(&normalize(&fps)) {
+                                eprintln!("[check_updates] 跳过(路径已存在): {}", fps);
+                                continue;
+                            }
                             let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                             // 2) 文件夹名/车牌直接匹配；时期文件夹本身不是视频集
                             let parsed_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
-                            if existing_base_names.contains(&name)
-                                || all_actor_period_names.contains(&name)
+                            if existing_base_names.contains(&name) {
+                                eprintln!("[check_updates] 跳过(名称已存在): {} existing_base_names包含={}", name, existing_base_names.contains(&name));
+                                continue;
+                            }
+                            if all_actor_period_names.contains(&name)
                                 || parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) { continue; }
                             // 3) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
-                            if !existing_base_names.contains(&base) {
+                            if existing_base_names.contains(&base) {
+                                eprintln!("[check_updates] 跳过(base名称已存在): name={} base={}", name, base);
+                                continue; // 修改为先打日志再continue
+                            }
+                            // 原来的 if !existing_base_names.contains(&base) 分支继续
+                            {
                                 // 统计视频文件数；空视频集文件夹也保留为 0
                                 let count = std::fs::read_dir(&p)
                                     .map(|entries| entries.filter_map(|e| e.ok())

@@ -915,7 +915,7 @@ const ActorDetail: React.FC = () => {
       </div>
 
       {/* 演员信息 */}
-      <div className="changli-detail-hero changli-panel flex gap-12 mb-16 p-6">
+      <div className="changli-detail-hero changli-panel flex gap-12 mb-16 p-6" data-tutorial="actor-hero">
         {/* 写真 */}
         <div className="w-80 flex-shrink-0">
           <div 
@@ -1305,8 +1305,8 @@ const ActorDetail: React.FC = () => {
       </div>
 
       {/* 参演作品 */}
-      <section>
-        <div className="changli-section-title">
+      <section data-tutorial="actor-works">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">参演作品</h2>
           <div className="flex gap-3">
             <button
