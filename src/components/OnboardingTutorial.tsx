@@ -312,7 +312,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       scrollIntoView: true,
     },
     {
-      page: '/actors',
+      page: 'current',  // 不跳转，保持在当前页面
       title: '前往设置',
       content: '最后带你看看设置 →',
       highlight: '[data-tutorial="go-settings"]',

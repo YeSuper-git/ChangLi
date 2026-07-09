@@ -7,8 +7,8 @@ import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
 
 const Home: React.FC = () => {
-  const { actors, series: storeSeries, favorites, refreshSeries } = useLibraryStore();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { actors, series: storeSeries, favorites, refreshSeries, categories: storeCategories } = useLibraryStore();
+  const [categories, setCategories] = useState<Category[]>(storeCategories);
   const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
   const [videoSeriesMap, setVideoSeriesMap] = useState<Map<number, number>>(new Map());
   const hotActorsRef = useRef<HTMLDivElement>(null);

@@ -559,24 +559,6 @@ const Settings: React.FC = () => {
         <h1 className="changli-heading-xl">设置</h1>
       </div>
 
-      {/* 功能导览 */}
-      <section className="mb-8">
-        <details className="group">
-          <summary className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-gray-700 transition-colors">
-            <span className="group-open:rotate-90 transition-transform">▶</span>
-            功能导览
-          </summary>
-          <div className="mt-3 p-4 bg-gray-50 rounded-xl text-sm text-gray-600 space-y-2">
-            <p><strong>数据存储</strong>：管理视频数据目录和海报缓存</p>
-            <p><strong>网站配置</strong>：添加视频源站点</p>
-            <p><strong>标签管理</strong>：创建和管理视频标签，用于分类筛选</p>
-            <p><strong>演员配置</strong>：自定义演员详情页显示的字段（输入"三围"或"罩杯"可解锁隐藏字段）</p>
-            <p><strong>分类管理</strong>：创建和配置视频分类，设置卡片样式和功能开关</p>
-            <p><strong>检查更新</strong>：查看最新版本并下载更新</p>
-          </div>
-        </details>
-      </section>
-
       {/* 数据存储 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
@@ -1381,7 +1363,6 @@ const Settings: React.FC = () => {
               onClick={() => {
                 localStorage.removeItem('changli_onboarding_done');
                 navigate('/');
-                window.location.reload();
               }}
               className="action-btn"
             >

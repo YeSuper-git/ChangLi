@@ -4136,9 +4136,24 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                         } else if tags_enabled && tag_names.contains(&name) {
                             // 匹配标签 → 进入标签目录找视频集
                             new_folders.extend(collect_new(&sub_path));
-                        } else {
-                            // 匹配不上分类/标签/演员的顶层文件夹，也尝试当视频集扫描
-                            new_folders.extend(collect_new(&sub_path));
+                        } else if tags_enabled {
+                            // 匹配不上标签 → 直接当视频集，递归统计视频文件数（含季/剧场版子目录）
+                            fn count_videos_recursive(dir: &std::path::Path) -> usize {
+                                let mut count = 0;
+                                if let Ok(entries) = std::fs::read_dir(dir) {
+                                    for entry in entries.filter_map(|e| e.ok()) {
+                                        let p = entry.path();
+                                        if p.is_file() && crate::scanner::is_video_file(&p) {
+                                            count += 1;
+                                        } else if p.is_dir() {
+                                            count += count_videos_recursive(&p);
+                                        }
+                                    }
+                                }
+                                count
+                            }
+                            let count = count_videos_recursive(&sub_path);
+                            new_folders.push((name, count, sub_path.to_string_lossy().to_string()));
                         }
                     }
                 }
