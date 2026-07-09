@@ -4222,8 +4222,11 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         vec![]
     };
 
-    // 批量更新重命名的视频集
+    // 批量更新重命名的视频集，并从 missing_series 中移除
     let renamed_series = renamed_series.into_inner().unwrap();
+    let renamed_ids: std::collections::HashSet<i64> = renamed_series.iter().map(|(sid, _, _, _)| *sid).collect();
+    missing_series.retain(|s| !s.id.map_or(false, |id| renamed_ids.contains(&id)));
+
     for (sid, _old_title, new_title, new_path) in &renamed_series {
         eprintln!("[check_updates] 自动更新视频集: id={} new_title={} new_path={}", sid, new_title, new_path);
         let _ = sqlx::query("UPDATE video_series SET title = ?, folder_path = ? WHERE id = ?")

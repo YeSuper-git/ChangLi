@@ -828,9 +828,6 @@ const Library: React.FC = () => {
                     {tag.name}
                   </button>
                 ))}
-                {tags.length === 0 && (
-                  <span className="text-gray-400 text-xs ml-2">标签从文件夹名自动识别</span>
-                )}
               </div>
               {tagsNeedsExpand && (
                 <button
