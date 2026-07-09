@@ -268,39 +268,31 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       position: 'bottom',
       scrollIntoView: true,
     },
+    // 老用户跳过视频集详情页，直接到演员库
     {
-      page: '/library',
-      title: '视频集',
-      content: '点击视频集进入详情页。也可以通过新建视频集或添加时自动识别更多的视频集。',
-      highlight: '[data-tutorial="video-card"]',
-      waitForClick: '[data-tutorial="video-card"]',
+      page: '/actors',
+      title: '前往演员库',
+      content: '点击导航栏的「演员」进入演员库 →',
+      highlight: '[data-tutorial="nav-actors"]',
+      waitForClick: '[data-tutorial="nav-actors"]',
+      position: 'bottom',
+    },
+    {
+      page: '/actors',
+      title: '演员管理',
+      content: '在这里可以快速找到所有演员，也可以添加你喜爱的新演员或家庭成员。',
+      highlight: '[data-tutorial="actors-content"]',
+      position: 'bottom',
+      scrollIntoView: true,
+    },
+    {
+      page: '/actors',
+      title: '查看演员详情',
+      content: '点击第一个演员进入详情页看看 →',
+      highlight: '[data-tutorial="first-actor"]',
+      waitForClick: '[data-tutorial="first-actor"]',
       position: 'right',
       scrollIntoView: true,
-    },
-    // 视频集详情页
-    {
-      page: '/series/1',
-      title: '视频集信息',
-      content: '这里展示视频集的海报和信息。右键左侧区域可进入编辑，来添加和修改标题、海报、标签、演员等。',
-      highlight: '[data-tutorial="series-hero"]',
-      position: 'bottom',
-      scrollIntoView: true,
-    },
-    {
-      page: '/series/1',
-      title: '选集',
-      content: '这里可以存放视频，点击即可播放。可通过右键海报选择「检查更新」自动扫描新视频，也可通过添加视频手动添加。',
-      highlight: '[data-tutorial="series-episodes"]',
-      position: 'bottom',
-      scrollIntoView: true,
-    },
-    {
-      page: '/series/1',
-      title: '关联演员',
-      content: '点击演员名称可以进入演员详情页 →',
-      highlight: '[data-tutorial="series-actors"]',
-      waitForClick: '[data-tutorial="series-actors"] a',
-      position: 'bottom',
     },
     // 演员详情页
     {
@@ -317,23 +309,6 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       content: '关联视频后，这里会展示演员参演的所有作品。',
       highlight: '[data-tutorial="actor-works"]',
       position: 'top',
-      scrollIntoView: true,
-    },
-    // 演员库
-    {
-      page: '/actors',
-      title: '前往演员库',
-      content: '点击导航栏的「演员」进入演员库 →',
-      highlight: '[data-tutorial="nav-actors"]',
-      waitForClick: '[data-tutorial="nav-actors"]',
-      position: 'bottom',
-    },
-    {
-      page: '/actors',
-      title: '演员管理',
-      content: '在这里可以快速找到所有演员，也可以添加你喜爱的新演员或家庭成员。',
-      highlight: '[data-tutorial="actors-content"]',
-      position: 'bottom',
       scrollIntoView: true,
     },
     {
@@ -478,12 +453,12 @@ export const OnboardingTutorial: React.FC = () => {
           updateTimerRef.current = setTimeout(() => {
             setSpotlight(el.getBoundingClientRect());
             setIsVisible(true);
-          }, 10);
+          }, 300); // 等待滚动完成后再获取位置
         } else {
           updateTimerRef.current = setTimeout(() => {
             setSpotlight(el.getBoundingClientRect());
             setIsVisible(true);
-          }, 10);
+          }, 50); // 给DOM渲染一点时间
         }
       } else {
         updateTimerRef.current = setTimeout(() => {
@@ -491,11 +466,14 @@ export const OnboardingTutorial: React.FC = () => {
           if (retryEl) {
             if (currentStep.scrollIntoView) {
               retryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            setTimeout(() => {
+              setTimeout(() => {
+                setSpotlight(retryEl.getBoundingClientRect());
+                setIsVisible(true);
+              }, 300);
+            } else {
               setSpotlight(retryEl.getBoundingClientRect());
               setIsVisible(true);
-            }, 200);
+            }
           } else {
             if (stepIndex < steps.length - 1) {
               setStepIndex(stepIndex + 1);
@@ -505,7 +483,7 @@ export const OnboardingTutorial: React.FC = () => {
       }
     };
 
-    const initTimer = setTimeout(updateSpotlight, 10);
+    const initTimer = setTimeout(updateSpotlight, 50); // 给页面渲染多一点时间
 
     const handleResize = () => {
       const el = document.querySelector(currentStep.highlight);

@@ -105,7 +105,7 @@ const Actors: React.FC = () => {
       {/* 演员列表 */}
       {filteredActors.length > 0 ? (
         <div className="changli-auto-grid-actor">
-          {filteredActors.map((actor) => {
+          {filteredActors.map((actor, index) => {
             const photoDataUrl = actorPhotoDataUrl(actor);
             return (
             <Link
@@ -114,6 +114,7 @@ const Actors: React.FC = () => {
               state={{ from: '/actors', backLabel: '返回演员列表', actorSnapshot: actor }}
               onContextMenu={(event) => openContextMenu(event, actor)}
               className="card block overflow-hidden"
+              data-tutorial={index === 0 ? "first-actor" : undefined}
             >
               <div className="aspect-[3/4] bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden">
                 {photoDataUrl ? (
