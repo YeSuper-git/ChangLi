@@ -409,6 +409,16 @@ export const OnboardingTutorial: React.FC = () => {
     checkUserData();
   }, []);
 
+  // 监听外部触发的教程启动事件
+  useEffect(() => {
+    const handleStartOnboarding = () => {
+      setStepIndex(0);
+      setActive(true);
+    };
+    window.addEventListener('start-onboarding', handleStartOnboarding);
+    return () => window.removeEventListener('start-onboarding', handleStartOnboarding);
+  }, []);
+
   const steps = getSteps(hasData, hasScanPath, hasUserTags);
 
   useEffect(() => {

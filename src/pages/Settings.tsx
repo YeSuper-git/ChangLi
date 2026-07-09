@@ -1363,6 +1363,10 @@ const Settings: React.FC = () => {
               onClick={() => {
                 localStorage.removeItem('changli_onboarding_done');
                 navigate('/');
+                // 通过自定义事件触发教程启动，不刷新页面
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('start-onboarding'));
+                }, 100);
               }}
               className="action-btn"
             >

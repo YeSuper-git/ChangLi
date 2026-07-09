@@ -3602,6 +3602,7 @@ pub struct CategoryUpdateResult {
     pub new_series: Vec<SeriesInfo>,               // 新发现的文件夹名+视频数
     pub missing_series: Vec<SeriesInfo>,           // 数据库中已丢失的视频集标题+分集数
     pub series_updates: Vec<SeriesUpdateSummary>,  // 每个视频集的新增/丢失分集
+    pub renamed_series: Vec<(i64, String, String, String)>,  // (id, old_title, new_title, new_path)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3839,8 +3840,24 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
             existing_codes.insert(code.to_uppercase());
         }
     }
-    eprintln!("[check_updates] category={} existing_base_names={:?} current_category_names={:?} existing_folder_paths_count={}",
-        category_key, existing_base_names, current_category_names, existing_folder_paths.len());
+    // 构建 base_name → (id, title, folder_path) 映射，用于检测文件夹改名
+    let mut base_to_series: std::collections::HashMap<String, (i64, String, String)> = std::collections::HashMap::new();
+    for (id, title, folder_path, _display_type, _code) in &series_list {
+        let base = crate::scanner::strip_episode_suffix(title);
+        base_to_series.entry(base).or_insert((*id, title.clone(), folder_path.clone().unwrap_or_default()));
+        if let Some(ref fp) = folder_path {
+            let folder_name = std::path::Path::new(fp)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| title.clone());
+            let folder_base = crate::scanner::strip_episode_suffix(&folder_name);
+            base_to_series.entry(folder_base).or_insert((*id, title.clone(), fp.clone()));
+        }
+    }
+    let renamed_series: std::cell::RefCell<Vec<(i64, String, String, String)>> = std::cell::RefCell::new(Vec::new());
+
+    eprintln!("[check_updates] category={} existing_base_names={:?} current_category_names={:?} existing_folder_paths_count={} base_to_series_count={}",
+        category_key, existing_base_names, current_category_names, existing_folder_paths.len(), base_to_series.len());
 
     for (id, title, folder_path, display_type, code) in &series_list {
         let resolved_folder = resolve_series_folder(
@@ -3949,7 +3966,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 let normalized_db_paths: std::collections::HashSet<String> =
                     existing_folder_paths.iter().map(|p| normalize(p)).collect();
 
-                let collect_new = |parent: &std::path::Path| -> Vec<(String, usize, String)> {
+                let mut collect_new = |parent: &std::path::Path| -> Vec<(String, usize, String)> {
                     let mut result = Vec::new();
                     if let Ok(entries) = std::fs::read_dir(parent) {
                         for entry in entries.filter_map(|e| e.ok()) {
@@ -3973,8 +3990,15 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             // 3) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if existing_base_names.contains(&base) {
+                                // 基名匹配但名称不同 → 检测为改名
+                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
+                                    if *old_title != name {
+                                        eprintln!("[check_updates] 检测到改名: {} -> {}", old_title, name);
+                                        renamed_series.borrow_mut().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                    }
+                                }
                                 eprintln!("[check_updates] 跳过(base名称已存在): name={} base={}", name, base);
-                                continue; // 修改为先打日志再continue
+                                continue;
                             }
                             // 原来的 if !existing_base_names.contains(&base) 分支继续
                             {
@@ -4009,10 +4033,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 async fn collect_from_actor_folder<F>(
                     pool: &SqlitePool,
                     actor_path: &std::path::Path,
-                    collect_new: &F,
+                    collect_new: &mut F,
                 ) -> Vec<(String, usize, String)>
                 where
-                    F: Fn(&std::path::Path) -> Vec<(String, usize, String)>,
+                    F: FnMut(&std::path::Path) -> Vec<(String, usize, String)> + ?Sized,
                 {
                     let name = actor_path.file_name()
                         .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -4050,10 +4074,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     actor_names: &std::collections::HashSet<String>,
                     actor_labels: &std::collections::HashSet<String>,
                     tag_names: &std::collections::HashSet<String>,
-                    collect_new: &F,
+                    collect_new: &mut F,
                 ) -> Vec<(String, usize, String)>
                 where
-                    F: Fn(&std::path::Path) -> Vec<(String, usize, String)>,
+                    F: FnMut(&std::path::Path) -> Vec<(String, usize, String)> + ?Sized,
                 {
                     if !actors_enabled && !tags_enabled {
                         // 分类没开演员/标签：下一层就是视频集；车牌/中字格式由 scan_category 新增时解析
@@ -4124,7 +4148,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 &actor_names,
                                 &actor_labels,
                                 &tag_names,
-                                &collect_new,
+                                &mut collect_new,
                             ).await);
                         } else if !actors_enabled && !tags_enabled {
                             // scan_path 本身就是分类目录，且分类未开演员/标签：顶层文件夹就是视频集
@@ -4132,12 +4156,40 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             break;
                         } else if actors_enabled && (actor_names.contains(&name) || actor_labels.contains(&name)) {
                             // 匹配演员 → 进入演员目录；如有时期，进入时期目录找视频集
-                            new_folders.extend(collect_from_actor_folder(pool, &sub_path, &collect_new).await);
+                            new_folders.extend(collect_from_actor_folder(pool, &sub_path, &mut collect_new).await);
                         } else if tags_enabled && tag_names.contains(&name) {
                             // 匹配标签 → 进入标签目录找视频集
                             new_folders.extend(collect_new(&sub_path));
                         } else if tags_enabled {
-                            // 匹配不上标签 → 直接当视频集，递归统计视频文件数（含季/剧场版子目录）
+                            // 匹配不上标签 → 直接当视频集，需要去重检查
+                            let fps = sub_path.to_string_lossy().to_string();
+                            // 1) 路径已存在 → 跳过
+                            let normalized_fps = fps.replace("\\", "/").to_lowercase();
+                            if normalized_db_paths.contains(&normalized_fps) {
+                                continue;
+                            }
+                            // 2) 名称已存在 → 跳过
+                            if existing_base_names.contains(&name) {
+                                continue;
+                            }
+                            // 3) 番号已存在 → 跳过
+                            let parsed_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
+                            if parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) {
+                                continue;
+                            }
+                            // 4) 去掉集数后缀再匹配
+                            let base = crate::scanner::strip_episode_suffix(&name);
+                            if existing_base_names.contains(&base) {
+                                // 基名匹配但名称不同 → 检测为改名
+                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
+                                    if *old_title != name {
+                                        eprintln!("[check_updates] 检测到改名(非标签): {} -> {}", old_title, name);
+                                        renamed_series.borrow_mut().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                    }
+                                }
+                                continue;
+                            }
+                            // 通过所有去重检查，递归统计视频文件数
                             fn count_videos_recursive(dir: &std::path::Path) -> usize {
                                 let mut count = 0;
                                 if let Ok(entries) = std::fs::read_dir(dir) {
@@ -4153,7 +4205,7 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 count
                             }
                             let count = count_videos_recursive(&sub_path);
-                            new_folders.push((name, count, sub_path.to_string_lossy().to_string()));
+                            new_folders.push((name, count, fps));
                         }
                     }
                 }
@@ -4170,9 +4222,22 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         vec![]
     };
 
+    // 批量更新重命名的视频集
+    let renamed_series = renamed_series.into_inner();
+    for (sid, _old_title, new_title, new_path) in &renamed_series {
+        eprintln!("[check_updates] 自动更新视频集: id={} new_title={} new_path={}", sid, new_title, new_path);
+        let _ = sqlx::query("UPDATE video_series SET title = ?, folder_path = ? WHERE id = ?")
+            .bind(new_title)
+            .bind(new_path)
+            .bind(sid)
+            .execute(pool)
+            .await;
+    }
+
     Ok(CategoryUpdateResult {
         new_series,
         missing_series,
         series_updates,
+        renamed_series,
     })
 }
