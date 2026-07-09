@@ -36,13 +36,15 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           >
             {confirmText}
           </button>
-          <button
-            type="button"
-            className="action-btn flex-1 text-sm"
-            onClick={onCancel}
-          >
-            {cancelText}
-          </button>
+          {cancelText && (
+            <button
+              type="button"
+              className="action-btn flex-1 text-sm"
+              onClick={onCancel}
+            >
+              {cancelText}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import BubbleSelect from '../components/BubbleSelect';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
+import { listen } from '@tauri-apps/api/event';
 import { notify } from '../utils/notify';
 import { changelogData, currentVersion } from '../generated/versionInfo';
 
@@ -356,9 +357,12 @@ const Settings: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [gameOverlayDisabled, setGameOverlayState] = useState(false);
   const [gameOverlayLoading, setGameOverlayLoading] = useState(false);
-  const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string } | null>(null);
+  const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string; fileName?: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ downloaded: number; total: number; percentage: number } | null>(null);
+  const [downloadedFilePath, setDownloadedFilePath] = useState<string | null>(null);
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -451,7 +455,7 @@ const Settings: React.FC = () => {
       const installer = findPlatformInstaller(release);
       const downloadUrl = installer?.browser_download_url || release.html_url;
 
-      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer), body: release.body || undefined });
+      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer), body: release.body || undefined, fileName: installer?.name });
       setUpdateStatus(`发现新版本 v${latestVersion}`);
       notify({ message: `检测到最新版本 v${latestVersion}`, type: 'info' });
     } catch (error) {
@@ -466,15 +470,79 @@ const Settings: React.FC = () => {
     if (!pendingUpdate) return;
     const update = pendingUpdate;
     setPendingUpdate(null);
-    setUpdateStatus(update.hasInstaller ? `正在打开 v${update.version} 安装包下载链接` : `正在打开 v${update.version} 发布页面`);
-    await openExternal(update.url);
-    notify({ 
-      message: update.hasInstaller 
-        ? `已在浏览器中打开下载链接，下载完成后请手动安装` 
-        : `已在浏览器中打开发布页面，请手动下载更新`, 
-      type: 'info' 
-    });
-    setTimeout(() => setUpdateStatus(null), 8000);
+
+    // If no installer available, fall back to opening browser
+    if (!update.hasInstaller || !update.fileName) {
+      setUpdateStatus(`正在打开 v${update.version} 发布页面`);
+      await openExternal(update.url);
+      notify({ message: '已在浏览器中打开发布页面，请手动下载更新', type: 'info' });
+      setTimeout(() => setUpdateStatus(null), 8000);
+      return;
+    }
+
+    // In-app download with progress
+    setDownloading(true);
+    setDownloadProgress({ downloaded: 0, total: 0, percentage: 0 });
+    setDownloadedFilePath(null);
+    setUpdateStatus(`正在下载 v${update.version} 安装包...`);
+
+    // Listen for progress events
+    const unlisten = await listen<{ downloaded: number; total: number; percentage: number }>(
+      'update-download-progress',
+      (event) => {
+        setDownloadProgress(event.payload);
+      }
+    );
+
+    try {
+      const filePath = await downloadUpdate(update.url, update.fileName);
+      setDownloadedFilePath(filePath);
+      setUpdateStatus(`v${update.version} 下载完成`);
+      notify({ message: '安装包下载完成，可点击安装', type: 'success' });
+    } catch (error: any) {
+      const errMsg = String(error?.message || error || '');
+      if (errMsg.includes('取消')) {
+        setUpdateStatus('下载已取消');
+        notify({ message: '下载已取消', type: 'info' });
+      } else {
+        console.error('下载更新失败:', error);
+        setUpdateStatus('下载失败，正在打开浏览器...');
+        notify({ message: '下载失败，正在打开浏览器下载', type: 'error' });
+        await openExternal(update.url);
+      }
+      setTimeout(() => setUpdateStatus(null), 5000);
+    } finally {
+      unlisten();
+      setDownloading(false);
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleCancelDownload = async () => {
+    try {
+      await cancelUpdateDownload();
+    } catch (e) {
+      console.error('取消下载失败:', e);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!downloadedFilePath) return;
+    try {
+      await installUpdate(downloadedFilePath);
+      notify({ message: '正在打开安装程序...', type: 'info' });
+    } catch (error) {
+      console.error('打开安装包失败:', error);
+      notify({ message: '打开安装包失败', type: 'error' });
+    }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   if (loading) {
@@ -1388,26 +1456,59 @@ const Settings: React.FC = () => {
       )}
 
       <ConfirmDialog
-        open={!!pendingUpdate}
-        title="检测到新版本"
-        message={pendingUpdate ? (
-          <div>
-            <p className="mb-3">检测到最新版本 v{pendingUpdate.version}，是否跳转下载更新？</p>
-            {pendingUpdate.body && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
-                <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
-                <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
-                  {pendingUpdate.body}
-                </div>
+        open={!!pendingUpdate || downloading || !!downloadedFilePath}
+        title={downloading ? '下载更新' : downloadedFilePath ? '安装更新' : '检测到新版本'}
+        message={
+          downloading && downloadProgress ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">正在下载安装包...</p>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${downloadProgress.percentage.toFixed(1)}%`,
+                    background: 'linear-gradient(90deg, #fb5b7b, #ff8a4c)',
+                  }}
+                />
               </div>
-            )}
-          </div>
-        ) : ''}
-        confirmText="是，下载更新"
-        cancelText="取消"
-        onConfirm={handleConfirmUpdateDownload}
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>{downloadProgress.percentage.toFixed(1)}%</span>
+                <span>
+                  {formatBytes(downloadProgress.downloaded)}
+                  {downloadProgress.total > 0 ? ` / ${formatBytes(downloadProgress.total)}` : ''}
+                </span>
+              </div>
+            </div>
+          ) : downloadedFilePath ? (
+            <div>
+              <p className="mb-2">安装包已下载完成，点击安装按钮打开安装程序。</p>
+              <p className="text-xs text-gray-500">安装前请关闭当前应用</p>
+            </div>
+          ) : pendingUpdate ? (
+            <div>
+              <p className="mb-3">检测到最新版本 v{pendingUpdate.version}，是否下载更新？</p>
+              {pendingUpdate.body && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg max-h-60 overflow-y-auto">
+                  <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
+                  <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                    {pendingUpdate.body}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : ''
+        }
+        confirmText={downloading ? '取消下载' : downloadedFilePath ? '立即安装' : '下载更新'}
+        cancelText={downloading ? '' : downloadedFilePath ? '稍后' : '取消'}
+        onConfirm={downloading ? handleCancelDownload : downloadedFilePath ? handleInstallUpdate : handleConfirmUpdateDownload}
         onCancel={() => {
+          if (downloading) {
+            handleCancelDownload();
+          }
           setPendingUpdate(null);
+          setDownloading(false);
+          setDownloadProgress(null);
+          setDownloadedFilePath(null);
           setUpdateStatus(null);
         }}
       />

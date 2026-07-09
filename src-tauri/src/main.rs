@@ -11,10 +11,12 @@ mod scanner;
 mod site_config;
 mod storage;
 
+use futures_util::StreamExt;
 use image::ImageReader;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 
 #[derive(Clone, serde::Serialize)]
@@ -46,6 +48,7 @@ impl Default for PosterRepairStatus {
 struct AppState {
     db: Mutex<Option<sqlx::SqlitePool>>,
     poster_repair_status: Arc<Mutex<PosterRepairStatus>>,
+    update_download_cancel: Arc<AtomicBool>,
 }
 
 // 防止并发初始化的全局锁
@@ -2559,6 +2562,7 @@ struct ReleaseAssetInfo {
 struct LatestReleaseInfo {
     tag_name: String,
     html_url: String,
+    body: Option<String>,
     assets: Vec<ReleaseAssetInfo>,
 }
 
@@ -2572,7 +2576,111 @@ struct GitHubReleaseAsset {
 struct GitHubLatestRelease {
     tag_name: String,
     html_url: String,
+    body: Option<String>,
     assets: Vec<GitHubReleaseAsset>,
+}
+
+// ==================== 应用内更新下载 ====================
+
+#[derive(Clone, serde::Serialize)]
+struct UpdateDownloadProgress {
+    downloaded: u64,
+    total: u64,
+    percentage: f64,
+}
+
+#[tauri::command]
+async fn download_update(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    url: String,
+    file_name: String,
+) -> Result<String, String> {
+    // 重置取消标志
+    state.update_download_cancel.store(false, Ordering::SeqCst);
+
+    let temp_dir = std::env::temp_dir().join("changli_update");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
+    let file_path = temp_dir.join(&file_name);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(600))
+        .redirect(reqwest::redirect::Policy::limited(20))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+
+    let response = client
+        .get(&url)
+        .header(reqwest::header::USER_AGENT, "ChangLi-App/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("下载请求失败: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("下载失败，HTTP 状态码: {}", response.status()));
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let mut downloaded: u64 = 0;
+
+    let mut file = tokio::fs::File::create(&file_path)
+        .await
+        .map_err(|e| format!("创建文件失败: {e}"))?;
+
+    let mut stream = response.bytes_stream();
+    let mut last_emit = std::time::Instant::now();
+
+    while let Some(chunk) = stream.next().await {
+        // 检查取消标志
+        if state.update_download_cancel.load(Ordering::SeqCst) {
+            drop(file);
+            let _ = tokio::fs::remove_file(&file_path).await;
+            return Err("下载已取消".to_string());
+        }
+
+        let chunk = chunk.map_err(|e| format!("下载数据失败: {e}"))?;
+        use tokio::io::AsyncWriteExt;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("写入文件失败: {e}"))?;
+
+        downloaded += chunk.len() as u64;
+
+        // 每 200ms 发送一次进度事件，避免过多事件
+        if last_emit.elapsed() >= std::time::Duration::from_millis(200) || downloaded >= total_size {
+            let percentage = if total_size > 0 {
+                (downloaded as f64 / total_size as f64) * 100.0
+            } else {
+                0.0
+            };
+            let _ = app.emit(
+                "update-download-progress",
+                UpdateDownloadProgress {
+                    downloaded,
+                    total: total_size,
+                    percentage,
+                },
+            );
+            last_emit = std::time::Instant::now();
+        }
+    }
+
+    file.sync_all()
+        .await
+        .map_err(|e| format!("同步文件失败: {e}"))?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn cancel_update_download(state: State<'_, AppState>) -> Result<(), String> {
+    state.update_download_cancel.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
+async fn install_update(file_path: String) -> Result<(), String> {
+    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))
 }
 
 #[tauri::command]
@@ -2605,6 +2713,7 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
             return Ok(LatestReleaseInfo {
                 tag_name: release.tag_name,
                 html_url: release.html_url,
+                body: release.body,
                 assets: release
                     .assets
                     .into_iter()
@@ -2644,6 +2753,7 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
     Ok(LatestReleaseInfo {
         tag_name: tag,
         html_url,
+        body: None,
         assets: vec![ReleaseAssetInfo {
             name: installer_name,
             browser_download_url: download_url,
@@ -2661,6 +2771,7 @@ fn main() {
         .manage(AppState {
             db: Mutex::new(None),
             poster_repair_status: Arc::new(Mutex::new(PosterRepairStatus::default())),
+            update_download_cancel: Arc::new(AtomicBool::new(false)),
         })
         .setup(|app| {
             // 创建主窗口
@@ -2716,6 +2827,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             init_db,
             check_latest_release,
+            download_update,
+            cancel_update_download,
+            install_update,
             get_sites,
             add_site,
             update_site,

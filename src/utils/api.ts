@@ -1128,6 +1128,19 @@ export async function checkLatestRelease(): Promise<LatestReleaseInfo> {
   return invoke<LatestReleaseInfo>('check_latest_release');
 }
 
+// 应用内更新下载
+export async function downloadUpdate(url: string, fileName: string): Promise<string> {
+  return invoke<string>('download_update', { url, fileName });
+}
+
+export async function cancelUpdateDownload(): Promise<void> {
+  return invoke('cancel_update_download');
+}
+
+export async function installUpdate(filePath: string): Promise<void> {
+  return invoke('install_update', { filePath });
+}
+
 // 游戏覆盖（NVIDIA / 游戏加加）
 export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
   return invoke<string>('set_game_overlay_disabled', { disabled });

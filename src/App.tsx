@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter as Router, MemoryRouter, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 import Layout from './components/Layout';
 import { OnboardingTutorial } from './components/OnboardingTutorial';
 import Home from './pages/Home';
@@ -16,7 +17,7 @@ import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
 import { useLibraryStore } from './store/libraryStore';
 import ToastProvider from './components/ToastProvider';
-import { checkLatestRelease } from './utils/api';
+import { checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from './utils/api';
 import { currentVersion } from './generated/versionInfo';
 
 function App() {
@@ -26,7 +27,10 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadAll = useLibraryStore((s) => s.loadAll);
-  const [autoUpdateInfo, setAutoUpdateInfo] = useState<{ version: string; body?: string; url: string } | null>(null);
+  const [autoUpdateInfo, setAutoUpdateInfo] = useState<{ version: string; body?: string; url: string; fileName?: string } | null>(null);
+  const [autoDownloading, setAutoDownloading] = useState(false);
+  const [autoDownloadProgress, setAutoDownloadProgress] = useState<{ downloaded: number; total: number; percentage: number } | null>(null);
+  const [autoDownloadedFilePath, setAutoDownloadedFilePath] = useState<string | null>(null);
 
   useEffect(() => {
     const preventBrowserContextMenu = (event: MouseEvent) => {
@@ -77,7 +81,7 @@ function App() {
             a.name.endsWith('.dmg') || a.name.endsWith('.exe') || a.name.endsWith('.msi')
           );
           const downloadUrl = installer?.browser_download_url || release.html_url;
-          setAutoUpdateInfo({ version: latestVersion, body: release.body, url: downloadUrl });
+          setAutoUpdateInfo({ version: latestVersion, body: release.body, url: downloadUrl, fileName: installer?.name });
         }
       } catch (error) {
         // 静默失败，不影响用户体验
@@ -176,40 +180,141 @@ function App() {
       <OnboardingTutorial />
       
       {/* 自动检查更新弹窗 */}
-      {autoUpdateInfo && (
+      {(autoUpdateInfo || autoDownloading || autoDownloadedFilePath) && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60">
           <div className="bg-white rounded-2xl shadow-2xl w-[420px] max-h-[80vh] flex flex-col">
             <div className="p-6 pb-4">
-              <h3 className="text-lg font-bold text-gray-900">发现新版本 v{autoUpdateInfo.version}</h3>
+              <h3 className="text-lg font-bold text-gray-900">
+                {autoDownloading ? '下载更新' : autoDownloadedFilePath ? '安装更新' : `发现新版本 v${autoUpdateInfo?.version}`}
+              </h3>
             </div>
             <div className="px-6 overflow-y-auto flex-1">
-              <p className="text-sm text-gray-600 mb-3">是否跳转下载更新？</p>
-              {autoUpdateInfo.body && (
-                <div className="p-3 bg-gray-50 rounded-lg mb-4">
-                  <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
-                  <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
-                    {autoUpdateInfo.body}
+              {autoDownloading && autoDownloadProgress ? (
+                <div className="space-y-4 py-2">
+                  <p className="text-sm text-gray-600">正在下载安装包...</p>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300 ease-out"
+                      style={{
+                        width: `${autoDownloadProgress.percentage.toFixed(1)}%`,
+                        background: 'linear-gradient(90deg, #fb5b7b, #ff8a4c)',
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>{autoDownloadProgress.percentage.toFixed(1)}%</span>
+                    <span>
+                      {(autoDownloadProgress.downloaded / 1024 / 1024).toFixed(1)} MB
+                      {autoDownloadProgress.total > 0 ? ` / ${(autoDownloadProgress.total / 1024 / 1024).toFixed(1)} MB` : ''}
+                    </span>
                   </div>
                 </div>
-              )}
+              ) : autoDownloadedFilePath ? (
+                <div className="py-2">
+                  <p className="text-sm text-gray-600 mb-2">安装包已下载完成，点击安装按钮打开安装程序。</p>
+                  <p className="text-xs text-gray-500">安装前请关闭当前应用</p>
+                </div>
+              ) : autoUpdateInfo ? (
+                <>
+                  <p className="text-sm text-gray-600 mb-3">是否下载更新？</p>
+                  {autoUpdateInfo.body && (
+                    <div className="p-3 bg-gray-50 rounded-lg mb-4">
+                      <p className="text-xs font-medium text-gray-500 mb-2">更新内容：</p>
+                      <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                        {autoUpdateInfo.body}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
             </div>
             <div className="p-6 pt-4 flex gap-3 justify-end border-t border-gray-100">
-              <button 
-                onClick={() => setAutoUpdateInfo(null)} 
-                className="action-btn text-sm px-4 py-1.5"
-              >
-                暂不更新
-              </button>
-              <button 
-                onClick={async () => {
-                  const url = autoUpdateInfo.url;
-                  setAutoUpdateInfo(null);
-                  window.open(url, '_blank');
-                }} 
-                className="action-btn action-btn-primary text-sm px-4 py-1.5"
-              >
-                下载更新
-              </button>
+              {autoDownloading ? (
+                <button 
+                  onClick={async () => {
+                    try { await cancelUpdateDownload(); } catch {}
+                    setAutoDownloading(false);
+                    setAutoDownloadProgress(null);
+                    setAutoUpdateInfo(null);
+                  }} 
+                  className="action-btn text-sm px-4 py-1.5"
+                >
+                  取消下载
+                </button>
+              ) : autoDownloadedFilePath ? (
+                <>
+                  <button 
+                    onClick={() => {
+                      setAutoDownloadedFilePath(null);
+                      setAutoUpdateInfo(null);
+                    }} 
+                    className="action-btn text-sm px-4 py-1.5"
+                  >
+                    稍后
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await installUpdate(autoDownloadedFilePath);
+                      } catch (e) {
+                        console.error('打开安装包失败:', e);
+                      }
+                      setAutoDownloadedFilePath(null);
+                      setAutoUpdateInfo(null);
+                    }} 
+                    className="action-btn action-btn-primary text-sm px-4 py-1.5"
+                  >
+                    立即安装
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setAutoUpdateInfo(null)} 
+                    className="action-btn text-sm px-4 py-1.5"
+                  >
+                    暂不更新
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (!autoUpdateInfo) return;
+                      const info = autoUpdateInfo;
+                      
+                      if (!info.fileName) {
+                        window.open(info.url, '_blank');
+                        setAutoUpdateInfo(null);
+                        return;
+                      }
+                      
+                      setAutoDownloading(true);
+                      setAutoDownloadProgress({ downloaded: 0, total: 0, percentage: 0 });
+                      
+                      const unlisten = await listen<{ downloaded: number; total: number; percentage: number }>(
+                        'update-download-progress',
+                        (event) => setAutoDownloadProgress(event.payload)
+                      );
+                      
+                      try {
+                        const filePath = await downloadUpdate(info.url, info.fileName);
+                        setAutoDownloadedFilePath(filePath);
+                      } catch (error: any) {
+                        const errMsg = String(error?.message || error || '');
+                        if (!errMsg.includes('取消')) {
+                          window.open(info.url, '_blank');
+                        }
+                        setAutoUpdateInfo(null);
+                      } finally {
+                        unlisten();
+                        setAutoDownloading(false);
+                        setAutoDownloadProgress(null);
+                      }
+                    }} 
+                    className="action-btn action-btn-primary text-sm px-4 py-1.5"
+                  >
+                    下载更新
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
