@@ -359,7 +359,7 @@ const Settings: React.FC = () => {
   const [gameOverlayLoading, setGameOverlayLoading] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string; fileName?: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(currentVersion);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ downloaded: number; total: number; percentage: number } | null>(null);
   const [downloadedFilePath, setDownloadedFilePath] = useState<string | null>(null);

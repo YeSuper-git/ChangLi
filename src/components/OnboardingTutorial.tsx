@@ -270,7 +270,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
     },
     // 老用户跳过视频集详情页，直接到演员库
     {
-      page: '/actors',
+      page: 'current',  // 不自动跳转，等待用户点击
       title: '前往演员库',
       content: '点击导航栏的「演员」进入演员库 →',
       highlight: '[data-tutorial="nav-actors"]',
@@ -294,9 +294,9 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       position: 'right',
       scrollIntoView: true,
     },
-    // 演员详情页
+    // 演员详情页 - 使用 dynamic 页面标识，等待用户点击演员后自动检测
     {
-      page: '/actors/1',
+      page: 'dynamic:/actors/',  // 动态匹配，任何演员详情页都算
       title: '演员信息',
       content: '这里展示演员的详细信息和海报，你可以通过编辑，添加演员的生日、身高、体重、简介以及添加多张海报，想完善更多用户信息也可通过设置「演员配置」设置自定义字段来记录你想保存的信息。',
       highlight: '[data-tutorial="actor-hero"]',
@@ -304,7 +304,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       scrollIntoView: true,
     },
     {
-      page: '/actors/1',
+      page: 'dynamic:/actors/',  // 保持在当前演员详情页
       title: '参演作品',
       content: '关联视频后，这里会展示演员参演的所有作品。',
       highlight: '[data-tutorial="actor-works"]',
@@ -426,7 +426,14 @@ export const OnboardingTutorial: React.FC = () => {
   // 页面跳转
   useEffect(() => {
     if (!currentStep) return;
-    if (currentStep.page !== location.pathname) {
+    // 'current' 表示不跳转，等待用户点击
+    if (currentStep.page === 'current') return;
+    // 'dynamic:' 开头表示动态匹配，只要当前路径以该前缀开头就行
+    if (currentStep.page.startsWith('dynamic:')) {
+      const prefix = currentStep.page.slice(8); // 移除 'dynamic:' 前缀
+      if (location.pathname.startsWith(prefix)) return; // 已经在正确的页面
+    }
+    if (currentStep.page !== location.pathname && !currentStep.page.startsWith('dynamic:')) {
       setSpotlight(null);
       setIsVisible(false);
       navigate(currentStep.page);
@@ -449,7 +456,7 @@ export const OnboardingTutorial: React.FC = () => {
       const el = document.querySelector(currentStep.highlight);
       if (el && currentStep.highlight !== 'body') {
         if (currentStep.scrollIntoView) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' }); // 使用 start 而不是 center
           updateTimerRef.current = setTimeout(() => {
             setSpotlight(el.getBoundingClientRect());
             setIsVisible(true);
@@ -465,7 +472,7 @@ export const OnboardingTutorial: React.FC = () => {
           const retryEl = document.querySelector(currentStep.highlight);
           if (retryEl) {
             if (currentStep.scrollIntoView) {
-              retryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              retryEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
               setTimeout(() => {
                 setSpotlight(retryEl.getBoundingClientRect());
                 setIsVisible(true);

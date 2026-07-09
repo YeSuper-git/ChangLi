@@ -22,15 +22,22 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    getAllCategories()
-      .then(setCategories)
-      .catch((err) => console.error('[Home] 加载大类配置失败:', err));
-    getPlayHistory()
-      .then(setPlayHistory)
-      .catch(() => {});
-    getVideoSeriesMap()
-      .then(setVideoSeriesMap)
-      .catch(() => {});
+    // 只在数据为空时加载，避免从其他页面导航过来时重新加载
+    if (categories.length === 0) {
+      getAllCategories()
+        .then(setCategories)
+        .catch((err) => console.error('[Home] 加载大类配置失败:', err));
+    }
+    if (playHistory.length === 0) {
+      getPlayHistory()
+        .then(setPlayHistory)
+        .catch(() => {});
+    }
+    if (videoSeriesMap.size === 0) {
+      getVideoSeriesMap()
+        .then(setVideoSeriesMap)
+        .catch(() => {});
+    }
   }, []);
 
   // 按最近观看时间排序分类

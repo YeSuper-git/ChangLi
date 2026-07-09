@@ -4137,8 +4137,8 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             // 匹配标签 → 进入标签目录找视频集
                             new_folders.extend(collect_new(&sub_path));
                         } else {
-                            // 匹配不上分类/标签/演员的顶层文件夹直接跳过
-                            continue;
+                            // 匹配不上分类/标签/演员的顶层文件夹，也尝试当视频集扫描
+                            new_folders.extend(collect_new(&sub_path));
                         }
                     }
                 }
