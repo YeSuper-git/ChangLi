@@ -2833,6 +2833,31 @@ fn main() {
                 window.set_always_on_top(false)?;
             }
             player::disable_game_dvr();
+
+            // 启动时清理程序目录下的旧安装包
+            if let Ok(exe_path) = std::env::current_exe() {
+                if let Some(app_dir) = exe_path.parent() {
+                    let dir = app_dir.to_path_buf();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        if let Ok(entries) = std::fs::read_dir(&dir) {
+                            for entry in entries.filter_map(|e| e.ok()) {
+                                let path = entry.path();
+                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                    if name.ends_with(".dmg") || name.ends_with(".exe") || name.ends_with(".msi") {
+                                        if let Err(e) = std::fs::remove_file(&path) {
+                                            eprintln!("[ChangLi] 清理旧安装包失败: {} ({})", name, e);
+                                        } else {
+                                            eprintln!("[ChangLi] 已清理旧安装包: {}", name);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
