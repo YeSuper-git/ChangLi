@@ -1431,9 +1431,10 @@ const VideoGrid: React.FC<VideoGridProps> = ({
     const poster = videoPosterDataUrl(video) || fallbackPoster;
     const isSelected = selectedEpisodes?.has(video.id) ?? false;
     return (
-      <button
+      <div
         key={video.id}
-        type="button"
+        role="button"
+        tabIndex={0}
         draggable={selectMode}
         onDragStart={() => onDragStart?.(videos.indexOf(video))}
         onDragOver={(e) => onDragOver?.(e, videos.indexOf(video))}
@@ -1470,7 +1471,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
             <p className="text-[11px] text-gray-400 truncate">{video.file_name}</p>
           )}
         </div>
-      </button>
+      </div>
     );
   };
 
