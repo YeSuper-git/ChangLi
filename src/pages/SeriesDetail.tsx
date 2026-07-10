@@ -447,7 +447,9 @@ const SeriesDetail: React.FC = () => {
   };
 
   // 拖动排序
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
     setDraggedIndex(index);
   };
   const handleDragOver = (e: React.DragEvent, index: number) => {
@@ -1370,7 +1372,7 @@ interface VideoGridProps {
   selectMode?: boolean;
   selectedEpisodes?: Set<number>;
   onToggleSelect?: (id: number) => void;
-  onDragStart?: (index: number) => void;
+  onDragStart?: (e: React.DragEvent, index: number) => void;
   onDragOver?: (e: React.DragEvent, index: number) => void;
   onDragEnd?: () => void;
   draggedIndex?: number | null;
@@ -1436,7 +1438,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         role="button"
         tabIndex={0}
         draggable={selectMode}
-        onDragStart={() => onDragStart?.(videos.indexOf(video))}
+        onDragStart={(e) => onDragStart?.(e, videos.indexOf(video))}
         onDragOver={(e) => onDragOver?.(e, videos.indexOf(video))}
         onDragEnd={() => onDragEnd?.()}
         className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''} ${draggedIndex === videos.indexOf(video) ? 'opacity-50' : ''}`}
