@@ -4222,19 +4222,40 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         vec![]
     };
 
-    // 批量更新重命名的视频集，并从 missing_series 中移除
+    // 批量更新重命名的视频集，并从 missing_series 移除
     let renamed_series = renamed_series.into_inner().unwrap();
     let renamed_ids: std::collections::HashSet<i64> = renamed_series.iter().map(|(sid, _, _, _)| *sid).collect();
     missing_series.retain(|s| !s.id.map_or(false, |id| renamed_ids.contains(&id)));
 
-    for (sid, _old_title, new_title, new_path) in &renamed_series {
-        eprintln!("[check_updates] 自动更新视频集: id={} new_title={} new_path={}", sid, new_title, new_path);
+    for (sid, old_title, new_title, new_path) in &renamed_series {
+        eprintln!("[check_updates] 自动更新视频集: id={} {} → {}", sid, old_title, new_title);
+        // 更新视频集名称和路径
         let _ = sqlx::query("UPDATE video_series SET title = ?, folder_path = ? WHERE id = ?")
             .bind(new_title)
             .bind(new_path)
             .bind(sid)
-            .execute(pool)
-            .await;
+            .execute(&*pool).await;
+
+        // 同时更新该视频集下所有视频的 file_path
+        if let Ok(old_fp) = sqlx::query_scalar::<_, String>(
+            "SELECT folder_path FROM video_series WHERE id = ?"
+        ).bind(sid).fetch_one(&*pool).await {
+            if let Some(old_dir_name) = std::path::Path::new(&old_fp).file_name() {
+                if let Some(new_dir_name) = std::path::Path::new(new_path).file_name() {
+                    let old_dir_str = old_dir_name.to_string_lossy().to_string();
+                    let new_dir_str = new_dir_name.to_string_lossy().to_string();
+                    if old_dir_str != new_dir_str {
+                        let _ = sqlx::query(
+                            "UPDATE video SET file_path = REPLACE(file_path, ?, ?) WHERE series_id = ?"
+                        )
+                        .bind(&old_dir_str)
+                        .bind(&new_dir_str)
+                        .bind(sid)
+                        .execute(&*pool).await;
+                    }
+                }
+            }
+        }
     }
 
     Ok(CategoryUpdateResult {
