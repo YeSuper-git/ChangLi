@@ -2,6 +2,25 @@
 export const currentVersion = "1.8.62";
 export const changelogData = [
   {
+    "version": "1.8.62",
+    "date": "2026-07-10",
+    "changes": [
+      {
+        "category": "选集拖拽修复",
+        "items": [
+          "选集卡片从 button 改为 div，修复 HTML5 拖拽兼容性",
+          "编辑模式下可拖拽排序选集，保存后自动调整集数"
+        ]
+      },
+      {
+        "category": "设置页优化",
+        "items": [
+          "清理缓存 section 样式改为与其他 section 一致"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.61",
     "date": "2026-07-10",
     "changes": [
