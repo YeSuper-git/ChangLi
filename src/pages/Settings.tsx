@@ -53,6 +53,7 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 };
 
 const Settings: React.FC = () => {
+  const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
   const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
@@ -618,8 +619,34 @@ const Settings: React.FC = () => {
       </section>
 
 
+      {/* 清理缓存 */}
+      <section className="mb-12">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">清理缓存</h2>
+              <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const count = await cleanupOldInstallers();
+              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
+            }}
+            className="action-btn"
+          >
+            清理缓存
+          </button>
+        </div>
+      </section>
+
       {/* 游戏覆盖 — 仅 Windows */}
-      {(navigator.platform.includes('Win') || navigator.userAgent.includes('Windows')) && (
+      {!isMac && (
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1384,15 +1411,6 @@ const Settings: React.FC = () => {
               className="action-btn"
             >
               版本更新记录
-            </button>
-            <button
-              onClick={async () => {
-                const count = await cleanupOldInstallers();
-                notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
-              }}
-              className="action-btn"
-            >
-              清理旧安装包
             </button>
           </div>
         </div>
