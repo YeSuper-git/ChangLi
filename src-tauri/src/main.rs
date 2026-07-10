@@ -2680,15 +2680,29 @@ async fn cancel_update_download(state: State<'_, AppState>) -> Result<(), String
 
 #[tauri::command]
 async fn install_update(file_path: String) -> Result<(), String> {
-    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))?;
-    // 延迟清理安装包（给安装程序时间读取文件）
-    let path = std::path::PathBuf::from(&file_path);
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-        let _ = std::fs::remove_file(&path);
-        eprintln!("[ChangLi] 已清理安装包: {}", path.display());
-    });
-    Ok(())
+    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))
+}
+
+#[tauri::command]
+async fn cleanup_old_installers() -> Result<u32, String> {
+    let mut count = 0u32;
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(app_dir) = exe_path.parent() {
+            if let Ok(entries) = std::fs::read_dir(app_dir) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    let path = entry.path();
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        if name.ends_with(".dmg") || name.ends_with(".exe") || name.ends_with(".msi") {
+                            if std::fs::remove_file(&path).is_ok() {
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(count)
 }
 
 #[tauri::command]
@@ -2760,10 +2774,27 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
     let exe_url = format!("https://github.com/{REPO}/releases/download/{tag}/{exe_name}");
     let dmg_url = format!("https://github.com/{REPO}/releases/download/{tag}/{dmg_name}");
 
+    // 尝试获取 release body（通过 API 获取 release 信息）
+    let body = {
+        let release_api = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
+        match client.get(&release_api)
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .send().await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                resp.json::<serde_json::Value>().await
+                    .ok()
+                    .and_then(|v| v["body"].as_str().map(|s| s.to_string()))
+            }
+            _ => None
+        }
+    };
+
     Ok(LatestReleaseInfo {
         tag_name: tag,
         html_url,
-        body: None,
+        body,
         assets: vec![
             ReleaseAssetInfo {
                 name: exe_name,
@@ -2833,31 +2864,6 @@ fn main() {
                 window.set_always_on_top(false)?;
             }
             player::disable_game_dvr();
-
-            // 启动时清理程序目录下的旧安装包
-            if let Ok(exe_path) = std::env::current_exe() {
-                if let Some(app_dir) = exe_path.parent() {
-                    let dir = app_dir.to_path_buf();
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        if let Ok(entries) = std::fs::read_dir(&dir) {
-                            for entry in entries.filter_map(|e| e.ok()) {
-                                let path = entry.path();
-                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                                    if name.ends_with(".dmg") || name.ends_with(".exe") || name.ends_with(".msi") {
-                                        if let Err(e) = std::fs::remove_file(&path) {
-                                            eprintln!("[ChangLi] 清理旧安装包失败: {} ({})", name, e);
-                                        } else {
-                                            eprintln!("[ChangLi] 已清理旧安装包: {}", name);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -2871,6 +2877,7 @@ fn main() {
             download_update,
             cancel_update_download,
             install_update,
+            cleanup_old_installers,
             get_sites,
             add_site,
             update_site,

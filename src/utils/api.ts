@@ -1141,6 +1141,10 @@ export async function installUpdate(filePath: string): Promise<void> {
   return invoke('install_update', { filePath });
 }
 
+export async function cleanupOldInstallers(): Promise<number> {
+  return invoke('cleanup_old_installers');
+}
+
 // 游戏覆盖（NVIDIA / 游戏加加）
 export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
   return invoke<string>('set_game_overlay_disabled', { disabled });
