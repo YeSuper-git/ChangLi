@@ -38,11 +38,8 @@ jobs:
       - name: Add bundled deps to resources (Windows only)
         shell: pwsh
         run: |
-          $conf = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
-          $resources = @("resources/nip/**/*", "resources/mpv/**/*", "resources/ffmpeg/**/*", "resources/webview2/**/*")
-          $conf.bundle.windows.resources = $resources
-          $conf | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
-          Write-Host "Added bundled deps to resources config"
+          # 用 node 修改 JSON（更可靠）
+          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.windows.resources=['resources/nip/**/*','resources/mpv/**/*','resources/ffmpeg/**/*','resources/webview2/**/*'];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Added bundled deps')"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
