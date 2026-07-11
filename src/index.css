@@ -1131,11 +1131,11 @@ html.is-macos .changli-topbar {
 
 .changli-modal-header {
   border-bottom: 1px solid rgba(232, 235, 242, 0.92);
-  padding: 22px 26px;
+  padding: 18px 24px;
 }
 
 .changli-modal-body {
-  padding: 22px 26px;
+  padding: 18px 24px;
 }
 
 .changli-modal-footer {

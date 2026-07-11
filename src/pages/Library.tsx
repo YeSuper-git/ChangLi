@@ -1398,7 +1398,7 @@ const Library: React.FC = () => {
 
     {showNewSeriesModal && (
       <div className="changli-modal-backdrop" onClick={() => { setShowNewSeriesModal(false); setNewSeriesTitle(''); }}>
-        <div className="changli-modal-panel !w-[min(100%,400px)]" onClick={e => e.stopPropagation()}>
+        <div className="changli-modal-panel !w-[min(100%,400px)] !p-0" onClick={e => e.stopPropagation()}>
           <div className="changli-modal-header">
             <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">创建</p>
             <h2 className="mt-1 text-xl font-bold text-gray-900">新增视频集</h2>
