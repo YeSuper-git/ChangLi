@@ -2,28 +2,25 @@
 export const currentVersion = "1.8.71";
 export const changelogData = [
   {
-    "version": "1.8.70",
+    "version": "1.8.71",
     "date": "2026-07-11",
     "changes": [
       {
-        "category": "依赖检查修复",
+        "category": "新功能：番剧订阅",
         "items": [
-          "检查 mpv/ffmpeg 时同时检测应用内置路径和 PATH",
-          "修复打包在应用内的 mpv 被误报为\"未安装\"的问题"
+          "支持 Mikanani 等番剧网站 RSS 订阅",
+          "自动识别 RSS 地址，输入番组 URL 即可绑定",
+          "从 RSS 标题自动提取关键词（字幕组/画质/编码/音频/语言/来源）",
+          "用户从提取的关键词中勾选偏好，智能匹配最优资源",
+          "视频集详情页显示订阅状态，一键检查更新",
+          "新集数通知：复制磁力链接 / 打开外部下载器"
         ]
       },
       {
-        "category": "设置页优化",
+        "category": "修复",
         "items": [
-          "已下载的更新显示版本和大小，可直接点击安装",
-          "检查更新后点\"稍后安装\"，设置页底部显示已下载版本"
-        ]
-      },
-      {
-        "category": "播放器查找优化",
-        "items": [
-          "mpv 查找增加 winget/scoop/PATH 路径",
-          "ffmpeg 查找增加更多系统路径"
+          "CI checkout 添加 lfs:true，修复安装包缺少 mpv/ffmpeg 的问题",
+          "macOS 构建前移除 bundled deps，DMG 恢复到 ~15MB"
         ]
       }
     ]
