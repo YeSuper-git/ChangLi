@@ -5,7 +5,7 @@ import {
   checkSubscriptionUpdates,
   getVideoSeriesList,
 } from '../utils/api';
-import type { BangumiSubscription, SubscriptionDownload, VideoSeries } from '../utils/api';
+import type { BangumiSubscription, VideoSeries } from '../utils/api';
 import { SubscriptionBindModal } from '../components/SubscriptionManager';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -41,7 +41,8 @@ const Subscriptions: React.FC = () => {
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
   // 每个订阅的更新展开状态
   const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
-  const [newEpisodes, setNewEpisodes] = useState<SubscriptionDownload[]>([]);
+  // 每个订阅的更新结果：subId -> episodes
+  const [subUpdates, setSubUpdates] = useState<Map<number, any[]>>(new Map());
 
   // Per-subscription checking state
   const [checkingId, setCheckingId] = useState<number | null>(null);
@@ -86,9 +87,13 @@ const Subscriptions: React.FC = () => {
       const items = await checkSubscriptionUpdates(sub.id);
       await loadData();
 
+      setSubUpdates(prev => {
+        const next = new Map(prev);
+        next.set(sub.id, items);
+        return next;
+      });
+      setExpandedSubs(prev => new Set([...prev, sub.id]));
       if (items.length > 0) {
-        setNewEpisodes(items);
-        setExpandedSubs(prev => new Set([...prev, sub.id]));
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
       } else {
         notify({ message: '暂无新剧集更新', type: 'info' });
@@ -236,29 +241,71 @@ const Subscriptions: React.FC = () => {
                           </div>
 
                           {/* 展开的更新列表 */}
-                          {expandedSubs.has(sub.id) && newEpisodes.length > 0 && (
-                            <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
-                              {newEpisodes.map((ep, idx) => (
-                                <div key={ep.id} className="flex items-center justify-between p-2 bg-rose-50 rounded-lg">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-xs text-gray-900 truncate">{ep.title}</div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5">
-                                      {ep.file_size ? (ep.file_size < 1024*1024*1024 ? (ep.file_size/1024/1024).toFixed(0) + ' MB' : (ep.file_size/1024/1024/1024).toFixed(1) + ' GB') : ''}
+                          {expandedSubs.has(sub.id) && (() => {
+                            const episodes = subUpdates.get(sub.id) || [];
+                            if (episodes.length === 0 && checkingId !== sub.id) {
+                              return (
+                                <div className="mt-3 text-xs text-gray-400 border-t border-gray-100 pt-3">
+                                  暂无新剧集更新
+                                </div>
+                              );
+                            }
+                            if (episodes.length === 0) return null;
+                            // 按字幕组+版本分组
+                            const groups: Record<string, any[]> = {};
+                            for (const ep of episodes) {
+                              const t = ep.title || '';
+                              let sg = '未知字幕组';
+                              if (t.startsWith('[')) { const e = t.indexOf(']'); if (e > 0) sg = t.substring(1, e); }
+                              const l = t.toLowerCase();
+                              const vp: string[] = [];
+                              if (l.includes('1080p') || l.includes('1920x1080')) vp.push('1080p');
+                              else if (l.includes('720p')) vp.push('720p');
+                              if (l.includes('chs') || l.includes('简中') || l.includes('简体')) vp.push('简中');
+                              else if (l.includes('简繁') || l.includes('简／繁')) vp.push('简繁');
+                              else if (l.includes('cht') || l.includes('繁中')) vp.push('繁中');
+                              if (l.includes('baha')) vp.push('Baha');
+                              else if (l.includes('cr ')) vp.push('CR');
+                              else if (l.includes('abema')) vp.push('ABEMA');
+                              if (l.includes('无修') || l.includes('uncensored')) vp.push('无修');
+                              if (l.includes('放送版') || l.includes('on-air')) vp.push('放送版');
+                              const gk = '[' + sg + '] ' + (vp.length > 0 ? vp.join(' ') : '默认');
+                              if (!groups[gk]) groups[gk] = [];
+                              groups[gk].push(ep);
+                            }
+                            let globalIdx = 0;
+                            return (
+                              <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                                {Object.entries(groups).map(([gKey, gItems]) => (
+                                  <div key={gKey} className="bg-rose-50 rounded-xl p-2.5">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-xs font-medium text-gray-700">{gKey}</span>
+                                      <span className="text-[10px] text-gray-400">{gItems.length} 集</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                      {gItems.map((ep: any) => {
+                                        const idx = globalIdx++;
+                                        return (
+                                          <div key={idx} className="flex items-center justify-between">
+                                            <span className="text-[11px] text-gray-600 truncate flex-1">{ep.title}</span>
+                                            <button
+                                              onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
+                                              className={copiedKey === sub.id + '_' + idx
+                                                ? "ml-2 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded"
+                                                : "ml-2 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                                              }
+                                            >
+                                              {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
-                                    className={copiedKey === sub.id + '_' + idx
-                                      ? "ml-2 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded"
-                                      : "ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
-                                    }
-                                  >
-                                    {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
