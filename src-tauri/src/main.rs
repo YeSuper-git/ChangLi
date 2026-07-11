@@ -285,12 +285,18 @@ async fn check_subscription_updates(
     };
     
     let mut new_items = Vec::new();
+    // 查询视频集中已有的集数列表（精确匹配，不只是最大集数）
+    let existing_episodes: Vec<Option<i32>> = if let Some(series_id) = sub.series_id {
+        sqlx::query_scalar::<_, Option<i32>>("SELECT episode_number FROM videos WHERE series_id = ?")
+            .bind(series_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     
     for item in &feed.items {
-        if existing_guids.contains(&item.guid) {
-            continue;
-        }
-        
         // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
         if !selected_prefixes.is_empty() {
             let title_lower = item.title.to_lowercase();
@@ -315,11 +321,11 @@ async fn check_subscription_updates(
             }
         }
         
-        // 从标题中提取集数，只返回比已有集数更新的
+        // 从标题中提取集数，跳过视频集中已有的集数
         let item_episode = extract_episode_number(&item.title);
-        if let (Some(max_ep), Some(ep)) = (max_episode, item_episode) {
-            if ep <= max_ep {
-                continue; // 已有该集或更新的集，跳过
+        if let Some(ep) = item_episode {
+            if existing_episodes.contains(&Some(ep)) {
+                continue; // 视频集中已有该集，跳过
             }
         }
         
@@ -408,6 +414,83 @@ async fn check_subscription_updates(
             .await
             .ok();
     }
+    
+    let mut new_items = Vec::new();
+    
+    for item in &feed.items {
+        // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
+        if !selected_prefixes.is_empty() {
+            let title_lower = item.title.to_lowercase();
+            let matched = selected_prefixes.iter().any(|prefix| {
+                let prefix_lower = prefix.to_lowercase();
+                let parts: Vec<&str> = prefix_lower.split(' ').collect();
+                parts.iter().all(|part| {
+                    if title_lower.contains(part) { return true; }
+                    if part.as_bytes() == b"\xe7\xae\x80\xe7\xb9\x81" ||
+                       part.as_bytes() == b"\xe7\xae\x80\xef\xbc\x8f\xe7\xb9\x81" ||
+                       part.as_bytes() == b"\xe7\xae\x80/\xe7\xb9\x81" {
+                        return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
+                    }
+                    false
+                })
+            });
+            if !matched { continue; }
+        }
+        
+        let item_episode = extract_episode_number(&item.title);
+        if let Some(ep) = item_episode {
+            if existing_episodes.contains(&Some(ep)) { continue; }
+        }
+        
+        // 提取磁力链接
+        let mut magnet = item.magnet_link.clone();
+        if magnet.is_none() {
+            if let Some(ref hash) = item.info_hash {
+                let hash = hash.trim();
+                if hash.len() == 40 || hash.len() == 32 {
+                    magnet = Some(format!("magnet:?xt=urn:btih:{hash}"));
+                }
+            }
+        }
+        if magnet.is_none() && !item.link.is_empty() {
+            if let Ok(resp) = reqwest::get(&item.link).await {
+              if let Ok(html) = resp.text().await {
+                let lower = html.to_lowercase();
+                if let Some(start) = lower.find("magnet:?xt=") {
+                    let slice = &html[start..];
+                    if let Some(end) = slice.find('"') {
+                        let raw = &slice[..end];
+                        magnet = Some(raw.replace("&amp;", "&").to_string());
+                    }
+                }
+              }
+            }
+        }
+        
+        new_items.push(db::SubscriptionDownload {
+            id: 0,
+            subscription_id,
+            guid: item.guid.clone(),
+            title: item.title.clone(),
+            torrent_url: item.torrent_url.clone(),
+            magnet_link: magnet,
+            file_size: item.content_length,
+            pub_date: item.pub_date.clone(),
+            status: "pending".to_string(),
+            aria2_gid: None,
+            file_path: None,
+            notified: false,
+            created_at: String::new(),
+            updated_at: String::new(),
+        });
+    }
+    
+    // 更新最后检查时间
+    sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = datetime('now', 'localtime') WHERE id = ?")
+        .bind(subscription_id)
+        .execute(&pool)
+        .await
+        .ok();
     
     Ok(new_items)
 }
