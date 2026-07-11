@@ -858,6 +858,56 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
         );
       })()}
 
+      {/* 展开的更新列表 */}
+      {expandedId && newEpisodes.length > 0 && (() => {
+        const groups: Record<string, any[]> = {};
+        for (const ep of newEpisodes) {
+          const title = ep.title || '';
+          let sg = '未知字幕组';
+          if (title.startsWith('[')) { const e = title.indexOf(']'); if (e > 0) sg = title.substring(1, e); }
+          const l = title.toLowerCase();
+          const vp: string[] = [];
+          if (l.includes('1080p') || l.includes('1920x1080')) vp.push('1080p');
+          else if (l.includes('720p')) vp.push('720p');
+          if (l.includes('chs') || l.includes('简中') || l.includes('简体')) vp.push('简中');
+          else if (l.includes('简繁') || l.includes('简／繁')) vp.push('简繁');
+          else if (l.includes('cht') || l.includes('繁中')) vp.push('繁中');
+          if (l.includes('baha')) vp.push('Baha');
+          else if (l.includes('cr ')) vp.push('CR');
+          else if (l.includes('abema')) vp.push('ABEMA');
+          if (l.includes('无修') || l.includes('uncensored')) vp.push('无修');
+          if (l.includes('放送版') || l.includes('on-air')) vp.push('放送版');
+          const gk = '[' + sg + '] ' + (vp.length > 0 ? vp.join(' ') : '默认');
+          if (!groups[gk]) groups[gk] = [];
+          groups[gk].push(ep);
+        }
+        return (
+          <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+            {Object.entries(groups).map(([key, items]) => (
+              <div key={key} className="bg-rose-50 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-900">{key}</span>
+                  <span className="text-xs text-gray-400">{items.length} 集</span>
+                </div>
+                <div className="space-y-1.5">
+                  {items.map((ep: any) => (
+                    <div key={ep.id} className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600 truncate flex-1">{ep.title}</span>
+                      <button
+                        onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
+                        className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                      >
+                        复制磁力
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       <SubscriptionBindModal
         open={showBindModal}
         onClose={() => setShowBindModal(false)}
