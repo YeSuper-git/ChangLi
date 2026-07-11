@@ -620,78 +620,6 @@ const Settings: React.FC = () => {
       </section>
 
 
-      {/* 清理缓存 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">清理缓存</h2>
-            <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
-          </div>
-          <button
-            onClick={async () => {
-              const count = await cleanupOldInstallers();
-              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
-            }}
-            className="action-btn"
-          >
-            清理缓存
-          </button>
-        </div>
-      </section>
-
-      {/* 环境依赖 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">环境依赖</h2>
-            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
-          </div>
-          <button
-            onClick={async () => {
-              try {
-                const deps = await checkEnvDependencies();
-                setEnvDeps(deps);
-              } catch (e) {
-                notify({ message: '检查失败', type: 'error' });
-              }
-            }}
-            className="action-btn"
-          >
-            检查依赖
-          </button>
-        </div>
-        {envDeps && (
-          <div className="py-3 px-4 bg-gray-50 rounded-lg">
-            {envDeps.every(([, ok]) => ok) ? (
-              <p className="text-sm text-green-600">所有依赖正常</p>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-red-600">
-                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
-                </p>
-                <button
-                  onClick={async () => {
-                    for (const [name, ok] of envDeps) {
-                      if (!ok) {
-                        try {
-                          const msg = await installDependency(name);
-                          notify({ message: msg, type: 'success' });
-                        } catch (e: any) {
-                          notify({ message: String(e), type: 'error' });
-                        }
-                      }
-                    }
-                  }}
-                  className="action-btn action-btn-primary text-xs"
-                >
-                  一键安装
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
       {/* 游戏覆盖 — 仅 Windows */}
       {!isMac && (
       <section className="mb-12">
@@ -728,50 +656,6 @@ const Settings: React.FC = () => {
         </div>
       </section>
       )}
-
-
-      {/* 网站管理 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">网站管理</h2>
-            <p className="text-sm text-gray-500 mt-1">配置视频来源网站</p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="action-btn action-btn-primary"
-          >
-            添加网站
-          </button>
-        </div>
-        
-        {sites.length > 0 ? (
-          <div className="space-y-4">
-            {sites.map((site) => (
-              <div key={site.id} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{site.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{site.url}</p>
-                    <p className="text-xs text-gray-400 mt-1">解析器: {site.parser_type}</p>
-                  </div>
-                  <button
-                    onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
-                    className="action-btn action-btn-danger text-sm"
-                  >
-                    {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="changli-empty-state">
-            <p className="text-gray-500 mb-4">暂无网站配置</p>
-            <p className="text-gray-400 text-sm">添加网站后可以搜索在线资源</p>
-          </div>
-        )}
-      </section>
 
 
       {/* 分类配置 */}
@@ -992,6 +876,123 @@ const Settings: React.FC = () => {
           );
         })()}
       </section>
+
+      {/* 清理缓存 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">清理缓存</h2>
+            <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
+          </div>
+          <button
+            onClick={async () => {
+              const count = await cleanupOldInstallers();
+              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
+            }}
+            className="action-btn"
+          >
+            清理缓存
+          </button>
+        </div>
+      </section>
+
+      {/* 环境依赖 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">环境依赖</h2>
+            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const deps = await checkEnvDependencies();
+                setEnvDeps(deps);
+              } catch (e) {
+                notify({ message: '检查失败', type: 'error' });
+              }
+            }}
+            className="action-btn"
+          >
+            检查依赖
+          </button>
+        </div>
+        {envDeps && (
+          <div className="py-3 px-4 bg-gray-50 rounded-lg">
+            {envDeps.every(([, ok]) => ok) ? (
+              <p className="text-sm text-green-600">所有依赖正常</p>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-red-600">
+                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
+                </p>
+                <button
+                  onClick={async () => {
+                    for (const [name, ok] of envDeps) {
+                      if (!ok) {
+                        try {
+                          const msg = await installDependency(name);
+                          notify({ message: msg, type: 'success' });
+                        } catch (e: any) {
+                          notify({ message: String(e), type: 'error' });
+                        }
+                      }
+                    }
+                  }}
+                  className="action-btn action-btn-primary text-xs"
+                >
+                  一键安装
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 网站管理 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">网站管理</h2>
+            <p className="text-sm text-gray-500 mt-1">配置视频来源网站</p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="action-btn action-btn-primary"
+          >
+            添加网站
+          </button>
+        </div>
+        
+        {sites.length > 0 ? (
+          <div className="space-y-4">
+            {sites.map((site) => (
+              <div key={site.id} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{site.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{site.url}</p>
+                    <p className="text-xs text-gray-400 mt-1">解析器: {site.parser_type}</p>
+                  </div>
+                  <button
+                    onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
+                    className="action-btn action-btn-danger text-sm"
+                  >
+                    {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="changli-empty-state">
+            <p className="text-gray-500 mb-4">暂无网站配置</p>
+            <p className="text-gray-400 text-sm">添加网站后可以搜索在线资源</p>
+          </div>
+        )}
+      </section>
+
+
 
 
 
