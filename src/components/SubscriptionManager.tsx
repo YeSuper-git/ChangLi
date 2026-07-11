@@ -852,7 +852,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
             disabled={checkingUpdates}
             className="action-btn text-xs px-3 py-1 disabled:opacity-50"
           >
-            {checkingUpdates ? '检查中...' : '检查更新'}
+            {checkingUpdates ? <>检查中 <img src={loadingIcon} alt='' className='w-3 h-3 inline' /></> : '检查更新'}
           </button>
           <button
             onClick={handleDelete}
