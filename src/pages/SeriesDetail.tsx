@@ -369,8 +369,8 @@ const SeriesDetail: React.FC = () => {
     try {
       await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
       await syncSeriesRelations();
-      await loadSeries();
-      await refreshSeries();
+      loadSeries({ silent: true }).catch(() => {});
+      refreshSeries().catch(() => {});
     } catch (error) {
       console.error('保存视频集失败:', error);
       notify({ message: '保存失败，请检查内容后重试', type: 'error' });
@@ -690,8 +690,8 @@ const SeriesDetail: React.FC = () => {
       const result = await checkSeriesUpdates(series.id);
       if (result.new_videos.length === 0 && result.missing_videos.length === 0) {
         seriesDetailCache.delete(series.id);
-        await loadSeries();
-        await refreshSeries();
+        loadSeries({ silent: true }).catch(() => {});
+        refreshSeries().catch(() => {});
         const parts = buildUpdateNotifyParts({
           renamed: result.renamed_videos_count,
           posterUpdated: result.poster_updated,
