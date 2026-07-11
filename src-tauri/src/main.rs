@@ -261,11 +261,36 @@ async fn check_subscription_updates(
     .await
     .unwrap_or_default();
     
+    // 解析用户选择的版本前缀
+    let selected_prefixes: Vec<String> = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
+        if let Some(arr) = parsed.get("selectedPrefixes").and_then(|v| v.as_array()) {
+            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    
     let mut new_items = Vec::new();
     
     for item in &feed.items {
         if existing_guids.contains(&item.guid) {
             continue;
+        }
+        
+        // 如果用户选择了版本，过滤不匹配的条目
+        if !selected_prefixes.is_empty() {
+            let title_lower = item.title.to_lowercase();
+            let matched = selected_prefixes.iter().any(|prefix| {
+                let prefix_lower = prefix.to_lowercase();
+                // 检查标题是否包含版本关键词
+                let parts: Vec<&str> = prefix_lower.split(' ').collect();
+                parts.iter().all(|part| title_lower.contains(part))
+            });
+            if !matched {
+                continue;
+            }
         }
         
         // 插入新记录
