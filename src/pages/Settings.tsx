@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -54,7 +54,7 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 };
 
 const Settings: React.FC = () => {
-  const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
+  // const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
   const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
@@ -93,14 +93,13 @@ const Settings: React.FC = () => {
 
   const loadSettingsData = async () => {
     try {
-      const [sitesList, tagsList, storage, catsList, fieldsList, overlayDisabled] = await Promise.all([getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields(), getGameOverlayDisabled().catch(() => false)]);
+      const [sitesList, tagsList, storage, catsList, fieldsList] = await Promise.all([getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
       setSites(sitesList);
       setTags(tagsList);
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
-      setGameOverlayState(overlayDisabled);
-      // 加载扩展预设模板
+        // 加载扩展预设模板
       try {
         const templates = await getExtensionPresetTemplates();
         setPresetTemplates(templates);
@@ -361,7 +360,6 @@ const Settings: React.FC = () => {
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-  const [gameOverlayDisabled, setGameOverlayState] = useState(false);
   // gameOverlayLoading 已移除，改为乐观更新
   const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string; fileName?: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -622,43 +620,6 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </section>
-
-
-      {/* 游戏覆盖 — 仅 Windows */}
-      {!isMac && (
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">游戏覆盖</h2>
-            <p className="text-sm text-gray-500 mt-1">防止录屏软件干扰视频播放</p>
-          </div>
-        </div>
-        <div className="changli-panel p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm text-gray-700">禁用游戏覆盖</span>
-              <p className="text-xs text-gray-400 mt-0.5">写入系统注册表禁用 Game DVR/GameBar，如已安装 NVIDIA Profile Inspector 会自动导入配置</p>
-            </div>
-            <Switch
-            checked={gameOverlayDisabled}
-            disabled={false}
-            onChange={async (checked: boolean) => {
-              setGameOverlayState(checked);
-              try {
-                await setGameOverlayDisabled(checked);
-                notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
-              } catch (error) {
-                setGameOverlayState(!checked);
-                notify({ message: '操作失败，请稍后重试', type: 'error' });
-              }
-            }}
-            ariaLabel="禁用游戏覆盖"
-          />
-          </div>
-        </div>
-      </section>
-      )}
-
 
       {/* 分类配置 */}
       <section className="mb-12" data-tutorial="settings-categories">

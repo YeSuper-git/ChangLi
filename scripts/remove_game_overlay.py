@@ -1,45 +1,42 @@
-"""精确移除游戏覆盖功能"""
-import re
-
+"""安全删除游戏覆盖：只删 section + state，不碰其他代码"""
 with open('src/pages/Settings.tsx', 'r') as f:
-    lines = f.readlines()
+    content = f.read()
 
-new_lines = []
-skip_until_next_section = False
-in_game_section = False
+# 1. 删除 gameOverlay state
+content = content.replace(
+    '  const [gameOverlayDisabled, setGameOverlayState] = useState(false);\n',
+    ''
+)
+content = content.replace(
+    '  const [gameOverlayLoading, setGameOverlayLoading] = useState(false);\n',
+    ''
+)
 
-for i, line in enumerate(lines):
-    # 跳过游戏覆盖 state 声明
-    if 'const [gameOverlayDisabled' in line or 'const [gameOverlayLoading' in line:
-        continue
-    
-    # 跳过 useEffect 中的 getGameOverlayDisabled
-    if 'getGameOverlayDisabled' in line and 'useEffect' in lines[i-1]:
-        # 跳到 useEffect 结束
-        j = i
-        while j < len(lines) and '}, []);' not in lines[j]:
-            j += 1
-        continue
-    
-    # 跳过游戏覆盖 section
-    if '{/* 游戏覆盖' in line:
-        in_game_section = True
-        continue
-    if in_game_section:
-        if '{/*' in line and '游戏覆盖' not in line:
-            in_game_section = False
-        else:
-            continue
-    
-    # 跳过 setGameOverlayDisabled 相关的导入
-    if 'getGameOverlayDisabled' in line and 'import' in line:
-        line = line.replace(', getGameOverlayDisabled', '').replace('getGameOverlayDisabled, ', '')
-    if 'setGameOverlayDisabled' in line and 'import' in line:
-        line = line.replace(', setGameOverlayDisabled', '').replace('setGameOverlayDisabled, ', '')
-    
-    new_lines.append(line)
+# 2. 删除游戏覆盖 section（精确匹配从注释到下一个 { 注释之前）
+import re
+# 匹配从 {/* 游戏覆盖 到下一个 {/* 之前的闭合 )}
+pattern = r'\s*\{/\* 游戏覆盖.*?\n\s*\{/\*'
+match = re.search(pattern, content, re.DOTALL)
+if match:
+    content = content[:match.start()] + '\n' + content[match.end():]
+
+# 3. 清理 Promise.all 中的 overlay 相关（但保持结构不变）
+content = content.replace(
+    "    const [sitesList, tagsList, storage, catsList, fieldsList, overlayDisabled] = await Promise.all([\n      getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields(), getGameOverlayDisabled().catch(() => false)\n    ]);",
+    "    const [sitesList, tagsList, storage, catsList, fieldsList] = await Promise.all([\n      getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()\n    ]);"
+)
+content = content.replace(
+    '    setGameOverlayState(overlayDisabled);\n',
+    ''
+)
+
+# 4. 清理导入
+content = content.replace(', setGameOverlayDisabled', '')
+content = content.replace(', getGameOverlayDisabled', '')
+content = content.replace('setGameOverlayDisabled, ', '')
+content = content.replace('getGameOverlayDisabled, ', '')
 
 with open('src/pages/Settings.tsx', 'w') as f:
-    f.writelines(new_lines)
+    f.write(content)
 
-print("Settings.tsx: 游戏覆盖已精确移除")
+print("done")
