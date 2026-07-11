@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   detectRssUrl,
   fetchRss,
@@ -985,15 +986,18 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
         );
       })()}
 
-      <SubscriptionBindModal
-        open={showBindModal}
-        onClose={() => setShowBindModal(false)}
-        onBind={handleBind}
-        initialSeriesId={seriesId}
-      />
+      {createPortal(
+        <SubscriptionBindModal
+          open={showBindModal}
+          onClose={() => setShowBindModal(false)}
+          onBind={handleBind}
+          initialSeriesId={seriesId}
+        />,
+        document.body
+      )}
 
       {/* 取消订阅确认弹窗 */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && createPortal(
         <div className="changli-modal-backdrop" onClick={() => setShowDeleteConfirm(false)}>
           <div className="changli-modal-panel !w-[min(100%,380px)] !p-0" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
@@ -1021,7 +1025,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
             </div>
           </div>
         </div>
-      )}
+, document.body)}
     </>
   );
 };
