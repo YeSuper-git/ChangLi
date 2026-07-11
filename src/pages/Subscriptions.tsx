@@ -66,7 +66,6 @@ function extractSiteName(title: string): string {
 const Subscriptions: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<BangumiSubscription[]>([]);
   const [seriesMap, setSeriesMap] = useState<Map<number, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [showBindModal, setShowBindModal] = useState(false);
 
   // 按网站分组的展开状态
@@ -94,8 +93,6 @@ const Subscriptions: React.FC = () => {
       setExpandedSites(sites);
     } catch (err) {
       console.error('[Subscriptions] 加载订阅列表失败:', err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -191,16 +188,7 @@ const Subscriptions: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 flex items-center gap-2">
-          <img src={loadingIcon} alt="加载中" className="w-6 h-6" />
-          加载中...
-        </div>
-      </div>
-    );
-  }
+  // 不显示全屏 loading，直接显示内容
 
   // 按网站分组
   const siteGroups: Record<string, BangumiSubscription[]> = {};
