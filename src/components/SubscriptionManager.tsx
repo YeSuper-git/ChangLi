@@ -463,7 +463,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900 truncate">{group.prefix}</span>
+                          <span className="text-sm font-medium text-gray-900 truncate" title={group.prefix}>{group.prefix}</span>
                           {group.recommended && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">推荐</span>
                           )}
