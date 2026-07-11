@@ -19,3 +19,8 @@
     DetailPrint "WebView2 已安装，跳过"
   ${EndIf}
 !macroend
+
+; 禁用程序兼容性助手（PCA）
+!macro disablePCA
+  WriteRegStr HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers" "$INSTDIR\${_FILE}.exe" "WIN10RTMRTM"
+!macroend
