@@ -112,6 +112,57 @@ pub struct VideoSeries {
 }
 
 // 演员
+// 番组订阅
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BangumiSubscription {
+    pub id: i64,
+    pub series_id: Option<i64>,
+    pub site_id: Option<i64>,
+    pub bangumi_url: String,
+    pub rss_url: String,
+    pub title: String,
+    pub enabled: bool,
+    pub check_interval_minutes: i64,
+    pub last_check_at: Option<String>,
+    pub auto_download: bool,
+    pub download_mode: String,
+    pub download_dir: Option<String>,
+    pub preferences: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// 订阅下载记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionDownload {
+    pub id: i64,
+    pub subscription_id: i64,
+    pub guid: String,
+    pub title: String,
+    pub torrent_url: Option<String>,
+    pub magnet_link: Option<String>,
+    pub file_size: Option<i64>,
+    pub pub_date: Option<String>,
+    pub status: String,
+    pub aria2_gid: Option<String>,
+    pub file_path: Option<String>,
+    pub notified: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// 订阅关键词
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionKeyword {
+    pub id: i64,
+    pub subscription_id: i64,
+    pub keyword_category: String,
+    pub keyword_value: String,
+    pub is_selected: bool,
+    pub created_at: String,
+}
+
+// 演员
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Actor {
     pub id: i64,
