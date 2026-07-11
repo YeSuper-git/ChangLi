@@ -72,7 +72,12 @@ function App() {
         // 等待 5 秒后再检查，避免影响启动速度
         await new Promise(resolve => setTimeout(resolve, 5000));
         
-        if (localStorage.getItem('changli_skip_auto_update') === 'true') return;
+        const skipCount = parseInt(localStorage.getItem('changli_skip_auto_update') || '0', 10);
+        if (skipCount > 0 && skipCount < 5) {
+          localStorage.setItem('changli_skip_auto_update', String(skipCount + 1));
+          return;
+        }
+        localStorage.removeItem('changli_skip_auto_update');
         
         const release = await checkLatestRelease() as any;
         const tagName = release.tag_name || '';
@@ -222,10 +227,10 @@ function App() {
                   <p className="text-sm text-gray-600 mb-3">是否下载更新？</p>
                   <label className="flex items-center gap-2 text-xs text-gray-500 mb-3 cursor-pointer">
                     <input type="checkbox" className="rounded" onChange={(e) => {
-                      if (e.target.checked) localStorage.setItem('changli_skip_auto_update', 'true');
+                      if (e.target.checked) localStorage.setItem('changli_skip_auto_update', '1');
                       else localStorage.removeItem('changli_skip_auto_update');
                     }} />
-                    下次不再自动提示
+                    近期不再提示（5次启动后恢复）
                   </label>
                   {autoUpdateInfo.body && (
                     <div className="p-3 bg-gray-50 rounded-lg mb-4">
