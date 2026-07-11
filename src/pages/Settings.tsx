@@ -877,6 +877,225 @@ const Settings: React.FC = () => {
         })()}
       </section>
 
+      {/* 分类配置 */}
+      <section className="mb-12" data-tutorial="settings-categories">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">分类配置</h2>
+            <p className="text-sm text-gray-500 mt-1">自定义视频分类的显示方式和功能</p>
+          </div>
+          <button
+            onClick={openAddCategory}
+            className="action-btn action-btn-primary"
+          >
+            新增分类
+          </button>
+        </div>
+
+        {categories.length > 0 ? (
+          <div className="space-y-4">
+            {categories.map((cat) => {
+              const features = parseCategoryFeatures(cat.features);
+              const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
+              const activeFeatures = Object.entries(features).filter(([k, v]) => v && k !== 'episode').map(([k]) => {
+                const labels: Record<string, string> = { tracking: '追番标记', watched: '观影进度', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
+                const colors: Record<string, string> = { tracking: 'bg-blue-50 text-blue-700', watched: 'bg-amber-50 text-amber-700', status: 'bg-emerald-50 text-emerald-700', tags: 'bg-purple-50 text-purple-700', actors: 'bg-pink-50 text-pink-700', chinese_sub: 'bg-orange-50 text-orange-700' };
+                return { label: labels[k] || k, color: colors[k] || 'bg-gray-50 text-gray-700' };
+              });
+              return (
+                <div key={cat.key} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900">{cat.name}</h3>
+                      <p className="text-sm text-gray-500 mt-1">卡片方向: {layoutLabel} · 集数称呼: {features.episode || '部'}</p>
+                      {cat.scan_path && (
+                        <p className="text-xs text-gray-400 mt-1 truncate">扫描路径: {cat.scan_path}</p>
+                      )}
+                      {activeFeatures.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {activeFeatures.map((f) => (
+                            <span key={f.label} className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${f.color}`}>{f.label}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => handleMoveCategory(cat.key, 'up')}
+                        disabled={categories.indexOf(cat) === 0}
+                        className="action-btn text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="上移"
+                      >▲ 上移</button>
+                      <button
+                        onClick={() => handleMoveCategory(cat.key, 'down')}
+                        disabled={categories.indexOf(cat) === categories.length - 1}
+                        className="action-btn text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="下移"
+                      >▼ 下移</button>
+                      <button
+                        onClick={() => openEditCategory(cat)}
+                        className="action-btn action-btn-primary"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => setDeleteCatConfirm(cat.key)}
+                        className="action-btn action-btn-danger text-sm"
+                      >
+                        删除所有视频
+                      </button>
+                      <button
+                        onClick={() => setCategoryDeleteConfirm(cat.key)}
+                        className="action-btn action-btn-danger text-sm"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="changli-empty-state">
+            <p className="text-gray-500 mb-4">暂无分类配置</p>
+            <p className="text-gray-400 text-sm">点击"新增分类"添加</p>
+          </div>
+        )}
+      </section>
+
+
+      {/* 标签管理 */}
+      <section className="mb-12" data-tutorial="settings-tags">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">标签管理</h2>
+            <p className="text-sm text-gray-500 mt-1">管理视频标签，方便筛选和分类</p>
+          </div>
+        </div>
+
+        <div className="changli-panel p-6 mb-4">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={newTagName}
+              onChange={(event) => setNewTagName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleAddTag();
+              }}
+              placeholder="输入新标签名称"
+              className="search-input flex-1"
+            />
+            <button
+              onClick={handleAddTag}
+              disabled={!newTagName.trim()}
+              className="action-btn action-btn-primary disabled:opacity-50"
+            >
+              添加标签
+            </button>
+          </div>
+        </div>
+
+        {tags.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {tags.map((tag) => (
+              <div key={tag.id} className={`inline-flex items-center gap-2 px-4 py-2 ${getTagColor(tag.id).bg} rounded-full`}>
+                {editingTag?.id === tag.id ? (
+                  <input
+                    type="text"
+                    value={editingTagValue}
+                    onChange={(e) => setEditingTagValue(e.target.value)}
+                    onBlur={handleSaveTagEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTagEdit();
+                      if (e.key === 'Escape') setEditingTag(null);
+                    }}
+                    className="bg-transparent border-none outline-none text-sm text-gray-800 w-20"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="text-sm text-gray-800 cursor-pointer select-none"
+                    onDoubleClick={() => {
+                      setEditingTag(tag);
+                      setEditingTagValue(tag.name);
+                    }}
+                    title="双击编辑标签名称"
+                  >
+                    {tag.name}
+                  </span>
+                )}
+                <button
+                  onClick={() => requestSecondConfirm(`settings-tag-${tag.id}`, () => handleDeleteTag(tag.id))}
+                  className="text-gray-400 hover:text-red-500"
+                  aria-label={`删除标签 ${tag.name}`}
+                >
+                  {pendingKey === `settings-tag-${tag.id}` ? '确认' : '✕'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="changli-empty-state text-gray-500">暂无标签</div>
+        )}
+      </section>
+
+
+      {/* 演员配置 */}
+      <section className="mb-12" data-tutorial="settings-actors">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">演员配置</h2>
+            <p className="text-sm text-gray-500 mt-1">自定义演员详情页显示的信息</p>
+          </div>
+          <div className="flex gap-2">
+            {/* 扩展系统预设已隐藏为彩蛋：新增字段时输入"三围"或"罩杯"自动解锁 */}
+          </div>
+        </div>
+
+        {(() => {
+          const presetKeySet = new Set(allPresetTemplates.map(t => t.key));
+          const extensionPresetKeySet = new Set(presetTemplates.map(t => t.key));
+          const sorted = [...actorFields.filter(f => {
+            if (f.field_key === 'name') return false;
+            if (extensionPresetKeySet.has(f.field_key) && !f.enabled) return false;
+            return true;
+          })].sort((a, b) => {
+            const aPreset = presetKeySet.has(a.field_key) ? 0 : 1;
+            const bPreset = presetKeySet.has(b.field_key) ? 0 : 1;
+            return aPreset - bPreset;
+          });
+          return (
+            <div className="grid grid-cols-4 gap-4">
+              {sorted.map((field) => (
+                <div key={field.field_key} className="changli-panel p-4 cursor-pointer flex flex-col items-center justify-center transition-transform duration-200 hover:-translate-y-0.5" onClick={() => openEditField(field)} onContextMenu={(e) => { e.preventDefault(); setFieldContextMenu({ key: field.field_key, x: e.clientX, y: e.clientY }); }}>
+                  <h3 className="font-semibold text-gray-900 text-sm">{field.field_label}</h3>
+                  {presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-50 text-[10px] text-rose-700 mt-1">系统预设</span>
+                  )}
+                  {extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-700 mt-1">扩展预设</span>
+                  )}
+                  {!presetKeySet.has(field.field_key) && !extensionPresetKeySet.has(field.field_key) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-green-50 text-[10px] text-green-700 mt-1">自定义</span>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">{field.field_type === 'text' ? '文本' : field.field_type === 'number' ? '数字' : field.field_type === 'date' ? '日期' : field.field_type === 'compound' ? '复合' : '选择'}</p>
+                  <p className="text-xs mt-1">{field.enabled ? <span className="text-green-600">● 启用</span> : <span className="text-gray-400">○ 未启用</span>}</p>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={openAddField}
+                className="min-h-[118px] rounded-2xl border-2 border-dashed border-gray-300 bg-white/58 p-4 text-gray-500 transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-50/40 hover:text-rose-500"
+              >
+                <span className="block text-3xl leading-none">+</span>
+                <span className="mt-2 block text-sm font-semibold">新增字段</span>
+              </button>
+            </div>
+          );
+        })()}
+      </section>
+
       {/* 清理缓存 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
@@ -991,6 +1210,82 @@ const Settings: React.FC = () => {
           </div>
         )}
       </section>
+
+
+
+      {/* 清理缓存 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">清理缓存</h2>
+            <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
+          </div>
+          <button
+            onClick={async () => {
+              const count = await cleanupOldInstallers();
+              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
+            }}
+            className="action-btn"
+          >
+            清理缓存
+          </button>
+        </div>
+      </section>
+
+      {/* 环境依赖 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">环境依赖</h2>
+            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const deps = await checkEnvDependencies();
+                setEnvDeps(deps);
+              } catch (e) {
+                notify({ message: '检查失败', type: 'error' });
+              }
+            }}
+            className="action-btn"
+          >
+            检查依赖
+          </button>
+        </div>
+        {envDeps && (
+          <div className="py-3 px-4 bg-gray-50 rounded-lg">
+            {envDeps.every(([, ok]) => ok) ? (
+              <p className="text-sm text-green-600">所有依赖正常</p>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-red-600">
+                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
+                </p>
+                <button
+                  onClick={async () => {
+                    for (const [name, ok] of envDeps) {
+                      if (!ok) {
+                        try {
+                          const msg = await installDependency(name);
+                          notify({ message: msg, type: 'success' });
+                        } catch (e: any) {
+                          notify({ message: String(e), type: 'error' });
+                        }
+                      }
+                    }
+                  }}
+                  className="action-btn action-btn-primary text-xs"
+                >
+                  一键安装
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+
 
 
 
