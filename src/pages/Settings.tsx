@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency, getDownloadedUpdate } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, getDownloadedUpdate } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -60,7 +60,7 @@ const Settings: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
-  const [envDeps, setEnvDeps] = useState<[string, boolean, string][] | null>(null);
+  // envDeps 已移除
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
@@ -1085,61 +1085,7 @@ const Settings: React.FC = () => {
           </button>
         </div>
       </section>
-
-      {/* 环境依赖 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">环境依赖</h2>
-            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
-          </div>
-          <button
-            onClick={async () => {
-              try {
-                const deps = await checkEnvDependencies();
-                setEnvDeps(deps);
-              } catch (e) {
-                notify({ message: '检查失败', type: 'error' });
-              }
-            }}
-            className="action-btn"
-          >
-            检查依赖
-          </button>
-        </div>
-        {envDeps && (
-          <div className="py-3 px-4 bg-gray-50 rounded-lg">
-            {envDeps.every(([, ok]) => ok) ? (
-              <p className="text-sm text-green-600">所有依赖正常</p>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-red-600">
-                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
-                </p>
-                <button
-                  onClick={async () => {
-                    for (const [name, ok] of envDeps) {
-                      if (!ok) {
-                        try {
-                          const msg = await installDependency(name);
-                          notify({ message: msg, type: 'success' });
-                        } catch (e: any) {
-                          notify({ message: String(e), type: 'error' });
-                        }
-                      }
-                    }
-                  }}
-                  className="action-btn action-btn-primary text-xs"
-                >
-                  一键安装
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 网站管理 */}
+{/* 网站管理 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1202,67 +1148,7 @@ const Settings: React.FC = () => {
           </button>
         </div>
       </section>
-
-      {/* 环境依赖 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">环境依赖</h2>
-            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
-          </div>
-          <button
-            onClick={async () => {
-              try {
-                const deps = await checkEnvDependencies();
-                setEnvDeps(deps);
-              } catch (e) {
-                notify({ message: '检查失败', type: 'error' });
-              }
-            }}
-            className="action-btn"
-          >
-            检查依赖
-          </button>
-        </div>
-        {envDeps && (
-          <div className="py-3 px-4 bg-gray-50 rounded-lg">
-            {envDeps.every(([, ok]) => ok) ? (
-              <p className="text-sm text-green-600">所有依赖正常</p>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-red-600">
-                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
-                </p>
-                <button
-                  onClick={async () => {
-                    for (const [name, ok] of envDeps) {
-                      if (!ok) {
-                        try {
-                          const msg = await installDependency(name);
-                          notify({ message: msg, type: 'success' });
-                        } catch (e: any) {
-                          notify({ message: String(e), type: 'error' });
-                        }
-                      }
-                    }
-                  }}
-                  className="action-btn action-btn-primary text-xs"
-                >
-                  一键安装
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-
-
-
-
-
-
-      {/* 分类视频删除确认弹窗 */}
+{/* 分类视频删除确认弹窗 */}
       {deleteCatConfirm && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">
