@@ -356,24 +356,27 @@ async fn check_subscription_updates(
 fn extract_episode_number(title: &str) -> Option<i32> {
     use regex::Regex;
     
-    // 尝试多种集数格式
+    // 按优先级尝试多种集数格式
     let patterns = [
-        r"(?:-|–|—)\s*(\d+)",           // "- 02", "– 02", "— 02"
-        r"EP\s*(\d+)",                   // "EP02"
-        r"Ep\.?\s*(\d+)",                // "Ep02", "Ep.02"
-        r"#(\d+)",                        // "#02"
-        r"第\s*(\d+)\s*集",              // "第02集"
-        r"(\d+)\s*话",                    // "02话"
-        r"(\d+)\s*話",                    // "02話"
-        r"S\d+E(\d+)",                    // "S01E02"
+        (r"EP\.?\s*(\d+)", true),                    // "EP02", "EP.02" (高优先)
+        (r"(?:-|–|—)\s*(\d+)\s*(?:\[|$)", true),   // "- 02 [" 或 "- 02" 在末尾
+        (r"#(\d+)", true),                              // "#02"
+        (r"第\s*(\d+)\s*集", true),                   // "第02集"
+        (r"(\d+)\s*话", true),                         // "02话"
+        (r"(\d+)\s*話", true),                         // "02話"
+        (r"S\d+E(\d+)", true),                         // "S01E02"
+        (r"(?:-|–|—)\s*(\d+)", false),                // "- 02" (低优先，可能误匹配)
     ];
     
-    for pattern in &patterns {
+    for (pattern, _) in &patterns {
         if let Ok(re) = Regex::new(pattern) {
             if let Some(caps) = re.captures(title) {
                 if let Some(ep_str) = caps.get(1) {
                     if let Ok(ep) = ep_str.as_str().parse::<i32>() {
-                        return Some(ep);
+                        // 排除明显不是集数的数字（如年份、分辨率等）
+                        if ep > 0 && ep < 1000 {
+                            return Some(ep);
+                        }
                     }
                 }
             }
