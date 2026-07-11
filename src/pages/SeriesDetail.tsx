@@ -443,7 +443,7 @@ const SeriesDetail: React.FC = () => {
   };
 
   // 保存分集排序
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  // const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const handleSaveEpisodeOrder = async () => {
     try {
       // 按当前顺序更新集数
@@ -459,22 +459,18 @@ const SeriesDetail: React.FC = () => {
   };
 
   // 拖动排序
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
-    setDraggedIndex(index);
-  };
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
+  // 上下移动
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
     const newVideos = [...videos];
-    const [removed] = newVideos.splice(draggedIndex, 1);
-    newVideos.splice(index, 0, removed);
+    [newVideos[index - 1], newVideos[index]] = [newVideos[index], newVideos[index - 1]];
     setVideos(newVideos);
-    setDraggedIndex(index);
   };
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
+  const handleMoveDown = (index: number) => {
+    if (index === videos.length - 1) return;
+    const newVideos = [...videos];
+    [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
+    setVideos(newVideos);
   };
 
   const handleBatchDeleteEpisodes = async () => {
@@ -1093,10 +1089,8 @@ const SeriesDetail: React.FC = () => {
           selectMode={selectMode}
           selectedEpisodes={selectedEpisodes}
           onToggleSelect={toggleEpisodeSelect}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          draggedIndex={draggedIndex}
+          onMoveUp={handleMoveUp}
+          onMoveDown={handleMoveDown}
         />
       ) : (
         <div className="changli-empty-state text-gray-500">暂无资源</div>
@@ -1391,7 +1385,8 @@ interface VideoGridProps {
   selectMode?: boolean;
   selectedEpisodes?: Set<number>;
   onToggleSelect?: (id: number) => void;
-  onDragStart?: (e: React.DragEvent, index: number) => void;
+  onMoveUp?: (index: number) => void;
+  onMoveDown?: (index: number) => void;
   onDragOver?: (e: React.DragEvent, index: number) => void;
   onDragEnd?: () => void;
   draggedIndex?: number | null;
@@ -1405,8 +1400,8 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   selectMode,
   selectedEpisodes,
   onToggleSelect,
-  onDragStart,
-  onDragOver,
+  onMoveUp,
+  onMoveDown,
   onDragEnd,
   draggedIndex,
 }) => {
@@ -1456,7 +1451,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         key={video.id}
         role="button"
         tabIndex={0}
-        onDragOver={(e) => { if (selectMode) { e.preventDefault(); onDragOver?.(e, videos.indexOf(video)); } }}
+        onDragOver={(e) => { if (selectMode) e.preventDefault(); }}
         onDragEnd={() => onDragEnd?.()}
         className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''} ${draggedIndex === videos.indexOf(video) ? 'opacity-50' : ''}`}
         onClick={() => {
@@ -1474,19 +1469,13 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         >
           {selectMode && (
             <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
-              <div
-                className="drag-handle cursor-grab active:cursor-grabbing p-1 rounded bg-white/80 hover:bg-white"
-                draggable={true}
-                onDragStart={(e) => {
-                  e.stopPropagation();
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', String(videos.indexOf(video)));
-                  onDragStart?.(e, videos.indexOf(video));
-                }}
-                onDragOver={(e) => { e.stopPropagation(); onDragOver?.(e, videos.indexOf(video)); }}
-                onDragEnd={(e) => { e.stopPropagation(); onDragEnd?.(); }}
-              >
-                <svg className="w-3 h-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+              <div className="flex flex-col gap-0.5">
+                <button className="w-5 h-5 flex items-center justify-center rounded bg-white/80 hover:bg-white text-gray-500 disabled:opacity-30" onClick={(e) => { e.stopPropagation(); onMoveUp?.(videos.indexOf(video)); }} disabled={videos.indexOf(video) === 0}>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                </button>
+                <button className="w-5 h-5 flex items-center justify-center rounded bg-white/80 hover:bg-white text-gray-500 disabled:opacity-30" onClick={(e) => { e.stopPropagation(); onMoveDown?.(videos.indexOf(video)); }} disabled={videos.indexOf(video) === videos.length - 1}>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
               </div>
               <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-gray-300 bg-white/80'}`}>
                 {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
