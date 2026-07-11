@@ -761,6 +761,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
   };
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const handleCopyMagnet = async (key: string, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
@@ -770,7 +771,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
   };
 
   const handleDelete = async () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
     if (!subscription) return;
+    setShowDeleteConfirm(false);
     try {
       await deleteSubscription(subscription.id);
       setSubscription(null);
@@ -985,6 +991,37 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
         onBind={handleBind}
         initialSeriesId={seriesId}
       />
+
+      {/* 取消订阅确认弹窗 */}
+      {showDeleteConfirm && (
+        <div className="changli-modal-backdrop" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="changli-modal-panel !w-[min(100%,380px)] !p-0" onClick={e => e.stopPropagation()}>
+            <div className="changli-modal-header">
+              <h2 className="text-lg font-bold text-gray-900">取消订阅</h2>
+            </div>
+            <div className="changli-modal-body">
+              <p className="text-sm text-gray-600">
+                确定取消订阅「<span className="font-medium text-gray-900">{subscription?.title?.replace(/^[^-]+\s*-\s*/, '') || subscription?.title}</span>」？
+              </p>
+              <p className="text-xs text-gray-400 mt-2">取消后检查更新记录将被清除</p>
+            </div>
+            <div className="changli-modal-footer">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="action-btn text-sm px-4 py-2"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); confirmDelete(); }}
+                className="action-btn action-btn-danger text-sm px-4 py-2"
+              >
+                确认取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
