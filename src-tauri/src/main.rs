@@ -2769,7 +2769,18 @@ async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String>
             }
             #[cfg(target_os = "windows")]
             {
-                std::process::Command::new("where").arg("mpv.exe").output().map(|o| o.status.success()).unwrap_or(false)
+                // 检查 PATH
+                let in_path = std::process::Command::new("where").arg("mpv.exe").output().map(|o| o.status.success()).unwrap_or(false);
+                // 检查应用内置
+                let bundled = app.path().resource_dir()
+                    .map(|rd| {
+                        rd.join("mpv").join("mpv.exe").exists()
+                        || rd.join("mpv.exe").exists()
+                        || rd.join("resources").join("mpv").join("mpv.exe").exists()
+                        || rd.join("resources").join("mpv.exe").exists()
+                    })
+                    .unwrap_or(false);
+                in_path || bundled
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             { false }
@@ -2792,7 +2803,16 @@ async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String>
             }
             #[cfg(target_os = "windows")]
             {
-                std::process::Command::new("where").arg("ffmpeg.exe").output().map(|o| o.status.success()).unwrap_or(false)
+                let in_path = std::process::Command::new("where").arg("ffmpeg.exe").output().map(|o| o.status.success()).unwrap_or(false);
+                let bundled = app.path().resource_dir()
+                    .map(|rd| {
+                        rd.join("ffmpeg").join("ffmpeg.exe").exists()
+                        || rd.join("ffmpeg.exe").exists()
+                        || rd.join("resources").join("ffmpeg").join("ffmpeg.exe").exists()
+                        || rd.join("resources").join("ffmpeg.exe").exists()
+                    })
+                    .unwrap_or(false);
+                in_path || bundled
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             { false }
