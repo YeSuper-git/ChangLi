@@ -1068,25 +1068,6 @@ const Settings: React.FC = () => {
         })()}
       </section>
 
-      {/* 清理缓存 */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">清理缓存</h2>
-            <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
-          </div>
-          <button
-            onClick={async () => {
-              const count = await cleanupOldInstallers();
-              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
-            }}
-            className="action-btn"
-          >
-            清理缓存
-          </button>
-        </div>
-      </section>
-{/* 网站管理 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
