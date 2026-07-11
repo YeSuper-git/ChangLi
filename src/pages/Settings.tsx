@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -665,9 +665,28 @@ const Settings: React.FC = () => {
             {envDeps.every(([, ok]) => ok) ? (
               <p className="text-sm text-green-600">所有依赖正常</p>
             ) : (
-              <p className="text-sm text-red-600">
-                缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}，请安装后重启应用
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-red-600">
+                  缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}
+                </p>
+                <button
+                  onClick={async () => {
+                    for (const [name, ok] of envDeps) {
+                      if (!ok) {
+                        try {
+                          const msg = await installDependency(name);
+                          notify({ message: msg, type: 'success' });
+                        } catch (e: any) {
+                          notify({ message: String(e), type: 'error' });
+                        }
+                      }
+                    }
+                  }}
+                  className="action-btn action-btn-primary text-xs"
+                >
+                  一键安装
+                </button>
+              </div>
             )}
           </div>
         )}

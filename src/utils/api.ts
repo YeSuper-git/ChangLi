@@ -1149,6 +1149,10 @@ export async function checkEnvDependencies(): Promise<[string, boolean, string][
   return invoke('check_env_dependencies');
 }
 
+export async function installDependency(name: string): Promise<string> {
+  return invoke('install_dependency', { name });
+}
+
 // 游戏覆盖（NVIDIA / 游戏加加）
 export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
   return invoke<string>('set_game_overlay_disabled', { disabled });

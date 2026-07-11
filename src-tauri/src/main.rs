@@ -2753,6 +2753,68 @@ async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String>
 }
 
 #[tauri::command]
+async fn install_dependency(name: String) -> Result<String, String> {
+    match name.as_str() {
+        "WebView2 运行时" => {
+            // 下载 WebView2 bootstrapper 并静默安装
+            let url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+            let resp = reqwest::get(url).await.map_err(|e| format!("下载失败: {e}"))?;
+            let bytes = resp.bytes().await.map_err(|e| format!("读取失败: {e}"))?;
+            let installer_path = std::env::temp_dir().join("MicrosoftEdgeWebview2Setup.exe");
+            std::fs::write(&installer_path, &bytes).map_err(|e| format!("写入失败: {e}"))?;
+            std::process::Command::new(&installer_path)
+                .args(["/silent", "/install"])
+                .spawn()
+                .map_err(|e| format!("安装失败: {e}"))?;
+            Ok("WebView2 安装程序已启动，请等待安装完成".to_string())
+        }
+        "mpv 播放器" => {
+            #[cfg(target_os = "macos")]
+            {
+                let status = std::process::Command::new("brew")
+                    .args(["install", "mpv"])
+                    .status()
+                    .map_err(|e| format!("brew 执行失败: {e}"))?;
+                if status.success() {
+                    Ok("mpv 安装完成".to_string())
+                } else {
+                    Err("mpv 安装失败，请手动运行 brew install mpv".to_string())
+                }
+            }
+            #[cfg(target_os = "windows")]
+            {
+                open::that("https://sourceforge.net/projects/mpv-player-windows/files/").map_err(|e| format!("打开浏览器失败: {e}"))?;
+                Ok("已在浏览器中打开 mpv 下载页面".to_string())
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            { Err("不支持自动安装".to_string()) }
+        }
+        "ffmpeg" => {
+            #[cfg(target_os = "macos")]
+            {
+                let status = std::process::Command::new("brew")
+                    .args(["install", "ffmpeg"])
+                    .status()
+                    .map_err(|e| format!("brew 执行失败: {e}"))?;
+                if status.success() {
+                    Ok("ffmpeg 安装完成".to_string())
+                } else {
+                    Err("ffmpeg 安装失败，请手动运行 brew install ffmpeg".to_string())
+                }
+            }
+            #[cfg(target_os = "windows")]
+            {
+                open::that("https://www.gyan.dev/ffmpeg/builds/").map_err(|e| format!("打开浏览器失败: {e}"))?;
+                Ok("已在浏览器中打开 ffmpeg 下载页面".to_string())
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            { Err("不支持自动安装".to_string()) }
+        }
+        _ => Err(format!("未知依赖: {}", name)),
+    }
+}
+
+#[tauri::command]
 async fn cleanup_old_installers() -> Result<u32, String> {
     let mut count = 0u32;
     if let Ok(exe_path) = std::env::current_exe() {
@@ -2947,6 +3009,7 @@ fn main() {
             cancel_update_download,
             install_update,
             check_env_dependencies,
+            install_dependency,
             cleanup_old_installers,
             get_sites,
             add_site,
