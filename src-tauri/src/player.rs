@@ -102,6 +102,10 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 
 pub fn close_player_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        // 检查窗口是否已经隐藏，避免重复操作
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
         let _ = window.hide();
     }
 
@@ -202,7 +206,9 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
                 let _ = position_player_window_next_to_main(app, &player);
             }
         }
-        WindowEvent::Destroyed => close_player_window(app),
+        WindowEvent::Destroyed => {
+            // 窗口已销毁，无需再操作
+        }
         WindowEvent::CloseRequested { .. } => close_player_window(app),
         _ => {}
     }
