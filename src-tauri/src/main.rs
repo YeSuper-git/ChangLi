@@ -261,10 +261,10 @@ async fn check_subscription_updates(
     .await
     .unwrap_or_default();
     
-    // 解析用户选择的匹配模式
-    let match_patterns: Vec<String> = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
-        if let Some(obj) = parsed.get("matchPatterns").and_then(|v| v.as_object()) {
-            obj.values().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+    // 解析用户选择的版本前缀
+    let selected_prefixes: Vec<String> = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
+        if let Some(arr) = parsed.get("selectedPrefixes").and_then(|v| v.as_array()) {
+            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
         } else {
             Vec::new()
         }
