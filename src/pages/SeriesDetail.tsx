@@ -37,7 +37,7 @@ import {
   checkSeriesUpdates,
   addVideoToSeries,
   addVideosToSeries,
-  updateVideoEpisodeNumbers,
+
   getTagColor,
   formatSeriesEpisodeCountLabel,
   isSeriesCompleted,
@@ -443,36 +443,7 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  // 保存分集排序
-  // const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const handleSaveEpisodeOrder = async () => {
-    try {
-      // 按当前顺序更新集数
-      const updates: [number, number][] = videos.map((v, i) => [v.id, i + 1]);
-      await updateVideoEpisodeNumbers(updates);
-      setSelectMode(false);
-      setSelectedEpisodes(new Set());
-      notify({ message: '排序已保存', type: 'success' });
-    } catch (error) {
-      console.error('保存排序失败:', error);
-      notify({ message: '保存排序失败', type: 'error' });
-    }
-  };
 
-  // 拖动排序
-  // 上下移动
-  const handleMoveUp = (index: number) => {
-    if (index === 0) return;
-    const newVideos = [...videos];
-    [newVideos[index - 1], newVideos[index]] = [newVideos[index], newVideos[index - 1]];
-    setVideos(newVideos);
-  };
-  const handleMoveDown = (index: number) => {
-    if (index === videos.length - 1) return;
-    const newVideos = [...videos];
-    [newVideos[index], newVideos[index + 1]] = [newVideos[index + 1], newVideos[index]];
-    setVideos(newVideos);
-  };
 
   const handleBatchDeleteEpisodes = async () => {
     if (selectedEpisodes.size === 0) return;
@@ -1080,10 +1051,9 @@ const SeriesDetail: React.FC = () => {
                 {episodePendingKey === 'batch-delete-episodes' ? `确认删除 ${selectedEpisodes.size} 个` : `删除 ${selectedEpisodes.size} 个`}
               </button>
               <button className="action-btn text-xs" onClick={() => { setSelectMode(false); setSelectedEpisodes(new Set()); episodeClearPending(); }}>取消</button>
-              <button className="action-btn action-btn-primary text-xs" onClick={handleSaveEpisodeOrder}>保存</button>
             </>
           ) : (
-            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>编辑</button>
+            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>批量删除</button>
           )}
         </div>
       </div>
@@ -1096,8 +1066,6 @@ const SeriesDetail: React.FC = () => {
           selectMode={selectMode}
           selectedEpisodes={selectedEpisodes}
           onToggleSelect={toggleEpisodeSelect}
-          onMoveUp={handleMoveUp}
-          onMoveDown={handleMoveDown}
         />
       ) : (
         <div className="changli-empty-state text-gray-500">暂无资源</div>
@@ -1392,11 +1360,6 @@ interface VideoGridProps {
   selectMode?: boolean;
   selectedEpisodes?: Set<number>;
   onToggleSelect?: (id: number) => void;
-  onMoveUp?: (index: number) => void;
-  onMoveDown?: (index: number) => void;
-  onDragOver?: (e: React.DragEvent, index: number) => void;
-  onDragEnd?: () => void;
-  draggedIndex?: number | null;
 }
 
 const VideoGrid: React.FC<VideoGridProps> = ({
@@ -1407,10 +1370,6 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   selectMode,
   selectedEpisodes,
   onToggleSelect,
-  onMoveUp,
-  onMoveDown,
-  onDragEnd,
-  draggedIndex,
 }) => {
   // 判断是否有任何视频设置了 season（非 0）
   const hasSeason = useMemo(
@@ -1458,9 +1417,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         key={video.id}
         role="button"
         tabIndex={0}
-        onDragOver={(e) => { if (selectMode) e.preventDefault(); }}
-        onDragEnd={() => onDragEnd?.()}
-        className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''} ${draggedIndex === videos.indexOf(video) ? 'opacity-50' : ''}`}
+        className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''}`}
         onClick={() => {
           if (selectMode && onToggleSelect) {
             onToggleSelect(video.id);
@@ -1475,15 +1432,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
           } bg-gray-100 overflow-hidden relative rounded-t-xl`}
         >
           {selectMode && (
-            <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
-              <div className="flex flex-col gap-0.5">
-                <button className="w-5 h-5 flex items-center justify-center rounded bg-white/80 hover:bg-white text-gray-500 disabled:opacity-30" onClick={(e) => { e.stopPropagation(); onMoveUp?.(videos.indexOf(video)); }} disabled={videos.indexOf(video) === 0}>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                </button>
-                <button className="w-5 h-5 flex items-center justify-center rounded bg-white/80 hover:bg-white text-gray-500 disabled:opacity-30" onClick={(e) => { e.stopPropagation(); onMoveDown?.(videos.indexOf(video)); }} disabled={videos.indexOf(video) === videos.length - 1}>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                </button>
-              </div>
+            <div className="absolute top-2 left-2 z-10">
               <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-gray-300 bg-white/80'}`}>
                 {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
               </div>
