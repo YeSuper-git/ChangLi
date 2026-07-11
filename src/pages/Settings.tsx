@@ -644,7 +644,7 @@ const Settings: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">环境依赖</h2>
-            <p className="text-sm text-gray-500 mt-1">检查播放器和界面运行所需的基础组件</p>
+            <p className="text-sm text-gray-500 mt-1">检查运行所需的基础组件是否正常</p>
           </div>
           <button
             onClick={async () => {
@@ -661,21 +661,14 @@ const Settings: React.FC = () => {
           </button>
         </div>
         {envDeps && (
-          <div className="space-y-3">
-            {envDeps.map(([name, installed, desc]) => (
-              <div key={name} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${installed ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <div>
-                    <span className="text-sm font-medium">{name}</span>
-                    <span className="text-xs text-gray-500 ml-2">{desc}</span>
-                  </div>
-                </div>
-                <span className={`text-xs font-medium ${installed ? 'text-green-600' : 'text-red-600'}`}>
-                  {installed ? '正常' : '缺失'}
-                </span>
-              </div>
-            ))}
+          <div className="py-3 px-4 bg-gray-50 rounded-lg">
+            {envDeps.every(([, ok]) => ok) ? (
+              <p className="text-sm text-green-600">所有依赖正常</p>
+            ) : (
+              <p className="text-sm text-red-600">
+                缺少：{envDeps.filter(([, ok]) => !ok).map(([name]) => name).join('、')}，请安装后重启应用
+              </p>
+            )}
           </div>
         )}
       </section>
