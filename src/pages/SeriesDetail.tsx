@@ -194,7 +194,7 @@ const SeriesDetail: React.FC = () => {
       const source = series.folder_path || series.title;
       const { code, hasChineseSub } = extractCode(source);
       if (code) {
-        setEditData((prev) => ({ ...prev, code, has_chinese_sub: hasChineseSub }));
+        setEditData((prev) => ({ ...prev, code, has_chinese_sub: hasChineseSub || prev.has_chinese_sub }));
       }
     }
   }, [editing, series, editData.code, userTouchedSub]);
