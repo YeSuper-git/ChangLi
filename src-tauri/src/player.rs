@@ -41,6 +41,8 @@ fn candidate_mpv_paths(app: &AppHandle) -> Vec<PathBuf> {
         {
             candidates.push(resource_dir.join("mpv").join("mpv.exe"));
             candidates.push(resource_dir.join("resources").join("mpv").join("mpv.exe"));
+            candidates.push(resource_dir.join("mpv.exe"));
+            candidates.push(resource_dir.join("resources").join("mpv.exe"));
         }
         #[cfg(target_os = "macos")]
         {
