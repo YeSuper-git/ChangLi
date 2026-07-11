@@ -795,26 +795,68 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
       )}
 
       {/* 展开的更新列表 */}
-      {expandedId && newEpisodes.length > 0 && (
-        <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
-          {newEpisodes.map(ep => (
-            <div key={ep.id} className="flex items-center justify-between p-2 bg-rose-50 rounded-lg">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-900 truncate">{ep.title}</div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {ep.file_size ? (ep.file_size < 1024*1024*1024 ? (ep.file_size/1024/1024).toFixed(0) + ' MB' : (ep.file_size/1024/1024/1024).toFixed(1) + ' GB') : ''}
+      {expandedId && newEpisodes.length > 0 && (() => {
+        // 按字幕组+版本分组
+        const groups: Record<string, any[]> = {};
+        for (const ep of newEpisodes) {
+          const title = ep.title || '';
+          let subtitleGroup = '未知字幕组';
+          if (title.startsWith('[')) {
+            const end = title.indexOf(']');
+            if (end > 0) subtitleGroup = title.substring(1, end);
+          }
+          // 提取版本关键词
+          const lower = title.toLowerCase();
+          const versionParts: string[] = [];
+          if (lower.includes('1080p') || lower.includes('1920x1080')) versionParts.push('1080p');
+          else if (lower.includes('720p')) versionParts.push('720p');
+          if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体')) versionParts.push('简中');
+          else if (lower.includes('简繁') || lower.includes('简／繁')) versionParts.push('简繁');
+          else if (lower.includes('cht') || lower.includes('繁中')) versionParts.push('繁中');
+          if (lower.includes('baha')) versionParts.push('Baha');
+          else if (lower.includes('cr ')) versionParts.push('CR');
+          else if (lower.includes('abema')) versionParts.push('ABEMA');
+          if (lower.includes('无修') || lower.includes('uncensored')) versionParts.push('无修');
+          if (lower.includes('放送版') || lower.includes('on-air')) versionParts.push('放送版');
+          const versionKey = versionParts.length > 0 ? versionParts.join(' ') : '默认';
+          const groupKey = subtitleGroup + '|' + versionKey;
+          if (!groups[groupKey]) groups[groupKey] = [];
+          groups[groupKey].push(ep);
+        }
+        return (
+          <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+            {Object.entries(groups).map(([key, items]) => {
+              const [subtitleGroup, versionKey] = key.split('|');
+              const totalSize = items.reduce((sum, ep) => sum + (ep.file_size || 0), 0);
+              return (
+                <div key={key} className="bg-rose-50 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      [{subtitleGroup}] {versionKey}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {items.length} 集{totalSize > 0 ? ' · ' + (totalSize < 1024*1024*1024 ? (totalSize/1024/1024).toFixed(0) + ' MB' : (totalSize/1024/1024/1024).toFixed(1) + ' GB') : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {items.map(ep => (
+                      <div key={ep.id} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600 truncate flex-1">{ep.title}</span>
+                        <button
+                          onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
+                          className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                        >
+                          复制磁力
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
-                className="ml-2 px-3 py-1 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors"
-              >
-                复制磁力
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <SubscriptionBindModal
         open={showBindModal}
