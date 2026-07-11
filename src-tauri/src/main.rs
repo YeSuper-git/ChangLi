@@ -326,7 +326,8 @@ async fn check_subscription_updates(
         // 如果 RSS 中没有磁力链接，从详情页提取
         let mut magnet = item.magnet_link.clone();
         if magnet.is_none() && !item.link.is_empty() {
-            if let Ok(html) = reqwest::get(&item.link).await.and_then(|r| r.text().map_err(|e| e.into())) {
+            if let Ok(resp) = reqwest::get(&item.link).await {
+              if let Ok(html) = resp.text().await {
                 // 从 HTML 中提取 magnet:?xt= 链接
                 let lower = html.to_lowercase();
                 if let Some(start) = lower.find("magnet:?xt=") {
@@ -337,6 +338,7 @@ async fn check_subscription_updates(
                         magnet = Some(decoded.to_string());
                     }
                 }
+              }
             }
         }
         
