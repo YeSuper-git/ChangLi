@@ -10,6 +10,24 @@ import { SubscriptionBindModal } from '../components/SubscriptionManager';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
 
+
+/// 从 localStorage 读取检查更新结果
+function loadSubUpdates(): Map<number, any[]> {
+  try {
+    const raw = localStorage.getItem('changli_sub_updates');
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw);
+    return new Map(Object.entries(obj).map(([k, v]) => [Number(k), v as any[]]));
+  } catch { return new Map(); }
+}
+
+/// 保存检查更新结果到 localStorage
+function saveSubUpdates(updates: Map<number, any[]>) {
+  const obj: Record<string, any[]> = {};
+  updates.forEach((v, k) => { if (v.length > 0) obj[k] = v; });
+  localStorage.setItem('changli_sub_updates', JSON.stringify(obj));
+}
+
 function formatTimeAgo(dateStr: string | null): string {
   if (!dateStr) return '从未';
   const d = new Date(dateStr);
@@ -42,7 +60,7 @@ const Subscriptions: React.FC = () => {
   // 每个订阅的更新展开状态
   const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
   // 每个订阅的更新结果：subId -> episodes
-  const [subUpdates, setSubUpdates] = useState<Map<number, any[]>>(new Map());
+  const [subUpdates, setSubUpdates] = useState<Map<number, any[]>>(() => loadSubUpdates());
 
   // Per-subscription checking state
   const [checkingId, setCheckingId] = useState<number | null>(null);
@@ -90,6 +108,7 @@ const Subscriptions: React.FC = () => {
       setSubUpdates(prev => {
         const next = new Map(prev);
         next.set(sub.id, items);
+        saveSubUpdates(next);
         return next;
       });
       setExpandedSubs(prev => new Set([...prev, sub.id]));
@@ -111,6 +130,12 @@ const Subscriptions: React.FC = () => {
     if (!window.confirm(`确定取消订阅「${displayName}」？`)) return;
     try {
       await deleteSubscription(sub.id);
+      setSubUpdates(prev => {
+        const next = new Map(prev);
+        next.delete(sub.id);
+        saveSubUpdates(next);
+        return next;
+      });
       notify({ message: '订阅已删除', type: 'info' });
       loadData();
     } catch {
