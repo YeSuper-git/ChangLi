@@ -1157,6 +1157,10 @@ export async function getDownloadedUpdate(): Promise<[string, string, number] | 
   return invoke('get_downloaded_update');
 }
 
+export async function getUpdatesDir(): Promise<string> {
+  return invoke('get_updates_dir');
+}
+
 // === 订阅相关 API ===
 
 export interface BangumiSubscription {

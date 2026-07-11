@@ -2911,8 +2911,10 @@ async fn download_update(
     // 重置取消标志
     state.update_download_cancel.store(false, Ordering::SeqCst);
 
-    let update_dir = app.path().app_data_dir()
-        .map_err(|e| format!("获取应用目录失败: {e}"))?
+    let update_dir = std::env::current_exe()
+        .map_err(|e| format!("获取应用路径失败: {e}"))?
+        .parent()
+        .ok_or("获取应用目录失败")?
         .join("updates");
     
     // 清理旧的下载文件
@@ -3030,6 +3032,17 @@ fn install_webview2_silent(app: &tauri::AppHandle) {
 
 #[cfg(not(target_os = "windows"))]
 fn install_webview2_silent(_app: &tauri::AppHandle) {}
+
+/// 获取更新缓存目录路径
+#[tauri::command]
+async fn get_updates_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let update_dir = std::env::current_exe()
+        .map_err(|e| format!("获取应用路径失败: {e}"))?
+        .parent()
+        .ok_or("获取应用目录失败")?
+        .join("updates");
+    Ok(update_dir.to_string_lossy().to_string())
+}
 
 /// 获取已下载的更新文件信息
 #[tauri::command]
@@ -3463,6 +3476,7 @@ fn main() {
             cancel_update_download,
             install_update,
             get_downloaded_update,
+            get_updates_dir,
             detect_rss_url,
             fetch_rss,
             extract_keywords_from_rss,
