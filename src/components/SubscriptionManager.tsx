@@ -372,7 +372,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                   onChange={e => setBangumiUrl(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleDetectRss(); }}
                   className="changli-input"
-                  placeholder="如：https://mikanani.kas.pub/Home/Bangumi/4042"
+                  placeholder="粘贴番组页面链接"
                   autoFocus
                 />
                 <p className="text-xs text-gray-400 mt-1">支持 Mikan 等主流番组网站</p>
