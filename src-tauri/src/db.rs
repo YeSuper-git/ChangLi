@@ -113,7 +113,7 @@ pub struct VideoSeries {
 
 // 演员
 // 番组订阅
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct BangumiSubscription {
     pub id: i64,
     pub series_id: Option<i64>,
@@ -133,7 +133,7 @@ pub struct BangumiSubscription {
 }
 
 // 订阅下载记录
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SubscriptionDownload {
     pub id: i64,
     pub subscription_id: i64,
@@ -152,7 +152,7 @@ pub struct SubscriptionDownload {
 }
 
 // 订阅关键词
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SubscriptionKeyword {
     pub id: i64,
     pub subscription_id: i64,

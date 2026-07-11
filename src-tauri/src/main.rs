@@ -3,10 +3,12 @@
 
 mod db;
 mod downloader;
+mod keyword_extractor;
 mod migrations;
 mod parser;
 mod player;
 mod preview;
+mod rss_parser;
 mod scanner;
 mod site_config;
 mod storage;
@@ -55,6 +57,316 @@ struct AppState {
 static INIT_LOCK: Mutex<()> = Mutex::const_new(());
 
 // 初始化数据库（如果已在 setup 中初始化则直接返回）
+// === 订阅相关命令 ===
+
+/// 从 URL 自动识别 RSS 地址
+#[tauri::command]
+async fn detect_rss_url(url: String) -> Result<String, String> {
+    let url = url.trim();
+    
+    // Mikanani: /Home/Bangumi/{id} → /RSS/Bangumi?bangumiId={id}
+    if url.contains("mikanani") && url.contains("/Home/Bangumi/") {
+        if let Some(id_pos) = url.rfind('/') {
+            let bangumi_id = &url[id_pos + 1..];
+            let bangumi_id = bangumi_id.split('?').next().unwrap_or(bangumi_id);
+            return Ok(format!("https://mikanani.kas.pub/RSS/Bangumi?bangumiId={}", bangumi_id));
+        }
+    }
+    
+    // 已经是 RSS URL
+    if url.contains("/RSS/") || url.contains("rss") {
+        return Ok(url.to_string());
+    }
+    
+    // 尝试从页面提取 RSS 链接
+    Err("无法识别 RSS 地址，请输入番组页面 URL 或 RSS URL".to_string())
+}
+
+/// 获取 RSS 并解析
+#[tauri::command]
+async fn fetch_rss(url: String) -> Result<rss_parser::RssFeed, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+    
+    let response = client
+        .get(&url)
+        .header(reqwest::header::USER_AGENT, "ChangLi/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {e}"))?;
+    
+    let xml = response.text().await.map_err(|e| format!("读取响应失败: {e}"))?;
+    
+    rss_parser::parse_mikanani_rss(&xml).map_err(|e| format!("解析 RSS 失败: {e}"))
+}
+
+/// 从 RSS 条目标题中提取关键词
+#[tauri::command]
+async fn extract_keywords_from_rss(url: String) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    let feed = fetch_rss(url).await?;
+    let titles: Vec<String> = feed.items.iter().map(|i| i.title.clone()).collect();
+    
+    let keywords = keyword_extractor::extract_keywords(&titles);
+    
+    // 转换为 String key
+    let result: std::collections::HashMap<String, Vec<String>> = keywords
+        .into_iter()
+        .map(|(cat, vals)| (cat.display_name().to_string(), vals))
+        .collect();
+    
+    Ok(result)
+}
+
+/// 创建订阅
+#[tauri::command]
+async fn create_subscription(
+    state: State<'_, AppState>,
+    series_id: i64,
+    site_id: Option<i64>,
+    bangumi_url: String,
+    rss_url: String,
+    title: String,
+    preferences: Option<String>,
+    download_mode: Option<String>,
+) -> Result<db::BangumiSubscription, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    let prefs = preferences.unwrap_or_else(|| "{}".to_string());
+    let mode = download_mode.unwrap_or_else(|| "clipboard".to_string());
+    
+    sqlx::query(
+        r#"INSERT INTO bangumi_subscriptions (series_id, site_id, bangumi_url, rss_url, title, preferences, download_mode)
+           VALUES (?, ?, ?, ?, ?, ?, ?)"#
+    )
+    .bind(series_id)
+    .bind(site_id)
+    .bind(&bangumi_url)
+    .bind(&rss_url)
+    .bind(&title)
+    .bind(&prefs)
+    .bind(&mode)
+    .execute(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    // 查询刚插入的记录
+    let sub = sqlx::query_as::<_, db::BangumiSubscription>(
+        "SELECT * FROM bangumi_subscriptions WHERE series_id = ? AND bangumi_url = ? ORDER BY id DESC LIMIT 1"
+    )
+    .bind(series_id)
+    .bind(&bangumi_url)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(sub)
+}
+
+/// 获取视频集的订阅
+#[tauri::command]
+async fn get_subscription_by_series(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<Option<db::BangumiSubscription>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    let sub = sqlx::query_as::<_, db::BangumiSubscription>(
+        "SELECT * FROM bangumi_subscriptions WHERE series_id = ? AND enabled = 1 LIMIT 1"
+    )
+    .bind(series_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(sub)
+}
+
+/// 获取所有订阅
+#[tauri::command]
+async fn get_all_subscriptions(
+    state: State<'_, AppState>,
+) -> Result<Vec<db::BangumiSubscription>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    let subs = sqlx::query_as::<_, db::BangumiSubscription>(
+        "SELECT * FROM bangumi_subscriptions ORDER BY created_at DESC"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(subs)
+}
+
+/// 删除订阅
+#[tauri::command]
+async fn delete_subscription(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    sqlx::query("DELETE FROM bangumi_subscriptions WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+/// 手动触发订阅检查（获取新集数列表）
+#[tauri::command]
+async fn check_subscription_updates(
+    state: State<'_, AppState>,
+    subscription_id: i64,
+) -> Result<Vec<db::SubscriptionDownload>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    // 获取订阅信息
+    let sub = sqlx::query_as::<_, db::BangumiSubscription>(
+        "SELECT * FROM bangumi_subscriptions WHERE id = ?"
+    )
+    .bind(subscription_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| format!("获取订阅失败: {e}"))?;
+    
+    // 获取 RSS
+    let feed = fetch_rss(sub.rss_url.clone()).await?;
+    
+    // 获取已下载的 guid
+    let existing_guids: Vec<String> = sqlx::query_scalar::<_, String>(
+        "SELECT guid FROM subscription_downloads WHERE subscription_id = ?"
+    )
+    .bind(subscription_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+    
+    let mut new_items = Vec::new();
+    
+    for item in &feed.items {
+        if existing_guids.contains(&item.guid) {
+            continue;
+        }
+        
+        // 插入新记录
+        sqlx::query(
+            r#"INSERT OR IGNORE INTO subscription_downloads (subscription_id, guid, title, torrent_url, magnet_link, file_size, pub_date, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')"#
+        )
+        .bind(subscription_id)
+        .bind(&item.guid)
+        .bind(&item.title)
+        .bind(&item.torrent_url)
+        .bind(&item.magnet_link)
+        .bind(item.content_length)
+        .bind(&item.pub_date)
+        .execute(&pool)
+        .await
+        .ok();
+        
+        // 查询插入的记录
+        if let Ok(download) = sqlx::query_as::<_, db::SubscriptionDownload>(
+            "SELECT * FROM subscription_downloads WHERE subscription_id = ? AND guid = ?"
+        )
+        .bind(subscription_id)
+        .bind(&item.guid)
+        .fetch_one(&pool)
+        .await
+        {
+            new_items.push(download);
+        }
+    }
+    
+    // 更新最后检查时间
+    sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(subscription_id)
+        .execute(&pool)
+        .await
+        .ok();
+    
+    Ok(new_items)
+}
+
+/// 更新订阅关键词偏好
+#[tauri::command]
+async fn update_subscription_keywords(
+    state: State<'_, AppState>,
+    subscription_id: i64,
+    keywords: Vec<(String, String, bool)>, // (category, value, is_selected)
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    // 清除旧关键词
+    sqlx::query("DELETE FROM subscription_keywords WHERE subscription_id = ?")
+        .bind(subscription_id)
+        .execute(&pool)
+        .await
+        .ok();
+    
+    // 插入新关键词
+    for (category, value, is_selected) in keywords {
+        sqlx::query(
+            "INSERT INTO subscription_keywords (subscription_id, keyword_category, keyword_value, is_selected) VALUES (?, ?, ?, ?)"
+        )
+        .bind(subscription_id)
+        .bind(&category)
+        .bind(&value)
+        .bind(is_selected)
+        .execute(&pool)
+        .await
+        .ok();
+    }
+    
+    Ok(())
+}
+
+/// 获取订阅关键词
+#[tauri::command]
+async fn get_subscription_keywords(
+    state: State<'_, AppState>,
+    subscription_id: i64,
+) -> Result<Vec<db::SubscriptionKeyword>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    
+    let keywords = sqlx::query_as::<_, db::SubscriptionKeyword>(
+        "SELECT * FROM subscription_keywords WHERE subscription_id = ? ORDER BY keyword_category, keyword_value"
+    )
+    .bind(subscription_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    
+    Ok(keywords)
+}
+
+// === 原有命令 ===
+
 #[tauri::command]
 async fn init_db(state: State<'_, AppState>) -> Result<(), String> {
     // 检查是否已经初始化完成
@@ -3151,6 +3463,16 @@ fn main() {
             cancel_update_download,
             install_update,
             get_downloaded_update,
+            detect_rss_url,
+            fetch_rss,
+            extract_keywords_from_rss,
+            create_subscription,
+            get_subscription_by_series,
+            get_all_subscriptions,
+            delete_subscription,
+            check_subscription_updates,
+            update_subscription_keywords,
+            get_subscription_keywords,
             check_env_dependencies,
             install_dependency,
             cleanup_old_installers,
