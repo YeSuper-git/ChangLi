@@ -174,10 +174,11 @@ const Settings: React.FC = () => {
     if (!name) return;
 
     try {
-      await addTag(name);
+      const tempTag = { id: -Date.now(), name, created_at: new Date().toISOString() };
+      setTags((prev: any) => [...prev, tempTag].sort((a: any, b: any) => a.name.localeCompare(b.name)));
       setNewTagName('');
-      loadTags();
       clearLibraryFilterCaches();
+      try { await addTag(name); } catch {}
     } catch (error) {
       console.error('添加标签失败:', error);
     }
@@ -185,9 +186,9 @@ const Settings: React.FC = () => {
 
   const handleDeleteTag = async (id: number) => {
     try {
-      await deleteTag(id);
-      loadTags();
+      setTags((prev: any) => prev.filter((t: any) => t.id !== id));
       clearLibraryFilterCaches();
+      try { await deleteTag(id); } catch {}
     } catch (error) {
       console.error('删除标签失败:', error);
     }
@@ -361,7 +362,7 @@ const Settings: React.FC = () => {
   const [deleteFieldConfirm, setDeleteFieldConfirm] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [gameOverlayDisabled, setGameOverlayState] = useState(false);
-  const [gameOverlayLoading, setGameOverlayLoading] = useState(false);
+  // gameOverlayLoading 已移除，改为乐观更新
   const [pendingUpdate, setPendingUpdate] = useState<{ version: string; url: string; hasInstaller: boolean; body?: string; fileName?: string } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(currentVersion);
@@ -640,17 +641,15 @@ const Settings: React.FC = () => {
             </div>
             <Switch
             checked={gameOverlayDisabled}
-            disabled={gameOverlayLoading}
+            disabled={false}
             onChange={async (checked: boolean) => {
-              setGameOverlayLoading(true);
+              setGameOverlayState(checked);
               try {
                 await setGameOverlayDisabled(checked);
-                setGameOverlayState(checked);
                 notify({ message: checked ? '已禁用游戏覆盖' : '已启用游戏覆盖', type: 'success' });
               } catch (error) {
+                setGameOverlayState(!checked);
                 notify({ message: '操作失败，请稍后重试', type: 'error' });
-              } finally {
-                setGameOverlayLoading(false);
               }
             }}
             ariaLabel="禁用游戏覆盖"

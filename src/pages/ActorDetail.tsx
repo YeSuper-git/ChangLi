@@ -366,10 +366,6 @@ const ActorDetail: React.FC = () => {
     if (!actor || !editForm.name.trim()) return;
     
     try {
-      // 乐观更新：先更新 UI
-      setActor(prev => prev ? { ...prev, ...editForm } : prev);
-      setEditing(false);
-      // 后台静默保存
       await updateActor(
         actor.id,
         editForm.name,
@@ -383,6 +379,9 @@ const ActorDetail: React.FC = () => {
         editForm.alias || undefined,
         (editForm as any).weight || undefined
       );
+      clearEditQuery();
+      setEditing(false);
+      loadActor(actor.id);
     } catch (error) {
       console.error('[Actor] 更新演员失败:', error);
     }
@@ -632,11 +631,8 @@ const ActorDetail: React.FC = () => {
   const handleAddPeriod = async () => {
     if (!actor || !newPeriodName.trim()) return;
     try {
-      const tempPeriod: any = { id: -Date.now(), actor_id: actor.id, period_name: newPeriodName, created_at: new Date().toISOString(), name: newPeriodName, sort_order: periods.length };
-      setPeriods(prev => [...prev, tempPeriod]);
-      setNewPeriodName('');
-      const period = await addActorPeriod(actor.id, newPeriodName);
-      setPeriods(prev => prev.map(p => p.id === tempPeriod.id ? period : p));
+      const period = await addActorPeriod(actor.id, newPeriodName.trim());
+      setPeriods(prev => [...prev, period]);
       setNewPeriodName('');
       setShowAddPeriodModal(false);
       notify({ message: `时期"${period.name}"已创建`, type: 'success' });
@@ -648,9 +644,9 @@ const ActorDetail: React.FC = () => {
   const handleUpdatePeriod = async (periodId: number) => {
     if (!editingPeriodName.trim()) return;
     try {
-      setPeriods(prev => prev.map(p => p.id === periodId ? { ...p, period_name: editingPeriodName } : p));
+      await updateActorPeriod(periodId, editingPeriodName.trim());
+      setPeriods(prev => prev.map(p => p.id === periodId ? { ...p, name: editingPeriodName.trim() } : p));
       setEditingPeriodId(null);
-      await updateActorPeriod(periodId, editingPeriodName);
       notify({ message: '时期名称已更新', type: 'success' });
     } catch (error) {
       console.error('[Actor] 更新时期失败:', error);
@@ -659,9 +655,9 @@ const ActorDetail: React.FC = () => {
 
   const handleDeletePeriod = async (periodId: number) => {
     try {
-      setPeriods(prev => prev.filter(p => p.id !== periodId));
-      await deleteActorPeriod(periodId);
-      // 重新加载作品关联
+      setPeriods((prev: any) => prev.filter((p: any) => p.id !== periodId));
+      try { await deleteActorPeriod(periodId); } catch {}
+      // 重新加载以刷新 workPeriodMap
       if (actor) {
         const periodMap = await getActorWorkPeriodMap(actor.id);
         setWorkPeriodMap(periodMap);
