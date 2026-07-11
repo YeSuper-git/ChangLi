@@ -2706,27 +2706,46 @@ async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String>
     // 检查 mpv
     {
         let mpv_found = {
-            // macOS: 检查 brew 或 /usr/local
             #[cfg(target_os = "macos")]
             {
                 std::path::Path::new("/opt/homebrew/bin/mpv").exists()
                     || std::path::Path::new("/usr/local/bin/mpv").exists()
                     || std::process::Command::new("which").arg("mpv").output().map(|o| o.status.success()).unwrap_or(false)
             }
-            // Windows: 检查 PATH 或安装目录
             #[cfg(target_os = "windows")]
             {
                 std::process::Command::new("where").arg("mpv.exe").output().map(|o| o.status.success()).unwrap_or(false)
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            {
-                false
-            }
+            { false }
         };
         results.push((
             "mpv 播放器".to_string(),
             mpv_found,
             if mpv_found { "已安装".to_string() } else { "未安装，视频播放依赖此组件".to_string() },
+        ));
+    }
+
+    // 检查 ffmpeg
+    {
+        let ffmpeg_found = {
+            #[cfg(target_os = "macos")]
+            {
+                std::path::Path::new("/opt/homebrew/bin/ffmpeg").exists()
+                    || std::path::Path::new("/usr/local/bin/ffmpeg").exists()
+                    || std::process::Command::new("which").arg("ffmpeg").output().map(|o| o.status.success()).unwrap_or(false)
+            }
+            #[cfg(target_os = "windows")]
+            {
+                std::process::Command::new("where").arg("ffmpeg.exe").output().map(|o| o.status.success()).unwrap_or(false)
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            { false }
+        };
+        results.push((
+            "ffmpeg".to_string(),
+            ffmpeg_found,
+            if ffmpeg_found { "已安装".to_string() } else { "未安装，缩略图生成依赖此组件".to_string() },
         ));
     }
 
