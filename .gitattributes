@@ -1,0 +1,2 @@
+src-tauri/resources/mpv/*.exe filter=lfs diff=lfs merge=lfs -text
+src-tauri/resources/ffmpeg/*.exe filter=lfs diff=lfs merge=lfs -text
