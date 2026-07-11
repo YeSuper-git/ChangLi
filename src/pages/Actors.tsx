@@ -205,7 +205,7 @@ const Actors: React.FC = () => {
                 onChange={(e) => setNewActor({ ...newActor, name: e.target.value })}
                 onKeyDown={(e) => { if (e.key === 'Enter' && newActor.name.trim()) handleAddActor(); }}
                 className="changli-input w-full"
-                placeholder="例如：三上悠亚"
+                placeholder="输入演员姓名"
                 autoFocus
               />
             </div>
