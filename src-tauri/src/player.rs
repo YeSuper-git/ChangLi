@@ -102,7 +102,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 
 pub fn close_player_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        // 检查窗口是否已经隐藏，避免重复操作
+        // 窗口已隐藏则跳过，避免重复操作
         if !window.is_visible().unwrap_or(false) {
             return;
         }
@@ -114,6 +114,10 @@ pub fn close_player_window(app: &AppHandle) {
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
         if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
+            // 如果窗口已被重新使用（可见），不销毁
+            if window.is_visible().unwrap_or(false) {
+                return;
+            }
             let _ = window.destroy();
             eprintln!("[player] Player window destroyed after delay.");
         }
