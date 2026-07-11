@@ -381,7 +381,7 @@ async fn check_subscription_updates(
     }
     
     // 更新最后检查时间
-    sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = CURRENT_TIMESTAMP WHERE id = ?")
+    sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = datetime('now', 'localtime') WHERE id = ?")
         .bind(subscription_id)
         .execute(&pool)
         .await
