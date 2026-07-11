@@ -338,7 +338,7 @@ const Subscriptions: React.FC = () => {
                             return (
                               <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
                                 {Object.entries(groups).map(([gKey, gItems]) => (
-                                  <div key={gKey} className="bg-rose-50 rounded-xl p-2.5">
+                                  <div key={gKey} className="bg-emerald-50 rounded-xl p-2.5">
                                     <div className="flex items-center justify-between mb-1.5">
                                       <span className="text-xs font-medium text-gray-700">{gKey}</span>
                                       <span className="text-[10px] text-gray-400">{gItems.length} 集</span>
@@ -353,14 +353,14 @@ const Subscriptions: React.FC = () => {
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx
                                                 ? "ml-1 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded"
-                                                : "ml-1 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                                                : "ml-1 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-emerald-50"
                                               }
                                             >
                                               {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
                                             </button>
                                             <button
                                               onClick={() => handleDownload(ep)}
-                                              className="ml-1 px-2 py-0.5 text-[10px] font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors"
+                                              className="action-btn action-btn-primary text-xs"
                                             >
                                               立即下载
                                             </button>
