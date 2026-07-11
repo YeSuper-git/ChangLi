@@ -63,18 +63,12 @@ interface RssItem {
 }
 
 interface RssGroup {
-  prefix: string;           // 标题前缀（去掉集数）
-  items: RssItem[];         // 该组的所有条目
-  count: number;            // 集数
-  recommended: boolean;     // 是否推荐
-}
-
-interface RssGroup {
   prefix: string;
   items: RssItem[];
   count: number;
   recommended: boolean;
-  customRule?: string; // 用户自定义的匹配规则
+  priority: number; // 0=不推荐, 1=简中/简繁, 2=无修+简繁, 3=无修+简中
+  customRule?: string;
 }
 
 interface BindModalProps {
@@ -126,16 +120,19 @@ function extractVersionKey(title: string): string {
   return parts.length > 0 ? parts.join(' ') : '默认';
 }
 
-/// 判断是否推荐版本（只推荐最优质的）
-function isRecommended(title: string): boolean {
-  const lower = title.toLowerCase();
-  // 简中 + 无修 = 最推荐
-  const isCHS = lower.includes('chs') || lower.includes('简中') || lower.includes('简体');
-  const isUncensored = lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored');
-  if (isCHS && isUncensored) return true;
-  // 纯简中也推荐
-  if (isCHS) return true;
-  return false;
+/// 计算推荐优先级（0=不推荐, 1=简中/简繁, 2=无修+简繁, 3=无修+简中）
+/// 输入格式: "[字幕组名] 标题内容"
+function getRecommendationPriority(text: string): number {
+  const lower = text.toLowerCase();
+  const isCHS = lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]');
+  const isCHSorCHT = isCHS || lower.includes('cht') || lower.includes('繁中') || lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('[big5]');
+  const isUncensored = lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored') || lower.includes('uncut') || lower.includes('年龄限制版');
+  
+  if (isUncensored && isCHS) return 3;      // 无修 + 简中 = 最高
+  if (isUncensored && isCHSorCHT) return 2;  // 无修 + 简繁 = 次高
+  if (isCHS) return 1;                        // 纯简中
+  if (isCHSorCHT) return 1;                   // 简繁
+  return 0;
 }
 
 /// 按字幕组分组，组内按关键版本信息细分
@@ -160,19 +157,21 @@ function groupRssItems(items: RssItem[]): RssGroup[] {
     }
 
     for (const [versionKey, vItems] of versionMap) {
-      const recommended = vItems.some(item => isRecommended(item.title));
+      const priority = Math.max(...vItems.map(item => getRecommendationPriority(`[${subtitleGroup}] ${item.title}`)));
+      const recommended = priority > 0;
       result.push({
         prefix: `[${subtitleGroup}] ${versionKey}`,
         items: vItems,
         count: vItems.length,
         recommended,
+        priority,
       });
     }
   }
 
-  // 排序：推荐的在前，然后按字幕组名字母序，集数多的在前
+  // 排序：按优先级降序，然后按字幕组名字母序，集数多的在前
   result.sort((a, b) => {
-    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+    if (a.priority !== b.priority) return b.priority - a.priority;
     if (a.prefix !== b.prefix) return a.prefix.localeCompare(b.prefix);
     return b.count - a.count;
   });
