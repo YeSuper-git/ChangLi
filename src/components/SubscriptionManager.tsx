@@ -445,7 +445,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
 
               {loading && (
                 <div className="flex items-center gap-2 text-[13px] text-gray-500 py-1">
-                  <img src={loadingIcon} alt="加载中" className="w-4 h-4 animate-spin" />
+                  <img src={loadingIcon} alt="加载中" className="w-4 h-4" />
                   <span>正在检测 RSS 地址...</span>
                 </div>
               )}
@@ -829,7 +829,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
     <>
       {loadingSub ? (
         <div className="flex items-center gap-1 text-xs text-gray-400">
-          <img src={loadingIcon} alt="" className="w-3 h-3 animate-spin" />
+          <img src={loadingIcon} alt="" className="w-3 h-3" />
           加载订阅...
         </div>
       ) : subscription ? (

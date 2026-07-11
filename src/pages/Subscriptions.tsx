@@ -287,7 +287,7 @@ const Subscriptions: React.FC = () => {
                               >
                                 {checkingId === sub.id ? (
                                   <span className="flex items-center gap-1">
-                                    <img src={loadingIcon} alt="" className="w-3 h-3 animate-spin" />
+                                    <img src={loadingIcon} alt="" className="w-3 h-3" />
                                     检查中...
                                   </span>
                                 ) : '检查更新'}

@@ -542,7 +542,7 @@ const SeriesDetail: React.FC = () => {
     ? `${convertFileSrc(editData.poster)}?t=${Date.now()}`
     : series?.poster_data_url;
 
-  if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6 animate-spin" /></div></div>;
+  if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2"><img src={loadingIcon} alt="加载中" className="w-6 h-6" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
 
   const isFavorite = series ? favorites.some(f => 'video_count' in f && f.id === series.id) : false;
@@ -1209,7 +1209,7 @@ const SeriesDetail: React.FC = () => {
             <div className="changli-modal-body max-h-96 overflow-y-auto">
               {loadingSeasons ? (
                 <div className="text-gray-500 text-sm flex items-center gap-2 py-4">
-                  <img src={loadingIcon} alt="加载中" className="w-5 h-5 animate-spin" />
+                  <img src={loadingIcon} alt="加载中" className="w-5 h-5" />
                 </div>
               ) : seasons.length > 0 ? (
                 <div className="space-y-3">
