@@ -147,6 +147,8 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
   const [rssTitle, setRssTitle] = useState('');
   const [rssGroups, setRssGroups] = useState<RssGroup[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [seriesSearch, setSeriesSearch] = useState('');
+  const [showSeriesDropdown, setShowSeriesDropdown] = useState(false);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [groupRules, setGroupRules] = useState<Record<string, string>>({});
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
@@ -205,6 +207,38 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
       return next;
     });
   };
+
+  // 从 RSS 标题中提取番名用于自动匹配
+  const extractAnimeName = (rssTitle: string): string => {
+    // 去掉字幕组 [xxx]
+    let name = rssTitle;
+    if (name.startsWith('[')) {
+      const end = name.indexOf(']');
+      if (end > 0) name = name.substring(end + 1).trim();
+    }
+    // 去掉标签部分 [xxx] 和 (xxx)
+    name = name.replace(/\[.*?\]/g, ' ').replace(/\(.*?\)/g, ' ').replace(/\{.*?\}/g, ' ');
+    // 去掉集数
+    name = name.replace(/\s*[-–—]\s*\d+\s*$/, '').replace(/\s+Ep?\.?\s*\d+\s*$/i, '');
+    // 取前20个字符作为搜索关键词
+    return name.trim().substring(0, 20);
+  };
+
+  // 自动匹配视频集
+  const matchedSeries = (() => {
+    const searchName = extractAnimeName(rssTitle);
+    if (!searchName || seriesList.length === 0) return null;
+    // 简单匹配：番名包含关系
+    const match = seriesList.find(s => 
+      s.title.includes(searchName) || searchName.includes(s.title)
+    );
+    return match || null;
+  })();
+
+  // 搜索过滤视频集
+  const filteredSeries = seriesSearch.trim()
+    ? seriesList.filter(s => s.title.toLowerCase().includes(seriesSearch.toLowerCase()))
+    : seriesList;
 
   const toggleEditGroup = (prefix: string) => {
     setEditingGroup(prev => prev === prefix ? null : prefix);
@@ -308,18 +342,75 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                 <div className="text-xs text-gray-400 mt-1 break-all">{detectedRssUrl}</div>
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="changli-form-label">关联视频集</label>
-                <select
-                  value={selectedSeriesId ?? ''}
-                  onChange={e => setSelectedSeriesId(e.target.value ? Number(e.target.value) : null)}
-                  className="changli-input"
-                >
-                  <option value="">请选择视频集</option>
-                  {seriesList.map(s => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
-                  ))}
-                </select>
+                {selectedSeriesId ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+                      {seriesList.find(s => s.id === selectedSeriesId)?.title || '未知'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSeriesId(null)}
+                      className="text-gray-400 hover:text-gray-600 text-sm"
+                    >
+                      更换
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={seriesSearch}
+                      onChange={e => {
+                        setSeriesSearch(e.target.value);
+                        setShowSeriesDropdown(true);
+                        // 自动匹配
+                        if (!e.target.value && matchedSeries) {
+                          setSelectedSeriesId(matchedSeries.id);
+                          setShowSeriesDropdown(false);
+                        }
+                      }}
+                      onFocus={() => setShowSeriesDropdown(true)}
+                      placeholder={matchedSeries ? `自动匹配: ${matchedSeries.title}（点击选择）` : '搜索视频集...'}
+                      className="changli-input"
+                    />
+                    {matchedSeries && !seriesSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSeriesId(matchedSeries.id);
+                          setShowSeriesDropdown(false);
+                        }}
+                        className="mt-1 text-xs text-rose-500 hover:text-rose-600"
+                      >
+                        ✓ 自动匹配到「{matchedSeries.title}」，点击选择
+                      </button>
+                    )}
+                    {showSeriesDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[200px] overflow-y-auto">
+                        {filteredSeries.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+                        ) : (
+                          filteredSeries.map(s => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedSeriesId(s.id);
+                                setShowSeriesDropdown(false);
+                                setSeriesSearch('');
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-rose-50 transition-colors"
+                            >
+                              {s.title}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               <div>

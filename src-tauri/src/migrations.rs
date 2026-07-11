@@ -57,6 +57,81 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
     add_column_if_not_exists(pool, "actors", "view_count", "INTEGER NOT NULL DEFAULT 0").await?;
+    
+    // === 订阅相关表 ===
+    create_subscription_tables(pool).await?;
+
+    Ok(())
+}
+
+async fn create_subscription_tables(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS bangumi_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_id INTEGER REFERENCES video_series(id) ON DELETE CASCADE,
+            site_id INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+            bangumi_url TEXT NOT NULL,
+            rss_url TEXT NOT NULL,
+            title TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            check_interval_minutes INTEGER NOT NULL DEFAULT 60,
+            last_check_at TIMESTAMP,
+            auto_download INTEGER NOT NULL DEFAULT 0,
+            download_mode TEXT NOT NULL DEFAULT 'clipboard',
+            download_dir TEXT,
+            preferences TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        "#,
+        "create bangumi_subscriptions table",
+    )
+    .await?;
+
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS subscription_downloads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subscription_id INTEGER REFERENCES bangumi_subscriptions(id) ON DELETE CASCADE,
+            guid TEXT NOT NULL,
+            title TEXT NOT NULL,
+            torrent_url TEXT,
+            magnet_link TEXT,
+            file_size INTEGER,
+            pub_date TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            aria2_gid TEXT,
+            file_path TEXT,
+            notified INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(subscription_id, guid)
+        )
+        "#,
+        "create subscription_downloads table",
+    )
+    .await?;
+
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS subscription_keywords (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subscription_id INTEGER REFERENCES bangumi_subscriptions(id) ON DELETE CASCADE,
+            keyword_category TEXT NOT NULL,
+            keyword_value TEXT NOT NULL,
+            is_selected INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(subscription_id, keyword_category, keyword_value)
+        )
+        "#,
+        "create subscription_keywords table",
+    )
+    .await?;
+
     Ok(())
 }
 
