@@ -27,9 +27,6 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/mpv/**/*",
-      "resources/ffmpeg/**/*",
-      "resources/webview2/**/*",
       "resources/nip/**/*",
       "lib/*"
     ],

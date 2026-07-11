@@ -35,6 +35,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Add bundled deps to resources (Windows only)
+        shell: pwsh
+        run: |
+          $conf = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+          $resources = @("resources/nip/**/*", "resources/mpv/**/*", "resources/ffmpeg/**/*", "resources/webview2/**/*")
+          $conf.bundle.windows.resources = $resources
+          $conf | ConvertTo-Json -Depth 10 | Set-Content "src-tauri/tauri.conf.json"
+          Write-Host "Added bundled deps to resources config"
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
