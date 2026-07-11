@@ -2702,6 +2702,42 @@ fn install_webview2_silent(app: &tauri::AppHandle) {
 #[cfg(not(target_os = "windows"))]
 fn install_webview2_silent(_app: &tauri::AppHandle) {}
 
+/// 获取已下载的更新文件信息
+#[tauri::command]
+async fn get_downloaded_update() -> Result<Option<(String, String, u64)>, String> {
+    let temp_dir = std::env::temp_dir().join("changli_update");
+    if !temp_dir.exists() {
+        return Ok(None);
+    }
+    
+    // 找最新的安装包
+    let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.ends_with(".exe") || name.ends_with(".dmg") {
+                    if let Ok(meta) = path.metadata() {
+                        if let Ok(modified) = meta.modified() {
+                            candidates.push((modified, path));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    
+    if let Some((_, path)) = candidates.first() {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        Ok(Some((path.to_string_lossy().to_string(), name, size)))
+    } else {
+        Ok(None)
+    }
+}
+
 #[tauri::command]
 async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String> {
     let mut results = Vec::new();
@@ -3073,6 +3109,7 @@ fn main() {
             download_update,
             cancel_update_download,
             install_update,
+            get_downloaded_update,
             check_env_dependencies,
             install_dependency,
             cleanup_old_installers,

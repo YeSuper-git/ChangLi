@@ -1153,6 +1153,10 @@ export async function installDependency(name: string): Promise<string> {
   return invoke('install_dependency', { name });
 }
 
+export async function getDownloadedUpdate(): Promise<[string, string, number] | null> {
+  return invoke('get_downloaded_update');
+}
+
 // 游戏覆盖（NVIDIA / 游戏加加）
 export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
   return invoke<string>('set_game_overlay_disabled', { disabled });

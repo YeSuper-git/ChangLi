@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency, getDownloadedUpdate } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -61,6 +61,7 @@ const Settings: React.FC = () => {
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
   const [envDeps, setEnvDeps] = useState<[string, boolean, string][] | null>(null);
+  const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   const [newTagName, setNewTagName] = useState('');
@@ -99,6 +100,13 @@ const Settings: React.FC = () => {
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
+      // 加载已下载的更新
+      try {
+        const update = await getDownloadedUpdate();
+        if (update) {
+          setDownloadedUpdate({ path: update[0], name: update[1], size: update[2] });
+        }
+      } catch {}
         // 加载扩展预设模板
       try {
         const templates = await getExtensionPresetTemplates();
@@ -1680,6 +1688,30 @@ const Settings: React.FC = () => {
       )}
 
 
+
+      {/* 已下载的更新 */}
+      {downloadedUpdate && (
+        <section className="mb-12">
+          <div className="py-3 px-4 bg-amber-50 rounded-lg flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-800">已下载更新：{downloadedUpdate.name}</p>
+              <p className="text-xs text-amber-600 mt-0.5">大小：{(downloadedUpdate.size / 1024 / 1024).toFixed(1)} MB</p>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await installUpdate(downloadedUpdate.path);
+                } catch (e) {
+                  notify({ message: '打开安装包失败', type: 'error' });
+                }
+              }}
+              className="action-btn action-btn-primary text-xs"
+            >
+              立即安装
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* 检查更新 & 版本信息 */}
       <section className="mb-12">
