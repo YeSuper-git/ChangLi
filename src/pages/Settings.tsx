@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { addSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, getDownloadedUpdate } from '../utils/api';
+import { addSite, getTags, getUpdatesDir, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, getDownloadedUpdate } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
-import type { Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
+import type { Tag, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
@@ -56,7 +56,8 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 const Settings: React.FC = () => {
   // const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
   const [tags, setTags] = useState<Tag[]>([]);
-  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
+  const [storageInfo, setStorageInfo] = useState<any>(null);
+  const [updatesDir, setUpdatesDir] = useState<string>('');
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
   // envDeps 已移除
@@ -94,6 +95,8 @@ const Settings: React.FC = () => {
   const loadSettingsData = async () => {
     try {
       const [tagsList, storage, catsList, fieldsList] = await Promise.all([getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
+      const uDir = await getUpdatesDir().catch(() => '');
+      setUpdatesDir(uDir);
       setTags(tagsList);
       setStorageInfo(storage);
       setCategories(catsList);
@@ -608,6 +611,12 @@ const Settings: React.FC = () => {
             <span className="text-sm text-gray-500 w-24 shrink-0">数据库</span>
             <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
               {storageInfo?.db_path || '加载中...'}
+            </code>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="text-sm text-gray-500 w-24 shrink-0">缓存目录</span>
+            <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
+              {updatesDir || '加载中...'}
             </code>
           </div>
         </div>
