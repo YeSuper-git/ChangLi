@@ -323,6 +323,23 @@ async fn check_subscription_updates(
             }
         }
         
+        // 如果 RSS 中没有磁力链接，从详情页提取
+        let mut magnet = item.magnet_link.clone();
+        if magnet.is_none() && !item.link.is_empty() {
+            if let Ok(html) = reqwest::get(&item.link).await.and_then(|r| r.text().map_err(|e| e.into())) {
+                // 从 HTML 中提取 magnet:?xt= 链接
+                let lower = html.to_lowercase();
+                if let Some(start) = lower.find("magnet:?xt=") {
+                    let slice = &html[start..];
+                    if let Some(end) = slice.find('"') {
+                        let raw = &slice[..end];
+                        let decoded = raw.replace("&amp;", "&");
+                        magnet = Some(decoded.to_string());
+                    }
+                }
+            }
+        }
+        
         // 插入新记录
         sqlx::query(
             r#"INSERT OR IGNORE INTO subscription_downloads (subscription_id, guid, title, torrent_url, magnet_link, file_size, pub_date, status)
@@ -332,7 +349,7 @@ async fn check_subscription_updates(
         .bind(&item.guid)
         .bind(&item.title)
         .bind(&item.torrent_url)
-        .bind(&item.magnet_link)
+        .bind(&magnet)
         .bind(item.content_length)
         .bind(&item.pub_date)
         .execute(&pool)
