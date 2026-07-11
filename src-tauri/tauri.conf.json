@@ -28,6 +28,9 @@
     ],
     "resources": [
       "resources/nip/**/*",
+      "resources/mpv/**/*",
+      "resources/ffmpeg/**/*",
+      "resources/webview2/**/*",
       "lib/*"
     ],
     "windows": {

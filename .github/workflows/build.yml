@@ -35,11 +35,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Add bundled deps to resources (Windows only)
-        shell: pwsh
+      - name: Remove bundled deps for macOS
+        if: runner.os == 'macOS'
         run: |
-          # 用 node 修改 JSON（更可靠）
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.resources=['resources/nip/**/*','resources/mpv/**/*','resources/ffmpeg/**/*','resources/webview2/**/*'];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Added bundled deps')"
+          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.resources=c.bundle.resources.filter(r=>!r.includes('mpv')&&!r.includes('ffmpeg')&&!r.includes('webview2'));fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Removed bundled deps for macOS')"
+
+      - name: Remove bundled deps for macOS (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Windows: keeping bundled deps (mpv/ffmpeg/webview2)"
+          # 不做任何操作，保留默认配置
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
