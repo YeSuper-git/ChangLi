@@ -1143,7 +1143,8 @@ html.is-macos .changli-topbar {
   gap: 12px;
   border-top: 1px solid rgba(232, 235, 242, 0.92);
   background: rgba(247, 248, 251, 0.72);
-  padding: 16px 26px;
+  padding: 16px 24px;
+  border-radius: 0 0 26px 26px;
 }
 
 .changli-menu-item {
