@@ -2600,6 +2600,21 @@ async fn download_update(
     state.update_download_cancel.store(false, Ordering::SeqCst);
 
     let temp_dir = std::env::temp_dir().join("changli_update");
+    
+    // 清理旧的下载文件
+    if temp_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(".exe") || name.ends_with(".dmg") || name.ends_with(".msi") {
+                        let _ = std::fs::remove_file(&path);
+                    }
+                }
+            }
+        }
+    }
+    
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     let file_path = temp_dir.join(&file_name);
 
