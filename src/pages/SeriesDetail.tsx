@@ -1066,11 +1066,18 @@ const SeriesDetail: React.FC = () => {
           )}
           {selectMode ? (
             <>
+              <button className="action-btn text-xs" onClick={() => {
+                if (selectedEpisodes.size === videos.length) {
+                  setSelectedEpisodes(new Set());
+                } else {
+                  setSelectedEpisodes(new Set(videos.map(v => v.id)));
+                }
+              }}>{selectedEpisodes.size === videos.length ? '取消全选' : '全选'}</button>
               <button className="action-btn action-btn-danger text-xs" disabled={selectedEpisodes.size === 0} onClick={() => episodeSecondConfirm('batch-delete-episodes', handleBatchDeleteEpisodes)}>
                 {episodePendingKey === 'batch-delete-episodes' ? `确认删除 ${selectedEpisodes.size} 个` : `删除 ${selectedEpisodes.size} 个`}
               </button>
               <button className="action-btn text-xs" onClick={() => { setSelectMode(false); setSelectedEpisodes(new Set()); episodeClearPending(); }}>取消</button>
-              <button className="action-btn action-btn-primary text-xs" onClick={handleSaveEpisodeOrder}>保存排序</button>
+              <button className="action-btn action-btn-primary text-xs" onClick={handleSaveEpisodeOrder}>保存</button>
             </>
           ) : (
             <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>编辑</button>
@@ -1449,9 +1456,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
         key={video.id}
         role="button"
         tabIndex={0}
-        draggable={selectMode}
-        onDragStart={(e) => onDragStart?.(e, videos.indexOf(video))}
-        onDragOver={(e) => onDragOver?.(e, videos.indexOf(video))}
+        onDragOver={(e) => { if (selectMode) { e.preventDefault(); onDragOver?.(e, videos.indexOf(video)); } }}
         onDragEnd={() => onDragEnd?.()}
         className={`card block w-full cursor-pointer overflow-hidden text-left ${selectMode && isSelected ? 'ring-2 ring-rose-500' : ''} ${draggedIndex === videos.indexOf(video) ? 'opacity-50' : ''}`}
         onClick={() => {
@@ -1468,7 +1473,21 @@ const VideoGrid: React.FC<VideoGridProps> = ({
           } bg-gray-100 overflow-hidden relative rounded-t-xl`}
         >
           {selectMode && (
-            <div className="absolute top-2 left-2 z-10">
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
+              <div
+                className="drag-handle cursor-grab active:cursor-grabbing p-1 rounded bg-white/80 hover:bg-white"
+                draggable={true}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', String(videos.indexOf(video)));
+                  onDragStart?.(e, videos.indexOf(video));
+                }}
+                onDragOver={(e) => { e.stopPropagation(); onDragOver?.(e, videos.indexOf(video)); }}
+                onDragEnd={(e) => { e.stopPropagation(); onDragEnd?.(); }}
+              >
+                <svg className="w-3 h-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+              </div>
               <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-gray-300 bg-white/80'}`}>
                 {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
               </div>
