@@ -28,6 +28,20 @@ function saveSubUpdates(updates: Map<number, any[]>) {
   localStorage.setItem('changli_sub_updates', JSON.stringify(obj));
 }
 
+/// 从 localStorage 读取展开状态
+function loadExpandedSubs(): Set<number> {
+  try {
+    const raw = localStorage.getItem('changli_expanded_subs');
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch { return new Set(); }
+}
+
+/// 保存展开状态到 localStorage
+function saveExpandedSubs(expanded: Set<number>) {
+  localStorage.setItem('changli_expanded_subs', JSON.stringify([...expanded]));
+}
+
 function formatTimeAgo(dateStr: string | null): string {
   if (!dateStr) return '从未';
   const d = new Date(dateStr);
@@ -58,7 +72,7 @@ const Subscriptions: React.FC = () => {
   // 按网站分组的展开状态
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
   // 每个订阅的更新展开状态
-  const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
+  const [expandedSubs, setExpandedSubs] = useState<Set<number>>(() => loadExpandedSubs());
   // 每个订阅的更新结果：subId -> episodes
   const [subUpdates, setSubUpdates] = useState<Map<number, any[]>>(() => loadSubUpdates());
 
@@ -99,6 +113,15 @@ const Subscriptions: React.FC = () => {
   };
 
 
+  const toggleSub = (subId: number) => {
+    setExpandedSubs(prev => {
+      const next = new Set(prev);
+      if (next.has(subId)) next.delete(subId); else next.add(subId);
+      saveExpandedSubs(next);
+      return next;
+    });
+  };
+
   const handleCheckUpdates = async (sub: BangumiSubscription) => {
     setCheckingId(sub.id);
     try {
@@ -111,7 +134,7 @@ const Subscriptions: React.FC = () => {
         saveSubUpdates(next);
         return next;
       });
-      setExpandedSubs(prev => new Set([...prev, sub.id]));
+      setExpandedSubs(prev => { const next = new Set([...prev, sub.id]); saveExpandedSubs(next); return next; });
       if (items.length > 0) {
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
       } else {
@@ -242,11 +265,20 @@ const Subscriptions: React.FC = () => {
                         <div key={sub.id} className="px-6 py-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-gray-900 truncate">
+                              <button
+                                onClick={() => toggleSub(sub.id)}
+                                className="flex items-center gap-1.5 mb-1 group"
+                              >
+                                <svg
+                                  className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expandedSubs.has(sub.id) ? 'rotate-90' : ''}`}
+                                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="text-sm font-medium text-gray-900 truncate group-hover:text-rose-600 transition-colors">
                                   {displayName}
                                 </span>
-                              </div>
+                              </button>
                               <div className="space-y-0.5">
                                 {sub.series_id && seriesMap.has(sub.series_id) && (
                                   <div className="text-xs text-gray-500">
