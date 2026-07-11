@@ -231,42 +231,9 @@ const GAME_BAR_KEY: &str = "SOFTWARE\\Microsoft\\GameBar";
 /// 一键禁用游戏覆盖（Game DVR + NVIDIA Profile）
 #[cfg(target_os = "windows")]
 pub fn set_game_overlay_disabled(disabled: bool) -> Result<String, String> {
-    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
-    use winreg::RegKey;
-
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let val: u32 = if disabled { 0 } else { 1 };
-
-    // Game DVR
-    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_DVR_KEY, KEY_SET_VALUE) {
-        let _ = key.0.set_value("AppCaptureEnabled", &val);
-    }
-    // GameConfigStore
-    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_CONFIG_KEY, KEY_SET_VALUE) {
-        let _ = key.0.set_value("GameDVR_Enabled", &val);
-    }
-    // GameBar
-    if let Ok(key) = hkcu.create_subkey_with_flags(GAME_BAR_KEY, KEY_SET_VALUE) {
-        let _ = key.0.set_value("AllowAutoGameMode", &val);
-    }
-
-    // NVIDIA Profile Inspector 导入（仅禁用时）
-    if disabled {
-        if let Ok(exe_dir) = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()) {
-            let nip_exe = exe_dir.join("nvidiaProfileInspector.exe");
-            let nip_xml = exe_dir.join("changli-disable-overlay.xml");
-            if nip_exe.exists() && nip_xml.exists() {
-                let _ = std::process::Command::new(&nip_exe)
-                    .arg("-import")
-                    .arg(&nip_xml)
-                    .output();
-            }
-        }
-    }
-
-    // 读取当前状态
-    let current = read_game_overlay_disabled().unwrap_or(disabled);
-    Ok(if current { "disabled".into() } else { "enabled".into() })
+    // 游戏覆盖功能已移除（修改注册表需要重启才能生效，实际无用）
+    let _ = disabled;
+    Ok("disabled".into())
 }
 
 /// 读取当前游戏覆盖禁用状态
