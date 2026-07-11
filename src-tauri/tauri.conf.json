@@ -33,9 +33,6 @@
     ],
     "windows": {
       "allowDowngrades": false,
-      "webview_install_mode": {
-        "type": "offlineInstaller"
-      },
       "nsis": {
         "headerImage": "nsis/installer-header.bmp",
         "sidebarImage": "nsis/installer-sidebar.bmp",
