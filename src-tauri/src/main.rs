@@ -2783,8 +2783,17 @@ async fn install_dependency(name: String) -> Result<String, String> {
             }
             #[cfg(target_os = "windows")]
             {
-                open::that("https://sourceforge.net/projects/mpv-player-windows/files/").map_err(|e| format!("打开浏览器失败: {e}"))?;
-                Ok("已在浏览器中打开 mpv 下载页面".to_string())
+                // 尝试 winget 安装
+                let status = std::process::Command::new("winget")
+                    .args(["install", "--id", "sharkdp.mpv", "--accept-package-agreements", "--accept-source-agreements"])
+                    .status();
+                if status.map(|s| s.success()).unwrap_or(false) {
+                    Ok("mpv 安装完成".to_string())
+                } else {
+                    // 打开浏览器下载
+                    let _ = open::that("https://sourceforge.net/projects/mpv-player-windows/files/");
+                    Ok("winget 不可用，已在浏览器中打开 mpv 下载页面，请手动安装".to_string())
+                }
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             { Err("不支持自动安装".to_string()) }
@@ -2804,8 +2813,16 @@ async fn install_dependency(name: String) -> Result<String, String> {
             }
             #[cfg(target_os = "windows")]
             {
-                open::that("https://www.gyan.dev/ffmpeg/builds/").map_err(|e| format!("打开浏览器失败: {e}"))?;
-                Ok("已在浏览器中打开 ffmpeg 下载页面".to_string())
+                // 尝试 winget 安装
+                let status = std::process::Command::new("winget")
+                    .args(["install", "--id", "Gyan.FFmpeg", "--accept-package-agreements", "--accept-source-agreements"])
+                    .status();
+                if status.map(|s| s.success()).unwrap_or(false) {
+                    Ok("ffmpeg 安装完成".to_string())
+                } else {
+                    let _ = open::that("https://www.gyan.dev/ffmpeg/builds/");
+                    Ok("winget 不可用，已在浏览器中打开 ffmpeg 下载页面，请手动安装".to_string())
+                }
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             { Err("不支持自动安装".to_string()) }
