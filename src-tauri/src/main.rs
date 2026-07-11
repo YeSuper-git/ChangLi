@@ -2739,7 +2739,7 @@ async fn get_downloaded_update() -> Result<Option<(String, String, u64)>, String
 }
 
 #[tauri::command]
-async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String> {
+async fn check_env_dependencies(app: tauri::AppHandle) -> Result<Vec<(String, bool, String)>, String> {
     let mut results = Vec::new();
 
     // 检查 WebView2 (Windows)
