@@ -350,22 +350,87 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
 
   if (!open) return null;
 
+  // 步骤计算
+  const currentStep = step === 'input' ? 1 : (selectedSeriesId ? 3 : 2);
+
   return (
     <div className="changli-modal-backdrop" onClick={onClose}>
-      <div className="changli-modal-panel !w-[min(100%,560px)] !p-0" onClick={e => e.stopPropagation()}>
-        <div className="changli-modal-header">
-          <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">订阅管理</p>
-          <h2 className="mt-1 text-2xl font-bold text-gray-900">绑定 Bangumi 订阅</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            输入番组页面地址，自动检测 RSS 并提取关键词偏好
-          </p>
+      <div className="changli-modal-panel !w-[min(100%,560px)] !p-0 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+
+        {/* ── Header ── */}
+        <div className="changli-modal-header shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-500">订阅管理</p>
+              <h2 className="mt-0.5 text-xl font-bold text-gray-900 tracking-tight">绑定 Bangumi 订阅</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              title="关闭"
+            >×</button>
+          </div>
+
+          {/* ── Step Indicator ── */}
+          <div className="flex items-center justify-center gap-0 mt-4">
+            {([
+              { num: 1, label: '输入地址' },
+              { num: 2, label: '选择分组' },
+              { num: 3, label: '确认绑定' },
+            ] as const).map((s, i) => {
+              const isActive = currentStep === s.num;
+              const isDone = currentStep > s.num;
+              return (
+                <React.Fragment key={s.num}>
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className={`flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold transition-all duration-300 ${
+                        isActive
+                          ? 'bg-rose-500 text-white shadow-md shadow-rose-200'
+                          : isDone
+                            ? 'bg-rose-100 text-rose-500'
+                            : 'bg-gray-100 text-gray-400'
+                      }`}
+                    >
+                      {isDone ? '✓' : s.num}
+                    </div>
+                    <span
+                      className={`text-xs font-medium transition-colors duration-300 ${
+                        isActive ? 'text-rose-600' : isDone ? 'text-rose-400' : 'text-gray-400'
+                      }`}
+                    >
+                      {s.label}
+                    </span>
+                  </div>
+                  {i < 2 && (
+                    <div
+                      className={`w-8 h-[1.5px] mx-1.5 rounded-full transition-colors duration-300 ${
+                        isDone ? 'bg-rose-300' : 'bg-gray-200'
+                      }`}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="changli-modal-body max-h-[60vh] overflow-y-auto">
+        {/* ── Body ── */}
+        <div className="changli-modal-body flex-1 overflow-y-auto min-h-0">
+
+          {/* 全局错误提示（避免重复渲染） */}
+          {error && step === 'input' && (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700 flex items-center gap-2">
+              <span className="shrink-0 text-red-400">!</span>
+              {error}
+            </div>
+          )}
+
+          {/* ── Step 1: 输入地址 ── */}
           {step === 'input' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <label className="changli-form-label">番组页面地址</label>
+                <label className="changli-form-label text-[13px]">番组页面地址</label>
                 <input
                   type="text"
                   value={bangumiUrl}
@@ -375,15 +440,11 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                   placeholder="粘贴番组页面链接"
                   autoFocus
                 />
-                <p className="text-xs text-gray-400 mt-1">支持 Mikan 等主流番组网站</p>
+                <p className="text-[11px] text-gray-400 mt-1">支持 Mikan 等主流番组网站</p>
               </div>
 
-              {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-              )}
-
               {loading && (
-                <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                <div className="flex items-center gap-2 text-[13px] text-gray-500 py-1">
                   <img src={loadingIcon} alt="加载中" className="w-4 h-4 animate-spin" />
                   <span>正在检测 RSS 地址...</span>
                 </div>
@@ -391,27 +452,31 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
             </div>
           )}
 
+          {/* ── Step 2/3: 选择分组 & 确认绑定 ── */}
           {step === 'episodes' && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-3">
-                <div className="text-sm font-medium text-gray-900">{rssTitle || '未获取标题'}</div>
-                <div className="text-xs text-gray-400 mt-1 break-all">{detectedRssUrl}</div>
+            <div className="space-y-3">
+              {/* RSS 信息卡片 */}
+              <div className="rounded-xl border border-gray-100 bg-[#f8f9fc] p-2.5 flex items-start gap-3">
+                <div className="shrink-0 w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-500 text-sm">📡</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-gray-900 truncate">{rssTitle || '未获取标题'}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5 break-all line-clamp-2">{detectedRssUrl}</div>
+                </div>
               </div>
 
+              {/* 关联视频集 — 紧凑 */}
               <div className="relative">
-                <label className="changli-form-label">关联视频集</label>
+                <label className="changli-form-label text-[13px] mb-1.5">关联视频集</label>
                 {selectedSeriesId ? (
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+                    <div className="flex-1 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl text-[13px] text-rose-700 truncate">
                       {seriesList.find(s => s.id === selectedSeriesId)?.title || '未知'}
                     </div>
                     <button
                       type="button"
                       onClick={() => setSelectedSeriesId(null)}
-                      className="text-gray-400 hover:text-gray-600 text-sm"
-                    >
-                      更换
-                    </button>
+                      className="text-gray-400 hover:text-gray-600 text-[12px] shrink-0"
+                    >更换</button>
                   </div>
                 ) : (
                   <>
@@ -421,14 +486,13 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                       onChange={e => {
                         setSeriesSearch(e.target.value);
                         setShowSeriesDropdown(true);
-                        // 自动匹配
                         if (!e.target.value && matchedSeries) {
                           setSelectedSeriesId(matchedSeries.id);
                           setShowSeriesDropdown(false);
                         }
                       }}
                       onFocus={() => setShowSeriesDropdown(true)}
-                      placeholder={matchedSeries ? `自动匹配: ${matchedSeries.title}（点击选择）` : '搜索视频集...'}
+                      placeholder={matchedSeries ? `自动匹配: ${matchedSeries.title}` : '搜索视频集...'}
                       className="changli-input"
                     />
                     {matchedSeries && !seriesSearch && (
@@ -438,15 +502,15 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                           setSelectedSeriesId(matchedSeries.id);
                           setShowSeriesDropdown(false);
                         }}
-                        className="mt-1 text-xs text-rose-500 hover:text-rose-600"
+                        className="mt-1 text-[11px] text-rose-500 hover:text-rose-600"
                       >
-                        ✓ 自动匹配到「{matchedSeries.title}」，点击选择
+                        ✓ 自动匹配「{matchedSeries.title}」，点击选择
                       </button>
                     )}
                     {showSeriesDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[200px] overflow-y-auto">
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[160px] overflow-y-auto">
                         {filteredSeries.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-gray-400">无匹配结果</div>
+                          <div className="px-3 py-2 text-[12px] text-gray-400">无匹配结果</div>
                         ) : (
                           filteredSeries.map(s => (
                             <button
@@ -457,7 +521,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                                 setShowSeriesDropdown(false);
                                 setSeriesSearch('');
                               }}
-                              className="w-full px-3 py-2 text-left text-sm hover:bg-rose-50 transition-colors"
+                              className="w-full px-3 py-1.5 text-left text-[13px] hover:bg-rose-50 transition-colors"
                             >
                               {s.title}
                             </button>
@@ -469,58 +533,62 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                 )}
               </div>
 
+              {/* 分组选择 */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="changli-form-label mb-0">选择要订阅的版本</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="changli-form-label text-[13px] mb-0">选择要订阅的版本</label>
                   <div className="flex gap-2">
-                    <button onClick={() => setSelectedGroups(new Set(rssGroups.map(g => g.prefix)))} className="text-xs text-rose-500 hover:text-rose-600">全选</button>
-                    <button onClick={() => setSelectedGroups(new Set())} className="text-xs text-gray-400 hover:text-gray-500">全不选</button>
+                    <button onClick={() => setSelectedGroups(new Set(rssGroups.map(g => g.prefix)))} className="text-[11px] text-rose-500 hover:text-rose-600 font-medium">全选</button>
+                    <button onClick={() => setSelectedGroups(new Set())} className="text-[11px] text-gray-400 hover:text-gray-500">全不选</button>
                   </div>
                 </div>
-                <div className="max-h-[300px] overflow-y-auto space-y-2">
+                <div className="max-h-[240px] overflow-y-auto space-y-1.5 pr-1">
                   {rssGroups.map(group => (
                     <label
                       key={group.prefix}
-                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      className={`relative flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all duration-200 ${
                         selectedGroups.has(group.prefix)
-                          ? 'border-rose-200 bg-rose-50/50'
-                          : 'border-gray-100 bg-white hover:border-gray-200'
+                          ? 'border-rose-200 bg-rose-50/60 shadow-sm'
+                          : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50/50'
                       }`}
                     >
+                      {/* 推荐角标 */}
+                      {group.recommended && (
+                        <div className="absolute -top-1.5 -right-1.5 px-1.5 py-[1px] rounded-full bg-rose-500 text-white text-[9px] font-bold leading-[18px] shadow-sm shadow-rose-200">
+                          推荐
+                        </div>
+                      )}
                       <input
                         type="checkbox"
                         checked={selectedGroups.has(group.prefix)}
                         onChange={() => toggleGroup(group.prefix)}
-                        className="mt-0.5 rounded border-gray-300 text-rose-500 focus:ring-rose-500"
+                        className="shrink-0 rounded border-gray-300 text-rose-500 focus:ring-rose-500 w-4 h-4"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900 truncate group relative">
-                            {group.prefix}
-                            <span className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap shadow-lg max-w-[400px] truncate">
-                              {group.prefix}
-                            </span>
-                          </span>
-                          {group.recommended && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">推荐</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">更新 {group.count} 集</div>
+                        <div className="text-[13px] font-medium text-gray-900 truncate">{group.prefix}</div>
+                        <div className="text-[11px] text-gray-400 mt-0.5">{group.count} 集</div>
                       </div>
                     </label>
                   ))}
                 </div>
-                <div className="text-xs text-gray-400 mt-2">已选 {selectedGroups.size} / {rssGroups.length} 个版本</div>
+                <div className="text-[11px] text-gray-400 mt-1.5">
+                  已选 {selectedGroups.size} / {rssGroups.length} 个版本
+                </div>
               </div>
 
-              {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              {/* 步骤2内错误提示 */}
+              {error && step === 'episodes' && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700 flex items-center gap-2">
+                  <span className="shrink-0 text-red-400">!</span>
+                  {error}
+                </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="changli-modal-footer">
+        {/* ── Footer (fixed at bottom) ── */}
+        <div className="changli-modal-footer shrink-0">
           {step === 'input' ? (
             <>
               <button onClick={onClose} className="action-btn flex-1">取消</button>
