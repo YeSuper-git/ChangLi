@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies, installDependency } from '../utils/api';
+import { clearLibraryFilterCaches } from './Library';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -176,6 +177,7 @@ const Settings: React.FC = () => {
       await addTag(name);
       setNewTagName('');
       loadTags();
+      clearLibraryFilterCaches();
     } catch (error) {
       console.error('添加标签失败:', error);
     }
@@ -185,6 +187,7 @@ const Settings: React.FC = () => {
     try {
       await deleteTag(id);
       loadTags();
+      clearLibraryFilterCaches();
     } catch (error) {
       console.error('删除标签失败:', error);
     }

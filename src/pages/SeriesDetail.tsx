@@ -288,6 +288,9 @@ const SeriesDetail: React.FC = () => {
       ...selectedActorIds.filter((actorId) => !currentActorIds.has(actorId)).map((actorId) => addSeriesActor(series.id, actorId)),
       ...seriesActors.filter((actor) => !nextActorIds.has(actor.id)).map((actor) => removeSeriesActor(series.id, actor.id)),
     ]);
+    // 刷新标签缓存，确保筛选器同步更新
+    const { clearLibraryFilterCaches } = await import('./Library');
+    clearLibraryFilterCaches();
   };
 
   const handleCreateTag = async () => {

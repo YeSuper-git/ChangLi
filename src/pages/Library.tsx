@@ -37,7 +37,7 @@ import {
 const categoryFilterCache = new Map<string, { tags: Tag[]; actors: Actor[] }>();
 const tagSeriesCache = new Map<number, VideoSeries[]>();
 const actorSeriesCache = new Map<number, VideoSeries[]>();
-const clearLibraryFilterCaches = () => {
+export const clearLibraryFilterCaches = () => {
   categoryFilterCache.clear();
   tagSeriesCache.clear();
   actorSeriesCache.clear();
