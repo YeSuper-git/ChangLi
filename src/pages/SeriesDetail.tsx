@@ -116,7 +116,7 @@ const SeriesDetail: React.FC = () => {
   const [loading, setLoading] = useState(!initialSeries);
   const [refreshing, setRefreshing] = useState(Boolean(initialSeries));
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // saving 状态已移除，保存改为后台静默操作
   const [userTouchedSub, setUserTouchedSub] = useState(false);
   const [editData, setEditData] = useState<{ title: string; description: string; poster: string; status: 'ongoing' | 'completed'; code: string; has_chinese_sub: boolean }>({ title: '', description: '', poster: '', status: 'ongoing', code: '', has_chinese_sub: false });
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -352,19 +352,28 @@ const SeriesDetail: React.FC = () => {
       notify({ message: '标题不能为空', type: 'info' });
       return;
     }
-    setSaving(true);
+    // 乐观更新：先更新 UI
+    setSeries(prev => prev ? {
+      ...prev,
+      title,
+      description: editData.description,
+      poster_data_url: editData.poster || prev.poster_data_url,
+      status: editData.status,
+      code: editData.code || undefined,
+      has_chinese_sub: editData.has_chinese_sub ? 1 : 0,
+    } : prev);
+    clearEditQuery(); setUserTouchedSub(false);
+    setEditing(false);
+    notify({ message: '已保存', type: 'success' });
+    // 后台静默保存
     try {
       await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
       await syncSeriesRelations();
-      clearEditQuery(); setUserTouchedSub(false);
-      setEditing(false);
       await loadSeries();
       await refreshSeries();
     } catch (error) {
       console.error('保存视频集失败:', error);
       notify({ message: '保存失败，请检查内容后重试', type: 'error' });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -940,7 +949,7 @@ const SeriesDetail: React.FC = () => {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleSave} disabled={saving} className="action-btn action-btn-primary">保存</button>
+                  <button onClick={handleSave} className="action-btn action-btn-primary">保存</button>
                   <button onClick={() => { setEditing(false); clearEditQuery(); setUserTouchedSub(false); }} className="action-btn">取消</button>
                 </div>
               </div>
