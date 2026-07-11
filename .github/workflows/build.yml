@@ -14,8 +14,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          lfs: true
 
       - name: Get version
         id: version
@@ -37,17 +35,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Remove bundled deps for macOS
-        if: runner.os == 'macOS'
-        run: |
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.resources=c.bundle.resources.filter(r=>!r.includes('mpv')&&!r.includes('ffmpeg')&&!r.includes('webview2'));fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Removed bundled deps for macOS')"
-
-      - name: Remove bundled deps for macOS (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo "Windows: keeping bundled deps (mpv/ffmpeg/webview2)"
-          # 不做任何操作，保留默认配置
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -62,52 +49,6 @@ jobs:
           prerelease: false
           includeUpdaterJson: false
           args: --bundles nsis
-
-      - name: Build lightweight update package (no bundled deps)
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          # 1. 备份完整安装包
-          $fullInstaller = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
-          if (-not $fullInstaller) { throw "No installer found" }
-          $backupDir = Join-Path $env:RUNNER_TEMP "full-installer"
-          New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-          Copy-Item $fullInstaller.FullName $backupDir -Force
-          Write-Host "Backed up full installer: $($fullInstaller.Name)"
-
-          # 2. 删除 bundled 依赖
-          Remove-Item "src-tauri/resources/mpv" -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item "src-tauri/resources/ffmpeg" -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item "src-tauri/resources/webview2" -Recurse -Force -ErrorAction SilentlyContinue
-          Write-Host "Removed bundled dependencies"
-
-          # 3. 清理旧构建
-          Remove-Item "src-tauri/target/release/bundle/nsis/*.exe" -Force -ErrorAction SilentlyContinue
-
-          # 4. 重新构建（无依赖版本）
-          npm run tauri build -- --bundles nsis 2>&1 | Out-Host
-
-          # 5. 重命名更新包
-          $updateInstaller = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
-          if ($updateInstaller) {
-            $version = "${{ github.ref_name }}" -replace '^v', ''
-            $updateName = "ChangLi_${version}_x64-update.exe"
-            $updatePath = Join-Path $updateInstaller.DirectoryName $updateName
-            Rename-Item $updateInstaller.FullName $updatePath -Force
-            Write-Host "Created update package: $updateName"
-
-            # 6. 上传更新包
-            gh release upload "${{ github.ref_name }}" $updatePath --repo "${{ github.repository }}" --clobber
-            Write-Host "Uploaded update package to release"
-          }
-
-          # 7. 恢复完整安装包
-          Copy-Item "$backupDir\*.exe" "src-tauri/target/release/bundle/nsis/" -Force
-          Write-Host "Restored full installer"
-          gh release upload "${{ github.ref_name }}" (Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Where-Object { $_.Name -notmatch 'update' } | Select-Object -First 1).FullName --repo "${{ github.repository }}" --clobber
 
       - name: Build custom installer shell
         shell: pwsh
@@ -162,8 +103,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          lfs: true
 
       - name: Get version
         id: version
