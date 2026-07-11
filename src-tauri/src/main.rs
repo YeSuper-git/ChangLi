@@ -2599,11 +2599,13 @@ async fn download_update(
     // 重置取消标志
     state.update_download_cancel.store(false, Ordering::SeqCst);
 
-    let temp_dir = std::env::temp_dir().join("changli_update");
+    let update_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取应用目录失败: {e}"))?
+        .join("updates");
     
     // 清理旧的下载文件
-    if temp_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+    if update_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&update_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
@@ -2615,8 +2617,8 @@ async fn download_update(
         }
     }
     
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
-    let file_path = temp_dir.join(&file_name);
+    std::fs::create_dir_all(&update_dir).map_err(|e| format!("创建更新目录失败: {e}"))?;
+    let file_path = update_dir.join(&file_name);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(600))
@@ -2719,15 +2721,17 @@ fn install_webview2_silent(_app: &tauri::AppHandle) {}
 
 /// 获取已下载的更新文件信息
 #[tauri::command]
-async fn get_downloaded_update() -> Result<Option<(String, String, u64)>, String> {
-    let temp_dir = std::env::temp_dir().join("changli_update");
-    if !temp_dir.exists() {
+async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, String, u64)>, String> {
+    let update_dir = app.path().app_data_dir()
+        .map_err(|e| format!("获取应用目录失败: {e}"))?
+        .join("updates");
+    if !update_dir.exists() {
         return Ok(None);
     }
     
     // 找最新的安装包
     let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+    if let Ok(entries) = std::fs::read_dir(&update_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
