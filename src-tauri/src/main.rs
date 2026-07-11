@@ -2683,6 +2683,25 @@ async fn install_update(file_path: String) -> Result<(), String> {
     open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))
 }
 
+/// 安装 WebView2 运行时（静默安装）
+#[cfg(target_os = "windows")]
+fn install_webview2_silent(app: &tauri::AppHandle) {
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let installer = resource_dir.join("webview2").join("MicrosoftEdgeWebview2Setup.exe");
+        if installer.exists() {
+            eprintln!("[webview2] 执行静默安装: {}", installer.display());
+            let _ = std::process::Command::new(&installer)
+                .args(["/silent", "/install"])
+                .spawn();
+        } else {
+            eprintln!("[webview2] 安装包不存在: {}", installer.display());
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn install_webview2_silent(_app: &tauri::AppHandle) {}
+
 #[tauri::command]
 async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String> {
     let mut results = Vec::new();
@@ -2989,6 +3008,15 @@ fn main() {
             update_download_cancel: Arc::new(AtomicBool::new(false)),
         })
         .setup(|app| {
+            // Windows: 后台静默安装 WebView2
+            #[cfg(target_os = "windows")]
+            {
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    install_webview2_silent(&app_handle);
+                });
+            }
+
             // 创建主窗口
             #[cfg(target_os = "macos")]
             {
