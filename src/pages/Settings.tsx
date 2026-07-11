@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, getDownloadedUpdate } from '../utils/api';
+import { addSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, getDownloadedUpdate } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
-import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
+import type { Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
-import SubscriptionManager from '../components/SubscriptionManager';
-import Switch from '../components/Switch';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BubbleSelect from '../components/BubbleSelect';
+import Switch from '../components/Switch';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { listen } from '@tauri-apps/api/event';
@@ -56,7 +55,6 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 
 const Settings: React.FC = () => {
   // const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
-  const [sites, setSites] = useState<Site[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
@@ -95,8 +93,7 @@ const Settings: React.FC = () => {
 
   const loadSettingsData = async () => {
     try {
-      const [sitesList, tagsList, storage, catsList, fieldsList] = await Promise.all([getSites(), getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
-      setSites(sitesList);
+      const [tagsList, storage, catsList, fieldsList] = await Promise.all([getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
       setTags(tagsList);
       setStorageInfo(storage);
       setCategories(catsList);
@@ -125,11 +122,6 @@ const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadSites = async () => {
-    const sitesList = await getSites();
-    setSites(sitesList);
   };
 
   const loadTags = async () => {
@@ -162,20 +154,11 @@ const Settings: React.FC = () => {
       });
       setShowAddModal(false);
       setNewSite({ name: '', url: '', parser_type: 'auto', config: '{}' });
-      loadSites();
-    } catch (error) {
+      } catch (error) {
       console.error('添加网站失败:', error);
     }
   };
 
-  const handleDeleteSite = async (id: number) => {
-    try {
-      await deleteSite(id);
-      loadSites();
-    } catch (error) {
-      console.error('删除网站失败:', error);
-    }
-  };
 
   const handleAddTag = async () => {
     const name = newTagName.trim();
@@ -1068,54 +1051,28 @@ const Settings: React.FC = () => {
         })()}
       </section>
 
+
+
+
+      {/* 清理缓存 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold">网站管理</h2>
-            <p className="text-sm text-gray-500 mt-1">配置视频来源网站</p>
+            <h2 className="text-xl font-semibold">清理缓存</h2>
+            <p className="text-sm text-gray-500 mt-1">清理无用缓存、过往安装包，优化磁盘占用。清理不影响使用</p>
           </div>
           <button
-            onClick={() => setShowAddModal(true)}
-            className="action-btn action-btn-primary"
+            onClick={async () => {
+              const count = await cleanupOldInstallers();
+              notify({ message: count > 0 ? `已清理 ${count} 个旧安装包` : '没有发现旧安装包', type: count > 0 ? 'success' : 'info' });
+            }}
+            className="action-btn"
           >
-            添加网站
+            清理缓存
           </button>
         </div>
-        
-        {sites.length > 0 ? (
-          <div className="space-y-4">
-            {sites.map((site) => (
-              <div key={site.id} className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{site.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{site.url}</p>
-                    <p className="text-xs text-gray-400 mt-1">解析器: {site.parser_type}</p>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <SubscriptionManager siteId={site.id} />
-                    <button
-                      onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
-                      className="action-btn action-btn-danger text-sm"
-                    >
-                      {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="changli-empty-state">
-            <p className="text-gray-500 mb-4">暂无网站配置</p>
-            <p className="text-gray-400 text-sm">添加网站后可以搜索在线资源</p>
-          </div>
-        )}
       </section>
-
-
-
-      {/* 分类视频删除确认弹窗 */}
+{/* 分类视频删除确认弹窗 */}
       {deleteCatConfirm && (
         <div className="changli-modal-backdrop">
           <div className="changli-modal-panel">

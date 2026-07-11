@@ -66,7 +66,7 @@ interface BindModalProps {
   initialSiteId?: number;
 }
 
-const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose, onBind, initialSeriesId, initialSiteId }) => {
+export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose, onBind, initialSeriesId, initialSiteId }) => {
   const [bangumiUrl, setBangumiUrl] = useState('');
   const [detectedRssUrl, setDetectedRssUrl] = useState('');
   const [rssTitle, setRssTitle] = useState('');
@@ -353,7 +353,7 @@ interface NewEpisodeModalProps {
   onClose: () => void;
 }
 
-const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes, onClose }) => {
+export const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes, onClose }) => {
   const handleCopyMagnet = async (magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
@@ -514,6 +514,32 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
           onBind={handleBind}
           initialSiteId={siteId}
         />
+      </>
+    );
+  }
+
+  // siteId 模式：只显示订阅按钮
+  if (siteId && !seriesId) {
+    return (
+      <>
+        <button
+          onClick={() => setShowBindModal(true)}
+          className="action-btn text-xs px-3 py-1"
+        >
+          订阅
+        </button>
+        {showBindModal && (
+          <SubscriptionBindModal
+            open={showBindModal}
+            onClose={() => setShowBindModal(false)}
+            onBind={(sub) => {
+              setSubscription(sub);
+              setShowBindModal(false);
+              notify({ message: '订阅创建成功', type: 'success' });
+            }}
+            initialSiteId={siteId}
+          />
+        )}
       </>
     );
   }

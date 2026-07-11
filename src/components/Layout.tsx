@@ -31,6 +31,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/library', label: '视频' },
     { path: '/actors', label: '演员', tutorial: 'nav-actors' },
     { path: '/downloads', label: '下载' },
+    { path: '/subscriptions', label: '订阅' },
   ];
 
   const handleGlobalSearch = (event: React.FormEvent) => {
