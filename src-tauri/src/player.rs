@@ -105,27 +105,15 @@ pub fn close_player_window(app: &AppHandle) {
         let _ = window.hide();
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        // Windows: 延迟销毁避免 GPU 清理冲突
-        let app_handle = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(600));
-            if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
-                let _ = window.destroy();
-                eprintln!("[player] Player window destroyed after delay.");
-            }
-        });
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        // macOS/Linux: 直接销毁
-        if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+    // 延迟销毁，避免 GPU 清理冲突
+    let app_handle = app.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+        if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
             let _ = window.destroy();
-            eprintln!("[player] Player window destroyed.");
+            eprintln!("[player] Player window destroyed after delay.");
         }
-    }
+    });
 }
 
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
