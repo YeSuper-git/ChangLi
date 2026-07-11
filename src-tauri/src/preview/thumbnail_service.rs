@@ -202,8 +202,10 @@ pub async fn get_preview_thumb(
     let file_path_clone = file_path.clone();
     let cache_dir_clone = cache_dir.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let output = std::process::Command::new(&ffmpeg)
-            .args([
+        let mut cmd = std::process::Command::new(&ffmpeg);
+            #[cfg(target_os = "windows")]
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            let output = cmd.args([
                 "-ss",
                 &format!("{:.1}", time),
                 "-i",
