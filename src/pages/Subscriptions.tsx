@@ -152,6 +152,22 @@ const Subscriptions: React.FC = () => {
     } catch {}
   };
 
+  const handleDownload = async (ep: any) => {
+    const magnet = ep.magnet_link || ep.torrent_url;
+    if (!magnet) {
+      notify({ message: '无可用下载链接', type: 'error' });
+      return;
+    }
+    // 预留：Phase 2 内置 aria2 下载
+    // 暂时复制到剪贴板并提示
+    try {
+      await navigator.clipboard.writeText(magnet);
+      notify({ message: '磁力链接已复制，请使用外部下载器打开', type: 'info' });
+    } catch {
+      notify({ message: '复制失败', type: 'error' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -316,11 +332,17 @@ const Subscriptions: React.FC = () => {
                                             <button
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx
-                                                ? "ml-2 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded"
-                                                : "ml-2 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
+                                                ? "ml-1 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded"
+                                                : "ml-1 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
                                               }
                                             >
                                               {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
+                                            </button>
+                                            <button
+                                              onClick={() => handleDownload(ep)}
+                                              className="ml-1 px-2 py-0.5 text-[10px] font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors"
+                                            >
+                                              立即下载
                                             </button>
                                           </div>
                                         );
