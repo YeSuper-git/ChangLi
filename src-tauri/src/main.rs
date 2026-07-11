@@ -2916,13 +2916,33 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
         .ok_or_else(|| format!("无法解析最新版本地址: {final_url}"))?
         .to_string();
     let version = tag.trim_start_matches('v');
-    let exe_name = format!("ChangLi_{version}_x64-setup.exe");
+    let full_exe_name = format!("ChangLi_{version}_x64-setup.exe");
+    let update_exe_name = format!("ChangLi_{version}_x64-update.exe");
     let dmg_name = format!("ChangLi_{version}_aarch64.dmg");
     let html_url = format!("https://github.com/{REPO}/releases/tag/{tag}");
-    let exe_url = format!("https://github.com/{REPO}/releases/download/{tag}/{exe_name}");
+    // 优先使用更新包（轻量），fallback 到完整安装包
+    let update_url = format!("https://github.com/{REPO}/releases/download/{tag}/{update_exe_name}");
+    let full_url = format!("https://github.com/{REPO}/releases/download/{tag}/{full_exe_name}");
+    let exe_url = update_url;
     let dmg_url = format!("https://github.com/{REPO}/releases/download/{tag}/{dmg_name}");
 
     // 尝试获取 release body（通过 API 获取 release 信息）
+    // 检查更新包是否存在，不存在则 fallback 到完整安装包
+    let exe_url = {
+        let check_client = reqwest::Client::builder()
+            .user_agent("ChangLi")
+            .build()
+            .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+        let resp = check_client.head(&exe_url).send().await;
+        match resp {
+            Ok(r) if r.status().is_success() => exe_url,
+            _ => {
+                eprintln!("[update] 更新包不存在，使用完整安装包");
+                full_url
+            }
+        }
+    };
+
     let body = {
         let release_api = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
         match client.get(&release_api)
@@ -2945,7 +2965,7 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
         body,
         assets: vec![
             ReleaseAssetInfo {
-                name: exe_name,
+                name: exe_url.split('/').last().unwrap_or(&"ChangLi.exe").to_string(),
                 browser_download_url: exe_url,
             },
             ReleaseAssetInfo {
