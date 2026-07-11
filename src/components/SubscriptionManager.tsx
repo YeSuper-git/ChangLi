@@ -79,43 +79,16 @@ interface BindModalProps {
 }
 
 
-/// 提取匹配模式：字幕组+版本关键词（用于匹配RSS条目）
+/// 提取匹配模式：完整标题去掉集数（用于匹配RSS条目）
 function extractMatchPattern(title: string): string {
-  // 提取字幕组
-  let subtitleGroup = '未知字幕组';
-  if (title.startsWith('[')) {
-    const end = title.indexOf(']');
-    if (end > 0) subtitleGroup = title.substring(1, end).trim();
-  }
-  
-  // 提取关键版本信息
-  const lower = title.toLowerCase();
-  const parts: string[] = [];
-  
-  // 画质
-  if (lower.includes('1080p') || lower.includes('1920x1080')) parts.push('1080p');
-  else if (lower.includes('720p') || lower.includes('1280x720')) parts.push('720p');
-  else if (lower.includes('480p')) parts.push('480p');
-  
-  // 语言
-  if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]')) parts.push('简中');
-  else if (lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('简／繁') || lower.includes('简/繁')) parts.push('简繁');
-  else if (lower.includes('cht') || lower.includes('繁中') || lower.includes('繁体') || lower.includes('[big5]')) parts.push('繁中');
-  
-  // 来源
-  if (lower.includes('baha')) parts.push('Baha');
-  else if (lower.includes('cr ') || lower.includes('[cr]')) parts.push('CR');
-  else if (lower.includes('abema')) parts.push('ABEMA');
-  
-  // 容器
-  if (lower.includes('[mp4]')) parts.push('MP4');
-  else if (lower.includes('[mkv]')) parts.push('MKV');
-  
-  // 特殊版本
-  if (lower.includes('无修') || lower.includes('uncensored')) parts.push('无修');
-  if (lower.includes('放送版') || lower.includes('on-air')) parts.push('放送版');
-  
-  return '[' + subtitleGroup + '] ' + parts.join(' ');
+  return title.replace(/\s*[-–—]\s*\d+[vV]?\d*\s*$/, '')
+             .replace(/\s+Ep?\.?\s*\d+[vV]?\d*\s*$/i, '')
+             .replace(/\s+#\d+\s*$/, '')
+             .replace(/\s*第\d+集\s*$/, '')
+             .replace(/\s*\d+话\s*$/, '')
+             .replace(/\s*\d+話\s*$/, '')
+             .replace(/\s*S\d+E\d+\s*$/, '')
+             .trim();
 }
 
 /// 从标题中提取字幕组（第一个 [] 中的内容）
