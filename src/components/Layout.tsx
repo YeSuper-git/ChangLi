@@ -29,10 +29,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { path: '/', label: '首页' },
     { path: '/library', label: '视频' },
-    { path: '/subscriptions', label: '订阅' },
     { path: '/actors', label: '演员', tutorial: 'nav-actors' },
-    { path: '/downloads', label: '下载' },
     { path: '/subscriptions', label: '订阅' },
+    { path: '/downloads', label: '下载' },
   ];
 
   const handleGlobalSearch = (event: React.FormEvent) => {
