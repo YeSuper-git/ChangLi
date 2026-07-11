@@ -63,11 +63,12 @@ interface RssItem {
 }
 
 interface RssGroup {
-  prefix: string;
+  prefix: string;        // 显示标题（过滤后的简洁版）
+  matchPattern: string;  // 匹配模式（原始标题去掉集数）
   items: RssItem[];
   count: number;
   recommended: boolean;
-  priority: number; // 0=不推荐, 1=简中/简繁, 2=无修+简繁, 3=无修+简中
+  priority: number;
 }
 
 interface BindModalProps {
@@ -77,6 +78,17 @@ interface BindModalProps {
   initialSeriesId?: number;
 }
 
+
+/// 提取匹配模式：去掉集数部分的原始标题
+function extractMatchPattern(title: string): string {
+  return title.replace(/\s*[-–—]\s*\d+[vV]?\d*\s*$/, '')
+             .replace(/\s+Ep?\.?\s*\d+[vV]?\d*\s*$/i, '')
+             .replace(/\s+#\d+\s*$/, '')
+             .replace(/\s*第\d+集\s*$/, '')
+             .replace(/\s*\d+话\s*$/, '')
+             .replace(/\s*\d+話\s*$/, '')
+             .trim();
+}
 
 /// 从标题中提取字幕组（第一个 [] 中的内容）
 function extractSubtitleGroup(title: string): string {
@@ -158,8 +170,11 @@ function groupRssItems(items: RssItem[]): RssGroup[] {
     for (const [versionKey, vItems] of versionMap) {
       const priority = Math.max(...vItems.map(item => getRecommendationPriority(`[${subtitleGroup}] ${item.title}`)));
       const recommended = priority > 0;
+      // 生成匹配模式：取第一个条目的标题，去掉集数部分
+      const matchPattern = extractMatchPattern(vItems[0].title);
       result.push({
         prefix: `[${subtitleGroup}] ${versionKey}`,
+        matchPattern,
         items: vItems,
         count: vItems.length,
         recommended,
@@ -301,8 +316,10 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     try {
       // 收集选中组的所有 guid 作为已知条目
       const knownGuids: string[] = [];
+      const matchPatterns: Record<string, string> = {};
       for (const group of rssGroups) {
         if (selectedGroups.has(group.prefix)) {
+          matchPatterns[group.prefix] = group.matchPattern;
           for (const item of group.items) {
             knownGuids.push(item.guid);
           }
@@ -315,7 +332,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), knownGuids }),
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids }),
         'clipboard'
       );
 
