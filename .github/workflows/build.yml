@@ -159,6 +159,8 @@ jobs:
           DMG=$(ls src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
           if [ -n "$DMG" ]; then
             cp "$DMG" "ChangLi_${{ steps.version.outputs.version }}_aarch64.dmg"
+            # 确保 release 存在（Windows 可能已创建）
+            gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1 ||               gh release create "v${{ steps.version.outputs.version }}" --title "v${{ steps.version.outputs.version }}" --notes "ChangLi v${{ steps.version.outputs.version }}" --target ${{ github.sha }}
             gh release upload "v${{ steps.version.outputs.version }}" "ChangLi_${{ steps.version.outputs.version }}_aarch64.dmg" --clobber
           else
             echo "No DMG found, skipping release upload"
