@@ -9,6 +9,7 @@ import notFavoriteIcon from '../assets/icons/not-favorite.svg';
 import watchedIcon from '../assets/icons/watched.svg';
 import translateIcon from '../assets/icons/translate.svg';
 import FloatingActions from '../components/FloatingActions';
+import SubscriptionManager from '../components/SubscriptionManager';
 
 import {
   addActor,
@@ -996,6 +997,12 @@ const SeriesDetail: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* 订阅状态 */}
+                <div className="mb-3">
+                  <SubscriptionManager seriesId={series.id} onSubscriptionChange={() => loadSeries({ silent: true })} />
+                </div>
+
                 <div className="mb-4 space-y-3">
                   {features.tags && (
                     <div>

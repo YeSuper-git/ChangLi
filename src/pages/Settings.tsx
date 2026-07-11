@@ -7,6 +7,7 @@ import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, Pr
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
+import SubscriptionManager from '../components/SubscriptionManager';
 import Switch from '../components/Switch';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BubbleSelect from '../components/BubbleSelect';
@@ -1110,12 +1111,15 @@ const Settings: React.FC = () => {
                     <p className="text-sm text-gray-500 mt-1">{site.url}</p>
                     <p className="text-xs text-gray-400 mt-1">解析器: {site.parser_type}</p>
                   </div>
-                  <button
-                    onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
-                    className="action-btn action-btn-danger text-sm"
-                  >
-                    {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
-                  </button>
+                  <div className="flex gap-2 ml-4">
+                    <SubscriptionManager siteId={site.id} />
+                    <button
+                      onClick={() => requestSecondConfirm(`site-${site.id}`, () => handleDeleteSite(site.id))}
+                      className="action-btn action-btn-danger text-sm"
+                    >
+                      {pendingKey === `site-${site.id}` ? '再次确认删除' : '删除'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

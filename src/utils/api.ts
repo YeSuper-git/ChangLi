@@ -1157,6 +1157,92 @@ export async function getDownloadedUpdate(): Promise<[string, string, number] | 
   return invoke('get_downloaded_update');
 }
 
+// === 订阅相关 API ===
+
+export interface BangumiSubscription {
+  id: number;
+  series_id: number | null;
+  site_id: number | null;
+  bangumi_url: string;
+  rss_url: string;
+  title: string;
+  enabled: boolean;
+  check_interval_minutes: number;
+  last_check_at: string | null;
+  auto_download: boolean;
+  download_mode: string;
+  download_dir: string | null;
+  preferences: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionDownload {
+  id: number;
+  subscription_id: number;
+  guid: string;
+  title: string;
+  torrent_url: string | null;
+  magnet_link: string | null;
+  file_size: number | null;
+  pub_date: string | null;
+  status: string;
+  aria2_gid: string | null;
+  file_path: string | null;
+  notified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionKeyword {
+  id: number;
+  subscription_id: number;
+  keyword_category: string;
+  keyword_value: string;
+  is_selected: boolean;
+  created_at: string;
+}
+
+export async function detectRssUrl(url: string): Promise<string> {
+  return invoke('detect_rss_url', { url });
+}
+
+export async function fetchRss(url: string): Promise<{ title: string; link: string; description: string; items: Array<{ guid: string; title: string; link: string; description: string; torrent_url: string | null; magnet_link: string | null; content_length: number | null; pub_date: string | null }> }> {
+  return invoke('fetch_rss', { url });
+}
+
+export async function extractKeywordsFromRss(url: string): Promise<Record<string, string[]>> {
+  return invoke('extract_keywords_from_rss', { url });
+}
+
+export async function createSubscription(seriesId: number, siteId: number | null, bangumiUrl: string, rssUrl: string, title: string, preferences?: string, downloadMode?: string): Promise<BangumiSubscription> {
+  return invoke('create_subscription', { seriesId, siteId, bangumiUrl, rssUrl, title, preferences, downloadMode });
+}
+
+export async function getSubscriptionBySeries(seriesId: number): Promise<BangumiSubscription | null> {
+  return invoke('get_subscription_by_series', { seriesId });
+}
+
+export async function getAllSubscriptions(): Promise<BangumiSubscription[]> {
+  return invoke('get_all_subscriptions');
+}
+
+export async function deleteSubscription(id: number): Promise<void> {
+  return invoke('delete_subscription', { id });
+}
+
+export async function checkSubscriptionUpdates(subscriptionId: number): Promise<SubscriptionDownload[]> {
+  return invoke('check_subscription_updates', { subscriptionId });
+}
+
+export async function updateSubscriptionKeywords(subscriptionId: number, keywords: Array<[string, string, boolean]>): Promise<void> {
+  return invoke('update_subscription_keywords', { subscriptionId, keywords });
+}
+
+export async function getSubscriptionKeywords(subscriptionId: number): Promise<SubscriptionKeyword[]> {
+  return invoke('get_subscription_keywords', { subscriptionId });
+}
+
 // 游戏覆盖（NVIDIA / 游戏加加）
 export async function setGameOverlayDisabled(disabled: boolean): Promise<string> {
   return invoke<string>('set_game_overlay_disabled', { disabled });
