@@ -467,10 +467,12 @@ const Library: React.FC = () => {
   const handleDeleteSeries = async (id: number) => {
     setContextMenu(null);
     clearPending();
+    // 乐观更新：立即从列表移除
+    const prev = useLibraryStore.getState().series;
+    useLibraryStore.setState({ series: prev.filter((s: any) => s.id !== id) });
     try {
       clearLibraryFilterCaches();
       await deleteVideoSeries(id, true);
-      refreshSeries().catch(() => {});
     } catch (error) {
       console.error('[Library] 删除视频集失败:', error);
       notify({ message: '删除视频集失败，请稍后重试', type: 'error' });
