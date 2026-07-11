@@ -146,8 +146,13 @@ const Subscriptions: React.FC = () => {
   };
 
   const handleDelete = async (sub: BangumiSubscription) => {
-    const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
-    if (!window.confirm(`确定取消订阅「${displayName}」？`)) return;
+    setDeleteConfirm(sub);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const sub = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       await deleteSubscription(sub.id);
       setSubUpdates(prev => {
@@ -164,6 +169,7 @@ const Subscriptions: React.FC = () => {
   };
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<BangumiSubscription | null>(null);
   const handleCopyMagnet = async (key: string, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
@@ -392,6 +398,37 @@ const Subscriptions: React.FC = () => {
           loadData();
         }}
       />
+
+      {/* 取消订阅确认弹窗 */}
+      {deleteConfirm && (
+        <div className="changli-modal-backdrop" onClick={() => setDeleteConfirm(null)}>
+          <div className="changli-modal-panel !w-[min(100%,380px)] !p-0" onClick={e => e.stopPropagation()}>
+            <div className="changli-modal-header">
+              <h2 className="text-lg font-bold text-gray-900">取消订阅</h2>
+            </div>
+            <div className="changli-modal-body">
+              <p className="text-sm text-gray-600">
+                确定取消订阅「<span className="font-medium text-gray-900">{deleteConfirm.title?.replace(/^[^-]+\s*-\s*/, '') || deleteConfirm.title}</span>」？
+              </p>
+              <p className="text-xs text-gray-400 mt-2">取消后检查更新记录将被清除</p>
+            </div>
+            <div className="changli-modal-footer">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="action-btn text-sm px-4 py-2"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="action-btn action-btn-danger text-sm px-4 py-2"
+              >
+                确认取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
