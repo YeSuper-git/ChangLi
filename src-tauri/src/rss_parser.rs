@@ -10,6 +10,7 @@ pub struct RssItem {
     pub description: String,
     pub torrent_url: Option<String>,
     pub magnet_link: Option<String>,
+    pub info_hash: Option<String>,
     pub content_length: Option<i64>,
     pub pub_date: Option<String>,
 }
@@ -76,6 +77,7 @@ pub fn parse_mikanani_rss(xml: &str) -> Result<RssFeed> {
                 description: String::new(),
                 torrent_url: None,
                 magnet_link: None,
+                info_hash: None,
                 content_length: None,
                 pub_date: None,
             };
@@ -141,6 +143,13 @@ pub fn parse_mikanani_rss(xml: &str) -> Result<RssFeed> {
                 }
             }
 
+            // 提取 infoHash（Nyaa 用 nyaa:infoHash，其他站可能用不同命名空间）
+            if let Some(ih_start) = item_xml.find("infoHash>") {
+                if let Some(ih_end) = item_xml[ih_start..].find("</") {
+                    item.info_hash = Some(item_xml[ih_start + 9..ih_start + ih_end].trim().to_string());
+                }
+            }
+            
             // 从整个 item XML 中提取磁力链接
             item.magnet_link = extract_magnet(item_xml);
 

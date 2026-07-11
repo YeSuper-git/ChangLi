@@ -323,8 +323,17 @@ async fn check_subscription_updates(
             }
         }
         
-        // 如果 RSS 中没有磁力链接，从详情页提取
+        // 如果 RSS 中没有磁力链接，先尝试用 infoHash 拼接
         let mut magnet = item.magnet_link.clone();
+        if magnet.is_none() {
+            if let Some(ref hash) = item.info_hash {
+                let hash = hash.trim();
+                if hash.len() == 40 || hash.len() == 32 {
+                    magnet = Some(format!("magnet:?xt=urn:btih:{hash}"));
+                }
+            }
+        }
+        // 如果还没有磁力链接，从详情页提取
         if magnet.is_none() && !item.link.is_empty() {
             if let Ok(resp) = reqwest::get(&item.link).await {
               if let Ok(html) = resp.text().await {
