@@ -6,7 +6,7 @@ import {
   getVideoSeriesList,
 } from '../utils/api';
 import type { BangumiSubscription, SubscriptionDownload, VideoSeries } from '../utils/api';
-import { SubscriptionBindModal, NewEpisodeModal } from '../components/SubscriptionManager';
+import { SubscriptionBindModal } from '../components/SubscriptionManager';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
 
@@ -24,14 +24,23 @@ function formatTimeAgo(dateStr: string | null): string {
   return `${diffD} 天前`;
 }
 
+/// 从订阅标题提取网站名（"-" 前面的部分）
+function extractSiteName(title: string): string {
+  const idx = title.indexOf(' - ');
+  if (idx > 0) return title.substring(0, idx).trim();
+  return '其他';
+}
+
 const Subscriptions: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<BangumiSubscription[]>([]);
   const [seriesMap, setSeriesMap] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [showBindModal, setShowBindModal] = useState(false);
 
-  // New episode modal state
-  const [showNewEpisodes, setShowNewEpisodes] = useState(false);
+  // 按网站分组的展开状态
+  const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
+  // 每个订阅的更新展开状态
+  const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
   const [newEpisodes, setNewEpisodes] = useState<SubscriptionDownload[]>([]);
 
   // Per-subscription checking state
@@ -47,6 +56,9 @@ const Subscriptions: React.FC = () => {
       const map = new Map<number, string>();
       seriesList.forEach((s: VideoSeries) => map.set(s.id, s.title));
       setSeriesMap(map);
+      // 默认展开所有网站
+      const sites = new Set(subs.map(s => extractSiteName(s.title || s.rss_url)));
+      setExpandedSites(sites);
     } catch (err) {
       console.error('[Subscriptions] 加载订阅列表失败:', err);
     } finally {
@@ -59,16 +71,24 @@ const Subscriptions: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  const toggleSite = (site: string) => {
+    setExpandedSites(prev => {
+      const next = new Set(prev);
+      if (next.has(site)) next.delete(site); else next.add(site);
+      return next;
+    });
+  };
+
+
   const handleCheckUpdates = async (sub: BangumiSubscription) => {
     setCheckingId(sub.id);
     try {
       const items = await checkSubscriptionUpdates(sub.id);
-      // Refresh list to update last_check_at
       await loadData();
 
       if (items.length > 0) {
         setNewEpisodes(items);
-        setShowNewEpisodes(true);
+        setExpandedSubs(prev => new Set([...prev, sub.id]));
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
       } else {
         notify({ message: '暂无新剧集更新', type: 'info' });
@@ -91,6 +111,15 @@ const Subscriptions: React.FC = () => {
     }
   };
 
+  const handleCopyMagnet = async (magnetLink: string) => {
+    try {
+      await navigator.clipboard.writeText(magnetLink);
+      notify({ message: '磁力链接已复制', type: 'success' });
+    } catch {
+      notify({ message: '复制失败', type: 'error' });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -100,6 +129,14 @@ const Subscriptions: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // 按网站分组
+  const siteGroups: Record<string, BangumiSubscription[]> = {};
+  for (const sub of subscriptions) {
+    const site = extractSiteName(sub.title || sub.rss_url);
+    if (!siteGroups[site]) siteGroups[site] = [];
+    siteGroups[site].push(sub);
   }
 
   return (
@@ -117,7 +154,7 @@ const Subscriptions: React.FC = () => {
       {subscriptions.length === 0 ? (
         <div className="changli-empty-state">
           <p className="text-gray-500 text-lg">暂无订阅</p>
-          <p className="text-gray-400 text-sm mt-2">点击上方"添加订阅"按钮，绑定 Bangumi 番组</p>
+          <p className="text-gray-400 text-sm mt-2">点击上方"添加订阅"按钮，绑定 RSS 番组</p>
           <button
             onClick={() => setShowBindModal(true)}
             className="action-btn action-btn-primary mt-6"
@@ -127,71 +164,104 @@ const Subscriptions: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {subscriptions.map((sub) => (
-            <div
-              key={sub.id}
-              className="changli-panel p-6 transition-transform duration-200 hover:-translate-y-0.5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
-                      {sub.title}
-                    </h3>
-                    <span
-                      className={`tag ${
-                        sub.enabled
-                          ? 'status-completed'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}
+          {Object.entries(siteGroups).map(([site, subs]) => {
+            const isExpanded = expandedSites.has(site);
+            return (
+              <div key={site} className="changli-panel overflow-hidden">
+                {/* 网站标题栏 */}
+                <button
+                  onClick={() => toggleSite(site)}
+                  className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     >
-                      {sub.enabled ? '已启用' : '已禁用'}
-                    </span>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-sm font-medium text-gray-700">{site}</span>
+                    <span className="text-xs text-gray-400">({subs.length})</span>
                   </div>
+                </button>
 
-                  <div className="space-y-1">
-                    {sub.series_id && seriesMap.has(sub.series_id) && (
-                      <div className="text-sm text-gray-600">
-                        <span className="text-gray-400">关联视频集：</span>
-                        {seriesMap.get(sub.series_id)}
-                      </div>
-                    )}
-                    <div className="text-sm text-gray-500 truncate">
-                      <span className="text-gray-400">RSS：</span>
-                      <span className="font-mono text-xs">{sub.rss_url}</span>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      <span className="text-gray-400">上次检查：</span>
-                      {formatTimeAgo(sub.last_check_at)}
-                    </div>
+                {/* 该网站下的订阅列表 */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {subs.map((sub) => {
+                      const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
+                      return (
+                        <div key={sub.id} className="px-6 py-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-900 truncate">
+                                  {displayName}
+                                </span>
+                              </div>
+                              <div className="space-y-0.5">
+                                {sub.series_id && seriesMap.has(sub.series_id) && (
+                                  <div className="text-xs text-gray-500">
+                                    关联：{seriesMap.get(sub.series_id)}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-400">
+                                  上次检查：{formatTimeAgo(sub.last_check_at)}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => handleCheckUpdates(sub)}
+                                disabled={checkingId === sub.id}
+                                className="action-btn text-xs px-3 py-1 disabled:opacity-50"
+                              >
+                                {checkingId === sub.id ? (
+                                  <span className="flex items-center gap-1">
+                                    <img src={loadingIcon} alt="" className="w-3 h-3 animate-spin" />
+                                    检查中...
+                                  </span>
+                                ) : '检查更新'}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(sub)}
+                                className="action-btn action-btn-danger text-xs px-3 py-1"
+                              >
+                                取消订阅
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 展开的更新列表 */}
+                          {expandedSubs.has(sub.id) && newEpisodes.length > 0 && (
+                            <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
+                              {newEpisodes.map(ep => (
+                                <div key={ep.id} className="flex items-center justify-between p-2 bg-rose-50 rounded-lg">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs text-gray-900 truncate">{ep.title}</div>
+                                    <div className="text-[10px] text-gray-400 mt-0.5">
+                                      {ep.file_size ? (ep.file_size < 1024*1024*1024 ? (ep.file_size/1024/1024).toFixed(0) + ' MB' : (ep.file_size/1024/1024/1024).toFixed(1) + ' GB') : ''}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
+                                    className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                                  >
+                                    复制磁力
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => handleCheckUpdates(sub)}
-                    disabled={checkingId === sub.id}
-                    className="action-btn text-xs px-3 py-1.5 disabled:opacity-50"
-                  >
-                    {checkingId === sub.id ? (
-                      <span className="flex items-center gap-1">
-                        <img src={loadingIcon} alt="" className="w-3 h-3 animate-spin" />
-                        检查中...
-                      </span>
-                    ) : (
-                      '检查更新'
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(sub)}
-                    className="action-btn action-btn-danger text-xs px-3 py-1.5"
-                  >
-                    取消订阅
-                  </button>
-                </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -202,12 +272,6 @@ const Subscriptions: React.FC = () => {
           setShowBindModal(false);
           loadData();
         }}
-      />
-
-      <NewEpisodeModal
-        open={showNewEpisodes}
-        episodes={newEpisodes}
-        onClose={() => setShowNewEpisodes(false)}
       />
     </div>
   );
