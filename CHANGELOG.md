@@ -1,3 +1,12 @@
+## v1.8.65 (2026-07-11)
+
+### 播放器稳定性
+- 修复关闭播放器时 0xc0000005 内存访问违规闪退
+- close_player_window 增加 is_visible 检查，防止重复操作
+- 延迟 destroy 增加 is_visible 检查，防止窗口被重新使用时误销毁
+- Destroyed 事件不再调用 close_player_window，避免操作已销毁窗口
+- 播放器关闭改用 tokio::spawn（Tauri 异步上下文）代替 std::thread::spawn
+
 ## v1.8.64 (2026-07-11)
 
 ### 设置页优化
