@@ -358,8 +358,8 @@ const Subscriptions: React.FC = () => {
                                             <button
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx
-                                                ? "ml-1 px-2 py-0.5 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded"
-                                                : "ml-1 px-2 py-0.5 text-[10px] font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-emerald-50"
+                                                ? "action-btn text-xs !bg-emerald-50 !text-emerald-700 !border-emerald-200"
+                                                : "action-btn text-xs"
                                               }
                                             >
                                               {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
