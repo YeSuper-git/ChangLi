@@ -291,24 +291,24 @@ async fn check_subscription_updates(
             continue;
         }
         
-        // 如果用户选择了版本，用 matchPatterns 匹配
-        if !match_patterns.is_empty() {
-            let title_no_ep = extract_episode_number(&item.title)
-                .map(|ep| {
-                    // 去掉集数部分
-                    let re_ep = regex::Regex::new(r"(?:-|–|—)\s*\d+[vV]?\d*\s*$").ok();
-                    if let Some(re) = re_ep {
-                        re.replace(&item.title, "").trim().to_string()
-                    } else {
-                        item.title.clone()
+        // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
+        if !selected_prefixes.is_empty() {
+            let title_lower = item.title.to_lowercase();
+            let matched = selected_prefixes.iter().any(|prefix| {
+                let prefix_lower = prefix.to_lowercase();
+                let parts: Vec<&str> = prefix_lower.split(' ').collect();
+                parts.iter().all(|part| {
+                    if title_lower.contains(part) {
+                        return true;
                     }
+                    // 处理简繁变体
+                    if part.as_bytes() == b"\xe7\xae\x80\xe7\xb9\x81" ||
+                       part.as_bytes() == b"\xe7\xae\x80\xef\xbc\x8f\xe7\xb9\x81" ||
+                       part.as_bytes() == b"\xe7\xae\x80/\xe7\xb9\x81" {
+                        return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
+                    }
+                    false
                 })
-                .unwrap_or_else(|| item.title.clone());
-            let title_lower = title_no_ep.to_lowercase();
-            let matched = match_patterns.iter().any(|pattern| {
-                let pattern_lower = pattern.to_lowercase();
-                // 直接包含匹配
-                title_lower.contains(&pattern_lower)
             });
             if !matched {
                 continue;
