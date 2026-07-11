@@ -272,6 +272,18 @@ async fn check_subscription_updates(
         Vec::new()
     };
     
+    // 查询视频集已有的最大集数
+    let max_episode: Option<i32> = if let Some(series_id) = sub.series_id {
+        sqlx::query_scalar::<_, Option<i32>>("SELECT MAX(episode_number) FROM videos WHERE series_id = ?")
+            .bind(series_id)
+            .fetch_one(&pool)
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+    
     let mut new_items = Vec::new();
     
     for item in &feed.items {
@@ -284,12 +296,19 @@ async fn check_subscription_updates(
             let title_lower = item.title.to_lowercase();
             let matched = selected_prefixes.iter().any(|prefix| {
                 let prefix_lower = prefix.to_lowercase();
-                // 检查标题是否包含版本关键词
                 let parts: Vec<&str> = prefix_lower.split(' ').collect();
                 parts.iter().all(|part| title_lower.contains(part))
             });
             if !matched {
                 continue;
+            }
+        }
+        
+        // 从标题中提取集数，只返回比已有集数更新的
+        let item_episode = extract_episode_number(&item.title);
+        if let (Some(max_ep), Some(ep)) = (max_episode, item_episode) {
+            if ep <= max_ep {
+                continue; // 已有该集或更新的集，跳过
             }
         }
         
@@ -330,6 +349,37 @@ async fn check_subscription_updates(
         .ok();
     
     Ok(new_items)
+}
+
+
+/// 从标题中提取集数
+fn extract_episode_number(title: &str) -> Option<i32> {
+    use regex::Regex;
+    
+    // 尝试多种集数格式
+    let patterns = [
+        r"(?:-|–|—)\s*(\d+)",           // "- 02", "– 02", "— 02"
+        r"EP\s*(\d+)",                   // "EP02"
+        r"Ep\.?\s*(\d+)",                // "Ep02", "Ep.02"
+        r"#(\d+)",                        // "#02"
+        r"第\s*(\d+)\s*集",              // "第02集"
+        r"(\d+)\s*话",                    // "02话"
+        r"(\d+)\s*話",                    // "02話"
+        r"S\d+E(\d+)",                    // "S01E02"
+    ];
+    
+    for pattern in &patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            if let Some(caps) = re.captures(title) {
+                if let Some(ep_str) = caps.get(1) {
+                    if let Ok(ep) = ep_str.as_str().parse::<i32>() {
+                        return Some(ep);
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// 更新订阅关键词偏好
