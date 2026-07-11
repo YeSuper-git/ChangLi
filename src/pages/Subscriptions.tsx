@@ -102,6 +102,8 @@ const Subscriptions: React.FC = () => {
   };
 
   const handleDelete = async (sub: BangumiSubscription) => {
+    const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
+    if (!window.confirm(`确定取消订阅「${displayName}」？`)) return;
     try {
       await deleteSubscription(sub.id);
       notify({ message: '订阅已删除', type: 'info' });
@@ -111,13 +113,13 @@ const Subscriptions: React.FC = () => {
     }
   };
 
-  const handleCopyMagnet = async (magnetLink: string) => {
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const handleCopyMagnet = async (epId: number, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
-      notify({ message: '磁力链接已复制', type: 'success' });
-    } catch {
-      notify({ message: '复制失败', type: 'error' });
-    }
+      setCopiedId(epId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
   };
 
   if (loading) {
@@ -245,10 +247,13 @@ const Subscriptions: React.FC = () => {
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
-                                    className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                                    onClick={() => handleCopyMagnet(ep.id, ep.magnet_link || ep.torrent_url || '')}
+                                    className={copiedId === ep.id
+                                      ? "ml-2 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded"
+                                      : "ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                                    }
                                   >
-                                    复制磁力
+                                    {copiedId === ep.id ? '复制成功' : '复制磁力'}
                                   </button>
                                 </div>
                               ))}

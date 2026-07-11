@@ -559,13 +559,13 @@ interface NewEpisodeModalProps {
 }
 
 export const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes, onClose }) => {
-  const handleCopyMagnet = async (magnetLink: string) => {
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const handleCopyMagnet = async (epId: number, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
-      notify({ message: '磁力链接已复制到剪贴板', type: 'success' });
-    } catch {
-      notify({ message: '复制失败，请手动复制', type: 'error' });
-    }
+      setCopiedId(epId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
   };
 
   const handleOpenExternal = async (magnetLink: string) => {
@@ -603,10 +603,13 @@ export const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes
                   {ep.magnet_link && (
                     <>
                       <button
-                        onClick={() => handleCopyMagnet(ep.magnet_link!)}
-                        className="action-btn text-xs px-3 py-1"
+                        onClick={() => handleCopyMagnet(ep.id, ep.magnet_link || ep.torrent_url || '')}
+                        className={copiedId === ep.id
+                          ? "text-xs px-3 py-1 font-medium text-green-700 bg-green-50 border border-green-200 rounded"
+                          : "action-btn text-xs px-3 py-1"
+                        }
                       >
-                        复制磁力链接
+                        {copiedId === ep.id ? '复制成功' : '复制磁力链接'}
                       </button>
                       <button
                         onClick={() => handleOpenExternal(ep.magnet_link!)}
@@ -689,13 +692,13 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
     onSubscriptionChange?.();
   };
 
-  const handleCopyMagnet = async (magnetLink: string) => {
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const handleCopyMagnet = async (epId: number, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
-      notify({ message: '磁力链接已复制', type: 'success' });
-    } catch {
-      notify({ message: '复制失败', type: 'error' });
-    }
+      setCopiedId(epId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
   };
 
   const handleDelete = async () => {
@@ -843,8 +846,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
                       <div key={ep.id} className="flex items-center justify-between">
                         <span className="text-xs text-gray-600 truncate flex-1">{ep.title}</span>
                         <button
-                          onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
-                          className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
+                          onClick={() => handleCopyMagnet(ep.id, ep.magnet_link || ep.torrent_url || '')}
+                          className={copiedId === ep.id ? "ml-2 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded" : "ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"}
                         >
                           复制磁力
                         </button>
@@ -894,7 +897,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
                     <div key={ep.id} className="flex items-center justify-between">
                       <span className="text-xs text-gray-600 truncate flex-1">{ep.title}</span>
                       <button
-                        onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
+                        onClick={() => handleCopyMagnet(ep.id, ep.magnet_link || ep.torrent_url || '')}
                         className="ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50"
                       >
                         复制磁力
