@@ -13,7 +13,7 @@ const Actors: React.FC = () => {
   const { actors, refreshActors } = useLibraryStore();
   
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newActor, setNewActor] = useState({ name: '', bio: '' });
+  const [newActor, setNewActor] = useState({ name: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenu, setContextMenu] = useState<{ id: number; name: string; x: number; y: number } | null>(null);
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
@@ -35,14 +35,14 @@ const Actors: React.FC = () => {
       const actor = await addActor(
         newActor.name,
         undefined,
-        newActor.bio || undefined
+        undefined
       );
       setShowAddModal(false);
-      setNewActor({ name: '', bio: '' });
+      setNewActor({ name: '' });
       // 跳转到演员详情页
       navigate(`/actors/${actor.id}`);
     } catch (error) {
-      console.error('添加演员失败:', error);
+      console.error('新建演员失败:', error);
     }
   };
 
@@ -87,7 +87,7 @@ const Actors: React.FC = () => {
           className="action-btn action-btn-primary"
           data-tutorial="add-actor"
         >
-          添加演员
+          新建演员
         </button>
       </div>
 
@@ -189,46 +189,40 @@ const Actors: React.FC = () => {
         </div>
       )}
 
-      {/* 添加演员弹窗 */}
+      {/* 新建演员弹窗 */}
       {showAddModal && (
-        <div className="changli-modal-backdrop">
-          <div className="changli-modal-panel" data-tutorial="add-actor-modal">
-            <h2 className="changli-modal-title">添加演员</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="changli-form-label">姓名</label>
-                <input
-                  type="text"
-                  value={newActor.name}
-                  onChange={(e) => setNewActor({ ...newActor, name: e.target.value })}
-                  className="changli-input"
-                  placeholder="输入演员姓名"
-                />
-              </div>
-              <div>
-                <label className="changli-form-label">简介</label>
-                <textarea
-                  value={newActor.bio}
-                  onChange={(e) => setNewActor({ ...newActor, bio: e.target.value })}
-                  className="changli-textarea"
-                  rows={3}
-                  placeholder="输入演员简介"
-                />
-              </div>
+        <div className="changli-modal-backdrop" onClick={() => setShowAddModal(false)}>
+          <div className="changli-modal-panel !w-[min(100%,400px)] !p-0" onClick={e => e.stopPropagation()} data-tutorial="add-actor-modal">
+            <div className="changli-modal-header">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">创建</p>
+              <h2 className="mt-1 text-xl font-bold text-gray-900">新建演员</h2>
+              <p className="mt-1.5 text-[13px] text-gray-500">输入演员姓名，稍后可补充详细信息</p>
             </div>
-            <div className="flex gap-4 mt-8">
+            <div className="changli-modal-body">
+              <input
+                type="text"
+                value={newActor.name}
+                onChange={(e) => setNewActor({ ...newActor, name: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter' && newActor.name.trim()) handleAddActor(); }}
+                className="changli-input w-full"
+                placeholder="例如：三上悠亚"
+                autoFocus
+              />
+            </div>
+            <div className="changli-modal-footer">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="action-btn flex-1"
+                className="action-btn text-sm px-4 py-2"
                 data-tutorial="cancel-add-actor"
               >
                 取消
               </button>
               <button
                 onClick={handleAddActor}
-                className="action-btn action-btn-primary flex-1"
+                disabled={!newActor.name.trim()}
+                className="action-btn action-btn-primary text-sm px-4 py-2 disabled:opacity-50"
               >
-                添加
+                创建
               </button>
             </div>
           </div>
