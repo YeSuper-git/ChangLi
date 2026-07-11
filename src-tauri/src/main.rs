@@ -2722,8 +2722,10 @@ fn install_webview2_silent(_app: &tauri::AppHandle) {}
 /// 获取已下载的更新文件信息
 #[tauri::command]
 async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, String, u64)>, String> {
-    let update_dir = app.path().app_data_dir()
-        .map_err(|e| format!("获取应用目录失败: {e}"))?
+    let update_dir = std::env::current_exe()
+        .map_err(|e| format!("获取应用路径失败: {e}"))?
+        .parent()
+        .ok_or("获取应用目录失败")?
         .join("updates");
     if !update_dir.exists() {
         return Ok(None);
