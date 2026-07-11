@@ -14,7 +14,7 @@ export const changelogData = [
           "loadingIcon 去掉 animate-spin（SVG 本身已是动态动画）",
           "取消订阅改为自定义确认弹窗（订阅页+视频集详情页）",
           "视频集详情页订阅弹窗用 createPortal 渲染到 body 避免被父容器限制",
-          "添加 Windows manifest 声明兼容 Win10/11 避免程序兼容性助手弹窗",
+          "视频集详情页订阅更新列表去重",
           "creation_flags 改用 cfg 属性兼容跨平台编译"
         ]
       }

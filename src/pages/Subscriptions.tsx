@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSubscriptionStore } from '../store/subscriptionStore';
 import {
-  getAllSubscriptions,
   deleteSubscription,
   checkSubscriptionUpdates,
-  getVideoSeriesList,
 } from '../utils/api';
-import type { BangumiSubscription, VideoSeries } from '../utils/api';
+import type { BangumiSubscription } from '../utils/api';
 import { SubscriptionBindModal } from '../components/SubscriptionManager';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -80,13 +79,9 @@ const Subscriptions: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [subs, seriesList] = await Promise.all([
-        getAllSubscriptions(),
-        getVideoSeriesList(),
-      ]);
+      await useSubscriptionStore.getState().load();
+      const { subscriptions: subs, seriesMap: map } = useSubscriptionStore.getState();
       setSubscriptions(subs);
-      const map = new Map<number, string>();
-      seriesList.forEach((s: VideoSeries) => map.set(s.id, s.title));
       setSeriesMap(map);
       // 默认展开所有网站
       const sites = new Set(subs.map(s => extractSiteName(s.title || s.rss_url)));
@@ -98,6 +93,16 @@ const Subscriptions: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // 先用缓存数据快速渲染
+    const { subscriptions: cached, loaded } = useSubscriptionStore.getState();
+    if (loaded && cached.length > 0) {
+      setSubscriptions(cached);
+      const map = useSubscriptionStore.getState().seriesMap;
+      setSeriesMap(map);
+      const sites = new Set(cached.map(s => extractSiteName(s.title || s.rss_url)));
+      setExpandedSites(sites);
+    }
+    // 后台静默刷新
     loadData();
   }, [loadData]);
 
