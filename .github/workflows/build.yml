@@ -134,6 +134,10 @@ jobs:
           mkdir -p src-tauri/resources/mpv
           cp $(which mpv) src-tauri/resources/mpv/mpv
 
+      - name: Remove bundled deps for macOS
+        run: |
+          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.resources=c.bundle.resources.filter(r=>!r.includes('mpv')&&!r.includes('ffmpeg')&&!r.includes('webview2'));fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Removed bundled deps for macOS')"
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
