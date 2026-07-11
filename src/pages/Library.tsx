@@ -1397,35 +1397,61 @@ const Library: React.FC = () => {
     <FloatingActions onRefresh={async () => { await refreshSeries(); }} refreshLabel="刷新" />
 
     {showNewSeriesModal && (
-      <div className="changli-modal-backdrop">
-        <div className="changli-panel changli-modal" style={{ maxWidth: 420 }}>
-          <h2 className="text-lg font-semibold mb-4">新增视频集</h2>
-          <input
-            type="text"
-            value={newSeriesTitle}
-            onChange={(e) => setNewSeriesTitle(e.target.value)}
-            placeholder="请输入视频集标题"
-            className="search-input w-full mb-4"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newSeriesTitle.trim() && !creatingSeries) {
-                handleCreateSeries();
-              }
-            }}
-          />
-          <div className="flex gap-3">
+      <div className="changli-modal-backdrop" onClick={() => { setShowNewSeriesModal(false); setNewSeriesTitle(''); }}>
+        <div className="changli-modal-panel !w-[min(100%,400px)]" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-header">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">创建</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-900">新增视频集</h2>
+            <p className="mt-1.5 text-[13px] text-gray-500">输入视频集名称，稍后可导入视频文件</p>
+          </div>
+          <div className="changli-modal-body">
+            <div className="relative">
+              <input
+                type="text"
+                value={newSeriesTitle}
+                onChange={(e) => setNewSeriesTitle(e.target.value)}
+                placeholder="例如：令和的斑小姐"
+                className="changli-input w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newSeriesTitle.trim() && !creatingSeries) {
+                    handleCreateSeries();
+                  }
+                }}
+              />
+              {newSeriesTitle && (
+                <button
+                  onClick={() => setNewSeriesTitle('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="changli-modal-footer">
+            <button
+              onClick={() => { setShowNewSeriesModal(false); setNewSeriesTitle(''); }}
+              className="action-btn text-sm px-4 py-2"
+            >
+              取消
+            </button>
             <button
               onClick={handleCreateSeries}
               disabled={!newSeriesTitle.trim() || creatingSeries}
-              className="action-btn action-btn-primary flex-1 text-sm"
+              className="action-btn action-btn-primary text-sm px-4 py-2 disabled:opacity-50"
             >
-              {creatingSeries ? '创建中...' : '创建'}
-            </button>
-            <button
-              onClick={() => { setShowNewSeriesModal(false); setNewSeriesTitle(''); }}
-              className="action-btn flex-1 text-sm"
-            >
-              取消
+              {creatingSeries ? (
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  创建中...
+                </span>
+              ) : '创建'}
             </button>
           </div>
         </div>
