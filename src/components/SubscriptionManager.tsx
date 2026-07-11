@@ -68,7 +68,6 @@ interface RssGroup {
   count: number;
   recommended: boolean;
   priority: number; // 0=不推荐, 1=简中/简繁, 2=无修+简繁, 3=无修+简中
-  customRule?: string;
 }
 
 interface BindModalProps {
@@ -187,8 +186,6 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [seriesSearch, setSeriesSearch] = useState('');
   const [showSeriesDropdown, setShowSeriesDropdown] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<string | null>(null);
-  const [groupRules, setGroupRules] = useState<Record<string, string>>({});
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(initialSeriesId ?? null);
 
@@ -278,16 +275,6 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     ? seriesList.filter(s => s.title.toLowerCase().includes(seriesSearch.toLowerCase()))
     : seriesList;
 
-  const toggleEditGroup = (prefix: string) => {
-    setEditingGroup(prev => prev === prefix ? null : prefix);
-  };
-
-  const updateGroupRule = (oldPrefix: string, newRule: string) => {
-    if (newRule.trim() && newRule.trim() !== oldPrefix) {
-      setGroupRules(prev => ({ ...prev, [oldPrefix]: newRule.trim() }));
-    }
-    setEditingGroup(null);
-  };
 
   const handleCreate = async () => {
     if (!selectedSeriesId) {
@@ -300,7 +287,6 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     try {
       // 收集选中组的所有 guid 作为已知条目
       const knownGuids: string[] = [];
-      const customRules: Record<string, string> = { ...groupRules };
       for (const group of rssGroups) {
         if (selectedGroups.has(group.prefix)) {
           for (const item of group.items) {
@@ -315,7 +301,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), knownGuids, customRules }),
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), knownGuids }),
         'clipboard'
       );
 
@@ -481,36 +467,8 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                           {group.recommended && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">推荐</span>
                           )}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); toggleEditGroup(group.prefix); }}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="编辑匹配规则"
-                          >
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          </button>
                         </div>
                         <div className="text-xs text-gray-400 mt-1">更新 {group.count} 集</div>
-                        {editingGroup === group.prefix && (
-                          <div className="mt-2 flex gap-2">
-                            <input
-                              type="text"
-                              defaultValue={group.customRule || group.prefix}
-                              onBlur={(e) => updateGroupRule(group.prefix, e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') updateGroupRule(group.prefix, (e.target as HTMLInputElement).value); }}
-                              className="flex-1 text-xs px-2 py-1 border border-gray-200 rounded-lg focus:border-rose-300 focus:outline-none"
-                              placeholder="输入匹配关键词（支持正则）"
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); toggleEditGroup(group.prefix); }}
-                              className="text-xs text-gray-400 hover:text-gray-600 px-2"
-                            >
-                              完成
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </label>
                   ))}
