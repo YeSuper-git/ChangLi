@@ -389,7 +389,7 @@ async fn check_subscription_updates(
     
     // 将新条目的 GUID 加入 knownGuids，避免下次检查重复
     if !new_items.is_empty() {
-        let mut known = known_guids;
+        let mut known = existing_guids;
         for item in &new_items {
             if !known.contains(&item.guid) {
                 known.push(item.guid.clone());
