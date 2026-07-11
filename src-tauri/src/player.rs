@@ -39,34 +39,8 @@ fn candidate_mpv_paths(app: &AppHandle) -> Vec<PathBuf> {
     if let Ok(resource_dir) = app.path().resource_dir() {
         #[cfg(target_os = "windows")]
         {
-            // 打包路径
             candidates.push(resource_dir.join("mpv").join("mpv.exe"));
             candidates.push(resource_dir.join("resources").join("mpv").join("mpv.exe"));
-            candidates.push(resource_dir.join("mpv.exe"));
-            candidates.push(resource_dir.join("resources").join("mpv.exe"));
-            // winget 安装路径
-            if let Ok(home) = std::env::var("LOCALAPPDATA") {
-                let winget_pkg = std::path::PathBuf::from(&home)
-                    .join("Microsoft").join("WinGet").join("Packages");
-                if let Ok(entries) = std::fs::read_dir(&winget_pkg) {
-                    for entry in entries.flatten() {
-                        let name = entry.file_name().to_string_lossy().to_lowercase();
-                        if name.contains("mpv") || name.contains("sharkdp.mpv") {
-                            candidates.push(entry.path().join("mpv.exe"));
-                        }
-                    }
-                }
-            }
-            // scoop 安装路径
-            if let Ok(home) = std::env::var("USERPROFILE") {
-                candidates.push(std::path::PathBuf::from(&home).join("scoop").join("shims").join("mpv.exe"));
-            }
-            // PATH 中查找
-            if let Ok(path) = std::env::var("PATH") {
-                for dir in std::env::split_paths(&path) {
-                    candidates.push(dir.join("mpv.exe"));
-                }
-            }
         }
         #[cfg(target_os = "macos")]
         {

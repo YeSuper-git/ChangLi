@@ -56,8 +56,7 @@ fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
             vec![
                 resource_dir.join("ffmpeg").join("ffmpeg.exe"),
                 resource_dir.join("resources").join("ffmpeg").join("ffmpeg.exe"),
-                resource_dir.join("ffmpeg.exe"),
-                resource_dir.join("resources").join("ffmpeg.exe"),
+
             ]
         } else {
             vec![
