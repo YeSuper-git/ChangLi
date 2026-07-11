@@ -50,28 +50,51 @@ jobs:
           includeUpdaterJson: false
           args: --bundles nsis
 
-      - name: Build lightweight update package
+      - name: Build lightweight update package (no bundled deps)
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 备份完整安装包
+          $ErrorActionPreference = "Stop"
+
+          # 1. 备份完整安装包
           $fullInstaller = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
-          if ($fullInstaller) {
+          if (-not $fullInstaller) { throw "No installer found" }
+          $backupDir = Join-Path $env:RUNNER_TEMP "full-installer"
+          New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+          Copy-Item $fullInstaller.FullName $backupDir -Force
+          Write-Host "Backed up full installer: $($fullInstaller.Name)"
+
+          # 2. 删除 bundled 依赖
+          Remove-Item "src-tauri/resources/mpv" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "src-tauri/resources/ffmpeg" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "src-tauri/resources/webview2" -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Removed bundled dependencies"
+
+          # 3. 清理旧构建
+          Remove-Item "src-tauri/target/release/bundle/nsis/*.exe" -Force -ErrorAction SilentlyContinue
+
+          # 4. 重新构建（无依赖版本）
+          npm run tauri build -- --bundles nsis 2>&1 | Out-Host
+
+          # 5. 重命名更新包
+          $updateInstaller = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          if ($updateInstaller) {
             $version = "${{ github.ref_name }}" -replace '^v', ''
             $updateName = "ChangLi_${version}_x64-update.exe"
-            $updatePath = "src-tauri/target/release/bundle/nsis/$updateName"
-
-            # 复制一份作为更新包
-            Copy-Item $fullInstaller.FullName $updatePath -Force
+            $updatePath = Join-Path $updateInstaller.DirectoryName $updateName
+            Rename-Item $updateInstaller.FullName $updatePath -Force
             Write-Host "Created update package: $updateName"
 
-            # 上传更新包到 release
-            if (Test-Path $updatePath) {
-              gh release upload "${{ github.ref_name }}" $updatePath --repo "${{ github.repository }}" --clobber
-              Write-Host "Uploaded update package to release"
-            }
+            # 6. 上传更新包
+            gh release upload "${{ github.ref_name }}" $updatePath --repo "${{ github.repository }}" --clobber
+            Write-Host "Uploaded update package to release"
           }
+
+          # 7. 恢复完整安装包
+          Copy-Item "$backupDir\*.exe" "src-tauri/target/release/bundle/nsis/" -Force
+          Write-Host "Restored full installer"
+          gh release upload "${{ github.ref_name }}" (Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Where-Object { $_.Name -notmatch 'update' } | Select-Object -First 1).FullName --repo "${{ github.repository }}" --clobber
 
       - name: Build custom installer shell
         shell: pwsh
