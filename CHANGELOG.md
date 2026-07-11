@@ -1,3 +1,15 @@
+## v1.9.1 (2026-07-12)
+
+### 修复
+- 订阅页去掉全屏 loading，直接显示内容
+- 更新列表背景色改为绿色（emerald）
+- 更新列表按钮使用项目 UI 样式（action-btn）
+- loadingIcon 去掉 animate-spin（SVG 本身已是动态动画）
+- 取消订阅改为自定义确认弹窗（订阅页+视频集详情页）
+- 视频集详情页订阅弹窗用 createPortal 渲染到 body 避免被父容器限制
+- 添加 Windows manifest 声明兼容 Win10/11 避免程序兼容性助手弹窗
+- creation_flags 改用 cfg 属性兼容跨平台编译
+
 ## v1.9.0 (2026-07-12)
 
 ### 重大更新：订阅系统全面重构
