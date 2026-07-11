@@ -175,6 +175,20 @@ function groupRssItems(items: RssItem[]): RssGroup[] {
     return b.count - a.count;
   });
 
+  // 只推荐最高优先级的那一个
+  const maxPriority = Math.max(...result.map(g => g.priority));
+  if (maxPriority > 0) {
+    let foundFirst = false;
+    for (const group of result) {
+      if (group.priority === maxPriority && !foundFirst) {
+        group.recommended = true;
+        foundFirst = true;
+      } else {
+        group.recommended = false;
+      }
+    }
+  }
+
   return result;
 }
 
@@ -463,7 +477,12 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900 truncate" title={group.prefix}>{group.prefix}</span>
+                          <span className="text-sm font-medium text-gray-900 truncate group relative">
+                            {group.prefix}
+                            <span className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap shadow-lg max-w-[400px] truncate">
+                              {group.prefix}
+                            </span>
+                          </span>
                           {group.recommended && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">推荐</span>
                           )}
