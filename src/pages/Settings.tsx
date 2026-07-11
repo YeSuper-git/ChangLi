@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers } from '../utils/api';
+import { getSites, addSite, deleteSite, getTags, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, setGameOverlayDisabled, getGameOverlayDisabled, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, cleanupOldInstallers, checkEnvDependencies } from '../utils/api';
 import type { Site, Tag, StorageInfo, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -59,6 +59,7 @@ const Settings: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
+  const [envDeps, setEnvDeps] = useState<[string, boolean, string][] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   const [newTagName, setNewTagName] = useState('');
@@ -638,6 +639,47 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
+      {/* 环境依赖 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">环境依赖</h2>
+            <p className="text-sm text-gray-500 mt-1">检查播放器和界面运行所需的基础组件</p>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const deps = await checkEnvDependencies();
+                setEnvDeps(deps);
+              } catch (e) {
+                notify({ message: '检查失败', type: 'error' });
+              }
+            }}
+            className="action-btn"
+          >
+            检查依赖
+          </button>
+        </div>
+        {envDeps && (
+          <div className="space-y-3">
+            {envDeps.map(([name, installed, desc]) => (
+              <div key={name} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${installed ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <div>
+                    <span className="text-sm font-medium">{name}</span>
+                    <span className="text-xs text-gray-500 ml-2">{desc}</span>
+                  </div>
+                </div>
+                <span className={`text-xs font-medium ${installed ? 'text-green-600' : 'text-red-600'}`}>
+                  {installed ? '正常' : '缺失'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* 游戏覆盖 — 仅 Windows */}
       {!isMac && (
       <section className="mb-12">
@@ -656,7 +698,7 @@ const Settings: React.FC = () => {
             <Switch
             checked={gameOverlayDisabled}
             disabled={gameOverlayLoading}
-            onChange={async (checked) => {
+            onChange={async (checked: boolean) => {
               setGameOverlayLoading(true);
               try {
                 await setGameOverlayDisabled(checked);
@@ -1064,7 +1106,7 @@ const Settings: React.FC = () => {
                   <BubbleSelect
                     value={categoryForm.card_layout}
                     options={[{ value: 'auto', label: '自动' }, { value: 'portrait', label: '竖版' }, { value: 'landscape', label: '横版' }]}
-                    onChange={(v) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
+                    onChange={(v: any) => setCategoryForm({ ...categoryForm, card_layout: v as 'portrait' | 'landscape' | 'auto' })}
                   />
                 </div>
                 <div className="flex items-center gap-2 flex-1">
@@ -1072,7 +1114,7 @@ const Settings: React.FC = () => {
                   <BubbleSelect
                     value={categoryForm.features.episode || '部'}
                     options={[{ value: '话', label: '话' }, { value: '部', label: '部' }, { value: '集', label: '集' }]}
-                    onChange={(v) => setCategoryForm({
+                    onChange={(v: any) => setCategoryForm({
                       ...categoryForm,
                       features: { ...categoryForm.features, episode: v }
                     })}
@@ -1095,7 +1137,7 @@ const Settings: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={!!categoryForm.features[key]}
-                          onChange={(checked) => setCategoryForm({
+                          onChange={(checked: any) => setCategoryForm({
                             ...categoryForm,
                             features: { ...categoryForm.features, [key]: checked }
                           })}
@@ -1188,7 +1230,7 @@ const Settings: React.FC = () => {
                     { value: 'date', label: '日期' },
                     { value: 'select', label: '选择' },
                   ]}
-                  onChange={(v) => setFieldForm({ ...fieldForm, field_type: v })}
+                  onChange={(v: any) => setFieldForm({ ...fieldForm, field_type: v })}
                 />
               </div>
 
@@ -1197,7 +1239,7 @@ const Settings: React.FC = () => {
                   <span className="text-sm text-gray-700">启用</span>
                   <Switch
                     checked={fieldForm.enabled}
-                    onChange={(checked) => setFieldForm({ ...fieldForm, enabled: checked })}
+                    onChange={(checked: boolean) => setFieldForm({ ...fieldForm, enabled: checked })}
                     ariaLabel="演员字段启用开关"
                   />
                 </div>
@@ -1226,7 +1268,7 @@ const Settings: React.FC = () => {
                   <span className="text-sm text-gray-700">启用</span>
                   <Switch
                     checked={fieldForm.enabled}
-                    onChange={(checked) => setFieldForm({ ...fieldForm, enabled: checked })}
+                    onChange={(checked: boolean) => setFieldForm({ ...fieldForm, enabled: checked })}
                     ariaLabel="演员字段启用开关"
                   />
                 </div>
@@ -1301,7 +1343,7 @@ const Settings: React.FC = () => {
                     </div>
                     <Switch
                       checked={enabled}
-                      onChange={async (checked) => {
+                      onChange={async (checked: boolean) => {
                         try {
                           if (checked) {
                             await enablePresetTemplate(template.key);

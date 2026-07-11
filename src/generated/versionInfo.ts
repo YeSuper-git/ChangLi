@@ -2,6 +2,31 @@
 export const currentVersion = "1.8.63";
 export const changelogData = [
   {
+    "version": "1.8.63",
+    "date": "2026-07-11",
+    "changes": [
+      {
+        "category": "拖拽修复",
+        "items": [
+          "选集卡片拖拽设置 dataTransfer，修复浏览器显示禁止图标",
+          "编辑模式下可拖拽排序选集"
+        ]
+      },
+      {
+        "category": "安装包优化",
+        "items": [
+          "NSIS 安装包嵌入 WebView2 离线安装包，确保自动安装"
+        ]
+      },
+      {
+        "category": "环境依赖检查",
+        "items": [
+          "设置页新增「环境依赖」section，检查 WebView2 和 mpv 是否安装"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.8.62",
     "date": "2026-07-10",
     "changes": [

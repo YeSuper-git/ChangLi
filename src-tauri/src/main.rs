@@ -2684,6 +2684,56 @@ async fn install_update(file_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn check_env_dependencies() -> Result<Vec<(String, bool, String)>, String> {
+    let mut results = Vec::new();
+
+    // 检查 WebView2 (Windows)
+    #[cfg(target_os = "windows")]
+    {
+        let webview2_installed = {
+            let path1 = std::path::PathBuf::from(r"C:\Program Files (x86)\Microsoft\EdgeWebView\Application");
+            let path2 = std::path::PathBuf::from(r"C:\Program Files\Microsoft\EdgeWebView\Application");
+            let path3 = std::path::PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application");
+            path1.exists() || path2.exists() || path3.exists()
+        };
+        results.push((
+            "WebView2 运行时".to_string(),
+            webview2_installed,
+            if webview2_installed { "已安装".to_string() } else { "未安装，播放器和界面依赖此组件".to_string() },
+        ));
+    }
+
+    // 检查 mpv
+    {
+        let mpv_found = {
+            // macOS: 检查 brew 或 /usr/local
+            #[cfg(target_os = "macos")]
+            {
+                std::path::Path::new("/opt/homebrew/bin/mpv").exists()
+                    || std::path::Path::new("/usr/local/bin/mpv").exists()
+                    || std::process::Command::new("which").arg("mpv").output().map(|o| o.status.success()).unwrap_or(false)
+            }
+            // Windows: 检查 PATH 或安装目录
+            #[cfg(target_os = "windows")]
+            {
+                std::process::Command::new("where").arg("mpv.exe").output().map(|o| o.status.success()).unwrap_or(false)
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            {
+                false
+            }
+        };
+        results.push((
+            "mpv 播放器".to_string(),
+            mpv_found,
+            if mpv_found { "已安装".to_string() } else { "未安装，视频播放依赖此组件".to_string() },
+        ));
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
 async fn cleanup_old_installers() -> Result<u32, String> {
     let mut count = 0u32;
     if let Ok(exe_path) = std::env::current_exe() {
@@ -2877,6 +2927,7 @@ fn main() {
             download_update,
             cancel_update_download,
             install_update,
+            check_env_dependencies,
             cleanup_old_installers,
             get_sites,
             add_site,
