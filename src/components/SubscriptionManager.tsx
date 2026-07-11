@@ -646,8 +646,8 @@ export const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes
 const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, siteId, onSubscriptionChange }) => {
   const [subscription, setSubscription] = useState<BangumiSubscription | null>(null);
   const [showBindModal, setShowBindModal] = useState(false);
-  const [showNewEpisodes, setShowNewEpisodes] = useState(false);
-  const [newEpisodes, setNewEpisodes] = useState<SubscriptionDownload[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [newEpisodes, setNewEpisodes] = useState<any[]>([]);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [loadingSub, setLoadingSub] = useState(false);
 
@@ -667,13 +667,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
     setCheckingUpdates(true);
     try {
       const items = await checkSubscriptionUpdates(subscription.id);
-      // Refresh subscription to update last_check_at
       const updated = await getSubscriptionBySeries(seriesId!);
       setSubscription(updated);
-
+      setNewEpisodes(items);
+      setExpandedId(expandedId === subscription.id ? null : subscription.id);
       if (items.length > 0) {
-        setNewEpisodes(items);
-        setShowNewEpisodes(true);
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
       } else {
         notify({ message: '暂无新剧集更新', type: 'info' });
@@ -689,6 +687,15 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
   const handleBind = (sub: BangumiSubscription) => {
     setSubscription(sub);
     onSubscriptionChange?.();
+  };
+
+  const handleCopyMagnet = async (magnetLink: string) => {
+    try {
+      await navigator.clipboard.writeText(magnetLink);
+      notify({ message: '磁力链接已复制', type: 'success' });
+    } catch {
+      notify({ message: '复制失败', type: 'error' });
+    }
   };
 
   const handleDelete = async () => {
@@ -777,6 +784,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
             取消订阅
           </button>
         </div>
+
       ) : (
         <button
           onClick={() => setShowBindModal(true)}
@@ -786,17 +794,33 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
         </button>
       )}
 
+      {/* 展开的更新列表 */}
+      {expandedId && newEpisodes.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+          {newEpisodes.map(ep => (
+            <div key={ep.id} className="flex items-center justify-between p-2 bg-rose-50 rounded-lg">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-gray-900 truncate">{ep.title}</div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  {ep.file_size ? (ep.file_size < 1024*1024*1024 ? (ep.file_size/1024/1024).toFixed(0) + ' MB' : (ep.file_size/1024/1024/1024).toFixed(1) + ' GB') : ''}
+                </div>
+              </div>
+              <button
+                onClick={() => handleCopyMagnet(ep.magnet_link || ep.torrent_url || '')}
+                className="ml-2 px-3 py-1 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors"
+              >
+                复制磁力
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <SubscriptionBindModal
         open={showBindModal}
         onClose={() => setShowBindModal(false)}
         onBind={handleBind}
         initialSeriesId={seriesId}
-      />
-
-      <NewEpisodeModal
-        open={showNewEpisodes}
-        episodes={newEpisodes}
-        onClose={() => setShowNewEpisodes(false)}
       />
     </>
   );
