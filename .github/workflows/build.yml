@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           # 用 node 修改 JSON（更可靠）
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.windows.resources=['resources/nip/**/*','resources/mpv/**/*','resources/ffmpeg/**/*','resources/webview2/**/*'];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Added bundled deps')"
+          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.bundle.resources=['resources/nip/**/*','resources/mpv/**/*','resources/ffmpeg/**/*','resources/webview2/**/*'];fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2));console.log('Added bundled deps')"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
