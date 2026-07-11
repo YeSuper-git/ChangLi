@@ -113,12 +113,12 @@ const Subscriptions: React.FC = () => {
     }
   };
 
-  const [copiedId, setCopiedId] = useState<number | null>(null);
-  const handleCopyMagnet = async (epId: number, magnetLink: string) => {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const handleCopyMagnet = async (key: string, magnetLink: string) => {
     try {
       await navigator.clipboard.writeText(magnetLink);
-      setCopiedId(epId);
-      setTimeout(() => setCopiedId(null), 2000);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
     } catch {}
   };
 
@@ -238,7 +238,7 @@ const Subscriptions: React.FC = () => {
                           {/* 展开的更新列表 */}
                           {expandedSubs.has(sub.id) && newEpisodes.length > 0 && (
                             <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
-                              {newEpisodes.map(ep => (
+                              {newEpisodes.map((ep, idx) => (
                                 <div key={ep.id} className="flex items-center justify-between p-2 bg-rose-50 rounded-lg">
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs text-gray-900 truncate">{ep.title}</div>
@@ -247,13 +247,13 @@ const Subscriptions: React.FC = () => {
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() => handleCopyMagnet(ep.id, ep.magnet_link || ep.torrent_url || '')}
-                                    className={copiedId === ep.id
+                                    onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
+                                    className={copiedKey === sub.id + '_' + idx
                                       ? "ml-2 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded"
                                       : "ml-2 px-2 py-0.5 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors"
                                     }
                                   >
-                                    {copiedId === ep.id ? '复制成功' : '复制磁力'}
+                                    {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
                                   </button>
                                 </div>
                               ))}
