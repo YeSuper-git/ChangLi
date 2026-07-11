@@ -100,8 +100,8 @@ function extractVersionKey(title: string): string {
   
   // 语言
   if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]')) parts.push('简中');
+  else if (lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('简／繁') || lower.includes('简/繁')) parts.push('简繁');
   else if (lower.includes('cht') || lower.includes('繁中') || lower.includes('繁体') || lower.includes('[big5]')) parts.push('繁中');
-  else if (lower.includes('简繁') || lower.includes('简繁内封')) parts.push('简繁');
   
   // 来源
   if (lower.includes('baha')) parts.push('Baha');
@@ -124,14 +124,14 @@ function extractVersionKey(title: string): string {
 function getRecommendationPriority(text: string): number {
   const lower = text.toLowerCase();
   const isCHS = lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]');
-  const isCHSorCHT = isCHS || lower.includes('cht') || lower.includes('繁中') || lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('[big5]');
+  const isCHSorCHT = isCHS || lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('简／繁') || lower.includes('简/繁');
   const isUncensored = lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored') || lower.includes('uncut') || lower.includes('年龄限制版');
   
   if (isUncensored && isCHS) return 3;      // 无修 + 简中 = 最高
   if (isUncensored && isCHSorCHT) return 2;  // 无修 + 简繁 = 次高
   if (isCHS) return 1;                        // 纯简中
   if (isCHSorCHT) return 1;                   // 简繁
-  return 0;
+  return 0;                                   // 纯繁中不推荐
 }
 
 /// 按字幕组分组，组内按关键版本信息细分
