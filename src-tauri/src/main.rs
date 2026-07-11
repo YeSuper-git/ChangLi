@@ -378,6 +378,28 @@ async fn check_subscription_updates(
         .await
         .ok();
     
+    // 将新条目的 GUID 加入 knownGuids，避免下次检查重复
+    if !new_items.is_empty() {
+        let mut known = known_guids;
+        for item in &new_items {
+            if !known.contains(&item.guid) {
+                known.push(item.guid.clone());
+            }
+        }
+        let prefs_str = if let Ok(mut prefs) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
+            prefs["knownGuids"] = serde_json::to_value(&known).unwrap_or_default();
+            serde_json::to_string(&prefs).unwrap_or_default()
+        } else {
+            sub.preferences.clone()
+        };
+        sqlx::query("UPDATE bangumi_subscriptions SET preferences = ? WHERE id = ?")
+            .bind(&prefs_str)
+            .bind(subscription_id)
+            .execute(&pool)
+            .await
+            .ok();
+    }
+    
     Ok(new_items)
 }
 
