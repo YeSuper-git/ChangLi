@@ -85,61 +85,100 @@ interface BindModalProps {
 }
 
 
-/// 从 RSS 标题中提取前缀（去掉集数部分）
-/// 例: "[ANi] Test - 02 [1080P]" → "[ANi] Test - [1080P]"
-function extractTitlePrefix(title: string): string {
-  // 去掉集数部分：匹配 " - 01", " - 02", " Ep01" 等
-  return title.replace(/\s*[-–—]\s*\d+\s*$/, '')
-             .replace(/\s+Ep?\d+\s*$/i, '')
-             .replace(/\s+#\d+\s*$/, '')
-             .trim();
+/// 从标题中提取字幕组（第一个 [] 中的内容）
+function extractSubtitleGroup(title: string): string {
+  if (title.startsWith('[')) {
+    const end = title.indexOf(']');
+    if (end > 0) return title.substring(1, end).trim();
+  }
+  return '未知字幕组';
 }
 
-/// 判断是否是推荐版本（简中、无修、无限制）
+/// 从标题中提取关键版本信息（画质+语言+来源）
+function extractVersionKey(title: string): string {
+  const lower = title.toLowerCase();
+  const parts: string[] = [];
+  
+  // 画质
+  if (lower.includes('1080p') || lower.includes('1920x1080')) parts.push('1080p');
+  else if (lower.includes('720p') || lower.includes('1280x720')) parts.push('720p');
+  else if (lower.includes('480p')) parts.push('480p');
+  else if (lower.includes('2160p') || lower.includes('4k')) parts.push('4k');
+  
+  // 语言
+  if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]')) parts.push('简中');
+  else if (lower.includes('cht') || lower.includes('繁中') || lower.includes('繁体') || lower.includes('[big5]')) parts.push('繁中');
+  else if (lower.includes('简繁') || lower.includes('简繁内封')) parts.push('简繁');
+  
+  // 来源
+  if (lower.includes('baha')) parts.push('Baha');
+  else if (lower.includes('cr ') || lower.includes('[cr]')) parts.push('CR');
+  else if (lower.includes('abema')) parts.push('ABEMA');
+  
+  // 容器
+  if (lower.includes('[mp4]')) parts.push('MP4');
+  else if (lower.includes('[mkv]')) parts.push('MKV');
+  
+  // 特殊版本
+  if (lower.includes('无修') || lower.includes('uncensored')) parts.push('无修');
+  if (lower.includes('放送版') || lower.includes('on-air')) parts.push('放送版');
+  
+  return parts.length > 0 ? parts.join(' ') : '默认';
+}
+
+/// 判断是否推荐版本（只推荐最优质的）
 function isRecommended(title: string): boolean {
   const lower = title.toLowerCase();
-  // 简中优先
-  if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体')) return true;
-  // 无修/无限制
-  if (lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored') || lower.includes('uncut')) return true;
+  // 简中 + 无修 = 最推荐
+  const isCHS = lower.includes('chs') || lower.includes('简中') || lower.includes('简体');
+  const isUncensored = lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored');
+  if (isCHS && isUncensored) return true;
+  // 纯简中也推荐
+  if (isCHS) return true;
   return false;
 }
 
-/// 按标题前缀分组 RSS 条目
+/// 按字幕组分组，组内按关键版本信息细分
 function groupRssItems(items: RssItem[]): RssGroup[] {
-  const map = new Map<string, RssItem[]>();
-  
+  // 第一步：按字幕组分组
+  const subtitleGroups = new Map<string, RssItem[]>();
   for (const item of items) {
-    const prefix = extractTitlePrefix(item.title);
-    if (!map.has(prefix)) map.set(prefix, []);
-    map.get(prefix)!.push(item);
+    const group = extractSubtitleGroup(item.title);
+    if (!subtitleGroups.has(group)) subtitleGroups.set(group, []);
+    subtitleGroups.get(group)!.push(item);
   }
 
-  const groups: RssGroup[] = [];
-  for (const [prefix, groupItems] of map) {
-    // 检查是否有推荐版本
-    const recommended = groupItems.some(item => isRecommended(item.title));
-    groups.push({
-      prefix,
-      items: groupItems,
-      count: groupItems.length,
-      recommended,
-    });
+  const result: RssGroup[] = [];
+
+  for (const [subtitleGroup, groupItems] of subtitleGroups) {
+    // 第二步：在字幕组内，按关键版本信息分组
+    const versionMap = new Map<string, RssItem[]>();
+    for (const item of groupItems) {
+      const versionKey = extractVersionKey(item.title);
+      if (!versionMap.has(versionKey)) versionMap.set(versionKey, []);
+      versionMap.get(versionKey)!.push(item);
+    }
+
+    for (const [versionKey, vItems] of versionMap) {
+      const recommended = vItems.some(item => isRecommended(item.title));
+      result.push({
+        prefix: `[${subtitleGroup}] ${versionKey}`,
+        items: vItems,
+        count: vItems.length,
+        recommended,
+      });
+    }
   }
 
-  // 排序：推荐的在前，然后按集数降序
-  groups.sort((a, b) => {
+  // 排序：推荐的在前，然后按字幕组名字母序，集数多的在前
+  result.sort((a, b) => {
     if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+    if (a.prefix !== b.prefix) return a.prefix.localeCompare(b.prefix);
     return b.count - a.count;
   });
 
-  return groups;
+  return result;
 }
-/// 从标题中提取前缀（去掉集数）
-
-/// 判断是否推荐版本
-
-/// 按标题前缀分组
 
 export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose, onBind, initialSeriesId }) => {
   const [bangumiUrl, setBangumiUrl] = useState('');
