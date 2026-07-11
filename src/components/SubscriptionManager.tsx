@@ -62,6 +62,20 @@ interface RssItem {
   pub_date: string | null;
 }
 
+interface RssGroup {
+  prefix: string;           // 标题前缀（去掉集数）
+  items: RssItem[];         // 该组的所有条目
+  count: number;            // 集数
+  recommended: boolean;     // 是否推荐
+}
+
+interface RssGroup {
+  prefix: string;
+  items: RssItem[];
+  count: number;
+  recommended: boolean;
+}
+
 interface BindModalProps {
   open: boolean;
   onClose: () => void;
@@ -69,12 +83,69 @@ interface BindModalProps {
   initialSeriesId?: number;
 }
 
+
+/// 从 RSS 标题中提取前缀（去掉集数部分）
+/// 例: "[ANi] Test - 02 [1080P]" → "[ANi] Test - [1080P]"
+function extractTitlePrefix(title: string): string {
+  // 去掉集数部分：匹配 " - 01", " - 02", " Ep01" 等
+  return title.replace(/\s*[-–—]\s*\d+\s*$/, '')
+             .replace(/\s+Ep?\d+\s*$/i, '')
+             .replace(/\s+#\d+\s*$/, '')
+             .trim();
+}
+
+/// 判断是否是推荐版本（简中、无修、无限制）
+function isRecommended(title: string): boolean {
+  const lower = title.toLowerCase();
+  // 简中优先
+  if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体')) return true;
+  // 无修/无限制
+  if (lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored') || lower.includes('uncut')) return true;
+  return false;
+}
+
+/// 按标题前缀分组 RSS 条目
+function groupRssItems(items: RssItem[]): RssGroup[] {
+  const map = new Map<string, RssItem[]>();
+  
+  for (const item of items) {
+    const prefix = extractTitlePrefix(item.title);
+    if (!map.has(prefix)) map.set(prefix, []);
+    map.get(prefix)!.push(item);
+  }
+
+  const groups: RssGroup[] = [];
+  for (const [prefix, groupItems] of map) {
+    // 检查是否有推荐版本
+    const recommended = groupItems.some(item => isRecommended(item.title));
+    groups.push({
+      prefix,
+      items: groupItems,
+      count: groupItems.length,
+      recommended,
+    });
+  }
+
+  // 排序：推荐的在前，然后按集数降序
+  groups.sort((a, b) => {
+    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+    return b.count - a.count;
+  });
+
+  return groups;
+}
+/// 从标题中提取前缀（去掉集数）
+
+/// 判断是否推荐版本
+
+/// 按标题前缀分组
+
 export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose, onBind, initialSeriesId }) => {
   const [bangumiUrl, setBangumiUrl] = useState('');
   const [detectedRssUrl, setDetectedRssUrl] = useState('');
   const [rssTitle, setRssTitle] = useState('');
-  const [rssItems, setRssItems] = useState<RssItem[]>([]);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [rssGroups, setRssGroups] = useState<RssGroup[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(initialSeriesId ?? null);
 
@@ -98,8 +169,8 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     setError('');
     setDetectedRssUrl('');
     setRssTitle('');
-    setRssItems([]);
-    setSelectedItems(new Set());
+    setRssGroups([]);
+    setSelectedGroups(new Set());
 
     try {
       const rssUrl = await detectRssUrl(bangumiUrl.trim());
@@ -107,10 +178,12 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
 
       const rssData = await fetchRss(rssUrl);
       setRssTitle(rssData.title || '');
-      setRssItems(rssData.items || []);
 
-      const allGuids = new Set((rssData.items || []).map(item => item.guid));
-      setSelectedItems(allGuids);
+      const groups = groupRssItems(rssData.items || []);
+      setRssGroups(groups);
+
+      const recommendedPrefixes = new Set(groups.filter(g => g.recommended).map(g => g.prefix));
+      setSelectedGroups(recommendedPrefixes);
 
       setStep('episodes');
     } catch (err: any) {
@@ -121,20 +194,15 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     }
   };
 
-  const toggleItem = (guid: string) => {
-    setSelectedItems(prev => {
+  const toggleGroup = (prefix: string) => {
+    setSelectedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(guid)) next.delete(guid);
-      else next.add(guid);
+      if (next.has(prefix)) next.delete(prefix);
+      else next.add(prefix);
       return next;
     });
   };
 
-  const formatSize = (bytes: number | null) => {
-    if (!bytes) return '未知';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
-    if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(0) + ' MB';
-  };
 
   const handleCreate = async () => {
     if (!selectedSeriesId) {
@@ -145,13 +213,23 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     setError('');
 
     try {
+      // 收集选中组的所有 guid 作为已知条目
+      const knownGuids: string[] = [];
+      for (const group of rssGroups) {
+        if (selectedGroups.has(group.prefix)) {
+          for (const item of group.items) {
+            knownGuids.push(item.guid);
+          }
+        }
+      }
+
       const sub = await createSubscription(
         selectedSeriesId,
         null,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        undefined,
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), knownGuids }),
         'clipboard'
       );
 
@@ -232,39 +310,41 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="changli-form-label mb-0">可下载的集数 ({rssItems.length})</label>
+                  <label className="changli-form-label mb-0">选择要订阅的版本</label>
                   <div className="flex gap-2">
-                    <button onClick={() => setSelectedItems(new Set(rssItems.map(i => i.guid)))} className="text-xs text-rose-500 hover:text-rose-600">全选</button>
-                    <button onClick={() => setSelectedItems(new Set())} className="text-xs text-gray-400 hover:text-gray-500">全不选</button>
+                    <button onClick={() => setSelectedGroups(new Set(rssGroups.map(g => g.prefix)))} className="text-xs text-rose-500 hover:text-rose-600">全选</button>
+                    <button onClick={() => setSelectedGroups(new Set())} className="text-xs text-gray-400 hover:text-gray-500">全不选</button>
                   </div>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto space-y-2">
-                  {rssItems.map(item => (
+                  {rssGroups.map(group => (
                     <label
-                      key={item.guid}
+                      key={group.prefix}
                       className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                        selectedItems.has(item.guid)
+                        selectedGroups.has(group.prefix)
                           ? 'border-rose-200 bg-rose-50/50'
                           : 'border-gray-100 bg-white hover:border-gray-200'
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={selectedItems.has(item.guid)}
-                        onChange={() => toggleItem(item.guid)}
+                        checked={selectedGroups.has(group.prefix)}
+                        onChange={() => toggleGroup(group.prefix)}
                         className="mt-0.5 rounded border-gray-300 text-rose-500 focus:ring-rose-500"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">{item.title}</div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                          <span>{formatSize(item.content_length)}</span>
-                          {item.pub_date && <span>{new Date(item.pub_date).toLocaleDateString('zh-CN')}</span>}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 truncate">{group.prefix}</span>
+                          {group.recommended && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">推荐</span>
+                          )}
                         </div>
+                        <div className="text-xs text-gray-400 mt-1">更新 {group.count} 集</div>
                       </div>
                     </label>
                   ))}
                 </div>
-                <div className="text-xs text-gray-400 mt-2">已选 {selectedItems.size} / {rssItems.length} 个</div>
+                <div className="text-xs text-gray-400 mt-2">已选 {selectedGroups.size} / {rssGroups.length} 个版本</div>
               </div>
 
               {error && (
