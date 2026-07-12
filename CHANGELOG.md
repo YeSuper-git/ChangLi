@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.15] - 2026-07-12
+
+### Fixed
+- **首页/演员页空白**: get_video_series_list SQL中s.has_actor和s.code列不存在于表中导致查询失败
+
 ## [1.9.14] - 2026-07-12
 
 ### Fixed
