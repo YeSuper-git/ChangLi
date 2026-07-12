@@ -55,7 +55,6 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 
 const Settings: React.FC = () => {
   // const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
-  const [tags, setTags] = useState<Tag[]>([]);
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [updatesDir, setUpdatesDir] = useState<string>('');
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
@@ -64,9 +63,6 @@ const Settings: React.FC = () => {
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
-  const [newTagName, setNewTagName] = useState('');
-  const [editingTag, setEditingTag] = useState<{ id: number; name: string; scope: string } | null>(null);
-  const [editingTagValue, setEditingTagValue] = useState('');
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
@@ -94,10 +90,9 @@ const Settings: React.FC = () => {
 
   const loadSettingsData = async () => {
     try {
-      const [tagsList, storage, catsList, fieldsList] = await Promise.all([getTags(), getStorageInfo(), getAllCategories(), getAllActorFields()]);
+      const [storage, catsList, fieldsList] = await Promise.all([getStorageInfo(), getAllCategories(), getAllActorFields()]);
       const uDir = await getUpdatesDir().catch(() => '');
       setUpdatesDir(uDir);
-      setTags(tagsList);
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
@@ -122,11 +117,6 @@ const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadTags = async () => {
-    const tagsList = await getTags();
-    setTags(tagsList);
   };
 
   const handleRepairMissingPosters = async () => {
@@ -156,48 +146,6 @@ const Settings: React.FC = () => {
       setNewSite({ name: '', url: '', parser_type: 'auto', config: '{}' });
       } catch (error) {
       console.error('添加网站失败:', error);
-    }
-  };
-
-
-  const handleAddTag = async () => {
-    const name = newTagName.trim();
-    if (!name) return;
-
-    try {
-      const tempTag = { id: -Date.now(), name, created_at: new Date().toISOString() };
-      setTags((prev: any) => [...prev, tempTag].sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      setNewTagName('');
-      clearLibraryFilterCaches();
-      try { await addTag(name); } catch {}
-    } catch (error) {
-      console.error('添加标签失败:', error);
-    }
-  };
-
-  const handleDeleteTag = async (id: number) => {
-    try {
-      setTags((prev: any) => prev.filter((t: any) => t.id !== id));
-      clearLibraryFilterCaches();
-      try { await deleteTag(id); } catch {}
-    } catch (error) {
-      console.error('删除标签失败:', error);
-    }
-  };
-
-  const handleSaveTagEdit = async () => {
-    if (!editingTag) return;
-    const newName = editingTagValue.trim();
-    if (!newName || newName === editingTag.name) {
-      setEditingTag(null);
-      return;
-    }
-    try {
-      await updateTag(editingTag.id, newName, editingTag.scope);
-      setEditingTag(null);
-      loadTags();
-    } catch (error) {
-      console.error('更新标签失败:', error);
     }
   };
 
