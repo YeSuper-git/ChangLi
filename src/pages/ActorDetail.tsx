@@ -364,9 +364,26 @@ const ActorDetail: React.FC = () => {
 
   const handleSave = async () => {
     if (!actor || !editForm.name.trim()) return;
-    
+    const previousActor = actor;
+    const nextActor: Actor = {
+      ...actor,
+      name: editForm.name,
+      bio: editForm.bio || undefined,
+      birthday: normalizeBirthday(editForm.birthday),
+      height: editForm.height || undefined,
+      measurements: editForm.measurements || undefined,
+      japanese_name: editForm.japanese_name || undefined,
+      cup_size: editForm.cup_size || undefined,
+      alias: editForm.alias || undefined,
+      weight: (editForm as any).weight || undefined,
+    };
+    setActor(nextActor);
+    clearEditQuery();
+    setEditing(false);
+    notify({ message: '已保存', type: 'success' });
+
     try {
-      await updateActor(
+      const savedActor = await updateActor(
         actor.id,
         editForm.name,
         actor.photo,
@@ -379,11 +396,12 @@ const ActorDetail: React.FC = () => {
         editForm.alias || undefined,
         (editForm as any).weight || undefined
       );
-      clearEditQuery();
-      setEditing(false);
-      loadActor(actor.id);
+      setActor(savedActor);
+      refreshActors().catch(() => {});
     } catch (error) {
+      setActor(previousActor);
       console.error('[Actor] 更新演员失败:', error);
+      notify({ message: '保存失败，请稍后重试', type: 'error' });
     }
   };
 

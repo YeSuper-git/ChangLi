@@ -17,6 +17,7 @@ import {
   toggleWatched,
   openSeriesInFileManager,
   createEmptyVideoSeries,
+  deleteVideoSeriesBatch,
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -46,7 +47,7 @@ export const clearLibraryFilterCaches = () => {
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty, toggleFavorite } = useLibraryStore();
+  const { series: storeSeries, favorites, watchedIds, categories: storeCategories, refreshSeries, refreshCategories, seriesDirty, toggleFavorite, upsertSeriesLocal, patchSeriesLocal, removeSeriesLocal } = useLibraryStore();
   const [scanning, setScanning] = useState(false);
   const [showNewSeriesModal, setShowNewSeriesModal] = useState(false);
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
@@ -466,8 +467,7 @@ const Library: React.FC = () => {
     setContextMenu(null);
     clearPending();
     // 乐观更新：立即从列表移除
-    const prev = useLibraryStore.getState().series;
-    useLibraryStore.setState({ series: prev.filter((s: any) => s.id !== id) });
+    removeSeriesLocal(id);
     try {
       clearLibraryFilterCaches();
       await deleteVideoSeries(id, true);
@@ -508,7 +508,6 @@ const Library: React.FC = () => {
     try {
       clearLibraryFilterCaches();
       const matched = await rescanSingleSeriesMetadata(seriesId);
-      refreshSeries().catch(() => {});
       notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
       console.error('[Library] 检查更新失败:', error);
@@ -525,9 +524,9 @@ const Library: React.FC = () => {
     setCreatingSeries(true);
     try {
       const series = await createEmptyVideoSeries(newSeriesTitle.trim(), mainCategory);
+      upsertSeriesLocal(series);
       setShowNewSeriesModal(false);
       setNewSeriesTitle('');
-      refreshSeries().catch(() => {});
       notify({ message: `已创建「${newSeriesTitle.trim()}」`, type: 'success' });
       navigate(`/series/${series.id}`);
     } catch (error) {
@@ -552,7 +551,7 @@ const Library: React.FC = () => {
     try {
       clearLibraryFilterCaches();
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
-      refreshSeries().catch(() => {});
+      patchSeriesLocal(typeSwitchConfirm.seriesId, { display_type: typeSwitchConfirm.categoryKey });
       notify({ message: `已移动到「${name}」`, type: 'success' });
     } catch (error) {
       console.error('[Library] 移动分类失败:', error);
@@ -702,9 +701,9 @@ const Library: React.FC = () => {
     setSelectedIds(new Set());
     setSelectMode(false);
     clearLibraryFilterCaches();
+    removeSeriesLocal(seriesIds);
     try {
-      await Promise.all(seriesIds.map(id => deleteVideoSeries(id, true)));
-      refreshSeries().catch(() => {});
+      await deleteVideoSeriesBatch(seriesIds);
     } catch (error) {
       refreshSeries().catch(() => {});
     }
@@ -723,9 +722,11 @@ const Library: React.FC = () => {
     setSelectMode(false);
     clearLibraryFilterCaches();
     const seriesIds = [...selectedIds].filter(k => k.startsWith('s-')).map(k => parseInt(k.split('-')[1]));
+    for (const id of seriesIds) {
+      patchSeriesLocal(id, { display_type: batchSwitchConfirm.categoryKey });
+    }
     try {
       await Promise.all(seriesIds.map(id => switchSeriesTypeTo(id, batchSwitchConfirm.categoryKey).catch(() => {})));
-      refreshSeries().catch(() => {});
     } catch (error) {
       refreshSeries().catch(() => {});
     }
@@ -1074,7 +1075,6 @@ const Library: React.FC = () => {
               const name = contextMenu.name;
               setContextMenu(null);
               toggleFavorite(id, 'series').then(() => {
-                refreshSeries();
                 notify({ message: isFav ? `已取消「${name}」的追番` : `已将「${name}」添加到追番`, type: 'success' });
               }).catch(() => {
                 notify({ message: '操作失败，请稍后重试', type: 'error' });
@@ -1089,8 +1089,8 @@ const Library: React.FC = () => {
               const id = contextMenu.id;
               const name = contextMenu.name;
               setContextMenu(null);
+              patchSeriesLocal(id, { is_watched: isWatched ? 0 : 1 });
               toggleWatched(id).then(() => {
-                refreshSeries();
                 notify({ message: isWatched ? `已取消「${name}」的已看完标记` : `已将「${name}」标记为已看完`, type: 'success' });
               }).catch(() => {
                 notify({ message: '操作失败，请稍后重试', type: 'error' });

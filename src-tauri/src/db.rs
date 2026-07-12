@@ -851,7 +851,7 @@ pub async fn get_video_series_list(
         ("created_at", "asc") => "ORDER BY s.created_at ASC, s.id ASC",
         _ => "ORDER BY s.created_at DESC, s.id DESC",
     };
-    // 列表查询必须排除 poster_base64（1200px 缩略图很大），避免启动/刷新时通过 IPC 传输全部海报。
+    // 列表查询必须排除 poster_base64（海报缓存较大），避免启动/刷新时通过 IPC 传输全部海报。
     // 卡片可用 poster 路径展示，详情页再单独读取高清 poster_base64。
     let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;

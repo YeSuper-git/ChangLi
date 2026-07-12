@@ -32,6 +32,10 @@ interface LibraryState {
   refreshCategories: () => Promise<void>;
   loadFavorites: () => Promise<void>;
   loadWatched: () => void;
+  upsertSeriesLocal: (series: VideoSeries) => void;
+  patchSeriesLocal: (id: number, patch: Partial<VideoSeries>) => void;
+  removeSeriesLocal: (ids: number | number[]) => void;
+  adjustSeriesVideoCountLocal: (id: number, delta: number) => void;
   toggleFavorite: (id: number, type: 'video' | 'series') => Promise<void>;
   setSortBy: (sortBy: 'created_at' | 'title') => void;
   setSortOrder: (sortOrder: 'asc' | 'desc') => void;
@@ -158,12 +162,54 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ watchedIds });
   },
 
+  upsertSeriesLocal: (series: VideoSeries) => {
+    set((state) => {
+      const exists = state.series.some((item) => item.id === series.id);
+      const nextSeries = exists
+        ? state.series.map((item) => item.id === series.id ? { ...item, ...series } : item)
+        : [series, ...state.series];
+      return { series: nextSeries };
+    });
+  },
+
+  patchSeriesLocal: (id: number, patch: Partial<VideoSeries>) => {
+    set((state) => {
+      const nextSeries = state.series.map((item) => item.id === id ? { ...item, ...patch } : item);
+      const nextFavorites = state.favorites.map((item) => (
+        'video_count' in item && item.id === id ? { ...item, ...patch } : item
+      ));
+      const watchedIds = new Set(state.watchedIds);
+      if (patch.is_watched !== undefined) {
+        if (patch.is_watched === 1) watchedIds.add(id);
+        else watchedIds.delete(id);
+      }
+      return { series: nextSeries, favorites: nextFavorites, watchedIds };
+    });
+  },
+
+  removeSeriesLocal: (ids: number | number[]) => {
+    const idSet = new Set(Array.isArray(ids) ? ids : [ids]);
+    set((state) => ({
+      series: state.series.filter((item) => !idSet.has(item.id)),
+      favorites: state.favorites.filter((item) => !('video_count' in item && idSet.has(item.id))),
+      watchedIds: new Set([...state.watchedIds].filter((id) => !idSet.has(id))),
+    }));
+  },
+
+  adjustSeriesVideoCountLocal: (id: number, delta: number) => {
+    const current = get().series.find((item) => item.id === id)?.video_count ?? 0;
+    get().patchSeriesLocal(id, { video_count: Math.max(0, current + delta) });
+  },
+
   toggleFavorite: async (id: number, type: 'video' | 'series') => {
     const { favorites } = get();
     // 乐观更新：先改本地状态
     const isCurrentlyFav = favorites.some(f => f.id === id && (type === 'series' ? 'video_count' in f : !('video_count' in f)));
     if (isCurrentlyFav) {
       set({ favorites: favorites.filter(f => !(f.id === id && (type === 'series' ? 'video_count' in f : !('video_count' in f)))) });
+    }
+    if (type === 'series') {
+      get().patchSeriesLocal(id, { is_favorite: isCurrentlyFav ? 0 : 1 });
     }
     try {
       await apiToggleFavorite(id, type);
@@ -175,6 +221,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         set({ favorites: favorites.filter(f => f.id !== id) });
       } else {
         set({ favorites });
+      }
+      if (type === 'series') {
+        get().patchSeriesLocal(id, { is_favorite: isCurrentlyFav ? 1 : 0 });
       }
       console.error('[LibraryStore] toggleFavorite failed:', error);
     }

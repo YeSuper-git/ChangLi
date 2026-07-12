@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
-import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures, toggleFavorite, toggleWatched, rescanSingleSeriesMetadata, openSeriesInFileManager, switchSeriesTypeTo, deleteVideoSeries } from '../utils/api';
+import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures, toggleWatched, rescanSingleSeriesMetadata, openSeriesInFileManager, switchSeriesTypeTo, deleteVideoSeries } from '../utils/api';
 import { actorPhotoDataUrl, seriesPosterSrc, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
@@ -30,7 +30,7 @@ const fuzzyMatch = (source: string, keyword: string) => {
 const Search: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { series: storeSeries, actors: storeActors, loadAll, loaded } = useLibraryStore();
+  const { series: storeSeries, actors: storeActors, loadAll, loaded, toggleFavorite, patchSeriesLocal, removeSeriesLocal } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const queryKeyword = useMemo(() => new URLSearchParams(location.search).get('q') || '', [location.search]);
   const [keyword, setKeyword] = useState(queryKeyword);
@@ -41,7 +41,7 @@ const Search: React.FC = () => {
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
   const [typeSwitchSeriesId, setTypeSwitchSeriesId] = useState<number | null>(null);
   const [typeSwitchConfirm, setTypeSwitchConfirm] = useState<{ seriesId: number; categoryName: string; categoryKey: string } | null>(null);
-  const { favorites, watchedIds, refreshSeries } = useLibraryStore();
+  const { favorites, watchedIds } = useLibraryStore();
 
   // 加载大类配置
   useEffect(() => {
@@ -154,7 +154,6 @@ const Search: React.FC = () => {
       setContextMenu(null);
       clearPending();
       const matched = await rescanSingleSeriesMetadata(seriesId);
-      refreshSeries().catch(() => {});
       notify({ message: matched ? '信息已更新' : '未识别到可更新的信息', type: matched ? 'success' : 'info' });
     } catch (error) {
       notify({ message: '重新识别失败，请确认本地文件夹仍然存在', type: 'error' });
@@ -177,8 +176,13 @@ const Search: React.FC = () => {
     const name = typeSwitchConfirm.categoryName;
     setTypeSwitchConfirm(null);
     try {
+      patchSeriesLocal(typeSwitchConfirm.seriesId, { display_type: typeSwitchConfirm.categoryKey });
+      setResults(prev => prev.map(item => (
+        item.type === 'series' && item.id === typeSwitchConfirm.seriesId
+          ? { ...item, series: { ...item.series, display_type: typeSwitchConfirm.categoryKey } }
+          : item
+      )));
       await switchSeriesTypeTo(typeSwitchConfirm.seriesId, typeSwitchConfirm.categoryKey);
-      refreshSeries().catch(() => {});
       notify({ message: `已切换到${name}`, type: 'success' });
     } catch (error) {
       notify({ message: '切换分类失败，请稍后重试', type: 'error' });
@@ -188,11 +192,11 @@ const Search: React.FC = () => {
   const handleDeleteSeries = async (seriesId: number) => {
     // 乐观更新：立即从结果中移除
     setResults(prev => prev.filter(r => !(r.type === 'series' && r.id === seriesId)));
+    removeSeriesLocal(seriesId);
     setContextMenu(null);
     clearPending();
     try {
       await deleteVideoSeries(seriesId, true);
-      refreshSeries().catch(() => {});
       notify({ message: '视频集已删除', type: 'success' });
     } catch (error) {
       notify({ message: '删除失败，请稍后重试', type: 'error' });
@@ -301,7 +305,6 @@ const Search: React.FC = () => {
             const name = contextMenu.name;
             setContextMenu(null);
             toggleFavorite(id, 'series').then(() => {
-              refreshSeries();
               notify({ message: isFav ? `已取消「${name}」的追番` : `已将「${name}」添加到追番`, type: 'success' });
             }).catch(() => { notify({ message: '操作失败，请稍后重试', type: 'error' }); });
           }}>{isFav ? '取消该追番' : '添加到追番'}</button>
@@ -309,10 +312,13 @@ const Search: React.FC = () => {
             const id = contextMenu.id;
             const name = contextMenu.name;
             setContextMenu(null);
+            patchSeriesLocal(id, { is_watched: isWatched ? 0 : 1 });
             toggleWatched(id).then(() => {
-              refreshSeries();
               notify({ message: isWatched ? `已取消「${name}」的已看完标记` : `已将「${name}」标记为已看完`, type: 'success' });
-            }).catch(() => { notify({ message: '操作失败，请稍后重试', type: 'error' }); });
+            }).catch(() => {
+              patchSeriesLocal(id, { is_watched: isWatched ? 1 : 0 });
+              notify({ message: '操作失败，请稍后重试', type: 'error' });
+            });
           }}>{isWatched ? '取消已看完标记' : '标记为已看完'}</button>
           <button className="changli-menu-item" onClick={() => handleRescanMetadata(contextMenu.id)}>检查更新</button>
           <button className="changli-menu-item" onClick={() => handleSwitchType(contextMenu.id)}>切换分类</button>

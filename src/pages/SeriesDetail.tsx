@@ -95,7 +95,7 @@ const SeriesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { favorites, toggleFavorite, refreshSeries, tags: cachedTags, actors: cachedActors } = useLibraryStore();
+  const { favorites, toggleFavorite, refreshSeries, tags: cachedTags, actors: cachedActors, patchSeriesLocal, adjustSeriesVideoCountLocal } = useLibraryStore();
   const [searchParams] = useSearchParams();
   const fromActor = searchParams.get('fromActor');
   const editFromUrl = searchParams.get('edit') === '1';
@@ -364,12 +364,19 @@ const SeriesDetail: React.FC = () => {
     clearEditQuery(); setUserTouchedSub(false);
     setEditing(false);
     notify({ message: '已保存', type: 'success' });
-    // 后台静默保存
+    patchSeriesLocal(series.id, {
+      title,
+      description: editData.description,
+      poster: editData.poster || series.poster,
+      status: editData.status,
+      code: editData.code || undefined,
+    });
+    // 后台静默保存；只刷新当前详情，不再触发整库列表刷新。
     try {
-      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined);
+      const savedSeries = await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined);
+      patchSeriesLocal(series.id, savedSeries);
       await syncSeriesRelations();
       loadSeries({ silent: true }).catch(() => {});
-      refreshSeries().catch(() => {});
     } catch (error) {
       console.error('保存视频集失败:', error);
       notify({ message: '保存失败，请检查内容后重试', type: 'error' });
@@ -394,8 +401,8 @@ const SeriesDetail: React.FC = () => {
         series.code || undefined,
         series.has_chinese_sub ?? 0,
       );
+      patchSeriesLocal(series.id, { status: nextStatus });
       loadSeries({ silent: true }).catch(() => {});
-      refreshSeries().catch(() => {});
     } catch (error) {
       // 回滚
       setSeries(prev => prev ? { ...prev, status: series.status } : prev);
@@ -431,8 +438,10 @@ const SeriesDetail: React.FC = () => {
         return nameA.localeCompare(nameB, undefined, { numeric: true });
       });
       await addVideosToSeries(series.id, paths);
-      // 重新加载视频列表
-      const [, newVideos] = await getVideoSeriesDetail(series.id);
+      adjustSeriesVideoCountLocal(series.id, paths.length);
+      // 只重新加载当前详情的视频列表，不刷新整库列表。
+      const [nextSeries, newVideos] = await getVideoSeriesDetail(series.id);
+      if (nextSeries) setSeries(nextSeries);
       setVideos(newVideos);
       notify({ message: `已添加 ${paths.length} 个分集`, type: 'success' });
     } catch (error) {
@@ -453,8 +462,8 @@ const SeriesDetail: React.FC = () => {
     setSelectMode(false);
     try {
       await deleteVideosBatch(idsToDelete);
-      // 后台同步
-      refreshSeries().catch(() => {});
+      adjustSeriesVideoCountLocal(seriesId, -count);
+      setSeries(prev => prev ? { ...prev, video_count: Math.max(0, (prev.video_count || 0) - count) } : prev);
       notify({ message: `已删除 ${count} 个分集`, type: 'success' });
     } catch (error) {
       // 失败时重新加载恢复
@@ -594,12 +603,12 @@ const SeriesDetail: React.FC = () => {
     // 乐观更新本地状态
     setSeries(prev => prev ? { ...prev, is_watched: wasWatched ? 0 : 1 } : prev);
     try {
+      patchSeriesLocal(series.id, { is_watched: wasWatched ? 0 : 1 });
       await toggleWatched(series.id);
-      // 后台静默同步 store
-      refreshSeries().catch(() => {});
     } catch (error) {
       // 回滚
       setSeries(prev => prev ? { ...prev, is_watched: wasWatched ? 1 : 0 } : prev);
+      patchSeriesLocal(series.id, { is_watched: wasWatched ? 1 : 0 });
       console.error('切换已看完状态失败:', error);
     }
   };
@@ -609,10 +618,11 @@ const SeriesDetail: React.FC = () => {
     const wasChineseSub = series.has_chinese_sub === 1;
     setSeries(prev => prev ? { ...prev, has_chinese_sub: wasChineseSub ? 0 : 1 } : prev);
     try {
+      patchSeriesLocal(series.id, { has_chinese_sub: wasChineseSub ? 0 : 1 });
       await toggleChineseSub(series.id);
-      refreshSeries().catch(() => {});
     } catch (error) {
       setSeries(prev => prev ? { ...prev, has_chinese_sub: wasChineseSub ? 1 : 0 } : prev);
+      patchSeriesLocal(series.id, { has_chinese_sub: wasChineseSub ? 1 : 0 });
       console.error('切换中文字幕状态失败:', error);
     }
   };
@@ -662,7 +672,6 @@ const SeriesDetail: React.FC = () => {
       if (result.new_videos.length === 0 && result.missing_videos.length === 0) {
         seriesDetailCache.delete(series.id);
         loadSeries({ silent: true }).catch(() => {});
-        refreshSeries().catch(() => {});
         const parts = buildUpdateNotifyParts({
           renamed: result.renamed_videos_count,
           posterUpdated: result.poster_updated,
@@ -698,8 +707,8 @@ const SeriesDetail: React.FC = () => {
         await deleteVideo(video.id);
       }
       seriesDetailCache.delete(series.id);
+      adjustSeriesVideoCountLocal(series.id, selectedNew.length - selectedMissing.length);
       await loadSeries();
-      await refreshSeries();
       const parts = buildUpdateNotifyParts({
         added: selectedNew.length,
         skippedNew: newVideos.length - selectedNew.length,
@@ -723,8 +732,8 @@ const SeriesDetail: React.FC = () => {
       }
       setMissingVideos([]);
       seriesDetailCache.delete(seriesId);
+      adjustSeriesVideoCountLocal(seriesId, -missingVideos.length);
       await loadSeries();
-      await refreshSeries();
       notify({ message: '已删除本地不存在的分集记录', type: 'success' });
     } catch (error) {
       console.error('[SeriesDetail] 移除本地已删除分集失败:', error);

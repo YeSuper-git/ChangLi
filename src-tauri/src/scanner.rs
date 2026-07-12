@@ -26,7 +26,7 @@ fn raw_image_data_url(poster_path: &Path) -> Option<String> {
     Some(format!("data:{};base64,{}", image_mime_from_extension(poster_path), encoded))
 }
 
-/// 生成缩略图 Base64（最大 300px 宽，≤50KB）。如果图片解码失败，回退为原图 data URL，避免本地海报路径存在但缓存为空。
+/// 生成海报缓存 Base64（最大 600px 宽）。如果图片解码失败，回退为原图 data URL，避免本地海报路径存在但缓存为空。
 pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
     let reader = match ImageReader::open(poster_path) {
         Ok(r) => r,
@@ -48,8 +48,8 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
         }
     };
 
-    // 缩放到最大 1200px 宽（详情页需要更高清）
-    let max_width = 1200;
+    // 缩放到最大 600px 宽，兼顾详情页清晰度和保存/刷新后的 IPC 负担。
+    let max_width = 600;
     let resized = if img.width() > max_width {
         img.resize(
             max_width,
