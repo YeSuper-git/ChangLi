@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { addTag, deleteTag } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
+import { notify } from '../utils/notify';
 
 const Tags: React.FC = () => {
   const { tags, refreshTags } = useLibraryStore();
@@ -10,10 +11,15 @@ const Tags: React.FC = () => {
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   const handleAddTag = async () => {
-    if (!newTagName.trim()) return;
-    
+    const name = newTagName.trim();
+    if (!name) return;
+    // 去重检查
+    if (tags.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
+      notify({ message: `标签"${name}"已存在`, type: 'info' });
+      return;
+    }
     try {
-      await addTag(newTagName);
+      await addTag(name);
       setShowAddModal(false);
       setNewTagName('');
       await refreshTags();

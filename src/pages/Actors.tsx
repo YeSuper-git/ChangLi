@@ -29,17 +29,17 @@ const Actors: React.FC = () => {
   }, []);
 
   const handleAddActor = async () => {
-    if (!newActor.name.trim()) return;
-    
+    const name = newActor.name.trim();
+    if (!name) return;
+    // 去重检查
+    if (actors.some(a => a.name.trim().toLowerCase() === name.toLowerCase())) {
+      notify({ message: `演员"${name}"已存在`, type: 'info' });
+      return;
+    }
     try {
-      const actor = await addActor(
-        newActor.name,
-        undefined,
-        undefined
-      );
+      const actor = await addActor(name, undefined, undefined);
       setShowAddModal(false);
       setNewActor({ name: '' });
-      // 跳转到演员详情页
       navigate(`/actors/${actor.id}`);
     } catch (error) {
       console.error('新建演员失败:', error);
