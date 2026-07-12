@@ -2,6 +2,13 @@
 
 # Changelog
 
+# Changelog
+
+## [1.9.9] - 2026-07-12
+
+### Added
+- **macOS播放器UI适配**: mpv通过IPC socket控制+属性轮询，前端控制栏正常渲染
+
 ## [1.9.8] - 2026-07-12
 
 ### Fixed
