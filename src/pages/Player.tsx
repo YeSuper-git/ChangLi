@@ -352,6 +352,22 @@ const Player: React.FC = () => {
     };
   }, [id]);
 
+  // 阻止窗口被关闭（mpv 未初始化时插件不会阻止）
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      event.preventDefault();
+      try {
+        if (mpvInitialized.current) {
+          await command('quit').catch(() => {});
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await destroy().catch(() => {});
+        }
+      } catch {}
+      getCurrentWindow().destroy().catch(() => {});
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
+
   // 组件卸载时清理 mpv — 延迟 destroy，等 mpv 完全退出后再销毁窗口
   useEffect(() => {
     return () => {
