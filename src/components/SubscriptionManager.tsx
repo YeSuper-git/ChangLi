@@ -250,7 +250,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     setSelectedGroups(new Set());
 
     try {
-      const rssUrl = await detectRssUrl(bangumiUrl.trim());
+      const { rss_url: rssUrl, feed_season } = await detectRssUrl(bangumiUrl.trim());
       setDetectedRssUrl(rssUrl);
 
       const rssData = await fetchRss(rssUrl);
@@ -340,7 +340,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids }),
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids, feedSeason: feed_season ?? null }),
         'clipboard'
       );
 

@@ -1238,7 +1238,7 @@ export interface SubscriptionKeyword {
   created_at: string;
 }
 
-export async function detectRssUrl(url: string): Promise<string> {
+export async function detectRssUrl(url: string): Promise<{ rss_url: string; feed_season: number | null }> {
   return invoke('detect_rss_url', { url });
 }
 

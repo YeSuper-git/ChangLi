@@ -61,25 +61,56 @@ static INIT_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// 从 URL 自动识别 RSS 地址
 #[tauri::command]
-async fn detect_rss_url(url: String) -> Result<String, String> {
+async fn detect_rss_url(url: String) -> Result<(String, Option<i32>), String> {
     let url = url.trim();
     
     // Mikanani: /Home/Bangumi/{id} → /RSS/Bangumi?bangumiId={id}
+    // 同时获取页面标题提取季号
     if url.contains("mikanani") && url.contains("/Home/Bangumi/") {
         if let Some(id_pos) = url.rfind('/') {
             let bangumi_id = &url[id_pos + 1..];
             let bangumi_id = bangumi_id.split('?').next().unwrap_or(bangumi_id);
-            return Ok(format!("https://mikanani.kas.pub/RSS/Bangumi?bangumiId={}", bangumi_id));
+            let rss_url = format!("https://mikanani.kas.pub/RSS/Bangumi?bangumiId={}", bangumi_id);
+            
+            // 获取页面标题提取季号
+            let feed_season = if let Ok(resp) = reqwest::get(url).await {
+                if let Ok(html) = resp.text().await {
+                    // 从 <title> 或 <h1> 提取季号
+                    extract_season_from_html(&html)
+                } else { None }
+            } else { None };
+            
+            return Ok((rss_url, feed_season));
         }
     }
     
     // 已经是 RSS URL
     if url.contains("/RSS/") || url.contains("rss") {
-        return Ok(url.to_string());
+        return Ok((url.to_string(), None));
     }
     
     // 尝试从页面提取 RSS 链接
     Err("无法识别 RSS 地址，请输入番组页面 URL 或 RSS URL".to_string())
+}
+
+/// 从 HTML 页面标题提取季号
+fn extract_season_from_html(html: &str) -> Option<i32> {
+    use regex::Regex;
+    // 提取 <title>...</title> 或 <h1>...</h1>
+    let title_patterns = [
+        r"(?i)<title[^>]*>([^<]+)</title>",
+        r"(?i)<h1[^>]*>([^<]+)</h1>",
+    ];
+    for pattern in &title_patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            if let Some(caps) = re.captures(html) {
+                if let Some(title_text) = caps.get(1) {
+                    return extract_season_number(title_text.as_str());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// 获取 RSS 并解析
@@ -297,7 +328,13 @@ async fn check_subscription_updates(
     };
     // 也保留纯集数列表用于无季号时的匹配
     let existing_episodes: Vec<Option<i32>> = existing_season_episode.iter().map(|(_, ep)| *ep).collect();
-    
+
+    // 从订阅 preferences 中读取 feedSeason（RSS 源级别的季号）
+    let feed_season: Option<i32> = serde_json::from_str::<serde_json::Value>(&sub.preferences)
+        .ok()
+        .and_then(|v| v.get("feedSeason")?.as_i64())
+        .map(|s| s as i32);
+
     for item in &feed.items {
         // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
         if !selected_prefixes.is_empty() {
@@ -324,7 +361,8 @@ async fn check_subscription_updates(
         }
         
         // 从标题中提取季号和集数，跳过视频集中已有的 (season, episode) 组合
-        let item_season = extract_season_number(&item.title);
+        // 优先用条目标题的季号，没有则用 RSS feed 级别的季号
+        let item_season = extract_season_number(&item.title).or(feed_season);
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
             let dominated = if let Some(season) = item_season {
