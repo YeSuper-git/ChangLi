@@ -535,7 +535,9 @@ const SeriesDetail: React.FC = () => {
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
   const displayPosterDataUrl = editing && editData.poster && editData.poster !== (series?.poster || '')
     ? `${convertFileSrc(editData.poster)}?t=${Date.now()}`
-    : series?.poster_data_url;
+    : series?.poster
+      ? convertFileSrc(series.poster)
+      : series?.poster_data_url;
 
   if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2">加载中 <img src={loadingIcon} alt="" className="w-6 h-6" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
