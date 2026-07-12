@@ -120,8 +120,12 @@ const Settings: React.FC = () => {
     if (posterRepairStatus.status === 'running') return;
     try {
       setPosterRepairStatus({ status: 'running', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
+      // 先修复缺失的海报
       await repairMissingPostersSilent();
-      notify({ message: '海报更新中，可继续使用', type: 'info' });
+      // 再重新生成所有海报缓存（1200px）
+      const count = await regenerateAllPosterBase64();
+      setPosterRepairStatus((current) => ({ ...current, status: 'success', updated_series: count }));
+      notify({ message: `已更新 ${count} 张海报缓存`, type: 'success' });
     } catch (error) {
       console.error('启动批量修复海报失败:', error);
       setPosterRepairStatus((current) => ({ ...current, status: 'error', error: '更新失败，请稍后重试' }));
@@ -583,19 +587,6 @@ const Settings: React.FC = () => {
             </code>
           </div>
           <div className="mt-4 flex gap-2">
-            <button
-              onClick={async () => {
-                try {
-                  const count = await regenerateAllPosterBase64();
-                  notify({ message: `已重新生成 ${count} 张海报缓存`, type: 'success' });
-                } catch (e) {
-                  notify({ message: '重新生成失败', type: 'error' });
-                }
-              }}
-              className="action-btn text-sm"
-            >
-              重新生成海报缓存
-            </button>
           </div>
         </div>
       </section>
