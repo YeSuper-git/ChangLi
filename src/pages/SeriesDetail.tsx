@@ -190,12 +190,11 @@ const SeriesDetail: React.FC = () => {
   // 编辑模式打开时自动识别车牌
   useEffect(() => {
     if (userTouchedSub) return;
-    // 等 editData 被 toEditData 初始化后再执行（title 不为空表示已初始化）
     if (editing && series && !editData.code && editData.title) {
       const source = series.folder_path || series.title;
-      const { code, hasChineseSub } = extractCode(source);
+      const { code } = extractCode(source);
       if (code) {
-        setEditData((prev) => ({ ...prev, code, has_chinese_sub: hasChineseSub || prev.has_chinese_sub }));
+        setEditData((prev) => ({ ...prev, code }));
       }
     }
   }, [editing, series, editData.code, editData.title, userTouchedSub]);
