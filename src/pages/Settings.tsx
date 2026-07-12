@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { addSite, getUpdatesDir, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
-import { clearLibraryFilterCaches } from './Library';
-import type { Tag, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
+import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
-import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -63,8 +61,6 @@ const Settings: React.FC = () => {
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
-  const { pendingKey, requestSecondConfirm } = useSecondConfirm();
-
   useEffect(() => {
     window.scrollTo(0, 0);
     loadSettingsData();

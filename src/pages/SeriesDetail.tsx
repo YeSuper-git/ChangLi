@@ -355,14 +355,14 @@ const SeriesDetail: React.FC = () => {
       poster_data_url: editData.poster || prev.poster_data_url,
       status: editData.status,
       code: editData.code || undefined,
-      has_chinese_sub: editData.has_chinese_sub ? 1 : 0,
+      has_chinese_sub: prev.has_chinese_sub,
     } : prev);
     clearEditQuery(); setUserTouchedSub(false);
     setEditing(false);
     notify({ message: '已保存', type: 'success' });
     // 后台静默保存
     try {
-      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined, editData.has_chinese_sub ? 1 : 0);
+      await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined);
       await syncSeriesRelations();
       loadSeries({ silent: true }).catch(() => {});
       refreshSeries().catch(() => {});
@@ -804,23 +804,7 @@ const SeriesDetail: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    {editData.code && (
-                      <div>
-                        <div className="text-sm font-medium text-gray-500 mb-2">中文字幕</div>
-                        <div className={`changli-status-switch ${editData.has_chinese_sub ? 'is-right' : ''}`} role="group" aria-label="中文字幕支持">
-                          <button
-                            type="button"
-                            onClick={() => setEditData({ ...editData, has_chinese_sub: false })}
-                            className={!editData.has_chinese_sub ? 'active' : ''}
-                          >不支持</button>
-                          <button
-                            type="button"
-                            onClick={() => setEditData({ ...editData, has_chinese_sub: true })}
-                            className={editData.has_chinese_sub ? 'active' : ''}
-                          >支持</button>
-                        </div>
-                      </div>
-                    )}
+
                   </div>
                 )}
                 {features.actors && (

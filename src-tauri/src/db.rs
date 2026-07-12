@@ -891,18 +891,32 @@ pub async fn update_video_series(
     code: Option<String>,
     has_chinese_sub: Option<i32>,
 ) -> Result<VideoSeries> {
-    sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, code = ?, has_chinese_sub = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .bind(title)
-        .bind(description)
-        .bind(poster)
-        .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
-        .bind(status.unwrap_or_else(|| "ongoing".to_string()))
-        .bind(poster_base64)
-        .bind(code)
-        .bind(has_chinese_sub.unwrap_or(0))
-        .bind(id)
-        .execute(pool)
-        .await?;
+    if let Some(val) = has_chinese_sub {
+        sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, code = ?, has_chinese_sub = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(title)
+            .bind(description)
+            .bind(poster)
+            .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
+            .bind(status.unwrap_or_else(|| "ongoing".to_string()))
+            .bind(poster_base64)
+            .bind(code)
+            .bind(val)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    } else {
+        sqlx::query("UPDATE video_series SET title = ?, description = ?, poster = ?, poster_orientation = ?, status = ?, poster_base64 = ?, code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(title)
+            .bind(description)
+            .bind(poster)
+            .bind(poster_orientation.unwrap_or_else(|| "landscape".to_string()))
+            .bind(status.unwrap_or_else(|| "ongoing".to_string()))
+            .bind(poster_base64)
+            .bind(code)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    };
     get_video_series(pool, id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("视频集不存在"))
