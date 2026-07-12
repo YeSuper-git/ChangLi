@@ -509,14 +509,15 @@ async fn check_subscription_updates(
 /// 从标题中提取集数
 fn extract_season_number(title: &str) -> Option<i32> {
     use regex::Regex;
-    // S01, Season 1, 第1季 等格式
+    // 优先从中文标题提取季号（第三季、第2季 等）
+    // 然后从英文提取（Season 1、3rd Season 等）
+    // 注意：Mikanani 的 S01E25 中 S01 是系列编号不是季号，不能用
     let patterns = [
-        r"(?i)S(\d+)\d*E",           // S01E02 中的 S01
-        r"(?i)Season\s*(\d+)",        // Season 1
-        r"(?i)S(\d+)(?:\s|$|\[)",    // S01 [ 或 S01 结尾
-        r"第\s*(\d+)\s*季",           // 第1季
+        (r"第\s*(\d+)\s*季", true),                    // 第1季、第三季（中文最高优先）
+        (r"(?i)(\d+)(?:st|nd|rd|th)\s+Season", true),   // 3rd Season
+        (r"(?i)Season\s*(\d+)", true),                   // Season 1
     ];
-    for pattern in &patterns {
+    for (pattern, _) in &patterns {
         if let Ok(re) = Regex::new(pattern) {
             if let Some(caps) = re.captures(title) {
                 if let Some(s) = caps.get(1) {
