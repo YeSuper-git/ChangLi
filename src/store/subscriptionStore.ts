@@ -1,33 +1,24 @@
 import { create } from 'zustand';
-import { getAllSubscriptions, getVideoSeriesList } from '../utils/api';
-import type { BangumiSubscription, VideoSeries } from '../utils/api';
+import { getAllSubscriptions } from '../utils/api';
+import type { BangumiSubscription } from '../utils/api';
 
 interface SubscriptionState {
   subscriptions: BangumiSubscription[];
-  seriesMap: Record<number, string>;
   loaded: boolean;
   dirty: boolean;
   load: () => Promise<void>;
   markDirty: () => void;
 }
 
-const EMPTY_MAP: Record<number, string> = {};
-
 export const useSubscriptionStore = create<SubscriptionState>((set) => ({
   subscriptions: [],
-  seriesMap: EMPTY_MAP,
   loaded: false,
-  dirty: true, // 首次需要加载
+  dirty: true,
 
   load: async () => {
     try {
-      const [subs, seriesList] = await Promise.all([
-        getAllSubscriptions(),
-        getVideoSeriesList(),
-      ]);
-      const map: Record<number, string> = {};
-      seriesList.forEach((s: VideoSeries) => { map[s.id] = s.title; });
-      set({ subscriptions: subs, seriesMap: map, loaded: true, dirty: false });
+      const subs = await getAllSubscriptions();
+      set({ subscriptions: subs, loaded: true, dirty: false });
     } catch (err) {
       console.error('[SubscriptionStore] load failed:', err);
     }

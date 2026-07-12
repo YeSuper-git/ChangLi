@@ -1179,6 +1179,7 @@ export interface BangumiSubscription {
   preferences: string;
   created_at: string;
   updated_at: string;
+  series_title?: string | null;
 }
 
 export interface SubscriptionDownload {

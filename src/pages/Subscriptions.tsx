@@ -64,7 +64,6 @@ function extractSiteName(title: string): string {
 
 const Subscriptions: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<BangumiSubscription[]>([]);
-  const [seriesMap, setSeriesMap] = useState<Record<number, string>>({});
   const [showBindModal, setShowBindModal] = useState(false);
 
   // 按网站分组的展开状态
@@ -80,18 +79,15 @@ const Subscriptions: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       const store = useSubscriptionStore.getState();
-      // 如果 store 已有数据且未标记脏，直接用缓存
       if (store.loaded && store.subscriptions.length > 0 && !store.dirty) {
         setSubscriptions(store.subscriptions);
-        setSeriesMap(store.seriesMap);
         const sites = new Set(store.subscriptions.map(s => extractSiteName(s.title || s.rss_url)));
         setExpandedSites(sites);
         return;
       }
       await store.load();
-      const { subscriptions: subs, seriesMap: map } = useSubscriptionStore.getState();
+      const { subscriptions: subs } = useSubscriptionStore.getState();
       setSubscriptions(subs);
-      setSeriesMap(map);
       const sites = new Set(subs.map(s => extractSiteName(s.title || s.rss_url)));
       setExpandedSites(sites);
     } catch (err) {
@@ -101,15 +97,10 @@ const Subscriptions: React.FC = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    // 先用缓存数据快速渲染
     const { subscriptions: cached, loaded } = useSubscriptionStore.getState();
     if (loaded && cached.length > 0) {
       setSubscriptions(cached);
-      const map = useSubscriptionStore.getState().seriesMap;
-      setSeriesMap(map);
-      const sites = new Set(cached.map(s => extractSiteName(s.title || s.rss_url)));
-      setExpandedSites(sites);
-      // 有缓存就不触发 API 调用
+      setExpandedSites(new Set(cached.map(s => extractSiteName(s.title || s.rss_url))));
       return;
     }
     // 无缓存才加载
@@ -289,9 +280,9 @@ const Subscriptions: React.FC = () => {
                                 </span>
                               </button>
                               <div className="space-y-0.5">
-                                {sub.series_id && sub.series_id in seriesMap && (
+                                {sub.series_id && sub.series_title && (
                                   <div className="text-xs text-gray-500">
-                                    关联：{seriesMap[sub.series_id]}
+                                    关联：{sub.series_title}
                                   </div>
                                 )}
                                 <div className="text-xs text-gray-400">

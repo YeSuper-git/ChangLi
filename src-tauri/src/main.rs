@@ -200,7 +200,7 @@ async fn get_all_subscriptions(
     };
     
     let subs = sqlx::query_as::<_, db::BangumiSubscription>(
-        "SELECT * FROM bangumi_subscriptions ORDER BY created_at DESC"
+        "SELECT s.*, vs.title as series_title FROM bangumi_subscriptions s LEFT JOIN video_series vs ON s.series_id = vs.id ORDER BY s.created_at DESC"
     )
     .fetch_all(&pool)
     .await

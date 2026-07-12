@@ -130,6 +130,8 @@ pub struct BangumiSubscription {
     pub preferences: String,
     pub created_at: String,
     pub updated_at: String,
+    #[sqlx(default)]
+    pub series_title: Option<String>,
 }
 
 // 订阅下载记录
