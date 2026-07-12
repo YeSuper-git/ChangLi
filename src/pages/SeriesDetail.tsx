@@ -919,10 +919,10 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className={`mb-3 ${isPortrait ? 'flex items-start justify-between gap-5' : 'flex flex-col items-center gap-5'}`}>
-                  <div className={`${isPortrait ? 'min-w-0 flex-1' : 'text-center'}`}>
+                <div className={`mb-3`}>
+                  <div className="min-w-0 flex-1">
                     <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className={`flex flex-wrap items-center gap-2 ${!isPortrait ? 'justify-center' : ''}`}>
+                    <div className="flex flex-wrap items-center gap-2">
                       {features.chinese_sub && (
                         <button
                           onClick={handleToggleChineseSub}
@@ -956,7 +956,7 @@ const SeriesDetail: React.FC = () => {
                         </button>
                       )}
                     </div>
-                    <div className={`mt-2 flex flex-wrap items-center gap-2 ${!isPortrait ? 'justify-center' : ''}`}>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       {features.status && (
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
                           {isCompleted ? '已完结' : '连载中'}
@@ -974,7 +974,7 @@ const SeriesDetail: React.FC = () => {
                 </div>
                 )}
 
-                <div className={`mb-4 space-y-3 ${!isPortrait ? 'text-center' : ''}`}>
+                <div className="mb-4 space-y-3">
                   {features.tags && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
@@ -1008,7 +1008,7 @@ const SeriesDetail: React.FC = () => {
                 <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
                   {series.description || '暂无简介，快来给长离介绍一下吧'}
                 </p>
-                <div className={`mt-5 flex flex-wrap items-center gap-4 ${!isPortrait ? 'justify-center' : ''}`}>
+                <div className="mt-5 flex flex-wrap items-center gap-4">
                   <button
                     type="button"
                     onClick={handlePrimaryPlay}
