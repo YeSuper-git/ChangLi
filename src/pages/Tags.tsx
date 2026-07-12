@@ -4,7 +4,7 @@ import { TagWithCategories, Category } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
-import loadingIcon from '../assets/loading.svg';
+import loadingIcon from '../assets/icons/loading.svg';
 
 type ScopeFilter = 'all' | 'global' | 'category';
 
