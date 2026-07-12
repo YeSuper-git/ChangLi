@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
 import { addSite, getUpdatesDir, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
 import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -302,7 +303,7 @@ const Settings: React.FC = () => {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(currentVersion);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ downloaded: number; total: number; percentage: number } | null>(null);
-  const [downloadedFilePath, setDownloadedFilePath] = useState<string | null>(null);
+  // removed: downloadedFilePath replaced by downloadedUpdate
 
   useEffect(() => {
     if (!fieldContextMenu) return;
@@ -395,9 +396,29 @@ const Settings: React.FC = () => {
       const installer = findPlatformInstaller(release);
       const downloadUrl = installer?.browser_download_url || release.html_url;
 
-      setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer), body: release.body || undefined, fileName: installer?.name });
-      setUpdateStatus(`发现新版本 v${latestVersion}`);
-      notify({ message: `检测到最新版本 v${latestVersion}`, type: 'info' });
+      // 检查 updates 目录是否已有该版本安装包
+      let existingPath: string | null = null;
+      try {
+        const updatesDir = await getUpdatesDir();
+        const files = await invoke<string[]>('read_dir_entries', { dirPath: updatesDir });
+        if (installer?.name) {
+          const match = files.find(f => f === installer.name);
+          if (match) {
+            existingPath = updatesDir + (updatesDir.endsWith('/') ? '' : '/') + match;
+          }
+        }
+      } catch {}
+
+      if (existingPath) {
+        // 已有安装包，直接提示安装
+        setDownloadedUpdate({ path: existingPath, name: `v${latestVersion}`, size: 0 });
+        setUpdateStatus(`已下载 v${latestVersion}`);
+        notify({ message: `检测到已下载的 v${latestVersion} 安装包`, type: 'info' });
+      } else {
+        setPendingUpdate({ version: latestVersion, url: downloadUrl, hasInstaller: Boolean(installer), body: release.body || undefined, fileName: installer?.name });
+        setUpdateStatus(`发现新版本 v${latestVersion}`);
+        notify({ message: `检测到最新版本 v${latestVersion}`, type: 'info' });
+      }
     } catch (error) {
       console.error('检查更新失败:', error);
       setUpdateStatus('检查更新失败');
@@ -423,7 +444,6 @@ const Settings: React.FC = () => {
     // In-app download with progress
     setDownloading(true);
     setDownloadProgress({ downloaded: 0, total: 0, percentage: 0 });
-    setDownloadedFilePath(null);
     setUpdateStatus(`正在下载 v${update.version} 安装包...`);
 
     // Listen for progress events
@@ -436,7 +456,7 @@ const Settings: React.FC = () => {
 
     try {
       const filePath = await downloadUpdate(update.url, update.fileName);
-      setDownloadedFilePath(filePath);
+      setDownloadedUpdate({ path: filePath, name: `v${update.version}`, size: 0 });
       setUpdateStatus(`v${update.version} 下载完成`);
       notify({ message: '安装包下载完成，可点击安装', type: 'success' });
     } catch (error: any) {
@@ -466,10 +486,12 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleInstallUpdate = async () => {
-    if (!downloadedFilePath) return;
+  const handleInstallUpdate = async (filePath?: string) => {
+    const path = filePath || downloadedUpdate?.path;
+    if (!path) return;
     try {
-      await installUpdate(downloadedFilePath);
+      await installUpdate(path);
+      setDownloadedUpdate(null);
       notify({ message: '正在打开安装程序...', type: 'info' });
     } catch (error) {
       console.error('打开安装包失败:', error);
@@ -1139,30 +1161,6 @@ const Settings: React.FC = () => {
 
 
 
-      {/* 已下载的更新 */}
-      {downloadedUpdate && (
-        <section className="mb-12">
-          <div className="py-3 px-4 bg-amber-50 rounded-lg flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-amber-800">已下载更新：{downloadedUpdate.name}</p>
-              <p className="text-xs text-amber-600 mt-0.5">大小：{(downloadedUpdate.size / 1024 / 1024).toFixed(1)} MB</p>
-            </div>
-            <button
-              onClick={async () => {
-                try {
-                  await installUpdate(downloadedUpdate.path);
-                } catch (e) {
-                  notify({ message: '打开安装包失败', type: 'error' });
-                }
-              }}
-              className="action-btn action-btn-primary text-xs"
-            >
-              立即安装
-            </button>
-          </div>
-        </section>
-      )}
-
       {/* 检查更新 & 版本信息 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
@@ -1171,6 +1169,14 @@ const Settings: React.FC = () => {
             <p className="text-sm text-gray-500 mt-1">当前版本：v{currentVersion}</p>
           </div>
           <div className="flex gap-2 items-center" data-tutorial="settings-about">
+            {downloadedUpdate && (
+              <button
+                onClick={() => handleInstallUpdate()}
+                className="action-btn action-btn-primary text-xs"
+              >
+                安装 v{downloadedUpdate.name}
+              </button>
+            )}
             {updateStatus && (
               <span className="text-sm text-gray-500">{updateStatus}</span>
             )}
@@ -1184,7 +1190,7 @@ const Settings: React.FC = () => {
                 }, 100);
               }}
               className="action-btn"
-            >
+              >
               新手引导
             </button>
             <button
@@ -1256,8 +1262,8 @@ const Settings: React.FC = () => {
       )}
 
       <ConfirmDialog
-        open={!!pendingUpdate || downloading || !!downloadedFilePath}
-        title={downloading ? '下载更新' : downloadedFilePath ? '安装更新' : '检测到新版本'}
+        open={!!pendingUpdate || downloading}
+        title={downloading ? '下载更新' : '检测到新版本'}
         message={
           downloading && downloadProgress ? (
             <div className="space-y-4">
@@ -1279,11 +1285,6 @@ const Settings: React.FC = () => {
                 </span>
               </div>
             </div>
-          ) : downloadedFilePath ? (
-            <div>
-              <p className="mb-2">安装包已下载完成，点击安装按钮打开安装程序。</p>
-              <p className="text-xs text-gray-500">安装前请关闭当前应用</p>
-            </div>
           ) : pendingUpdate ? (
             <div>
               <p className="mb-3">检测到最新版本 v{pendingUpdate.version}，是否下载更新？</p>
@@ -1298,20 +1299,13 @@ const Settings: React.FC = () => {
             </div>
           ) : ''
         }
-        confirmText={downloading ? '取消下载' : downloadedFilePath ? '立即安装' : '下载更新'}
-        cancelText={downloading ? '' : downloadedFilePath ? '稍后' : '取消'}
-        onConfirm={downloading ? handleCancelDownload : downloadedFilePath ? handleInstallUpdate : handleConfirmUpdateDownload}
+        confirmText={downloading ? '取消下载' : '下载更新'}
+        cancelText={downloading ? '' : '取消'}
+        onConfirm={downloading ? handleCancelDownload : handleConfirmUpdateDownload}
         onCancel={() => {
-          if (downloading) {
-            handleCancelDownload();
-          } else if (downloadedFilePath) {
-            // 用户选择「稍后安装」：记住已下载的更新
-            setDownloadedUpdate({ path: downloadedFilePath, name: pendingUpdate ? `v${pendingUpdate.version}` : '更新', size: 0 });
-          }
           setPendingUpdate(null);
           setDownloading(false);
           setDownloadProgress(null);
-          setDownloadedFilePath(null);
           setUpdateStatus(null);
         }}
       />
