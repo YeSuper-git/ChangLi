@@ -316,7 +316,11 @@ export function formatSeriesEpisodeCountLabel(
 }
 
 export async function getVideoSeriesList(sortBy?: string, sortOrder?: string): Promise<VideoSeries[]> {
-  return invoke<VideoSeries[]>('get_video_series_list', { sortBy, sortOrder });
+  return invoke('get_video_series_list', { sortBy: sortBy || null, sortOrder: sortOrder || null });
+}
+
+export async function getVideoSeriesListLite(): Promise<[number, string, string | null][]> {
+  return invoke('get_video_series_list_lite');
 }
 
 

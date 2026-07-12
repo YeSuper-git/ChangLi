@@ -794,6 +794,18 @@ pub async fn get_video_series_by_folder_path(
     Ok(row.map(|row| series_from_row(&row)))
 }
 
+/// 轻量级查询：只返回 id, title, display_type（用于订阅弹窗搜索）
+pub async fn get_video_series_list_lite(
+    pool: &SqlitePool,
+) -> Result<Vec<(i64, String, Option<String>)>> {
+    let rows = sqlx::query_as::<_, (i64, String, Option<String>)>(
+        "SELECT id, title, display_type FROM video_series ORDER BY created_at DESC, id DESC"
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 pub async fn get_video_series_list(
     pool: &SqlitePool,
     sort_by: &str,

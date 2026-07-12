@@ -1558,6 +1558,19 @@ async fn delete_video(state: State<'_, AppState>, id: i64) -> Result<(), String>
 }
 
 #[tauri::command]
+async fn get_video_series_list_lite(
+    state: State<'_, AppState>,
+) -> Result<Vec<(i64, String, Option<String>)>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_list_lite(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_video_series_list(
     state: State<'_, AppState>,
     sort_by: Option<String>,
@@ -3977,6 +3990,7 @@ fn main() {
             enable_preset_template_cmd,
             disable_preset_template_cmd,
             regenerate_all_poster_base64,
+            get_video_series_list_lite,
             player::mpv_send_command,
             set_game_overlay_disabled,
             get_game_overlay_disabled,
