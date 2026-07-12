@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
   getVideoSeriesByActor,
@@ -159,20 +159,15 @@ const Library: React.FC = () => {
   }, [categories]);
 
   // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
-  const location = useLocation();
-  const prevLocationRef = useRef(location.pathname);
-
   useEffect(() => {
     // 从详情页返回时恢复滚动位置
     const saved = sessionStorage.getItem('library-scroll-y');
     if (saved) {
       sessionStorage.removeItem('library-scroll-y');
       requestAnimationFrame(() => window.scrollTo(0, Number(saved)));
-    } else if (prevLocationRef.current !== location.pathname) {
-      // 切换到新页面时滚动到顶部
+    } else {
       window.scrollTo(0, 0);
     }
-    prevLocationRef.current = location.pathname;
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
