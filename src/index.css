@@ -2864,3 +2864,395 @@ html.changli-player-html .changli-player-pip-actions,
 html.changli-player-html .changli-speed-options {
   isolation: isolate;
 }
+/* 标签管理页视觉优化 */
+
+.changli-tags-header {
+  align-items: flex-end;
+}
+
+.changli-tags-subtitle {
+  max-width: 520px;
+  margin-top: 12px;
+  color: #717783;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.changli-tags-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.changli-tags-count-card {
+  min-width: 112px;
+  border: 1px solid rgba(232, 235, 242, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 10px 14px;
+  box-shadow: 0 12px 28px rgba(33, 38, 48, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
+.changli-tags-count-card span {
+  display: block;
+  color: var(--changli-ink);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.changli-tags-count-card small {
+  display: block;
+  margin-top: 4px;
+  color: #8a909c;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.changli-tags-content {
+  display: grid;
+  gap: 28px;
+}
+
+.changli-tags-dashboard {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 16px;
+}
+
+.changli-tags-overview-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 132px;
+  border: 1px solid rgba(232, 235, 242, 0.92);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 22px;
+  box-shadow: 0 16px 40px rgba(33, 38, 48, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.changli-tags-overview-card::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  top: -40px;
+  width: 132px;
+  height: 132px;
+  border-radius: 999px;
+  background: rgba(251, 91, 123, 0.08);
+}
+
+.changli-tags-overview-primary {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(255, 138, 76, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(251, 91, 123, 0.12), rgba(255, 255, 255, 0.80));
+}
+
+.changli-tags-overview-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  color: #7a808d;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.changli-tags-overview-card strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 10px;
+  color: var(--changli-ink);
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.changli-tags-overview-card p {
+  position: relative;
+  z-index: 1;
+  margin-top: 12px;
+  color: #737782;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.changli-tags-section {
+  border: 1px solid rgba(232, 235, 242, 0.92);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.56);
+  padding: 20px;
+  box-shadow: 0 14px 34px rgba(33, 38, 48, 0.045);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.changli-tags-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 0 2px;
+}
+
+.changli-tags-section-header h2 {
+  color: var(--changli-ink);
+  font-size: 22px;
+  font-weight: 880;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+
+.changli-tags-section-header p {
+  margin-top: 4px;
+  color: #858b96;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.changli-tags-section-header > span {
+  border: 1px solid rgba(232, 235, 242, 0.96);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #666d79;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.changli-tags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.changli-tag-card {
+  position: relative;
+  min-height: 138px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(248, 249, 252, 0.80));
+  padding: 16px;
+  box-shadow: 0 12px 28px rgba(33, 38, 48, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.changli-tag-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.86;
+  background: var(--tag-bg, linear-gradient(135deg, rgba(251, 91, 123, 0.10), transparent 62%));
+  pointer-events: none;
+}
+
+.changli-tag-card::after {
+  content: '';
+  position: absolute;
+  right: -28px;
+  bottom: -34px;
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  background: var(--tag-orb, rgba(251, 91, 123, 0.12));
+  pointer-events: none;
+}
+
+.changli-tag-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 44px rgba(33, 38, 48, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.changli-tag-card-rose { --tag-bg: linear-gradient(135deg, rgba(251, 91, 123, 0.18), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(251, 91, 123, 0.16); }
+.changli-tag-card-orange { --tag-bg: linear-gradient(135deg, rgba(255, 138, 76, 0.18), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(255, 138, 76, 0.16); }
+.changli-tag-card-amber { --tag-bg: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(245, 158, 11, 0.14); }
+.changli-tag-card-emerald { --tag-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(16, 185, 129, 0.14); }
+.changli-tag-card-blue { --tag-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(59, 130, 246, 0.14); }
+.changli-tag-card-indigo { --tag-bg: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(99, 102, 241, 0.14); }
+.changli-tag-card-violet { --tag-bg: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(139, 92, 246, 0.13); }
+.changli-tag-card-pink { --tag-bg: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(255, 255, 255, 0.28) 66%); --tag-orb: rgba(236, 72, 153, 0.13); }
+
+.changli-tag-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.changli-tag-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.80);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #9aa0ac;
+  font-size: 13px;
+  font-weight: 850;
+  opacity: 0;
+  box-shadow: 0 8px 18px rgba(33, 38, 48, 0.08);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  transition: opacity 0.16s ease, transform 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.changli-tag-card:hover .changli-tag-delete,
+.changli-tag-delete.is-confirming {
+  opacity: 1;
+}
+
+.changli-tag-delete:hover {
+  color: #ef4444;
+  background: rgba(255, 255, 255, 0.92);
+  transform: scale(1.04);
+}
+
+.changli-tag-delete.is-confirming {
+  border-color: rgba(239, 68, 68, 0.18);
+  background: #ef4444;
+  color: #fff;
+}
+
+.changli-tag-card-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 30px;
+}
+
+.changli-tag-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.70);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.64);
+  color: #5f6673;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 850;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.changli-tag-category-count {
+  min-width: 0;
+  overflow: hidden;
+  color: #858b96;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changli-tag-name {
+  margin-top: 18px;
+  padding-right: 16px;
+  color: #20242d;
+  font-size: 20px;
+  font-weight: 880;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+.changli-tag-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.changli-tag-category-chip,
+.changli-tag-category-more {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.58);
+  color: #525866;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.changli-tag-category-more {
+  color: #858b96;
+}
+
+.changli-tag-empty-note {
+  margin-top: 16px;
+  color: #8a909c;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.changli-tag-category-picker {
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(232, 235, 242, 0.96);
+  border-radius: 18px;
+  background: rgba(246, 247, 251, 0.72);
+  padding: 8px;
+}
+
+.changli-tag-category-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  padding: 9px 10px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.changli-tag-category-option:hover {
+  border-color: rgba(232, 235, 242, 0.96);
+  background: rgba(255, 255, 255, 0.82);
+  transform: translateY(-1px);
+}
+
+.changli-tag-category-key {
+  margin-left: auto;
+  color: #a0a6b1;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .changli-tags-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .changli-tags-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .changli-tags-dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .changli-tags-grid {
+    grid-template-columns: 1fr;
+  }
+}

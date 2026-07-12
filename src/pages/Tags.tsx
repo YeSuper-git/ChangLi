@@ -10,14 +10,14 @@ import loadingIcon from '../assets/icons/loading.svg';
 
 
 const colorCards = [
-  { background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', borderColor: '#fecdd3' },
-  { background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', borderColor: '#fed7aa' },
-  { background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)', borderColor: '#fde68a' },
-  { background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', borderColor: '#a7f3d0' },
-  { background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', borderColor: '#bfdbfe' },
-  { background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', borderColor: '#c7d2fe' },
-  { background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)', borderColor: '#e9d5ff' },
-  { background: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)', borderColor: '#fbcfe8' },
+  'rose',
+  'orange',
+  'amber',
+  'emerald',
+  'blue',
+  'indigo',
+  'violet',
+  'pink',
 ];
 
 function colorIndex(seed: string | number): number {
@@ -72,6 +72,10 @@ const Tags: React.FC = () => {
   // Split into global and category
   const globalTags = useMemo(() => tags.filter(t => t.scope === 'global'), [tags]);
   const categoryTags = useMemo(() => tags.filter(t => t.scope === 'category'), [tags]);
+  const linkedCategoryCount = useMemo(
+    () => new Set(categoryTags.flatMap(tag => tag.category_keys)).size,
+    [categoryTags]
+  );
 
   const toggleCategoryKey = (key: string, keys: string[], setKeys: (v: string[]) => void) => {
     setKeys(keys.includes(key) ? keys.filter(k => k !== key) : [...keys, key]);
@@ -158,11 +162,15 @@ const Tags: React.FC = () => {
   // Render tag card
   const renderTagCard = (tag: TagWithCategories) => {
     const cardColor = colorCards[colorIndex(tag.id || tag.name)];
+    const categorySummary = tag.scope === 'category'
+      ? tag.category_keys.length > 0
+        ? `已关联 ${tag.category_keys.length} 个分类`
+        : '未关联分类'
+      : '全部分类可用';
     return (
     <div
       key={tag.id}
-      className="changli-panel p-5 cursor-pointer hover:shadow-md transition-all duration-200 relative group"
-      style={cardColor}
+      className={`changli-tag-card changli-tag-card-${cardColor} cursor-pointer group`}
       onClick={() => openEditModal(tag)}
     >
       {/* Delete button */}
@@ -171,34 +179,38 @@ const Tags: React.FC = () => {
           e.stopPropagation();
           requestSecondConfirm(`delete-tag-${tag.id}`, () => handleDelete(tag.id));
         }}
-        className={`absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 ${
+        className={`changli-tag-delete ${
           pendingKey === `delete-tag-${tag.id}`
-            ? 'bg-red-500 text-white opacity-100'
-            : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
+            ? 'is-confirming'
+            : ''
         }`}
         title={pendingKey === `delete-tag-${tag.id}` ? '确认删除?' : '删除标签'}
       >
         {pendingKey === `delete-tag-${tag.id}` ? '✓' : '×'}
       </button>
+      <div className="changli-tag-card-topline">
+        <span className="changli-tag-scope-pill">{tag.scope === 'global' ? '全局' : '特殊'}</span>
+        <span className="changli-tag-category-count">{categorySummary}</span>
+      </div>
 
       {/* Tag name */}
-      <h3 className="text-base font-semibold text-gray-900 mb-2 pr-6">{tag.name}</h3>
+      <h3 className="changli-tag-name">{tag.name}</h3>
 
       {/* Associated categories */}
       {tag.scope === 'category' && tag.category_keys.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+        <div className="changli-tag-category-list">
           {tag.category_keys.slice(0, 4).map(key => (
-            <span key={key} className="text-[10px] px-2 py-0.5 rounded-full border border-white/60 bg-white/55 text-gray-700">
+            <span key={key} className="changli-tag-category-chip">
               {catName(key)}
             </span>
           ))}
           {tag.category_keys.length > 4 && (
-            <span className="text-[10px] text-gray-400 self-center">+{tag.category_keys.length - 4}</span>
+            <span className="changli-tag-category-more">+{tag.category_keys.length - 4}</span>
           )}
         </div>
       )}
       {tag.scope === 'category' && tag.category_keys.length === 0 && (
-        <p className="text-[11px] text-gray-500 italic mt-1">未关联分类</p>
+        <p className="changli-tag-empty-note">还没有选择使用范围</p>
       )}
     </div>
     );
@@ -227,11 +239,11 @@ const Tags: React.FC = () => {
   const renderCategoryCheckboxes = (scope: string, keys: string[], setKeys: (v: string[]) => void) => scope === 'category' && (
     <div>
       <label className="changli-form-label">关联分类</label>
-      <div className="border border-gray-200 rounded-xl p-3 space-y-1 max-h-52 overflow-y-auto bg-gray-50/50">
+      <div className="changli-tag-category-picker">
         {categories.length > 0 ? categories.map(cat => (
           <label
             key={cat.key}
-            className="flex items-center gap-2.5 py-2 px-3 rounded-lg hover:bg-white cursor-pointer transition-colors"
+            className="changli-tag-category-option"
           >
             <input
               type="checkbox"
@@ -239,8 +251,8 @@ const Tags: React.FC = () => {
               onChange={() => toggleCategoryKey(cat.key, keys, setKeys)}
               className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-400"
             />
-            <span className="text-sm text-gray-700">{cat.name}</span>
-            <span className="text-[10px] text-gray-400 ml-auto">{cat.key}</span>
+            <span className="text-sm text-gray-700 font-semibold">{cat.name}</span>
+            <span className="changli-tag-category-key">{cat.key}</span>
           </label>
         )) : (
           <p className="text-sm text-gray-400 text-center py-4">暂无分类</p>
@@ -252,14 +264,23 @@ const Tags: React.FC = () => {
   return (
     <div className="changli-page">
       {/* Header */}
-      <div className="changli-page-header">
-        <h1 className="changli-heading-xl">标签管理</h1>
-        <button
-          onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
-          className="action-btn action-btn-primary"
-        >
-          + 创建标签
-        </button>
+      <div className="changli-page-header changli-tags-header">
+        <div>
+          <h1 className="changli-heading-xl">标签管理</h1>
+          <p className="changli-tags-subtitle">整理全局标签和分类专属标签，让筛选规则更清晰。</p>
+        </div>
+        <div className="changli-tags-header-actions">
+          <div className="changli-tags-count-card">
+            <span>{tags.length}</span>
+            <small>标签总数</small>
+          </div>
+          <button
+            onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
+            className="action-btn action-btn-primary"
+          >
+            + 创建标签
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -278,12 +299,37 @@ const Tags: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="changli-tags-content">
+        <div className="changli-tags-dashboard">
+          <div className="changli-tags-overview-card changli-tags-overview-primary">
+            <span className="changli-tags-overview-label">全局标签</span>
+            <strong>{globalTags.length}</strong>
+            <p>用于所有分类的通用筛选项</p>
+          </div>
+          <div className="changli-tags-overview-card">
+            <span className="changli-tags-overview-label">特殊标签</span>
+            <strong>{categoryTags.length}</strong>
+            <p>只在指定分类中显示</p>
+          </div>
+          <div className="changli-tags-overview-card">
+            <span className="changli-tags-overview-label">已覆盖分类</span>
+            <strong>{linkedCategoryCount}</strong>
+            <p>已有专属标签关联的分类</p>
+          </div>
+        </div>
+
+        <div className="space-y-8">
           {/* 全局标签 */}
           {globalTags.length > 0 && (
-            <section>
-              <h2 className="text-sm font-medium text-gray-400 mb-4">全局标签</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <section className="changli-tags-section">
+              <div className="changli-tags-section-header">
+                <div>
+                  <h2>全局标签</h2>
+                  <p>适合跨分类共用的标签</p>
+                </div>
+                <span>{globalTags.length} 个</span>
+              </div>
+              <div className="changli-tags-grid">
                 {globalTags.map(renderTagCard)}
               </div>
             </section>
@@ -291,13 +337,20 @@ const Tags: React.FC = () => {
 
           {/* 特殊标签 */}
           {categoryTags.length > 0 && (
-            <section>
-              <h2 className="text-sm font-medium text-gray-400 mb-4">特殊标签</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <section className="changli-tags-section">
+              <div className="changli-tags-section-header">
+                <div>
+                  <h2>特殊标签</h2>
+                  <p>只在关联分类内出现，避免标签过多干扰</p>
+                </div>
+                <span>{categoryTags.length} 个</span>
+              </div>
+              <div className="changli-tags-grid">
                 {categoryTags.map(renderTagCard)}
               </div>
             </section>
           )}
+        </div>
         </div>
       )}
 
