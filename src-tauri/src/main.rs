@@ -59,9 +59,14 @@ static INIT_LOCK: Mutex<()> = Mutex::const_new(());
 // 初始化数据库（如果已在 setup 中初始化则直接返回）
 // === 订阅相关命令 ===
 
-/// 从 URL 自动识别 RSS 地址
+#[derive(serde::Serialize)]
+struct DetectRssResult {
+    rss_url: String,
+    feed_season: Option<i32>,
+}
+
 #[tauri::command]
-async fn detect_rss_url(url: String) -> Result<(String, Option<i32>), String> {
+async fn detect_rss_url(url: String) -> Result<DetectRssResult, String> {
     let url = url.trim();
     
     // Mikanani: /Home/Bangumi/{id} → /RSS/Bangumi?bangumiId={id}
@@ -80,13 +85,13 @@ async fn detect_rss_url(url: String) -> Result<(String, Option<i32>), String> {
                 } else { None }
             } else { None };
             
-            return Ok((rss_url, feed_season));
+            return Ok(DetectRssResult { rss_url, feed_season });
         }
     }
     
     // 已经是 RSS URL
     if url.contains("/RSS/") || url.contains("rss") {
-        return Ok((url.to_string(), None));
+        return Ok(DetectRssResult { rss_url: url.to_string(), feed_season: None });
     }
     
     // 尝试从页面提取 RSS 链接
