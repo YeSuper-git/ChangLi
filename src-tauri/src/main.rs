@@ -2426,7 +2426,6 @@ async fn update_tag(state: State<'_, AppState>, id: i64, name: String, scope: Op
     db::update_tag(&pool, id, &name, scope_str).await.map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 #[derive(serde::Serialize)]
 struct TagWithCategories {
     #[serde(flatten)]
@@ -2434,6 +2433,7 @@ struct TagWithCategories {
     category_keys: Vec<String>,
 }
 
+#[tauri::command]
 async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<TagWithCategories>, String> {
     let pool = {
         let guard = state.db.lock().await;
