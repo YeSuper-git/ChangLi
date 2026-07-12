@@ -1356,12 +1356,11 @@ pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
 pub async fn get_tags_by_category(pool: &SqlitePool, category_key: &str) -> Result<Vec<Tag>> {
     let rows = sqlx::query(
         "SELECT DISTINCT t.* FROM tags t
-         JOIN series_tags st ON st.tag_id = t.id
-         JOIN video_series vs ON vs.id = st.series_id
-         WHERE (vs.display_type = ? OR ((vs.display_type IS NULL OR vs.display_type = '') AND ? = 'anime'))
+         LEFT JOIN tag_categories tc ON tc.tag_id = t.id
+         WHERE t.scope = 'global'
+            OR (t.scope = 'category' AND tc.category_key = ?)
          ORDER BY t.name",
     )
-    .bind(category_key)
     .bind(category_key)
     .fetch_all(pool)
     .await?;
