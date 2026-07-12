@@ -855,7 +855,30 @@ pub async fn get_video_series_list(
     // poster_base64 只在详情页单独加载
     let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
-    Ok(rows.iter().map(series_from_row).collect())
+    // 直接构造结构体，不调用 series_from_row（避免读文件转base64，784个视频集会卡1分钟）
+    let result = rows.iter().map(|row| VideoSeries {
+        id: row.get("id"),
+        title: row.get("title"),
+        description: row.get("description"),
+        poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
+        poster_data_url: None,
+        poster_base64: None,
+        folder_path: row.get("folder_path"),
+        video_count: row.try_get("video_count").unwrap_or(0),
+        poster_orientation: row.try_get("poster_orientation").ok().flatten(),
+        status: row.try_get("status").ok().flatten(),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+        is_favorite: row.try_get("is_favorite").ok().flatten(),
+        is_watched: row.try_get("is_watched").ok().flatten(),
+        last_watched_episode: None,
+        last_watched_season: None,
+        has_actor: row.try_get::<Option<i64>, _>("has_actor").ok().flatten().map(|v| v > 0).unwrap_or(false),
+        has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
+        display_type: row.try_get("display_type").ok().flatten(),
+        code: None,
+    }).collect();
+    Ok(result)
 }
 
 pub async fn get_video_series_by_tag(pool: &SqlitePool, tag_id: i64) -> Result<Vec<VideoSeries>> {
