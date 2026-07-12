@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   getVideoSeriesByTag,
   getVideoSeriesByActor,
@@ -159,7 +159,6 @@ const Library: React.FC = () => {
   }, [categories]);
 
   // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
-  const dirtyRefreshHandledRef = useRef(false);
   const location = useLocation();
   const prevLocationRef = useRef(location.pathname);
 

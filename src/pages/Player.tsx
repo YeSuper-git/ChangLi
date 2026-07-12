@@ -216,6 +216,7 @@ const Player: React.FC = () => {
         } catch (initErr) {
           console.error('[Player] init 失败:', initErr);
           // 不传 path 重试一次（系统 PATH 中的 mpv）
+          try {
           await init({
               showMpvOutput: true,
               args: [

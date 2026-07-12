@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getTagsWithCategories, addTag, deleteTag, updateTag, updateTagCategories, getAllCategories } from '../utils/api';
-import { clearLibraryFilterCaches } from './Library';
+
 import { TagWithCategories, Category } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';

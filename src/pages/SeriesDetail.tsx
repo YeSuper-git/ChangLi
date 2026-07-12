@@ -25,6 +25,7 @@ import {
   getSeriesPlaybackVideo,
   openPlayerWindow,
   getTags,
+  getTagsByCategory,
   getVideoSeriesDetail,
   removeSeriesActor,
   removeSeriesTag,
@@ -251,7 +252,7 @@ const SeriesDetail: React.FC = () => {
       console.error('加载编辑选项失败:', error);
       notify({ message: '加载编辑选项失败，请稍后重试', type: 'error' });
     }
-  }, [cachedActors, cachedTags, editOptionsLoaded, currentCategory]);
+  }, [cachedActors, cachedTags, editOptionsLoaded]);
 
   useEffect(() => {
     if (editing) {
