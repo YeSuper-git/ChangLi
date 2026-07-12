@@ -30,6 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/', label: '首页' },
     { path: '/library', label: '视频' },
     { path: '/actors', label: '演员', tutorial: 'nav-actors' },
+    { path: '/tags', label: '标签' },
     { path: '/subscriptions', label: '订阅' },
     { path: '/downloads', label: '下载' },
   ];

@@ -626,7 +626,12 @@ export async function saveVideoThumbnail(sourcePath: string): Promise<string> {
 export interface Tag {
   id: number;
   name: string;
+  scope: 'global' | 'category';
   created_at: string;
+}
+
+export interface TagWithCategories extends Tag {
+  category_keys: string[];
 }
 
 export async function getTags(): Promise<Tag[]> {
@@ -635,6 +640,33 @@ export async function getTags(): Promise<Tag[]> {
     return result;
   } catch (err) {
     console.error('[API] getTags 失败:', err);
+    throw err;
+  }
+}
+
+export async function getTagsWithCategories(): Promise<TagWithCategories[]> {
+  try {
+    return await invoke<TagWithCategories[]>('get_tags_with_categories');
+  } catch (err) {
+    console.error('[API] getTagsWithCategories 失败:', err);
+    throw err;
+  }
+}
+
+export async function updateTag(id: number, name: string, scope: string): Promise<void> {
+  try {
+    await invoke('update_tag', { id, name, scope });
+  } catch (err) {
+    console.error('[API] updateTag 失败:', err);
+    throw err;
+  }
+}
+
+export async function updateTagCategories(tagId: number, categoryKeys: string[]): Promise<void> {
+  try {
+    await invoke('update_tag_categories', { tagId, categoryKeys });
+  } catch (err) {
+    console.error('[API] updateTagCategories 失败:', err);
     throw err;
   }
 }
@@ -662,14 +694,7 @@ export async function deleteTag(id: number): Promise<void> {
   }
 }
 
-export async function updateTag(id: number, name: string): Promise<void> {
-  try {
-    await invoke('update_tag', { id, name });
-  } catch (err) {
-    console.error('[API] updateTag 失败:', err);
-    throw err;
-  }
-}
+// 旧的 updateTag(id, name) 已合并到 updateTag(id, name, scope) 版本
 
 export async function getResourceTags(resourceId: number): Promise<Tag[]> {
   try {

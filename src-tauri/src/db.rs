@@ -191,7 +191,16 @@ pub struct Actor {
 pub struct Tag {
     pub id: i64,
     pub name: String,
+    pub scope: String,
     pub created_at: String,
+}
+
+// 标签-分类关联
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagCategory {
+    pub id: i64,
+    pub tag_id: i64,
+    pub category_key: String,
 }
 
 
@@ -1336,6 +1345,7 @@ pub async fn get_tags(pool: &SqlitePool) -> Result<Vec<Tag>> {
         .map(|row| Tag {
             id: row.get("id"),
             name: row.get("name"),
+            scope: row.get("scope"),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -1361,6 +1371,7 @@ pub async fn get_tags_by_category(pool: &SqlitePool, category_key: &str) -> Resu
         .map(|row| Tag {
             id: row.get("id"),
             name: row.get("name"),
+            scope: row.get("scope"),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -1417,26 +1428,33 @@ pub async fn get_tag_by_name(pool: &SqlitePool, name: &str) -> Result<Option<Tag
         Some(row) => Ok(Some(Tag {
             id: row.get("id"),
             name: row.get("name"),
+            scope: row.get("scope"),
             created_at: row.get("created_at"),
         })),
         None => Ok(None),
     }
 }
 
-pub async fn add_tag(pool: &SqlitePool, name: &str) -> Result<Tag> {
-    let row = sqlx::query("INSERT INTO tags (name) VALUES (?) RETURNING *")
+pub async fn add_tag(pool: &SqlitePool, name: &str, scope: &str) -> Result<Tag> {
+    let row = sqlx::query("INSERT INTO tags (name, scope) VALUES (?, ?) RETURNING *")
         .bind(name)
+        .bind(scope)
         .fetch_one(pool)
         .await?;
 
     Ok(Tag {
         id: row.get("id"),
         name: row.get("name"),
+        scope: row.get("scope"),
         created_at: row.get("created_at"),
     })
 }
 
 pub async fn delete_tag(pool: &SqlitePool, id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM tag_categories WHERE tag_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
     sqlx::query("DELETE FROM tags WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -1475,6 +1493,7 @@ pub async fn get_resource_tags(pool: &SqlitePool, resource_id: i64) -> Result<Ve
         .map(|row| Tag {
             id: row.get("id"),
             name: row.get("name"),
+            scope: row.get("scope"),
             created_at: row.get("created_at"),
         })
         .collect();
@@ -1697,6 +1716,7 @@ pub async fn get_series_tags(pool: &SqlitePool, series_id: i64) -> Result<Vec<Ta
         .map(|row| Tag {
             id: row.get("id"),
             name: row.get("name"),
+            scope: row.get("scope"),
             created_at: row.get("created_at"),
         })
         .collect())

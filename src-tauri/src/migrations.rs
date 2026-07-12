@@ -57,6 +57,23 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
     add_column_if_not_exists(pool, "actors", "view_count", "INTEGER NOT NULL DEFAULT 0").await?;
+
+    // === 标签 scope + tag_categories ===
+    add_column_if_not_exists(pool, "tags", "scope", "TEXT DEFAULT 'global'").await?;
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS tag_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tag_id INTEGER NOT NULL,
+            category_key TEXT NOT NULL,
+            FOREIGN KEY(tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+            UNIQUE(tag_id, category_key)
+        )
+        "#,
+        "create tag_categories table",
+    )
+    .await?;
     
     // === 订阅相关表 ===
     create_subscription_tables(pool).await?;
