@@ -8,6 +8,27 @@ import { notify } from '../utils/notify';
 import FloatingActions from '../components/FloatingActions';
 import loadingIcon from '../assets/icons/loading.svg';
 
+
+const colorCards = [
+  { background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', borderColor: '#fecdd3' },
+  { background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', borderColor: '#fed7aa' },
+  { background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)', borderColor: '#fde68a' },
+  { background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', borderColor: '#a7f3d0' },
+  { background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', borderColor: '#bfdbfe' },
+  { background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', borderColor: '#c7d2fe' },
+  { background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)', borderColor: '#e9d5ff' },
+  { background: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)', borderColor: '#fbcfe8' },
+];
+
+function colorIndex(seed: string | number): number {
+  const text = String(seed);
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  return hash % colorCards.length;
+}
+
 const Tags: React.FC = () => {
   const { refreshTags } = useLibraryStore();
   const [loading, setLoading] = useState(true);
@@ -135,10 +156,13 @@ const Tags: React.FC = () => {
   const catName = (key: string) => categories.find(c => c.key === key)?.name || key;
 
   // Render tag card
-  const renderTagCard = (tag: TagWithCategories) => (
+  const renderTagCard = (tag: TagWithCategories) => {
+    const cardColor = colorCards[colorIndex(tag.id || tag.name)];
+    return (
     <div
       key={tag.id}
       className="changli-panel p-5 cursor-pointer hover:shadow-md transition-all duration-200 relative group"
+      style={cardColor}
       onClick={() => openEditModal(tag)}
     >
       {/* Delete button */}
@@ -164,7 +188,7 @@ const Tags: React.FC = () => {
       {tag.scope === 'category' && tag.category_keys.length > 0 && (
         <div className="flex flex-wrap justify-center gap-1.5 mt-2">
           {tag.category_keys.slice(0, 4).map(key => (
-            <span key={key} className="changli-brand-badge text-[10px] px-2 py-0.5">
+            <span key={key} className="text-[10px] px-2 py-0.5 rounded-full border border-white/60 bg-white/55 text-gray-700">
               {catName(key)}
             </span>
           ))}
@@ -174,10 +198,11 @@ const Tags: React.FC = () => {
         </div>
       )}
       {tag.scope === 'category' && tag.category_keys.length === 0 && (
-        <p className="text-[11px] text-gray-400 italic mt-1">未关联分类</p>
+        <p className="text-[11px] text-gray-500 italic mt-1">未关联分类</p>
       )}
     </div>
-  );
+    );
+  };
 
   // Scope switch in modal
   const renderScopeSwitch = (scope: 'global' | 'category', setScope: (v: 'global' | 'category') => void, setKeys: (v: string[]) => void) => (

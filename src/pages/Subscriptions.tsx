@@ -11,6 +11,26 @@ import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
 
 
+const subscriptionColors = [
+  { background: 'linear-gradient(135deg, #fff1f2 0%, #fff7f7 100%)', borderColor: '#fecdd3' },
+  { background: 'linear-gradient(135deg, #fff7ed 0%, #fffaf5 100%)', borderColor: '#fed7aa' },
+  { background: 'linear-gradient(135deg, #fefce8 0%, #fffdf2 100%)', borderColor: '#fde68a' },
+  { background: 'linear-gradient(135deg, #ecfdf5 0%, #f5fffa 100%)', borderColor: '#a7f3d0' },
+  { background: 'linear-gradient(135deg, #eff6ff 0%, #f7fbff 100%)', borderColor: '#bfdbfe' },
+  { background: 'linear-gradient(135deg, #eef2ff 0%, #f8f9ff 100%)', borderColor: '#c7d2fe' },
+  { background: 'linear-gradient(135deg, #faf5ff 0%, #fdfaff 100%)', borderColor: '#e9d5ff' },
+  { background: 'linear-gradient(135deg, #fdf2f8 0%, #fff7fb 100%)', borderColor: '#fbcfe8' },
+];
+
+function colorIndex(seed: string | number): number {
+  const text = String(seed);
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  return hash % subscriptionColors.length;
+}
+
 /// 从 localStorage 读取检查更新结果
 function loadSubUpdates(): Map<number, any[]> {
   try {
@@ -250,8 +270,9 @@ const Subscriptions: React.FC = () => {
                   <div className="border-t border-gray-100 divide-y divide-gray-50">
                     {subs.map((sub) => {
                       const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
+                      const cardColor = subscriptionColors[colorIndex(sub.id || displayName || sub.rss_url)];
                       return (
-                        <div key={sub.id} className="px-6 py-4">
+                        <div key={sub.id} className="mx-3 my-2 rounded-2xl border px-4 py-4 shadow-sm transition-shadow hover:shadow-md" style={cardColor}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 min-w-0">
                               <button
@@ -315,7 +336,7 @@ const Subscriptions: React.FC = () => {
                             const episodes = subUpdates.get(sub.id) || [];
                             if (episodes.length === 0 && checkingId !== sub.id) {
                               return (
-                                <div className="mt-3 text-xs text-gray-400 border-t border-gray-100 pt-3">
+                                <div className="mt-3 text-xs text-gray-500 border-t border-white/60 pt-3">
                                   暂无新剧集更新
                                 </div>
                               );
@@ -345,9 +366,9 @@ const Subscriptions: React.FC = () => {
                             }
                             let globalIdx = 0;
                             return (
-                              <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                              <div className="mt-3 space-y-2 border-t border-white/60 pt-3">
                                 {Object.entries(groups).map(([gKey, gItems]) => (
-                                  <div key={gKey} className="bg-emerald-50 rounded-xl p-2.5">
+                                  <div key={gKey} className="rounded-xl border border-white/70 bg-white/55 p-2.5">
                                     <div className="flex items-center justify-between mb-1.5">
                                       <span className="text-xs font-medium text-gray-700">{gKey}</span>
                                       <span className="text-[10px] text-gray-400">{gItems.length} 集</span>
