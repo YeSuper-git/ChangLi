@@ -154,7 +154,6 @@ const SeriesDetail: React.FC = () => {
   const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     setEditOptionsLoaded(false);
     const nextCached = Number.isFinite(seriesId) ? seriesDetailCache.get(seriesId) : undefined;
     const nextSeries = nextCached?.series || routeState?.seriesSnapshot || null;
