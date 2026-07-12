@@ -60,6 +60,7 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   // envDeps 已移除
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
+  const [downloadCompletedUpdate, setDownloadCompletedUpdate] = useState<{path: string; version: string; size: number} | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   useEffect(() => {
@@ -415,7 +416,7 @@ const Settings: React.FC = () => {
 
       if (existingPath) {
         // 已有安装包，直接提示安装
-        setDownloadedUpdate({ path: existingPath, name: `v${latestVersion}`, size: 0 });
+        setDownloadedUpdate({ path: existingPath, name: latestVersion, size: 0 });
         setUpdateStatus(`已下载 v${latestVersion}`);
         notify({ message: `检测到已下载的 v${latestVersion} 安装包`, type: 'info' });
       } else {
@@ -460,9 +461,9 @@ const Settings: React.FC = () => {
 
     try {
       const filePath = await downloadUpdate(update.url, update.fileName);
-      setDownloadedUpdate({ path: filePath, name: `v${update.version}`, size: 0 });
+      setDownloadCompletedUpdate({ path: filePath, version: update.version, size: 0 });
       setUpdateStatus(`v${update.version} 下载完成`);
-      notify({ message: '安装包下载完成，可点击安装', type: 'success' });
+      notify({ message: '安装包下载完成', type: 'success' });
     } catch (error: any) {
       const errMsg = String(error?.message || error || '');
       if (errMsg.includes('取消')) {
@@ -496,6 +497,7 @@ const Settings: React.FC = () => {
     try {
       await installUpdate(path);
       setDownloadedUpdate(null);
+      setDownloadCompletedUpdate(null);
       notify({ message: '正在打开安装程序...', type: 'info' });
     } catch (error) {
       console.error('打开安装包失败:', error);
@@ -1268,8 +1270,8 @@ const Settings: React.FC = () => {
       )}
 
       <ConfirmDialog
-        open={!!pendingUpdate || downloading}
-        title={downloading ? '下载更新' : '检测到新版本'}
+        open={!!pendingUpdate || downloading || !!downloadCompletedUpdate}
+        title={downloading ? '下载更新' : downloadCompletedUpdate ? '安装更新' : '检测到新版本'}
         message={
           downloading && downloadProgress ? (
             <div className="space-y-4">
@@ -1291,6 +1293,11 @@ const Settings: React.FC = () => {
                 </span>
               </div>
             </div>
+          ) : downloadCompletedUpdate ? (
+            <div>
+              <p className="mb-2">v{downloadCompletedUpdate.version} 安装包已下载完成，是否立即安装？</p>
+              <p className="text-xs text-gray-500">安装前请关闭当前应用</p>
+            </div>
           ) : pendingUpdate ? (
             <div>
               <p className="mb-3">检测到最新版本 v{pendingUpdate.version}，是否下载更新？</p>
@@ -1305,10 +1312,16 @@ const Settings: React.FC = () => {
             </div>
           ) : ''
         }
-        confirmText={downloading ? '取消下载' : '下载更新'}
-        cancelText={downloading ? '' : '取消'}
-        onConfirm={downloading ? handleCancelDownload : handleConfirmUpdateDownload}
+        confirmText={downloading ? '取消下载' : downloadCompletedUpdate ? '立即安装' : '下载更新'}
+        cancelText={downloading ? '' : downloadCompletedUpdate ? '暂不安装' : '取消'}
+        onConfirm={downloading ? handleCancelDownload : downloadCompletedUpdate ? () => handleInstallUpdate(downloadCompletedUpdate.path) : handleConfirmUpdateDownload}
         onCancel={() => {
+          if (downloadCompletedUpdate) {
+            setDownloadedUpdate({ path: downloadCompletedUpdate.path, name: downloadCompletedUpdate.version, size: downloadCompletedUpdate.size });
+            setDownloadCompletedUpdate(null);
+            setUpdateStatus(`已下载 v${downloadCompletedUpdate.version}`);
+            return;
+          }
           setPendingUpdate(null);
           setDownloading(false);
           setDownloadProgress(null);

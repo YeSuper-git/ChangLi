@@ -32,6 +32,9 @@ function App() {
   const [autoDownloading, setAutoDownloading] = useState(false);
   const [autoDownloadProgress, setAutoDownloadProgress] = useState<{ downloaded: number; total: number; percentage: number } | null>(null);
   const [autoDownloadedFilePath, setAutoDownloadedFilePath] = useState<string | null>(null);
+  const AUTO_UPDATE_SKIP_UNTIL_KEY = 'changli_skip_auto_update_until';
+  const AUTO_UPDATE_SKIP_LEGACY_KEY = 'changli_skip_auto_update';
+  const AUTO_UPDATE_SKIP_DAYS = 15;
 
   useEffect(() => {
     const preventBrowserContextMenu = (event: MouseEvent) => {
@@ -73,12 +76,10 @@ function App() {
         // 等待 5 秒后再检查，避免影响启动速度
         await new Promise(resolve => setTimeout(resolve, 5000));
         
-        const skipCount = parseInt(localStorage.getItem('changli_skip_auto_update') || '0', 10);
-        if (skipCount > 0 && skipCount < 5) {
-          localStorage.setItem('changli_skip_auto_update', String(skipCount + 1));
-          return;
-        }
-        localStorage.removeItem('changli_skip_auto_update');
+        const skipUntil = Number(localStorage.getItem(AUTO_UPDATE_SKIP_UNTIL_KEY) || '0');
+        if (skipUntil > Date.now()) return;
+        localStorage.removeItem(AUTO_UPDATE_SKIP_UNTIL_KEY);
+        localStorage.removeItem(AUTO_UPDATE_SKIP_LEGACY_KEY);
         
         const release = await checkLatestRelease() as any;
         const tagName = release.tag_name || '';
@@ -221,7 +222,7 @@ function App() {
                 </div>
               ) : autoDownloadedFilePath ? (
                 <div className="py-2">
-                  <p className="text-sm text-gray-600 mb-2">安装包已下载完成，点击安装按钮打开安装程序。</p>
+                  <p className="text-sm text-gray-600 mb-2">安装包已下载完成，是否立即安装？</p>
                   <p className="text-xs text-gray-500">安装前请关闭当前应用</p>
                 </div>
               ) : autoUpdateInfo ? (
@@ -229,10 +230,15 @@ function App() {
                   <p className="text-sm text-gray-600 mb-3">是否下载更新？</p>
                   <label className="flex items-center gap-2 text-xs text-gray-500 mb-3 cursor-pointer">
                     <input type="checkbox" className="rounded" onChange={(e) => {
-                      if (e.target.checked) localStorage.setItem('changli_skip_auto_update', '1');
-                      else localStorage.removeItem('changli_skip_auto_update');
+                      if (e.target.checked) {
+                        localStorage.setItem(AUTO_UPDATE_SKIP_UNTIL_KEY, String(Date.now() + AUTO_UPDATE_SKIP_DAYS * 24 * 60 * 60 * 1000));
+                        localStorage.removeItem(AUTO_UPDATE_SKIP_LEGACY_KEY);
+                      } else {
+                        localStorage.removeItem(AUTO_UPDATE_SKIP_UNTIL_KEY);
+                        localStorage.removeItem(AUTO_UPDATE_SKIP_LEGACY_KEY);
+                      }
                     }} />
-                    近期不再提示（5次启动后恢复）
+                    近期不再提示
                   </label>
                   {autoUpdateInfo.body && (
                     <div className="p-3 bg-gray-50 rounded-lg mb-4">
@@ -267,7 +273,7 @@ function App() {
                     }} 
                     className="action-btn text-sm px-4 py-1.5"
                   >
-                    稍后
+                    暂不安装
                   </button>
                   <button 
                     onClick={async () => {
