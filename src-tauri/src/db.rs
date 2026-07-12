@@ -1668,8 +1668,6 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
         let poster: Option<String> = row.get("poster");
         let created_at: String = row.get("created_at");
         let poster_base64: Option<String> = row.try_get("series_poster_base64").ok().flatten();
-        // poster_base64 可能在列表查询中被排除，这时为 None
-        let poster_base64: Option<String> = row.try_get("poster_base64").ok().flatten();
         // poster_base64 可能已经是完整 data URL，不要再加前缀
         let poster_data_url = poster_base64.clone();
         results.push(Video {
