@@ -279,6 +279,7 @@ const Player: React.FC = () => {
             throw retryErr;
           }
         }
+        } // end else (Windows/Linux)
 
         await setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 }).catch(() => undefined);
 
