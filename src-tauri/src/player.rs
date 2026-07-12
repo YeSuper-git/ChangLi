@@ -315,6 +315,13 @@ pub fn mpv_send_command(cmd: String, args: Vec<String>) -> Result<String, String
     mpv_ipc::send_command(&cmd, &args_refs)
 }
 
+/// Windows/Linux: mpv_send_command 空实现（Windows 用 tauri-plugin-mpv）
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn mpv_send_command(_cmd: String, _args: Vec<String>) -> Result<String, String> {
+    Err("mpv_send_command only supported on macOS".to_string())
+}
+
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_) => {
