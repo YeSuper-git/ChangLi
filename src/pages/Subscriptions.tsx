@@ -79,11 +79,19 @@ const Subscriptions: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      await useSubscriptionStore.getState().load();
+      const store = useSubscriptionStore.getState();
+      // 如果 store 已有数据且未标记脏，直接用缓存
+      if (store.loaded && store.subscriptions.length > 0 && !store.dirty) {
+        setSubscriptions(store.subscriptions);
+        setSeriesMap(store.seriesMap);
+        const sites = new Set(store.subscriptions.map(s => extractSiteName(s.title || s.rss_url)));
+        setExpandedSites(sites);
+        return;
+      }
+      await store.load();
       const { subscriptions: subs, seriesMap: map } = useSubscriptionStore.getState();
       setSubscriptions(subs);
       setSeriesMap(map);
-      // 默认展开所有网站
       const sites = new Set(subs.map(s => extractSiteName(s.title || s.rss_url)));
       setExpandedSites(sites);
     } catch (err) {

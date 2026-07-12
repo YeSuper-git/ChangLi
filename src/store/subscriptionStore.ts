@@ -6,16 +6,18 @@ interface SubscriptionState {
   subscriptions: BangumiSubscription[];
   seriesMap: Record<number, string>;
   loaded: boolean;
+  dirty: boolean;
   load: () => Promise<void>;
+  markDirty: () => void;
 }
 
-// 空对象引用，避免每次创建新 Map
 const EMPTY_MAP: Record<number, string> = {};
 
 export const useSubscriptionStore = create<SubscriptionState>((set) => ({
   subscriptions: [],
   seriesMap: EMPTY_MAP,
   loaded: false,
+  dirty: true, // 首次需要加载
 
   load: async () => {
     try {
@@ -25,9 +27,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
       ]);
       const map: Record<number, string> = {};
       seriesList.forEach((s: VideoSeries) => { map[s.id] = s.title; });
-      set({ subscriptions: subs, seriesMap: map, loaded: true });
+      set({ subscriptions: subs, seriesMap: map, loaded: true, dirty: false });
     } catch (err) {
       console.error('[SubscriptionStore] load failed:', err);
     }
   },
+
+  markDirty: () => set({ dirty: true }),
 }));
