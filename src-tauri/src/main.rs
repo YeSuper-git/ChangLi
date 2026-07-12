@@ -2686,6 +2686,31 @@ async fn open_player_window(
     id: i64,
 ) -> Result<(), String> {
     eprintln!("[player] open_player_window called for video id={}", id);
+
+    // macOS: 直接用系统 mpv 播放（带 OSC），不创建 WebView 播放器窗口
+    #[cfg(target_os = "macos")]
+    {
+        let video_path = {
+            let pool = {
+                let guard = state.db.lock().await;
+                guard.as_ref().ok_or("数据库未初始化")?.clone()
+            };
+            let video = db::get_video(&pool, id)
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "视频不存在".to_string())?;
+            video.file_path.clone()
+        };
+        let mpv_path = player::find_mpv_path().unwrap_or_else(|_| "mpv".to_string());
+        let _ = std::process::Command::new(&mpv_path)
+            .arg(&video_path)
+            .arg("--osc=yes")
+            .arg("--osd-level=1")
+            .arg("--hwdec=auto-safe")
+            .spawn();
+        return Ok(());
+    }
+
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()

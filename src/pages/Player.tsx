@@ -178,19 +178,21 @@ const Player: React.FC = () => {
           throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
         }
 
-        // 获取播放器窗口原生句柄，用于 --wid 嵌入
-        let playerWid: string | undefined;
-        try {
-          const wid = await invoke<number>('get_player_wid');
-          playerWid = String(wid);
-          console.log('[Player] player WID:', playerWid);
-        } catch (e) {
-          console.warn('[Player] get_player_wid failed:', e);
-        }
-
         // 平台检测
         const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
+
+        // macOS 上不用 --wid 嵌入（WebKit 不兼容），改用 mpv 自带 OSC
+        let playerWid: string | undefined;
+        if (!isMac) {
+          try {
+            const wid = await invoke<number>('get_player_wid');
+            playerWid = String(wid);
+            console.log('[Player] player WID:', playerWid);
+          } catch (e) {
+            console.warn('[Player] get_player_wid failed:', e);
+          }
+        }
 
         try {
           await init({
@@ -201,9 +203,10 @@ const Player: React.FC = () => {
               isMac ? '--hwdec=auto-safe' : '--hwdec=no',
               ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
               '--keep-open=yes',
-              '--force-window=no',
-              '--osc=no',
-              '--osd-level=0',
+              '--force-window=yes',
+              // macOS 用 mpv 自带 OSC，Windows/Linux 用自定义控制栏
+              isMac ? '--osc=yes' : '--osc=no',
+              isMac ? '--osd-level=1' : '--osd-level=0',
               '--video-sync=audio',
               '--log-file=mpv.log',
               ...(playerWid ? [`--wid=${playerWid}`] : []),
@@ -214,16 +217,16 @@ const Player: React.FC = () => {
           console.error('[Player] init 失败:', initErr);
           // 不传 path 重试一次（系统 PATH 中的 mpv）
           try {
-          await init({
+            await init({
               showMpvOutput: true,
               args: [
                 '--vo=gpu',
                 isMac ? '--hwdec=auto-safe' : '--hwdec=no',
                 ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
                 '--keep-open=yes',
-                '--force-window=no',
-                '--osc=no',
-                '--osd-level=0',
+                '--force-window=yes',
+                isMac ? '--osc=yes' : '--osc=no',
+                isMac ? '--osd-level=1' : '--osd-level=0',
                 '--video-sync=audio',
                 '--log-file=mpv.log',
                 ...(playerWid ? [`--wid=${playerWid}`] : []),

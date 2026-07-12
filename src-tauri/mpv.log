@@ -1,67 +1,67 @@
-[   0.002][v][cplayer] mpv v0.41.0 Copyright © 2000-2025 mpv/MPlayer/mplayer2 projects
-[   0.002][v][cplayer] libplacebo version: v7.360.1
-[   0.002][v][cplayer] FFmpeg version: 8.1.1
-[   0.002][v][cplayer] FFmpeg library versions:
-[   0.002][v][cplayer]    libavcodec      62.28.101
-[   0.002][v][cplayer]    libavdevice     62.3.101
-[   0.002][v][cplayer]    libavfilter     11.14.101
-[   0.002][v][cplayer]    libavformat     62.12.101
-[   0.002][v][cplayer]    libavutil       60.26.101
-[   0.002][v][cplayer]    libswresample   6.3.101
-[   0.002][v][cplayer]    libswscale      9.5.101
-[   0.002][v][cplayer] Configuration: -Dbuildtype=release -Dsysconfdir=/opt/homebrew/etc -Dbuild-date=false -Dhtml-build=enabled -Djavascript=enabled -Dlibmpv=true -Dlua=luajit -Dlibarchive=enabled -Duchardet=enabled -Dvulkan=enabled -Dprefix=/opt/homebrew/Cellar/mpv/0.41.0_6 -Dlibdir=/opt/homebrew/Cellar/mpv/0.41.0_6/lib -Dwrap_mode=nofallback
-[   0.002][v][cplayer] List of enabled features: avfoundation bsd-fstatfs cocoa coreaudio cplugins darwin ffmpeg gl gl-cocoa glob glob-posix gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libdl libplacebo luajit mac-thread-name macos-10-15-4-features macos-11-3-features macos-11-features macos-12-features macos-cocoa-cb macos-media-player macos-touchbar posix posix-shm rubberband rubberband-3 swift uchardet vapoursynth vector videotoolbox-gl videotoolbox-pl vk-khr-display vulkan zimg zimg-st428 zlib
-[   0.002][v][cplayer] Command line options: '--input-ipc-server=/tmp/tauri_plugin_mpv_socket_30149_player' '--profile=libmpv' '--vo=gpu' '--hwdec=auto-safe' '--keep-open=yes' '--force-window=no' '--osc=no' '--osd-level=0' '--video-sync=audio' '--log-file=mpv.log' '--wid=49126763776'
-[   0.002][v][cplayer] mpv v0.41.0 Copyright © 2000-2025 mpv/MPlayer/mplayer2 projects
-[   0.002][v][cplayer] libplacebo version: v7.360.1
-[   0.002][v][cplayer] FFmpeg version: 8.1.1
-[   0.002][v][cplayer] FFmpeg library versions:
-[   0.002][v][cplayer]    libavcodec      62.28.101
-[   0.002][v][cplayer]    libavdevice     62.3.101
-[   0.002][v][cplayer]    libavfilter     11.14.101
-[   0.002][v][cplayer]    libavformat     62.12.101
-[   0.002][v][cplayer]    libavutil       60.26.101
-[   0.002][v][cplayer]    libswresample   6.3.101
-[   0.002][v][cplayer]    libswscale      9.5.101
-[   0.002][v][cplayer] Configuration: -Dbuildtype=release -Dsysconfdir=/opt/homebrew/etc -Dbuild-date=false -Dhtml-build=enabled -Djavascript=enabled -Dlibmpv=true -Dlua=luajit -Dlibarchive=enabled -Duchardet=enabled -Dvulkan=enabled -Dprefix=/opt/homebrew/Cellar/mpv/0.41.0_6 -Dlibdir=/opt/homebrew/Cellar/mpv/0.41.0_6/lib -Dwrap_mode=nofallback
-[   0.002][v][cplayer] List of enabled features: avfoundation bsd-fstatfs cocoa coreaudio cplugins darwin ffmpeg gl gl-cocoa glob glob-posix gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libdl libplacebo luajit mac-thread-name macos-10-15-4-features macos-11-3-features macos-11-features macos-12-features macos-cocoa-cb macos-media-player macos-touchbar posix posix-shm rubberband rubberband-3 swift uchardet vapoursynth vector videotoolbox-gl videotoolbox-pl vk-khr-display vulkan zimg zimg-st428 zlib
-[   0.002][d][global] home path: '' -> '/Users/liuzilong/.config/mpv'
-[   0.002][d][global] user path: '~~home/' -> '/Users/liuzilong/.config/mpv'
-[   0.002][d][global] user path: '~~old_home/' -> '/Users/liuzilong/.mpv'
-[   0.002][d][global] config path: 'encoding-profiles.conf' -/-> '/Users/liuzilong/.config/mpv/encoding-profiles.conf'
-[   0.002][d][global] config path: 'encoding-profiles.conf' -/-> '/Users/liuzilong/.mpv/encoding-profiles.conf'
-[   0.002][d][global] config path: 'encoding-profiles.conf' -/-> '/opt/homebrew/etc/mpv/encoding-profiles.conf'
-[   0.002][d][global] config path: 'mpv.conf' -/-> '/Users/liuzilong/.config/mpv/mpv.conf'
-[   0.002][d][global] config path: 'config' -/-> '/Users/liuzilong/.config/mpv/config'
-[   0.002][d][global] config path: 'mpv.conf' -/-> '/Users/liuzilong/.mpv/mpv.conf'
-[   0.002][d][global] config path: 'config' -/-> '/Users/liuzilong/.mpv/config'
-[   0.002][d][global] config path: 'mpv.conf' -/-> '/opt/homebrew/etc/mpv/mpv.conf'
-[   0.002][d][global] config path: 'config' -/-> '/opt/homebrew/etc/mpv/config'
-[   0.002][v][cplayer] Setting option 'input-ipc-server' = '/tmp/tauri_plugin_mpv_socket_30149_player' (flags = 8)
-[   0.002][v][cplayer] Setting option 'profile' = 'libmpv' (flags = 8)
-[   0.002][v][cplayer] Applying profile 'libmpv'...
-[   0.002][v][cplayer] Setting option 'config' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'idle' = 'yes' (flags = 12)
-[   0.002][v][cplayer] Setting option 'terminal' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'input-terminal' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'osc' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'input-default-bindings' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'input-vo-keyboard' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'input-media-keys' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'media-controls' = 'no' (flags = 12)
-[   0.002][v][cplayer] Setting option 'vo' = 'gpu' (flags = 8)
-[   0.002][v][cplayer] Setting option 'hwdec' = 'auto-safe' (flags = 8)
-[   0.002][v][cplayer] Setting option 'keep-open' = 'yes' (flags = 8)
-[   0.002][v][cplayer] Setting option 'force-window' = 'no' (flags = 8)
-[   0.002][v][cplayer] Setting option 'osc' = 'no' (flags = 8)
-[   0.002][v][cplayer] Setting option 'osd-level' = '0' (flags = 8)
-[   0.002][v][cplayer] Setting option 'video-sync' = 'audio' (flags = 8)
-[   0.002][v][cplayer] Setting option 'log-file' = 'mpv.log' (flags = 8)
-[   0.002][v][cplayer] Setting option 'wid' = '49126763776' (flags = 8)
-[   0.003][d][global] config path: 'input.conf' -/-> '/Users/liuzilong/.config/mpv/input.conf'
-[   0.003][d][global] config path: 'input.conf' -/-> '/Users/liuzilong/.mpv/input.conf'
-[   0.003][d][global] config path: 'input.conf' -/-> '/opt/homebrew/etc/mpv/input.conf'
-[   0.003][d][ytdl_hook] Loading lua script @ytdl_hook.lua...
+[   0.001][v][cplayer] mpv v0.41.0 Copyright © 2000-2025 mpv/MPlayer/mplayer2 projects
+[   0.001][v][cplayer] libplacebo version: v7.360.1
+[   0.001][v][cplayer] FFmpeg version: 8.1.1
+[   0.001][v][cplayer] FFmpeg library versions:
+[   0.001][v][cplayer]    libavcodec      62.28.101
+[   0.001][v][cplayer]    libavdevice     62.3.101
+[   0.001][v][cplayer]    libavfilter     11.14.101
+[   0.001][v][cplayer]    libavformat     62.12.101
+[   0.001][v][cplayer]    libavutil       60.26.101
+[   0.001][v][cplayer]    libswresample   6.3.101
+[   0.001][v][cplayer]    libswscale      9.5.101
+[   0.001][v][cplayer] Configuration: -Dbuildtype=release -Dsysconfdir=/opt/homebrew/etc -Dbuild-date=false -Dhtml-build=enabled -Djavascript=enabled -Dlibmpv=true -Dlua=luajit -Dlibarchive=enabled -Duchardet=enabled -Dvulkan=enabled -Dprefix=/opt/homebrew/Cellar/mpv/0.41.0_6 -Dlibdir=/opt/homebrew/Cellar/mpv/0.41.0_6/lib -Dwrap_mode=nofallback
+[   0.001][v][cplayer] List of enabled features: avfoundation bsd-fstatfs cocoa coreaudio cplugins darwin ffmpeg gl gl-cocoa glob glob-posix gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libdl libplacebo luajit mac-thread-name macos-10-15-4-features macos-11-3-features macos-11-features macos-12-features macos-cocoa-cb macos-media-player macos-touchbar posix posix-shm rubberband rubberband-3 swift uchardet vapoursynth vector videotoolbox-gl videotoolbox-pl vk-khr-display vulkan zimg zimg-st428 zlib
+[   0.001][v][cplayer] Command line options: '--input-ipc-server=/tmp/tauri_plugin_mpv_socket_31070_player-1-1783837427279' '--profile=libmpv' '--wid=36403229824' '--vo=gpu' '--hwdec=auto-safe' '--keep-open=yes' '--force-window=no' '--osc=no' '--osd-level=0' '--video-sync=audio' '--log-file=mpv.log'
+[   0.001][v][cplayer] mpv v0.41.0 Copyright © 2000-2025 mpv/MPlayer/mplayer2 projects
+[   0.001][v][cplayer] libplacebo version: v7.360.1
+[   0.001][v][cplayer] FFmpeg version: 8.1.1
+[   0.001][v][cplayer] FFmpeg library versions:
+[   0.001][v][cplayer]    libavcodec      62.28.101
+[   0.001][v][cplayer]    libavdevice     62.3.101
+[   0.001][v][cplayer]    libavfilter     11.14.101
+[   0.001][v][cplayer]    libavformat     62.12.101
+[   0.001][v][cplayer]    libavutil       60.26.101
+[   0.001][v][cplayer]    libswresample   6.3.101
+[   0.001][v][cplayer]    libswscale      9.5.101
+[   0.001][v][cplayer] Configuration: -Dbuildtype=release -Dsysconfdir=/opt/homebrew/etc -Dbuild-date=false -Dhtml-build=enabled -Djavascript=enabled -Dlibmpv=true -Dlua=luajit -Dlibarchive=enabled -Duchardet=enabled -Dvulkan=enabled -Dprefix=/opt/homebrew/Cellar/mpv/0.41.0_6 -Dlibdir=/opt/homebrew/Cellar/mpv/0.41.0_6/lib -Dwrap_mode=nofallback
+[   0.001][v][cplayer] List of enabled features: avfoundation bsd-fstatfs cocoa coreaudio cplugins darwin ffmpeg gl gl-cocoa glob glob-posix gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libdl libplacebo luajit mac-thread-name macos-10-15-4-features macos-11-3-features macos-11-features macos-12-features macos-cocoa-cb macos-media-player macos-touchbar posix posix-shm rubberband rubberband-3 swift uchardet vapoursynth vector videotoolbox-gl videotoolbox-pl vk-khr-display vulkan zimg zimg-st428 zlib
+[   0.001][d][global] home path: '' -> '/Users/liuzilong/.config/mpv'
+[   0.001][d][global] user path: '~~home/' -> '/Users/liuzilong/.config/mpv'
+[   0.001][d][global] user path: '~~old_home/' -> '/Users/liuzilong/.mpv'
+[   0.001][d][global] config path: 'encoding-profiles.conf' -/-> '/Users/liuzilong/.config/mpv/encoding-profiles.conf'
+[   0.001][d][global] config path: 'encoding-profiles.conf' -/-> '/Users/liuzilong/.mpv/encoding-profiles.conf'
+[   0.001][d][global] config path: 'encoding-profiles.conf' -/-> '/opt/homebrew/etc/mpv/encoding-profiles.conf'
+[   0.001][d][global] config path: 'mpv.conf' -/-> '/Users/liuzilong/.config/mpv/mpv.conf'
+[   0.001][d][global] config path: 'config' -/-> '/Users/liuzilong/.config/mpv/config'
+[   0.001][d][global] config path: 'mpv.conf' -/-> '/Users/liuzilong/.mpv/mpv.conf'
+[   0.001][d][global] config path: 'config' -/-> '/Users/liuzilong/.mpv/config'
+[   0.001][d][global] config path: 'mpv.conf' -/-> '/opt/homebrew/etc/mpv/mpv.conf'
+[   0.001][d][global] config path: 'config' -/-> '/opt/homebrew/etc/mpv/config'
+[   0.001][v][cplayer] Setting option 'input-ipc-server' = '/tmp/tauri_plugin_mpv_socket_31070_player-1-1783837427279' (flags = 8)
+[   0.001][v][cplayer] Setting option 'profile' = 'libmpv' (flags = 8)
+[   0.001][v][cplayer] Applying profile 'libmpv'...
+[   0.001][v][cplayer] Setting option 'config' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'idle' = 'yes' (flags = 12)
+[   0.001][v][cplayer] Setting option 'terminal' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'input-terminal' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'osc' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'input-default-bindings' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'input-vo-keyboard' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'input-media-keys' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'media-controls' = 'no' (flags = 12)
+[   0.001][v][cplayer] Setting option 'wid' = '36403229824' (flags = 8)
+[   0.001][v][cplayer] Setting option 'vo' = 'gpu' (flags = 8)
+[   0.001][v][cplayer] Setting option 'hwdec' = 'auto-safe' (flags = 8)
+[   0.001][v][cplayer] Setting option 'keep-open' = 'yes' (flags = 8)
+[   0.001][v][cplayer] Setting option 'force-window' = 'no' (flags = 8)
+[   0.001][v][cplayer] Setting option 'osc' = 'no' (flags = 8)
+[   0.001][v][cplayer] Setting option 'osd-level' = '0' (flags = 8)
+[   0.001][v][cplayer] Setting option 'video-sync' = 'audio' (flags = 8)
+[   0.001][v][cplayer] Setting option 'log-file' = 'mpv.log' (flags = 8)
+[   0.002][d][global] config path: 'input.conf' -/-> '/Users/liuzilong/.config/mpv/input.conf'
+[   0.002][d][global] config path: 'input.conf' -/-> '/Users/liuzilong/.mpv/input.conf'
+[   0.002][d][global] config path: 'input.conf' -/-> '/opt/homebrew/etc/mpv/input.conf'
+[   0.002][d][ytdl_hook] Loading lua script @ytdl_hook.lua...
 [   0.003][d][stats] Loading lua script @stats.lua...
 [   0.003][d][console] Loading lua script @console.lua...
 [   0.003][d][auto_profiles] Loading lua script @auto_profiles.lua...
@@ -69,112 +69,112 @@
 [   0.003][d][positioning] Loading lua script @positioning.lua...
 [   0.003][d][commands] Loading lua script @commands.lua...
 [   0.003][d][context_menu] Loading lua script @context_menu.lua...
-[   0.003][d][positioning] loading mp.defaults
+[   0.003][d][ytdl_hook] loading mp.defaults
+[   0.003][d][stats] loading mp.defaults
 [   0.003][d][console] loading mp.defaults
 [   0.003][d][auto_profiles] loading mp.defaults
-[   0.003][d][stats] loading mp.defaults
-[   0.003][d][ytdl_hook] loading mp.defaults
-[   0.003][d][commands] loading mp.defaults
 [   0.003][d][select] loading mp.defaults
-[   0.004][d][context_menu] loading mp.defaults
-[   0.004][v][clipboard] Initialized mac clipboard backend.
-[   0.004][d][select] loading @select.lua
-[   0.004][d][commands] loading @commands.lua
-[   0.004][d][positioning] loading @positioning.lua
-[   0.004][d][context_menu] loading @context_menu.lua
-[   0.004][d][console] loading @console.lua
-[   0.004][d][auto_profiles] loading @auto_profiles.lua
-[   0.004][d][stats] loading @stats.lua
-[   0.004][d][select] reading options for select
-[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/select.conf'
-[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.mpv/script-opts/select.conf'
-[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/select.conf'
-[   0.004][d][select] script-opts/select.conf not found.
-[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/select.conf'
-[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/select.conf'
-[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/select.conf'
-[   0.004][d][select] lua-settings/select.conf not found.
-[   0.004][d][positioning] reading options for positioning
-[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/positioning.conf'
-[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.mpv/script-opts/positioning.conf'
-[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/positioning.conf'
-[   0.004][d][positioning] script-opts/positioning.conf not found.
-[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/positioning.conf'
-[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/positioning.conf'
-[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/positioning.conf'
-[   0.004][d][positioning] lua-settings/positioning.conf not found.
-[   0.004][d][context_menu] reading options for context_menu
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/context_menu.conf'
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.mpv/script-opts/context_menu.conf'
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/context_menu.conf'
-[   0.004][d][context_menu] script-opts/context_menu.conf not found.
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/context_menu.conf'
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/context_menu.conf'
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/context_menu.conf'
-[   0.004][d][context_menu] lua-settings/context_menu.conf not found.
-[   0.004][d][ytdl_hook] loading @ytdl_hook.lua
-[   0.005][d][ytdl_hook] reading options for ytdl_hook
-[   0.005][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/ytdl_hook.conf'
-[   0.005][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/script-opts/ytdl_hook.conf'
-[   0.005][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/ytdl_hook.conf'
-[   0.005][d][ytdl_hook] script-opts/ytdl_hook.conf not found.
-[   0.005][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/ytdl_hook.conf'
-[   0.005][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/ytdl_hook.conf'
-[   0.005][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/ytdl_hook.conf'
-[   0.005][d][ytdl_hook] lua-settings/ytdl_hook.conf not found.
-[   0.005][d][stats] reading options for stats
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/stats.conf'
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.mpv/script-opts/stats.conf'
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/stats.conf'
-[   0.005][d][stats] script-opts/stats.conf not found.
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/stats.conf'
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/stats.conf'
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/stats.conf'
-[   0.005][d][stats] lua-settings/stats.conf not found.
-[   0.023][v][mac/app] AppHub functionality initialised
-[   0.023][v][ipc] Starting IPC master
-[   0.023][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.config/mpv/scripts'
-[   0.023][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.mpv/scripts'
-[   0.023][d][global] config path: 'scripts' -/-> '/opt/homebrew/etc/mpv/scripts'
-[   0.023][v][cplayer] Waiting for scripts...
-[   0.023][v][ipc] Listening to IPC socket.
-[   0.023][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
-[   0.023][d][commands] reading options for commands
-[   0.023][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.023][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/commands.conf'
-[   0.023][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.mpv/script-opts/commands.conf'
-[   0.023][d][global] config path: 'script-opts/commands.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/commands.conf'
-[   0.023][d][commands] script-opts/commands.conf not found.
-[   0.023][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/commands.conf'
-[   0.023][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/commands.conf'
-[   0.023][d][global] config path: 'lua-settings/commands.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/commands.conf'
-[   0.023][d][commands] lua-settings/commands.conf not found.
-[   0.023][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][console] reading options for console
-[   0.024][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/console.conf'
-[   0.024][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.mpv/script-opts/console.conf'
-[   0.024][d][global] config path: 'script-opts/console.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/console.conf'
-[   0.024][d][console] script-opts/console.conf not found.
-[   0.024][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/console.conf'
-[   0.024][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/console.conf'
-[   0.024][d][global] config path: 'lua-settings/console.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/console.conf'
-[   0.024][d][console] lua-settings/console.conf not found.
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
-[   0.024][v][cplayer] Done loading scripts.
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][auto_profiles] Destroying client handle...
+[   0.003][d][commands] loading mp.defaults
+[   0.003][d][context_menu] loading mp.defaults
+[   0.003][d][positioning] loading mp.defaults
+[   0.003][v][clipboard] Initialized mac clipboard backend.
+[   0.003][d][ytdl_hook] loading @ytdl_hook.lua
+[   0.003][d][context_menu] loading @context_menu.lua
+[   0.003][d][stats] loading @stats.lua
+[   0.003][d][auto_profiles] loading @auto_profiles.lua
+[   0.003][d][select] loading @select.lua
+[   0.003][d][commands] loading @commands.lua
+[   0.003][d][positioning] loading @positioning.lua
+[   0.003][d][console] loading @console.lua
+[   0.003][d][ytdl_hook] reading options for ytdl_hook
+[   0.003][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/ytdl_hook.conf'
+[   0.003][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/script-opts/ytdl_hook.conf'
+[   0.003][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/ytdl_hook.conf'
+[   0.003][d][ytdl_hook] script-opts/ytdl_hook.conf not found.
+[   0.003][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/ytdl_hook.conf'
+[   0.003][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/ytdl_hook.conf'
+[   0.003][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/ytdl_hook.conf'
+[   0.003][d][ytdl_hook] lua-settings/ytdl_hook.conf not found.
+[   0.003][d][context_menu] reading options for context_menu
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/context_menu.conf'
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.mpv/script-opts/context_menu.conf'
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/context_menu.conf'
+[   0.003][d][context_menu] script-opts/context_menu.conf not found.
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/context_menu.conf'
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/context_menu.conf'
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/context_menu.conf'
+[   0.003][d][context_menu] lua-settings/context_menu.conf not found.
+[   0.003][d][positioning] reading options for positioning
+[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/positioning.conf'
+[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.mpv/script-opts/positioning.conf'
+[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/positioning.conf'
+[   0.003][d][positioning] script-opts/positioning.conf not found.
+[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/positioning.conf'
+[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/positioning.conf'
+[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/positioning.conf'
+[   0.003][d][positioning] lua-settings/positioning.conf not found.
+[   0.003][d][select] reading options for select
+[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/select.conf'
+[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.mpv/script-opts/select.conf'
+[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/select.conf'
+[   0.003][d][select] script-opts/select.conf not found.
+[   0.003][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/select.conf'
+[   0.003][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/select.conf'
+[   0.003][d][global] config path: 'lua-settings/select.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/select.conf'
+[   0.003][d][select] lua-settings/select.conf not found.
+[   0.004][d][stats] reading options for stats
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/stats.conf'
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.mpv/script-opts/stats.conf'
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/stats.conf'
+[   0.004][d][stats] script-opts/stats.conf not found.
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/stats.conf'
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/stats.conf'
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/stats.conf'
+[   0.004][d][stats] lua-settings/stats.conf not found.
+[   0.039][v][mac/app] AppHub functionality initialised
+[   0.039][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.config/mpv/scripts'
+[   0.039][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.mpv/scripts'
+[   0.039][d][global] config path: 'scripts' -/-> '/opt/homebrew/etc/mpv/scripts'
+[   0.039][v][cplayer] Waiting for scripts...
+[   0.039][v][ipc] Starting IPC master
+[   0.039][v][ipc] Listening to IPC socket.
+[   0.043][d][commands] reading options for commands
+[   0.043][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/commands.conf'
+[   0.043][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.mpv/script-opts/commands.conf'
+[   0.043][d][global] config path: 'script-opts/commands.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/commands.conf'
+[   0.043][d][commands] script-opts/commands.conf not found.
+[   0.043][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/commands.conf'
+[   0.043][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/commands.conf'
+[   0.043][d][global] config path: 'lua-settings/commands.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/commands.conf'
+[   0.043][d][commands] lua-settings/commands.conf not found.
+[   0.043][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
+[   0.043][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.043][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
+[   0.043][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.043][d][console] reading options for console
+[   0.043][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/console.conf'
+[   0.043][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.mpv/script-opts/console.conf'
+[   0.043][d][global] config path: 'script-opts/console.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/console.conf'
+[   0.044][d][console] script-opts/console.conf not found.
+[   0.044][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/console.conf'
+[   0.044][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/console.conf'
+[   0.044][d][global] config path: 'lua-settings/console.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/console.conf'
+[   0.044][d][console] lua-settings/console.conf not found.
+[   0.048][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
+[   0.048][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.048][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
+[   0.048][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.048][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
+[   0.048][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.048][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
+[   0.048][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.049][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
+[   0.049][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.049][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
+[   0.049][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.049][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
+[   0.049][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.049][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
+[   0.049][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.049][v][cplayer] Done loading scripts.
+[   0.050][d][auto_profiles] Destroying client handle...
