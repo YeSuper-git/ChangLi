@@ -196,6 +196,9 @@ const Player: React.FC = () => {
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
         try {
+          // 先清理可能残留的旧实例
+          await destroy().catch(() => {});
+          await new Promise(resolve => setTimeout(resolve, 200));
           await init({
             ...(mpvPath ? { path: mpvPath } : {}),
             showMpvOutput: true,
@@ -217,6 +220,8 @@ const Player: React.FC = () => {
           console.error('[Player] init 失败:', initErr);
           // 不传 path 重试一次（系统 PATH 中的 mpv）
           try {
+            await destroy().catch(() => {});
+            await new Promise(resolve => setTimeout(resolve, 200));
             await init({
               showMpvOutput: true,
               args: [
