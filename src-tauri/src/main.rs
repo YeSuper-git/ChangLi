@@ -3721,6 +3721,23 @@ fn main() {
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 player::handle_main_window_event(&window.app_handle(), event);
+            } else if window.label() == "player" {
+                // 播放器窗口关闭时，手动清理 mpv
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    eprintln!("[player] Rust: player CloseRequested - preventing close, cleaning up");
+                    api.prevent_close();
+                    let app = window.app_handle().clone();
+                    let label = window.label().to_string();
+                    tauri::async_runtime::spawn(async move {
+                        // 通过 invoke 销毁 mpv 实例
+                        let _ = app.emit("player-close-cleanup", &label);
+                        eprintln!("[player] emitted player-close-cleanup, now destroying window");
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        if let Some(w) = app.get_webview_window(&label) {
+                            let _ = w.destroy();
+                        }
+                    });
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
