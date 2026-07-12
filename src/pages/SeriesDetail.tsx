@@ -738,8 +738,8 @@ const SeriesDetail: React.FC = () => {
       </div>
 
       <div className="changli-detail-hero changli-panel p-6 mb-8" data-tutorial="series-hero">
-        <div className="flex gap-6">
-          <div className={`w-80 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm ring-1 ring-black/5 ${editing && !isPortrait ? 'h-80' : 'aspect-video'}`}>
+        <div className={`${editing || isPortrait ? 'flex gap-6' : 'flex flex-col gap-5'}`}>
+          <div className={`${editing ? (!isPortrait ? 'w-80 h-80' : 'w-80 aspect-video') : isPortrait ? 'w-52 aspect-[3/4]' : 'w-full aspect-video'} bg-gray-100 rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/5 ${editing || isPortrait ? 'flex-shrink-0' : ''}`}>
             <div
               className={`relative w-full h-full group ${editing ? 'cursor-pointer' : 'cursor-context-menu'}`}
               onClick={editing ? handleSelectPoster : undefined}
@@ -758,7 +758,7 @@ const SeriesDetail: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="flex-1">
+          <div className={`${editing || isPortrait ? 'flex-1' : ''}`}>
             {editing ? (
               <div className="space-y-4">
                 <div>
@@ -918,10 +918,10 @@ const SeriesDetail: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="mb-3 flex items-start justify-between gap-5">
-                  <div className="min-w-0 flex-1">
+                <div className={`mb-3 ${isPortrait ? 'flex items-start justify-between gap-5' : 'flex flex-col items-center gap-5'}`}>
+                  <div className={`${isPortrait ? 'min-w-0 flex-1' : 'text-center'}`}>
                     <h1 className="changli-heading-lg mb-3 line-clamp-2" title={series.title}>{series.title}</h1>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className={`flex flex-wrap items-center gap-2 ${!isPortrait ? 'justify-center' : ''}`}>
                       {features.chinese_sub && (
                         <button
                           onClick={handleToggleChineseSub}
@@ -955,7 +955,7 @@ const SeriesDetail: React.FC = () => {
                         </button>
                       )}
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className={`mt-2 flex flex-wrap items-center gap-2 ${!isPortrait ? 'justify-center' : ''}`}>
                       {features.status && (
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
                           {isCompleted ? '已完结' : '连载中'}
@@ -971,7 +971,7 @@ const SeriesDetail: React.FC = () => {
                   <SubscriptionManager seriesId={series.id} onSubscriptionChange={() => loadSeries({ silent: true })} />
                 </div>
 
-                <div className="mb-4 space-y-3">
+                <div className={`mb-4 space-y-3 ${!isPortrait ? 'text-center' : ''}`}>
                   {features.tags && (
                     <div>
                       <span className="text-sm font-medium text-gray-500 mr-2">标签：</span>
@@ -1005,7 +1005,7 @@ const SeriesDetail: React.FC = () => {
                 <p className={`whitespace-pre-wrap mb-4 ${series.description ? 'text-gray-700' : 'text-gray-400'}`}>
                   {series.description || '暂无简介，快来给长离介绍一下吧'}
                 </p>
-                <div className="mt-5 flex flex-wrap items-center gap-4">
+                <div className={`mt-5 flex flex-wrap items-center gap-4 ${!isPortrait ? 'justify-center' : ''}`}>
                   <button
                     type="button"
                     onClick={handlePrimaryPlay}
