@@ -592,7 +592,7 @@ fn video_from_row(row: &SqliteRow) -> Video {
     });
     // 直接从数据库读取缓存的 Base64，不再实时生成
     let thumbnail_data_url: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
-    // 双读兜底：优先读 series_poster_base64，如果为 NULL，降级使用 series_poster 字段
+    // 海报：和 series_from_row 一致，优先 poster_base64，fallback 原图路径
     let series_poster_data_url: Option<String> = row
         .try_get("series_poster_base64")
         .ok()
@@ -601,7 +601,11 @@ fn video_from_row(row: &SqliteRow) -> Video {
             let poster: Option<String> = row.try_get("series_poster").ok().flatten();
             poster.and_then(|p| {
                 let resolved = storage::resolve_data_path(&p);
-                image_data_url(Path::new(&resolved))
+                if resolved.exists() {
+                    image_data_url(Path::new(&resolved))
+                } else {
+                    None
+                }
             })
         });
 
