@@ -158,7 +158,7 @@ const Player: React.FC = () => {
             await mpvCommand('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
           }
           if (previousPosition > 5) {
-            await mpvCommand('seek', [previousPosition, 'absolute']).catch(() => undefined);
+            await mpvCommand('seek', [String(previousPosition), 'absolute']).catch(() => undefined);
             setCurrentTime(previousPosition);
           }
           await mpvSetProperty('pause', false).catch(() => undefined);
@@ -366,7 +366,7 @@ const Player: React.FC = () => {
         if (previousPosition > 5) {
           // 等待 mpv 加载文件后再 seek，避免 seek 被忽略
           await new Promise((resolve) => setTimeout(resolve, 800));
-          await mpvCommand('seek', [previousPosition, 'absolute']).catch(() => undefined);
+          await mpvCommand('seek', [String(previousPosition), 'absolute']).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
         await mpvSetProperty('pause', false).catch(() => undefined);

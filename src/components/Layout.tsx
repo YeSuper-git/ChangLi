@@ -83,7 +83,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     return () => {
       if (main && main.scrollTop > 0) {
-        scrollPositions.set(scrollKeyRef.current, main.scrollTop);
+        // 使用 effect setup 时捕获的 key，而非 scrollKeyRef.current
+        // 因为 cleanup 运行时 scrollKeyRef 已被下一次 render 更新为新页面的 key
+        scrollPositions.set(key, main.scrollTop);
       }
     };
   }, [location.pathname, navigationType]);
