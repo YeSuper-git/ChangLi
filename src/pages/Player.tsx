@@ -7,7 +7,8 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { init, destroy, setProperty, command, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
+import { init, destroy, setProperty, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
+import { mpvCommand, mpvSetProperty, mpvGetProperty, isMac } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 
 const OBSERVED_PROPERTIES = [
@@ -147,7 +148,7 @@ const Player: React.FC = () => {
           setCurrentTime(0);
           setDuration(0);
           try {
-            await command('loadfile', [currentVideo.file_path, 'replace']);
+            await mpvCommand('loadfile', [currentVideo.file_path, 'replace']);
           } catch (loadErr) {
             console.error('[Player] loadfile 失败:', loadErr);
             setError('加载视频失败，请确认视频文件仍然存在');
@@ -159,13 +160,13 @@ const Player: React.FC = () => {
             setHasVideoFrame(true);
           }
           if (currentVideo.subtitle) {
-            await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+            await mpvCommand('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
           }
           if (previousPosition > 5) {
-            await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
+            await mpvCommand('seek', [previousPosition, 'absolute']).catch(() => undefined);
             setCurrentTime(previousPosition);
           }
-          await setProperty('pause', false).catch(() => undefined);
+          await mpvSetProperty('pause', false).catch(() => undefined);
           isPlayingRef.current = true;
           setIsPlaying(true);
           setLoading(false);
@@ -197,6 +198,34 @@ const Player: React.FC = () => {
           } catch (e) {
             console.warn('[Player] macOS: mpv IPC 通道未就绪:', e);
           }
+
+          mpvInitialized.current = true;
+          // macOS: 用轮询替代 observeProperties
+          const pollInterval = setInterval(async () => {
+            if (!isMountedRef.current || !mpvInitialized.current) {
+              clearInterval(pollInterval);
+              return;
+            }
+            try {
+              const [pauseVal, timeVal, durVal, volVal, spdVal] = await Promise.all([
+                mpvGetProperty('pause').catch(() => null),
+                mpvGetProperty('time-pos').catch(() => null),
+                mpvGetProperty('duration').catch(() => null),
+                mpvGetProperty('volume').catch(() => null),
+                mpvGetProperty('speed').catch(() => null),
+              ]);
+              if (!isMountedRef.current) return;
+              if (pauseVal !== null) {
+                const playing = !pauseVal;
+                isPlayingRef.current = playing;
+                setIsPlaying(playing);
+              }
+              if (timeVal !== null) setCurrentTime(Number(timeVal) || 0);
+              if (durVal !== null) setDuration(Number(durVal) || 0);
+              if (volVal !== null) setVolume(Number(volVal) || 80);
+              if (spdVal !== null) setSpeed(Number(spdVal) || 1);
+            } catch {}
+          }, 500);
         } else {
         // Windows/Linux: 用 tauri-plugin-mpv 正常 init
         let playerWid: string | undefined;
@@ -328,7 +357,7 @@ const Player: React.FC = () => {
 
         // 加载视频
         try {
-          await command('loadfile', [currentVideo.file_path, 'replace']);
+          await mpvCommand('loadfile', [currentVideo.file_path, 'replace']);
         } catch (loadErr) {
           console.error('[Player] loadfile 失败:', loadErr);
           setError('加载视频失败，请确认视频文件仍然存在');
@@ -336,15 +365,15 @@ const Player: React.FC = () => {
           return;
         }
         if (currentVideo.subtitle) {
-          await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+          await mpvCommand('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
         }
         if (previousPosition > 5) {
           // 等待 mpv 加载文件后再 seek，避免 seek 被忽略
           await new Promise((resolve) => setTimeout(resolve, 800));
-          await command('seek', [previousPosition, 'absolute']).catch(() => undefined);
+          await mpvCommand('seek', [previousPosition, 'absolute']).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
-        await setProperty('pause', false).catch(() => undefined);
+        await mpvSetProperty('pause', false).catch(() => undefined);
         isPlayingRef.current = true;
         setIsPlaying(true);
         
@@ -374,12 +403,16 @@ const Player: React.FC = () => {
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
-            // 1. 发送 quit 让 mpv 优雅退出
-            await command('quit').catch(() => {});
-            // 2. 等待 mpv uninit 全周期完成
-            await new Promise(resolve => setTimeout(resolve, 500));
-            // 3. 清理插件状态
-            await destroy().catch(() => {});
+            if (isMac) {
+              // macOS: 通过 IPC socket 发送 quit，不调用 destroy
+              await mpvCommand('quit').catch(() => {});
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } else {
+              // Windows/Linux: 正常清理
+              await mpvCommand('quit').catch(() => {});
+              await new Promise(resolve => setTimeout(resolve, 500));
+              await destroy().catch(() => {});
+            }
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }
@@ -396,7 +429,7 @@ const Player: React.FC = () => {
     const timer = window.setInterval(async () => {
       if (!isMountedRef.current || !mpvInitialized.current) return;
       try {
-        await command('get_property', ['time-pos']);
+        await mpvCommand('get_property', ['time-pos']);
         failCount = 0;
       } catch (err) {
         if (!isMountedRef.current) return;
@@ -421,7 +454,7 @@ const Player: React.FC = () => {
       const nextPaused = isPlayingRef.current;
       isPlayingRef.current = !nextPaused;
       setIsPlaying(!nextPaused);
-      await setProperty('pause', nextPaused);
+      await mpvSetProperty('pause', nextPaused);
     } catch (err) {
       if (isMountedRef.current) {
         isPlayingRef.current = !isPlayingRef.current;
@@ -435,7 +468,7 @@ const Player: React.FC = () => {
   const seek = useCallback(async (time: number) => {
     if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
-      await command('seek', [time, 'absolute']);
+      await mpvCommand('seek', [time, 'absolute']);
     } catch (err) {
       console.error('[Player] 跳转失败:', err);
     }
@@ -444,7 +477,7 @@ const Player: React.FC = () => {
   // 设置音量
   const changeVolume = useCallback(async (vol: number) => {
     try {
-      await setProperty('volume', Math.max(0, Math.min(100, vol)));
+      await mpvSetProperty('volume', Math.max(0, Math.min(100, vol)));
     } catch (err) {
       console.error('[Player] 设置音量失败:', err);
     }
@@ -453,7 +486,7 @@ const Player: React.FC = () => {
   // 设置倍速
   const changeSpeed = useCallback(async (spd: number) => {
     try {
-      await setProperty('speed', spd);
+      await mpvSetProperty('speed', spd);
     } catch (err) {
       console.error('[Player] 设置倍速失败:', err);
     }
