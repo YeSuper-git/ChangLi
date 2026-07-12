@@ -62,24 +62,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     event.stopPropagation();
   };
 
-  // 滚动恢复机制：返回上一页时恢复原位置；普通跳转进入新页面时回到顶部
-  useLayoutEffect(() => {
-    const key = location.pathname + location.search;
-    const main = mainRef.current;
+  const currentScrollKey = location.pathname + location.search;
+  const latestScrollKeyRef = useRef(currentScrollKey);
+  latestScrollKeyRef.current = currentScrollKey;
 
-    if (navigationType === 'POP' && scrollPositions.has(key)) {
-      const savedTop = scrollPositions.get(key)!;
-      setTimeout(() => {
-        mainRef.current?.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
-      }, 0);
+  // 滚动恢复机制：返回上一页时恢复原位置；普通跳转进入新页面时回到顶部。
+  // 注意：真实滚动容器是 .changli-main，不是 window；并且筛选参数在 search 里，离开页面时必须保存最新 pathname + search。
+  useLayoutEffect(() => {
+    const restoreKey = latestScrollKeyRef.current;
+    const main = mainRef.current;
+    let cancelled = false;
+    let frame = 0;
+
+    if (navigationType === 'POP' && scrollPositions.has(restoreKey)) {
+      const savedTop = scrollPositions.get(restoreKey)!;
+      const restore = (attempt = 0) => {
+        if (cancelled) return;
+        const el = mainRef.current;
+        if (!el) return;
+        el.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
+        // 列表页返回时可能先渲染骨架/缓存数据，内容高度稍后才撑开；多试几帧避免恢复失败。
+        if (attempt < 12 && Math.abs(el.scrollTop - savedTop) > 2) {
+          frame = requestAnimationFrame(() => restore(attempt + 1));
+        }
+      };
+      frame = requestAnimationFrame(() => restore());
     } else {
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       window.scrollTo(0, 0);
     }
 
     return () => {
+      cancelled = true;
+      if (frame) cancelAnimationFrame(frame);
       if (main && main.scrollTop > 0) {
-        scrollPositions.set(key, main.scrollTop);
+        scrollPositions.set(latestScrollKeyRef.current, main.scrollTop);
       }
     };
   }, [location.pathname, navigationType]);
