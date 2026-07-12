@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { addSite, getUpdatesDir, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
+import { addSite, getUpdatesDir, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate, regenerateAllPosterBase64 } from '../utils/api';
 import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useLibraryStore } from '../store/libraryStore';
@@ -581,6 +581,21 @@ const Settings: React.FC = () => {
             <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
               {updatesDir || '加载中...'}
             </code>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={async () => {
+                try {
+                  const count = await regenerateAllPosterBase64();
+                  notify({ message: `已重新生成 ${count} 张海报缓存`, type: 'success' });
+                } catch (e) {
+                  notify({ message: '重新生成失败', type: 'error' });
+                }
+              }}
+              className="action-btn text-sm"
+            >
+              重新生成海报缓存
+            </button>
           </div>
         </div>
       </section>

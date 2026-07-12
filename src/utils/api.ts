@@ -602,6 +602,10 @@ export async function getActorResources(actorId: number): Promise<Video[]> {
   }
 }
 
+export async function regenerateAllPosterBase64(): Promise<number> {
+  return invoke<number>('regenerate_all_poster_base64');
+}
+
 export async function saveActorPhoto(sourcePath: string): Promise<string> {
   try {
     const result = await invoke<string>('save_actor_photo', { sourcePath });

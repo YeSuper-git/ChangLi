@@ -3899,6 +3899,7 @@ fn main() {
             is_preset_template_enabled_cmd,
             enable_preset_template_cmd,
             disable_preset_template_cmd,
+            regenerate_all_poster_base64,
             set_game_overlay_disabled,
             get_game_overlay_disabled,
             player::get_player_wid,
@@ -4622,7 +4623,36 @@ async fn disable_preset_template_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::disable_preset_template(&pool, &key)
-        .await
-        .map_err(|e| e.to_string())
+    db::disable_preset_template(&pool, &key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn regenerate_all_poster_base64(state: State<'_, AppState>) -> Result<i32, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT id, poster FROM video_series WHERE poster IS NOT NULL AND poster != ''"
+    )
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut updated = 0;
+    for (id, poster) in &rows {
+        if let Some(p) = poster {
+            let path = std::path::Path::new(p);
+            if let Some(b64) = scanner::generate_thumbnail_base64(path) {
+                sqlx::query("UPDATE video_series SET poster_base64 = ? WHERE id = ?")
+                    .bind(&b64)
+                    .bind(id)
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                updated += 1;
+            }
+        }
+    }
+    Ok(updated)
 }
