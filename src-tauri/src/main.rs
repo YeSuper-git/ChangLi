@@ -323,6 +323,39 @@ fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
     false
 }
 
+fn subscription_item_already_exists(
+    existing_season_episode: &[(Option<i32>, Option<i32>)],
+    existing_episodes: &[Option<i32>],
+    item_season: Option<i32>,
+    item_episode: i32,
+    existing_episode_progress: i32,
+) -> bool {
+    if let Some(season) = item_season {
+        // 直接季内集数匹配：第三季第 1 集 → (3, 1)
+        if existing_season_episode.contains(&(Some(season), Some(item_episode))) {
+            return true;
+        }
+        // 有些源用全局集数：第三季第 1 集写成 25。兼容已入库为全局集数的情况。
+        if existing_season_episode.contains(&(Some(season), Some(item_episode)))
+            || existing_season_episode.contains(&(Some(0), Some(item_episode)))
+            || existing_season_episode.contains(&(None, Some(item_episode)))
+        {
+            return true;
+        }
+        // 常见季度番每季 12 集：第 25 集 => 第三季第 1 集。
+        // 只在集数大于 12 时换算，避免把第一季第 1 集误判成第三季第 1 集。
+        if item_episode > 12 {
+            let normalized_episode = ((item_episode - 1) % 12) + 1;
+            if existing_season_episode.contains(&(Some(season), Some(normalized_episode))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    existing_episodes.contains(&Some(item_episode)) || item_episode <= existing_episode_progress
+}
+
 /// 手动触发订阅检查（获取新集数列表）
 #[tauri::command]
 async fn check_subscription_updates(
@@ -392,11 +425,12 @@ async fn check_subscription_updates(
     // 也保留纯集数列表用于无季号时的匹配
     let existing_episodes: Vec<Option<i32>> = existing_season_episode.iter().map(|(_, ep)| *ep).collect();
 
-    // 从订阅 preferences 中读取 feedSeason（RSS 源级别的季号）
+    // 从订阅 preferences 中读取 feedSeason；旧订阅缺失时，从 RSS 源标题实时提取
     let feed_season: Option<i32> = serde_json::from_str::<serde_json::Value>(&sub.preferences)
         .ok()
         .and_then(|v| v.get("feedSeason")?.as_i64())
-        .map(|s| s as i32);
+        .map(|s| s as i32)
+        .or_else(|| extract_season_number(&feed.title));
 
     let mut new_items = Vec::new();
     
@@ -415,12 +449,15 @@ async fn check_subscription_updates(
         let item_season = extract_season_number(&item.title).or(feed_season);
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
-            let dominated = if let Some(season) = item_season {
-                existing_season_episode.contains(&(Some(season), Some(ep)))
-            } else {
-                existing_episodes.contains(&Some(ep)) || ep <= existing_episode_progress
-            };
-            if dominated { continue; }
+            if subscription_item_already_exists(
+                &existing_season_episode,
+                &existing_episodes,
+                item_season,
+                ep,
+                existing_episode_progress,
+            ) {
+                continue;
+            }
         }
         
         // 提取磁力链接
