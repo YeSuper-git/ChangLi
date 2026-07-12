@@ -4,6 +4,11 @@
 
 # Changelog
 
+## [1.9.12] - 2026-07-12
+
+### Fixed
+- **Player.tsx类型错误**: seek命令参数统一转换为String
+
 ## [1.9.11] - 2026-07-12
 
 ### Fixed

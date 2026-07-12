@@ -160,18 +160,12 @@ const Library: React.FC = () => {
 
   // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
   useEffect(() => {
-    // 从详情页返回时恢复滚动位置
-    const saved = sessionStorage.getItem('library-scroll-y');
-    if (saved) {
-      sessionStorage.removeItem('library-scroll-y');
-      requestAnimationFrame(() => window.scrollTo(0, Number(saved)));
-    } else {
-      window.scrollTo(0, 0);
-    }
+    // 滚动恢复已由 Layout 组件的 useLayoutEffect 统一处理（基于 mainRef 的 scrollTop），
+    // 此处不再使用 sessionStorage + window.scrollTo（因为实际滚动容器是 <main> 而非 window）。
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
-  }, [location.pathname]);
+  }, []);
 
   // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
   useEffect(() => {
@@ -988,7 +982,6 @@ const Library: React.FC = () => {
                   key={series.id}
                   data-tutorial={series.id === 1 ? 'video-card' : undefined}
                   onClick={() => { if (!selectMode) {
-                    sessionStorage.setItem('library-scroll-y', String(window.scrollY));
                     const filterSearch = buildFilterSearch();
                     navigate(`/series/${series.id}`, { state: { from: `/library${filterSearch}`, backLabel: `返回${categoryDisplayName}`, seriesSnapshot: series } });
                   }}}
