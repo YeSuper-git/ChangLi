@@ -48,8 +48,8 @@ pub fn generate_thumbnail_base64(poster_path: &Path) -> Option<String> {
         }
     };
 
-    // 缩放到最大 300px 宽
-    let max_width = 300;
+    // 缩放到最大 1200px 宽（详情页需要更高清）
+    let max_width = 1200;
     let resized = if img.width() > max_width {
         img.resize(
             max_width,
