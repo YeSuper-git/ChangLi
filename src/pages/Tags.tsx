@@ -5,6 +5,7 @@ import { TagWithCategories, Category } from '../utils/api';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
+import FloatingActions from '../components/FloatingActions';
 import loadingIcon from '../assets/icons/loading.svg';
 
 const Tags: React.FC = () => {
@@ -228,28 +229,12 @@ const Tags: React.FC = () => {
       {/* Header */}
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">标签管理</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { loadData(); refreshTags(); }}
-            className="action-btn text-sm"
-            title="刷新"
-          >
-            ↻ 刷新
-          </button>
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="action-btn text-sm"
-            title="返回顶部"
-          >
-            ↑ 顶部
-          </button>
-          <button
-            onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
-            className="action-btn action-btn-primary"
-          >
-            + 创建标签
-          </button>
-        </div>
+        <button
+          onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
+          className="action-btn action-btn-primary"
+        >
+          + 创建标签
+        </button>
       </div>
 
       {/* Content */}
@@ -359,6 +344,13 @@ const Tags: React.FC = () => {
           </div>
         </div>
       )}
+      <FloatingActions
+        onRefresh={async () => {
+          await loadData();
+          await refreshTags();
+        }}
+        refreshLabel="刷新标签"
+      />
     </div>
   );
 };

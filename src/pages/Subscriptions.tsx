@@ -6,6 +6,7 @@ import {
 } from '../utils/api';
 import type { BangumiSubscription } from '../utils/api';
 import { SubscriptionBindModal } from '../components/SubscriptionManager';
+import FloatingActions from '../components/FloatingActions';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
 
@@ -200,28 +201,12 @@ const Subscriptions: React.FC = () => {
     <div className="changli-page">
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">订阅管理</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { useSubscriptionStore.getState().markDirty(); loadData(); }}
-            className="action-btn text-sm"
-            title="刷新"
-          >
-            ↻ 刷新
-          </button>
-          <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="action-btn text-sm"
-            title="返回顶部"
-          >
-            ↑ 顶部
-          </button>
-          <button
-            onClick={() => setShowBindModal(true)}
-            className="action-btn action-btn-primary text-sm"
-          >
-            + 添加订阅
-          </button>
-        </div>
+        <button
+          onClick={() => setShowBindModal(true)}
+          className="action-btn action-btn-primary text-sm"
+        >
+          + 添加订阅
+        </button>
       </div>
 
       {subscriptions.length === 0 ? (
@@ -439,6 +424,13 @@ const Subscriptions: React.FC = () => {
           </div>
         </div>
       )}
+      <FloatingActions
+        onRefresh={async () => {
+          useSubscriptionStore.getState().markDirty();
+          await loadData();
+        }}
+        refreshLabel="刷新订阅"
+      />
     </div>
   );
 };
