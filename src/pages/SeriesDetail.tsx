@@ -390,7 +390,7 @@ const SeriesDetail: React.FC = () => {
         series.poster_orientation,
         nextStatus,
         series.code || undefined,
-        series.has_chinese_sub ?? undefined,
+        series.has_chinese_sub ?? 0,
       );
       loadSeries({ silent: true }).catch(() => {});
       refreshSeries().catch(() => {});
