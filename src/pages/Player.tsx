@@ -73,6 +73,8 @@ const Player: React.FC = () => {
   const stageDraggedRef = useRef(false);
   const mpvInitialized = useRef(false);
   const mpvOperationLock = useRef(Promise.resolve());
+  const mpvCommandQueueRef = useRef(Promise.resolve());
+  const switchingVideoRef = useRef(false);
   const isPlayingRef = useRef(false);
   const isMountedRef = useRef(true);
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
@@ -86,6 +88,12 @@ const Player: React.FC = () => {
     const videoH = observedVideoSizeRef.current.height;
     if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return 16 / 9;
     return Math.max(0.45, Math.min(3.2, videoW / videoH));
+  }, []);
+
+  const runMpvCommand = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const next = mpvCommandQueueRef.current.then(task, task);
+    mpvCommandQueueRef.current = next.then(() => undefined, () => undefined);
+    return next;
   }, []);
 
   // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
@@ -142,26 +150,30 @@ const Player: React.FC = () => {
           observedVideoSizeRef.current = { width: 0, height: 0 };
           setCurrentTime(0);
           setDuration(0);
+          switchingVideoRef.current = true;
           try {
-            await mpvCommand('loadfile', [currentVideo.file_path, 'replace']);
+            await runMpvCommand(() => mpvCommand('loadfile', [currentVideo.file_path, 'replace']));
           } catch (loadErr) {
             console.error('[Player] loadfile 失败:', loadErr);
             setError('加载视频失败，请确认视频文件仍然存在');
             setLoading(false);
+            switchingVideoRef.current = false;
             return;
           }
           await new Promise((resolve) => setTimeout(resolve, 300));
           if (!observedVideoSizeRef.current.width || !observedVideoSizeRef.current.height) {
             setHasVideoFrame(true);
           }
-          if (currentVideo.subtitle) {
-            await mpvCommand('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+          const subtitlePath = currentVideo.subtitle;
+          if (subtitlePath) {
+            await runMpvCommand(() => mpvCommand('sub-add', [subtitlePath, 'auto'])).catch(() => undefined);
           }
           if (previousPosition > 5) {
-            await mpvCommand('seek', [String(previousPosition), 'absolute']).catch(() => undefined);
+            await runMpvCommand(() => mpvCommand('seek', [String(previousPosition), 'absolute'])).catch(() => undefined);
             setCurrentTime(previousPosition);
           }
-          await mpvSetProperty('pause', false).catch(() => undefined);
+          await runMpvCommand(() => mpvSetProperty('pause', false)).catch(() => undefined);
+          switchingVideoRef.current = false;
           isPlayingRef.current = true;
           setIsPlaying(true);
           setLoading(false);
@@ -276,7 +288,7 @@ const Player: React.FC = () => {
         }
         } // end else (Windows/Linux)
 
-        await setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 }).catch(() => undefined);
+        await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
 
         mpvInitialized.current = true;
 
@@ -353,23 +365,24 @@ const Player: React.FC = () => {
 
         // 加载视频
         try {
-          await mpvCommand('loadfile', [currentVideo.file_path, 'replace']);
+          await runMpvCommand(() => mpvCommand('loadfile', [currentVideo.file_path, 'replace']));
         } catch (loadErr) {
           console.error('[Player] loadfile 失败:', loadErr);
           setError('加载视频失败，请确认视频文件仍然存在');
           setLoading(false);
           return;
         }
-        if (currentVideo.subtitle) {
-          await mpvCommand('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
+        const subtitlePath = currentVideo.subtitle;
+        if (subtitlePath) {
+          await runMpvCommand(() => mpvCommand('sub-add', [subtitlePath, 'auto'])).catch(() => undefined);
         }
         if (previousPosition > 5) {
           // 等待 mpv 加载文件后再 seek，避免 seek 被忽略
           await new Promise((resolve) => setTimeout(resolve, 800));
-          await mpvCommand('seek', [String(previousPosition), 'absolute']).catch(() => undefined);
+          await runMpvCommand(() => mpvCommand('seek', [String(previousPosition), 'absolute'])).catch(() => undefined);
           setCurrentTime(previousPosition);
         }
-        await mpvSetProperty('pause', false).catch(() => undefined);
+        await runMpvCommand(() => mpvSetProperty('pause', false)).catch(() => undefined);
         isPlayingRef.current = true;
         setIsPlaying(true);
         
@@ -390,7 +403,7 @@ const Player: React.FC = () => {
       // 不在这里 destroy — 由下次 init 或组件卸载时处理
       // 避免 destroy/init 竞态导致闪退
     };
-  }, [id]);
+  }, [id, runMpvCommand]);
 
   // 组件卸载时清理 mpv — 延迟 destroy，等 mpv 完全退出后再销毁窗口
   useEffect(() => {
@@ -401,42 +414,20 @@ const Player: React.FC = () => {
           try {
             if (isMac) {
               // macOS: 通过 IPC socket 发送 quit，不调用 destroy
-              await mpvCommand('quit').catch(() => {});
+              await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
               await new Promise(resolve => setTimeout(resolve, 300));
             } else {
               // Windows/Linux: 正常清理
-              await mpvCommand('quit').catch(() => {});
+              await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
               await new Promise(resolve => setTimeout(resolve, 800));
-              await destroy().catch(() => {});
+              await runMpvCommand(() => destroy()).catch(() => {});
             }
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }
       }).catch(() => {});
     };
-  }, []);
-
-  // mpv 健康检查：只用于日志诊断，不再把短暂 IPC 失败误判成播放崩溃。
-  // 实际故障案例里音频仍在播放，说明 mpv 进程和解码没有退出；旧逻辑连续 3 次
-  // get_property 失败就切到错误页，反而用 WebView 覆盖了视频画面，造成“提示异常后白屏但有声音”。
-  useEffect(() => {
-    if (!mpvInitialized.current) return;
-    let failCount = 0;
-    const timer = window.setInterval(async () => {
-      if (!isMountedRef.current || !mpvInitialized.current) return;
-      try {
-        await mpvCommand('get_property', ['time-pos']);
-        failCount = 0;
-      } catch (err) {
-        if (!isMountedRef.current) return;
-        failCount++;
-        if (failCount === 3 || failCount % 12 === 0) {
-          console.warn('[Player] mpv IPC 健康检查暂时失败，保持当前播放画面:', err);
-        }
-      }
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [currentVideo]);
+  }, [runMpvCommand]);
 
   // 保存音量到本地
   useEffect(() => {
@@ -450,7 +441,7 @@ const Player: React.FC = () => {
       const nextPaused = isPlayingRef.current;
       isPlayingRef.current = !nextPaused;
       setIsPlaying(!nextPaused);
-      await mpvSetProperty('pause', nextPaused);
+      await runMpvCommand(() => mpvSetProperty('pause', nextPaused));
     } catch (err) {
       if (isMountedRef.current) {
         isPlayingRef.current = !isPlayingRef.current;
@@ -458,35 +449,35 @@ const Player: React.FC = () => {
       }
       console.error('[Player] 切换播放状态失败:', err);
     }
-  }, []);
+  }, [runMpvCommand]);
 
   // 跳转
   const seek = useCallback(async (time: number) => {
     if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
-      await mpvCommand('seek', [String(time), 'absolute']);
+      await runMpvCommand(() => mpvCommand('seek', [String(time), 'absolute']));
     } catch (err) {
       console.error('[Player] 跳转失败:', err);
     }
-  }, []);
+  }, [runMpvCommand]);
 
   // 设置音量
   const changeVolume = useCallback(async (vol: number) => {
     try {
-      await mpvSetProperty('volume', Math.max(0, Math.min(100, vol)));
+      await runMpvCommand(() => mpvSetProperty('volume', Math.max(0, Math.min(100, vol))));
     } catch (err) {
       console.error('[Player] 设置音量失败:', err);
     }
-  }, []);
+  }, [runMpvCommand]);
 
   // 设置倍速
   const changeSpeed = useCallback(async (spd: number) => {
     try {
-      await mpvSetProperty('speed', spd);
+      await runMpvCommand(() => mpvSetProperty('speed', spd));
     } catch (err) {
       console.error('[Player] 设置倍速失败:', err);
     }
-  }, []);
+  }, [runMpvCommand]);
 
   // 切换全屏
   const toggleFullscreen = useCallback(async () => {
