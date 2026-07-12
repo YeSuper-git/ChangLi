@@ -255,16 +255,32 @@ async fn delete_subscription(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     sqlx::query("DELETE FROM bangumi_subscriptions WHERE id = ?")
         .bind(id)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
-    
+
     Ok(())
 }
 
+/// 更新订阅（series_id 和/或 preferences）
+#[tauri::command]
+async fn update_subscription_cmd(
+    state: State<'_, AppState>,
+    subscription_id: i64,
+    series_id: Option<i64>,
+    preferences: Option<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_subscription(&pool, subscription_id, series_id, preferences)
+        .await
+        .map_err(|e| e.to_string())
+}
 /// 手动触发订阅检查（获取新集数列表）
 #[tauri::command]
 async fn check_subscription_updates(
@@ -3870,6 +3886,7 @@ fn main() {
             get_subscription_by_series,
             get_all_subscriptions,
             delete_subscription,
+            update_subscription_cmd,
             check_subscription_updates,
             update_subscription_keywords,
             get_subscription_keywords,

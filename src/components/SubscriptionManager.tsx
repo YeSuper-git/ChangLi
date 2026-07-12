@@ -9,9 +9,11 @@ import {
   deleteSubscription,
   getVideoSeriesListLite,
   getAllCategories,
+  updateSubscription,
 } from '../utils/api';
 import type { BangumiSubscription, SubscriptionDownload, VideoSeries } from '../utils/api';
 import { notify } from '../utils/notify';
+import { useSubscriptionStore } from '../store/subscriptionStore';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import loadingIcon from '../assets/icons/loading.svg';
 
@@ -644,6 +646,272 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== Subscription Edit Modal ====================
+
+interface EditModalProps {
+  open: boolean;
+  onClose: () => void;
+  subscription: BangumiSubscription | null;
+  onSave: (subscription: BangumiSubscription) => void;
+}
+
+export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose, subscription, onSave }) => {
+  const [seriesSearch, setSeriesSearch] = useState('');
+  const [showSeriesDropdown, setShowSeriesDropdown] = useState(false);
+  const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
+  const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null);
+
+  // Parse current preferences to get selectedPrefixes
+  const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  // Load data when modal opens
+  useEffect(() => {
+    if (open && subscription) {
+      // Set current series_id
+      setSelectedSeriesId(subscription.series_id ?? null);
+
+      // Parse preferences
+      try {
+        const prefs = JSON.parse(subscription.preferences || '{}');
+        const prefixes = prefs.selectedPrefixes || [];
+        setSelectedPrefixes(new Set(prefixes));
+      } catch {
+        setSelectedPrefixes(new Set());
+      }
+
+      // Load video series list
+      Promise.all([getVideoSeriesListLite(), getAllCategories()]).then(([s, cats]) => {
+        const disabledKeys = new Set(
+          cats.filter(c => {
+            try { return JSON.parse(c.features).subscription === false; } catch { return false; }
+          }).map(c => c.key)
+        );
+        const list = s
+          .filter(([, , dt]) => !disabledKeys.has(dt || ''))
+          .map(([id, title, display_type]) => ({ id, title, display_type } as any));
+        setSeriesList(list);
+      });
+    }
+  }, [open, subscription]);
+
+  const filteredSeries = seriesSearch.trim()
+    ? seriesList.filter(s => s.title.toLowerCase().includes(seriesSearch.toLowerCase()))
+    : seriesList;
+
+  const togglePrefix = (prefix: string) => {
+    setSelectedPrefixes(prev => {
+      const next = new Set(prev);
+      if (next.has(prefix)) next.delete(prefix);
+      else next.add(prefix);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!subscription) return;
+    setSaving(true);
+    setError('');
+
+    try {
+      // Build updated preferences
+      let prefs: any = {};
+      try { prefs = JSON.parse(subscription.preferences || '{}'); } catch { prefs = {}; }
+      prefs.selectedPrefixes = Array.from(selectedPrefixes);
+
+      await updateSubscription(
+        subscription.id,
+        selectedSeriesId,
+        JSON.stringify(prefs)
+      );
+
+      // Update subscription store
+      const store = useSubscriptionStore.getState();
+      store.markDirty();
+      await store.load();
+
+      notify({ message: '订阅已更新', type: 'success' });
+      onSave(subscription!);
+      onClose();
+    } catch (err: any) {
+      console.error('更新订阅失败:', err);
+      setError(err?.message || '更新失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open || !subscription) return null;
+
+  return (
+    <div className="changli-modal-backdrop" onClick={onClose}>
+      <div className="changli-modal-panel !w-[min(100%,560px)] !p-0 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+        {/* ── Header ── */}
+        <div className="changli-modal-header shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-500">订阅管理</p>
+              <h2 className="mt-0.5 text-xl font-bold text-gray-900 tracking-tight">编辑订阅</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-lg leading-none"
+              title="关闭"
+            >×</button>
+          </div>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="changli-modal-body flex-1 overflow-y-auto min-h-0">
+          <div className="space-y-4">
+            {/* 订阅标题（只读） */}
+            <div>
+              <label className="changli-form-label text-[13px]">订阅标题</label>
+              <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] text-gray-700 truncate">
+                {subscription.title || '未知'}
+              </div>
+            </div>
+
+            {/* 关联视频集 */}
+            <div className="relative">
+              <label className="changli-form-label text-[13px] mb-1.5">关联视频集</label>
+              {selectedSeriesId ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl text-[13px] text-rose-700 truncate">
+                    {seriesList.find(s => s.id === selectedSeriesId)?.title || `ID: ${selectedSeriesId}`}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSeriesId(null)}
+                    className="text-gray-400 hover:text-gray-600 text-[12px] shrink-0"
+                  >更换</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={seriesSearch}
+                    onChange={e => {
+                      setSeriesSearch(e.target.value);
+                      setShowSeriesDropdown(true);
+                    }}
+                    onFocus={() => setShowSeriesDropdown(true)}
+                    placeholder="搜索视频集..."
+                    className="changli-input"
+                  />
+                  {showSeriesDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[160px] overflow-y-auto">
+                      {filteredSeries.length === 0 ? (
+                        <div className="px-3 py-2 text-[12px] text-gray-400">无匹配结果</div>
+                      ) : (
+                        filteredSeries.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSeriesId(s.id);
+                              setShowSeriesDropdown(false);
+                              setSeriesSearch('');
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-[13px] hover:bg-rose-50 transition-colors"
+                          >
+                            {s.title}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* 订阅版本选择 */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="changli-form-label text-[13px] mb-0">订阅版本</label>
+                <div className="flex gap-2">
+                  <button onClick={() => setSelectedPrefixes(prev => {
+                    const next = new Set(prev);
+                    // Toggle all based on current state - if some selected, select all; otherwise clear all
+                    if (next.size > 0) next.clear();
+                    return next;
+                  })} className="text-[11px] text-rose-500 hover:text-rose-600 font-medium">全选</button>
+                  <button onClick={() => setSelectedPrefixes(new Set())} className="text-[11px] text-gray-400 hover:text-gray-500">全不选</button>
+                </div>
+              </div>
+
+              {/* 显示当前已选版本的标签 */}
+              {selectedPrefixes.size > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {Array.from(selectedPrefixes).map(prefix => (
+                    <span
+                      key={prefix}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[11px] font-medium"
+                    >
+                      {prefix}
+                      <button
+                        type="button"
+                        onClick={() => togglePrefix(prefix)}
+                        className="text-rose-400 hover:text-rose-600 ml-0.5"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* 手动输入版本标签 */}
+              <div>
+                <input
+                  type="text"
+                  placeholder="输入版本标签后按回车添加..."
+                  className="changli-input text-[13px]"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) {
+                      e.preventDefault();
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      setSelectedPrefixes(prev => {
+                        const next = new Set(prev);
+                        next.add(val);
+                        return next;
+                      });
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">输入自定义版本标签（如: [字幕组] 1080p 简中）</p>
+              </div>
+
+              <div className="text-[11px] text-gray-400 mt-1.5">
+                已选 {selectedPrefixes.size} 个版本
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700 flex items-center gap-2">
+                <span className="shrink-0 text-red-400">!</span>
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="changli-modal-footer shrink-0">
+          <button onClick={onClose} className="action-btn flex-1">取消</button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="action-btn action-btn-primary flex-1 disabled:opacity-50"
+          >
+            {saving ? '保存中...' : '保存'}
+          </button>
         </div>
       </div>
     </div>

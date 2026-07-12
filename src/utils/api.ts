@@ -1270,6 +1270,10 @@ export async function deleteSubscription(id: number): Promise<void> {
   return invoke('delete_subscription', { id });
 }
 
+export async function updateSubscription(subscriptionId: number, seriesId?: number | null, preferences?: string): Promise<void> {
+  return invoke('update_subscription_cmd', { subscriptionId, seriesId: seriesId ?? null, preferences: preferences ?? null });
+}
+
 export async function checkSubscriptionUpdates(subscriptionId: number): Promise<SubscriptionDownload[]> {
   return invoke('check_subscription_updates', { subscriptionId });
 }

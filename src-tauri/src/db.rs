@@ -164,6 +164,40 @@ pub struct SubscriptionKeyword {
     pub created_at: String,
 }
 
+/// 更新订阅的 series_id 和 preferences
+pub async fn update_subscription(
+    pool: &SqlitePool,
+    subscription_id: i64,
+    series_id: Option<i64>,
+    preferences: Option<String>,
+) -> Result<(), sqlx::Error> {
+    let mut sets = Vec::new();
+    if series_id.is_some() {
+        sets.push("series_id = ?");
+    }
+    if preferences.is_some() {
+        sets.push("preferences = ?");
+    }
+    if sets.is_empty() {
+        return Ok(());
+    }
+    sets.push("updated_at = CURRENT_TIMESTAMP");
+    let sql = format!(
+        "UPDATE bangumi_subscriptions SET {} WHERE id = ?",
+        sets.join(", ")
+    );
+    let mut query = sqlx::query(&sql);
+    if let Some(sid) = series_id {
+        query = query.bind(sid);
+    }
+    if let Some(prefs) = &preferences {
+        query = query.bind(prefs);
+    }
+    query = query.bind(subscription_id);
+    query.execute(pool).await?;
+    Ok(())
+}
+
 // 演员
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Actor {

@@ -5,7 +5,7 @@ import {
   checkSubscriptionUpdates,
 } from '../utils/api';
 import type { BangumiSubscription } from '../utils/api';
-import { SubscriptionBindModal } from '../components/SubscriptionManager';
+import { SubscriptionBindModal, SubscriptionEditModal } from '../components/SubscriptionManager';
 import FloatingActions from '../components/FloatingActions';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -66,6 +66,8 @@ function extractSiteName(title: string): string {
 const Subscriptions: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<BangumiSubscription[]>([]);
   const [showBindModal, setShowBindModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<BangumiSubscription | null>(null);
 
   // 按网站分组的展开状态
   const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
@@ -280,6 +282,15 @@ const Subscriptions: React.FC = () => {
 
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <button
+                                onClick={() => {
+                                  setEditingSubscription(sub);
+                                  setShowEditModal(true);
+                                }}
+                                className="action-btn text-xs px-3 py-1"
+                              >
+                                编辑
+                              </button>
+                              <button
                                 onClick={() => handleCheckUpdates(sub)}
                                 disabled={checkingId === sub.id}
                                 className="action-btn text-xs px-3 py-1 disabled:opacity-50"
@@ -389,6 +400,19 @@ const Subscriptions: React.FC = () => {
         onClose={() => setShowBindModal(false)}
         onBind={() => {
           setShowBindModal(false);
+          useSubscriptionStore.getState().markDirty();
+          loadData();
+        }}
+      />
+
+      <SubscriptionEditModal
+        key={showEditModal && editingSubscription ? `edit-${editingSubscription.id}` : 'closed'}
+        open={showEditModal}
+        subscription={editingSubscription}
+        onClose={() => { setShowEditModal(false); setEditingSubscription(null); }}
+        onSave={() => {
+          setShowEditModal(false);
+          setEditingSubscription(null);
           useSubscriptionStore.getState().markDirty();
           loadData();
         }}
