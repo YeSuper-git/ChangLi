@@ -878,8 +878,7 @@ const ActorDetail: React.FC = () => {
     const code = resource.series_code || '';
     const rawTitle = isSeries ? (resource.series_title || '视频集') : resource.file_name;
     const title = code ? `[${code}] ${rawTitle}` : rawTitle;
-    const hasVideo = (resource as any).video_count !== undefined ? (resource as any).video_count > 0 : true;
-    const poster = isSeries ? (hasVideo ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : '') : videoPosterDataUrl(resource);
+    const poster = isSeries ? (resource.series_poster_data_url || videoPosterDataUrl(resource)) : videoPosterDataUrl(resource);
     const target = isSeries ? `/series/${resource.series_id}?fromActor=${actor.id}` : `/series/${resource.series_id || resource.id}?fromActor=${actor.id}`;
     return (
       <Link
