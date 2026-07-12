@@ -323,6 +323,33 @@ fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
     false
 }
 
+fn infer_previous_seasons_episode_offset(
+    existing_season_episode: &[(Option<i32>, Option<i32>)],
+    target_season: i32,
+) -> Option<i32> {
+    if target_season <= 1 {
+        return Some(0);
+    }
+
+    let mut offset = 0;
+    for season in 1..target_season {
+        let season_max = existing_season_episode
+            .iter()
+            .filter_map(|(s, ep)| match (s, ep) {
+                (Some(existing_season), Some(existing_episode)) if *existing_season == season => Some(*existing_episode),
+                _ => None,
+            })
+            .max();
+
+        match season_max {
+            Some(max_episode) if max_episode > 0 => offset += max_episode,
+            _ => return None,
+        }
+    }
+
+    Some(offset)
+}
+
 fn subscription_item_already_exists(
     existing_season_episode: &[(Option<i32>, Option<i32>)],
     existing_episodes: &[Option<i32>],
@@ -335,21 +362,25 @@ fn subscription_item_already_exists(
         if existing_season_episode.contains(&(Some(season), Some(item_episode))) {
             return true;
         }
-        // 有些源用全局集数：第三季第 1 集写成 25。兼容已入库为全局集数的情况。
-        if existing_season_episode.contains(&(Some(season), Some(item_episode)))
-            || existing_season_episode.contains(&(Some(0), Some(item_episode)))
+
+        // 兼容已入库为全局集数/无季号的历史数据。
+        if existing_season_episode.contains(&(Some(0), Some(item_episode)))
             || existing_season_episode.contains(&(None, Some(item_episode)))
         {
             return true;
         }
-        // 常见季度番每季 12 集：第 25 集 => 第三季第 1 集。
-        // 只在集数大于 12 时换算，避免把第一季第 1 集误判成第三季第 1 集。
-        if item_episode > 12 {
-            let normalized_episode = ((item_episode - 1) % 12) + 1;
-            if existing_season_episode.contains(&(Some(season), Some(normalized_episode))) {
-                return true;
+
+        // 有些源用全局集数：例如已有第一季 12 集、第二季 12 集，第三季第 1 集写成 25。
+        // 不固定每季 12 集，而是根据本地已有前序季的最大集数动态推断 offset。
+        if let Some(offset) = infer_previous_seasons_episode_offset(existing_season_episode, season) {
+            if item_episode > offset {
+                let normalized_episode = item_episode - offset;
+                if existing_season_episode.contains(&(Some(season), Some(normalized_episode))) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
 
