@@ -318,9 +318,6 @@ const Player: React.FC = () => {
           console.error('[Player] loadfile 失败:', loadErr);
           setError('加载视频失败，请确认视频文件仍然存在');
           setLoading(false);
-          setTimeout(() => {
-            getCurrentWindow().close().catch(() => {});
-          }, 2000);
           return;
         }
         if (currentVideo.subtitle) {
@@ -342,10 +339,7 @@ const Player: React.FC = () => {
         const errMsg = err instanceof Error ? err.message : String(err);
         setError(`播放器启动失败: ${errMsg}`);
         setLoading(false);
-        // 初始化失败时关闭播放器窗口
-        setTimeout(() => {
-          getCurrentWindow().close().catch(() => {});
-        }, 2000);
+        // 初始化失败时显示错误（不自动关闭）
       }
       }); // end mpvOperationLock.then
     };
