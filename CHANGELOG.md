@@ -4,6 +4,12 @@
 
 # Changelog
 
+## [1.9.13] - 2026-07-12
+
+### Fixed
+- **参演作品海报不展示**: 修复双重data URL前缀导致浏览器无法解码
+- **返回上一页滚动位置不恢复**: 修复Layout scrollKeyRef时序竞态+SeriesDetail用history.back触发POP+Library移除重复scrollTo
+
 ## [1.9.12] - 2026-07-12
 
 ### Fixed
