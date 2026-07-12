@@ -238,9 +238,12 @@ const SeriesDetail: React.FC = () => {
   }, [seriesId]);
 
   const loadEditOptions = useCallback(async () => {
-    // 每次都重新加载，确保获取最新数据
     try {
-      const [tags, actors] = await Promise.all([getTags(), getActors()]);
+      const categoryKey = currentCategory?.key || 'anime';
+      const [tags, actors] = await Promise.all([
+        getTagsByCategory(categoryKey).catch(() => getTags()),
+        getActors(),
+      ]);
       setAllTags(tags);
       setAllActors(actors);
       setEditOptionsLoaded(true);
@@ -248,7 +251,7 @@ const SeriesDetail: React.FC = () => {
       console.error('加载编辑选项失败:', error);
       notify({ message: '加载编辑选项失败，请稍后重试', type: 'error' });
     }
-  }, [cachedActors, cachedTags, editOptionsLoaded]);
+  }, [cachedActors, cachedTags, editOptionsLoaded, currentCategory]);
 
   useEffect(() => {
     if (editing) {
@@ -535,9 +538,7 @@ const SeriesDetail: React.FC = () => {
   const isPortrait = currentCategory ? currentCategory.card_layout === 'portrait' : !isAdult;
   const displayPosterDataUrl = editing && editData.poster && editData.poster !== (series?.poster || '')
     ? `${convertFileSrc(editData.poster)}?t=${Date.now()}`
-    : series?.poster
-      ? convertFileSrc(series.poster)
-      : series?.poster_data_url;
+    : series?.poster_data_url;
 
   if (loading && !series) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-500 flex items-center gap-2">加载中 <img src={loadingIcon} alt="" className="w-6 h-6" /></div></div>;
   if (!series) return <div className="text-gray-500">视频集不存在</div>;
