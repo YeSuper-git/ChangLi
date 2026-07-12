@@ -2427,7 +2427,14 @@ async fn update_tag(state: State<'_, AppState>, id: i64, name: String, scope: Op
 }
 
 #[tauri::command]
-async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<(db::Tag, Vec<String>)>, String> {
+#[derive(serde::Serialize)]
+struct TagWithCategories {
+    #[serde(flatten)]
+    tag: db::Tag,
+    category_keys: Vec<String>,
+}
+
+async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<TagWithCategories>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -2436,7 +2443,7 @@ async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<(db:
     let mut result = Vec::new();
     for tag in tags {
         let categories = db::get_tag_categories(&pool, tag.id).await.map_err(|e| e.to_string())?;
-        result.push((tag, categories));
+        result.push(TagWithCategories { tag, category_keys: categories });
     }
     Ok(result)
 }
