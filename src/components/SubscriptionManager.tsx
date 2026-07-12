@@ -669,6 +669,9 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
 
   // Parse current preferences to get selectedPrefixes
   const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
+  const [detectedGroups, setDetectedGroups] = useState<RssGroup[]>([]);
+  const [detectedFeedSeason, setDetectedFeedSeason] = useState<number | null>(null);
+  const [detectingVersions, setDetectingVersions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -677,6 +680,9 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
     if (open && subscription) {
       // Set current series_id
       setSelectedSeriesId(subscription.series_id ?? null);
+      setDetectedGroups([]);
+      setDetectedFeedSeason(null);
+      setError('');
 
       // Parse preferences
       try {
@@ -715,6 +721,26 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
     });
   };
 
+  const handleRedetectVersions = async () => {
+    if (!subscription) return;
+    setDetectingVersions(true);
+    setError('');
+    try {
+      const detectResult = await detectRssUrl(subscription.bangumi_url);
+      const rssData = await fetchRss(detectResult.rss_url || subscription.rss_url);
+      const groups = groupRssItems(rssData.items || []);
+      setDetectedGroups(groups);
+      setDetectedFeedSeason(detectResult.feed_season);
+      const recommendedPrefixes = new Set(groups.filter(g => g.recommended).map(g => g.prefix));
+      setSelectedPrefixes(recommendedPrefixes.size > 0 ? recommendedPrefixes : new Set(groups.map(g => g.prefix)));
+    } catch (err: any) {
+      console.error('重新识别订阅版本失败:', err);
+      setError(err?.message || '重新识别失败，请稍后重试');
+    } finally {
+      setDetectingVersions(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!subscription) return;
     setSaving(true);
@@ -724,7 +750,23 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
       // Build updated preferences
       let prefs: any = {};
       try { prefs = JSON.parse(subscription.preferences || '{}'); } catch { prefs = {}; }
-      prefs.selectedPrefixes = Array.from(selectedPrefixes);
+      const selectedPrefixList = Array.from(selectedPrefixes);
+      prefs.selectedPrefixes = selectedPrefixList;
+      if (detectedGroups.length > 0) {
+        const matchPatterns: Record<string, string> = {};
+        for (const group of detectedGroups) {
+          if (selectedPrefixes.has(group.prefix)) {
+            matchPatterns[group.prefix] = group.matchPattern;
+          }
+        }
+        const previousKnownGuids = Array.isArray(prefs.knownGuids) ? prefs.knownGuids : [];
+        const redetectedGuids = detectedGroups
+          .filter(group => selectedPrefixes.has(group.prefix))
+          .flatMap(group => group.items.map(item => item.guid));
+        prefs.matchPatterns = matchPatterns;
+        prefs.knownGuids = Array.from(new Set([...previousKnownGuids, ...redetectedGuids]));
+        prefs.feedSeason = detectedFeedSeason ?? null;
+      }
 
       await updateSubscription(
         subscription.id,
@@ -836,14 +878,17 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="changli-form-label text-[13px] mb-0">订阅版本</label>
-                <div className="flex gap-2">
-                  <button onClick={() => setSelectedPrefixes(prev => {
-                    const next = new Set(prev);
-                    // Toggle all based on current state - if some selected, select all; otherwise clear all
-                    if (next.size > 0) next.clear();
-                    return next;
-                  })} className="text-[11px] text-rose-500 hover:text-rose-600 font-medium">全选</button>
-                  <button onClick={() => setSelectedPrefixes(new Set())} className="text-[11px] text-gray-400 hover:text-gray-500">全不选</button>
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={handleRedetectVersions}
+                    disabled={detectingVersions}
+                    className="text-[11px] text-rose-500 hover:text-rose-600 font-medium disabled:opacity-50 inline-flex items-center gap-1"
+                  >
+                    {detectingVersions ? <>识别中 <img src={loadingIcon} alt="" className="w-3 h-3" /></> : '重新识别'}
+                  </button>
+                  <button type="button" onClick={() => setSelectedPrefixes(new Set(detectedGroups.length > 0 ? detectedGroups.map(g => g.prefix) : Array.from(selectedPrefixes)))} className="text-[11px] text-rose-500 hover:text-rose-600 font-medium">全选</button>
+                  <button type="button" onClick={() => setSelectedPrefixes(new Set())} className="text-[11px] text-gray-400 hover:text-gray-500">全不选</button>
                 </div>
               </div>
 
@@ -862,6 +907,24 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
                         className="text-rose-400 hover:text-rose-600 ml-0.5"
                       >×</button>
                     </span>
+                  ))}
+                </div>
+              )}
+
+              {detectedGroups.length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-2 mb-2 space-y-1.5">
+                  {detectedGroups.map(group => (
+                    <label key={group.prefix} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white border border-gray-100 cursor-pointer hover:border-rose-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedPrefixes.has(group.prefix)}
+                        onChange={() => togglePrefix(group.prefix)}
+                        className="accent-rose-500"
+                      />
+                      <span className="flex-1 min-w-0 text-[12px] text-gray-700 truncate">{group.prefix}</span>
+                      {group.recommended && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-500">推荐</span>}
+                      <span className="text-[11px] text-gray-400">{group.count} 条</span>
+                    </label>
                   ))}
                 </div>
               )}
