@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { addSite, getTags, getUpdatesDir, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate, getDownloadedUpdate } from '../utils/api';
+import { addSite, getTags, getUpdatesDir, addTag, deleteTag, updateTag, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, getTagColor, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
 import { clearLibraryFilterCaches } from './Library';
 import type { Tag, Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
@@ -103,10 +103,7 @@ const Settings: React.FC = () => {
       setActorFields(fieldsList);
       // 加载已下载的更新
       try {
-        const update = await getDownloadedUpdate();
-        if (update) {
-          setDownloadedUpdate({ path: update[0], name: update[1], size: update[2] });
-        }
+        // 不自动检查已下载更新，只在用户选择「稍后安装」时显示
       } catch {}
         // 加载扩展预设模板
       try {
@@ -1438,6 +1435,9 @@ const Settings: React.FC = () => {
         onCancel={() => {
           if (downloading) {
             handleCancelDownload();
+          } else if (downloadedFilePath) {
+            // 用户选择「稍后安装」：记住已下载的更新
+            setDownloadedUpdate({ path: downloadedFilePath, name: pendingUpdate ? `v${pendingUpdate.version}` : '更新', size: 0 });
           }
           setPendingUpdate(null);
           setDownloading(false);
