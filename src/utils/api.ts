@@ -675,9 +675,9 @@ export async function getTagsByCategory(categoryKey: string): Promise<Tag[]> {
   return invoke<Tag[]>('get_tags_by_category', { categoryKey });
 }
 
-export async function addTag(name: string): Promise<Tag> {
+export async function addTag(name: string, scope?: string): Promise<Tag> {
   try {
-    const result = await invoke<Tag>('add_tag', { name });
+    const result = await invoke<Tag>('add_tag', { name, scope: scope || null });
     return result;
   } catch (err) {
     console.error('[API] addTag 失败:', err);

@@ -63,11 +63,10 @@ const Tags: React.FC = () => {
       return;
     }
     try {
-      const newTag = await addTag(name);
+      const newTag = await addTag(name, createScope);
       if (createScope === 'category' && createCategoryKeys.length > 0) {
         await updateTagCategories(newTag.id, createCategoryKeys);
       }
-      await updateTag(newTag.id, name, createScope);
       setShowCreateModal(false);
       setCreateName('');
       setCreateScope('global');
