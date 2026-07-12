@@ -160,21 +160,24 @@ const Library: React.FC = () => {
 
   // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
   const dirtyRefreshHandledRef = useRef(false);
+  const location = useLocation();
+  const prevLocationRef = useRef(location.pathname);
+
   useEffect(() => {
-    if (dirtyRefreshHandledRef.current) return;
-    dirtyRefreshHandledRef.current = true;
-    // 从 series detail 返回时恢复滚动位置
+    // 从详情页返回时恢复滚动位置
     const saved = sessionStorage.getItem('library-scroll-y');
     if (saved) {
       sessionStorage.removeItem('library-scroll-y');
       requestAnimationFrame(() => window.scrollTo(0, Number(saved)));
-    } else {
+    } else if (prevLocationRef.current !== location.pathname) {
+      // 切换到新页面时滚动到顶部
       window.scrollTo(0, 0);
     }
+    prevLocationRef.current = location.pathname;
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
-  }, []);
+  }, [location.pathname]);
 
   // 大类配置由 App 启动时预加载进 store；视频页首帧先用 store 快照，避免标题/筛选区闪现。
   useEffect(() => {
