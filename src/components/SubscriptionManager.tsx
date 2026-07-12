@@ -113,10 +113,19 @@ function extractVersionKey(title: string): string {
   else if (lower.includes('480p')) parts.push('480p');
   else if (lower.includes('2160p') || lower.includes('4k')) parts.push('4k');
   
-  // 语言
-  if (lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]')) parts.push('简中');
-  else if (lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('简／繁') || lower.includes('简/繁')) parts.push('简繁');
-  else if (lower.includes('cht') || lower.includes('繁中') || lower.includes('繁体') || lower.includes('[big5]')) parts.push('繁中');
+  // 语言（支持嵌套方括号格式如 [简日内嵌][AVC 8bit 1080P]）
+  // 先提取所有方括号中的内容
+  const bracketContents = title.match(/\[([^\]]+)\]/g)?.map(b => b.slice(1, -1).toLowerCase()) || [];
+  const allText = lower + ' ' + bracketContents.join(' ');
+  
+  if (allText.includes('chs') || allText.includes('简中') || allText.includes('简体') || allText.includes('[gb]') || (allText.includes('简') && allText.includes('日') && !allText.includes('繁'))) parts.push('简中');
+  else if (allText.includes('简繁') || allText.includes('简／繁') || allText.includes('简/繁') || (allText.includes('简') && allText.includes('繁'))) parts.push('简繁');
+  else if (allText.includes('cht') || allText.includes('繁中') || allText.includes('繁体') || allText.includes('[big5]') || (allText.includes('繁') && allText.includes('日') && !allText.includes('简'))) parts.push('繁中');
+  
+  // 日文轨道（如果有）
+  if (allText.includes('日内嵌') || allText.includes('日内封') || allText.includes('日文')) {
+    // 已在上面的语言分类中处理
+  }
   
   // 来源
   if (lower.includes('baha')) parts.push('Baha');
@@ -134,19 +143,28 @@ function extractVersionKey(title: string): string {
   return parts.length > 0 ? parts.join(' ') : '默认';
 }
 
-/// 计算推荐优先级（0=不推荐, 1=简中/简繁, 2=无修+简繁, 3=无修+简中）
+/// 计算推荐优先级
+/// 优先级: 无修+简中(5) > 无修+简日(4) > 无修+简繁(3) > 简中(2) > 简日(1) > 简繁(1) > 不推荐(0)
 /// 输入格式: "[字幕组名] 标题内容"
 function getRecommendationPriority(text: string): number {
   const lower = text.toLowerCase();
-  const isCHS = lower.includes('chs') || lower.includes('简中') || lower.includes('简体') || lower.includes('[gb]');
-  const isCHSorCHT = isCHS || lower.includes('简繁') || lower.includes('简繁内封') || lower.includes('简／繁') || lower.includes('简/繁');
-  const isUncensored = lower.includes('无修') || lower.includes('无限制') || lower.includes('uncensored') || lower.includes('uncut') || lower.includes('年龄限制版');
+  // 提取所有方括号内容
+  const bracketContents = text.match(/\[([^\]]+)\]/g)?.map(b => b.slice(1, -1).toLowerCase()) || [];
+  const allText = lower + ' ' + bracketContents.join(' ');
   
-  if (isUncensored && isCHS) return 3;      // 无修 + 简中 = 最高
-  if (isUncensored && isCHSorCHT) return 2;  // 无修 + 简繁 = 次高
-  if (isCHS) return 1;                        // 纯简中
-  if (isCHSorCHT) return 1;                   // 简繁
-  return 0;                                   // 纯繁中不推荐
+  const isCHS = allText.includes('chs') || allText.includes('简中') || allText.includes('简体') || allText.includes('[gb]') || (allText.includes('简') && allText.includes('日') && !allText.includes('繁'));
+  const isCHSonly = isCHS && !allText.includes('繁');
+  const isCHS_JP = allText.includes('简') && (allText.includes('日') || allText.includes('内嵌') || allText.includes('内封')) && !allText.includes('繁');
+  const isCHSorCHT = isCHS || allText.includes('简繁') || allText.includes('简／繁') || allText.includes('简/繁');
+  const isUncensored = allText.includes('无修') || allText.includes('无限制') || allText.includes('uncensored') || allText.includes('uncut') || allText.includes('年龄限制版');
+  
+  if (isUncensored && isCHS_JP) return 5;    // 无修 + 简日
+  if (isUncensored && isCHSonly) return 5;   // 无修 + 纯简中
+  if (isUncensored && isCHSorCHT) return 4;  // 无修 + 简繁
+  if (isCHS_JP) return 3;                    // 简日（有日文轨道）
+  if (isCHSonly) return 2;                   // 纯简中
+  if (isCHSorCHT) return 1;                  // 简繁
+  return 0;                                  // 纯繁中不推荐
 }
 
 /// 按字幕组分组，组内按关键版本信息细分
