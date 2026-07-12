@@ -399,6 +399,7 @@ const Subscriptions: React.FC = () => {
       )}
 
       <SubscriptionBindModal
+        key={showBindModal ? 'open' : 'closed'}
         open={showBindModal}
         onClose={() => setShowBindModal(false)}
         onBind={() => {

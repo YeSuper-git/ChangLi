@@ -285,9 +285,9 @@ async fn check_subscription_updates(
     };
     
     let mut new_items = Vec::new();
-    // 查询视频集中已有的集数列表（精确匹配，不只是最大集数）
-    let existing_episodes: Vec<Option<i32>> = if let Some(series_id) = sub.series_id {
-        sqlx::query_scalar::<_, Option<i32>>("SELECT episode_number FROM videos WHERE series_id = ?")
+    // 查询视频集中已有的 (season, episode_number) 组合
+    let existing_season_episode: Vec<(Option<i32>, Option<i32>)> = if let Some(series_id) = sub.series_id {
+        sqlx::query_as::<_, (Option<i32>, Option<i32>)>("SELECT season, episode_number FROM videos WHERE series_id = ?")
             .bind(series_id)
             .fetch_all(&pool)
             .await
@@ -295,6 +295,8 @@ async fn check_subscription_updates(
     } else {
         Vec::new()
     };
+    // 也保留纯集数列表用于无季号时的匹配
+    let existing_episodes: Vec<Option<i32>> = existing_season_episode.iter().map(|(_, ep)| *ep).collect();
     
     for item in &feed.items {
         // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
@@ -321,11 +323,19 @@ async fn check_subscription_updates(
             }
         }
         
-        // 从标题中提取集数，跳过视频集中已有的集数
+        // 从标题中提取季号和集数，跳过视频集中已有的 (season, episode) 组合
+        let item_season = extract_season_number(&item.title);
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
-            if existing_episodes.contains(&Some(ep)) {
-                continue; // 视频集中已有该集，跳过
+            let dominated = if let Some(season) = item_season {
+                // 有季号：按 (season, episode) 精确匹配
+                existing_season_episode.contains(&(Some(season), Some(ep)))
+            } else {
+                // 无季号：按 episode 匹配（兼容旧数据）
+                existing_episodes.contains(&Some(ep))
+            };
+            if dominated {
+                continue;
             }
         }
         
@@ -497,6 +507,31 @@ async fn check_subscription_updates(
 
 
 /// 从标题中提取集数
+fn extract_season_number(title: &str) -> Option<i32> {
+    use regex::Regex;
+    // S01, Season 1, 第1季 等格式
+    let patterns = [
+        r"(?i)S(\d+)\d*E",           // S01E02 中的 S01
+        r"(?i)Season\s*(\d+)",        // Season 1
+        r"(?i)S(\d+)(?:\s|$|\[)",    // S01 [ 或 S01 结尾
+        r"第\s*(\d+)\s*季",           // 第1季
+    ];
+    for pattern in &patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            if let Some(caps) = re.captures(title) {
+                if let Some(s) = caps.get(1) {
+                    if let Ok(season) = s.as_str().parse::<i32>() {
+                        if season >= 1 && season <= 99 {
+                            return Some(season);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn extract_episode_number(title: &str) -> Option<i32> {
     use regex::Regex;
     
