@@ -101,8 +101,10 @@ const Subscriptions: React.FC = () => {
       setSeriesMap(map);
       const sites = new Set(cached.map(s => extractSiteName(s.title || s.rss_url)));
       setExpandedSites(sites);
+      // 有缓存就不触发 API 调用
+      return;
     }
-    // 后台静默刷新
+    // 无缓存才加载
     loadData();
   }, [loadData]);
 
