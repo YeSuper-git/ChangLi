@@ -346,15 +346,6 @@ async fn check_subscription_updates(
     // 获取 RSS
     let feed = fetch_rss(sub.rss_url.clone()).await?;
     
-    // 获取已下载的 guid
-    let existing_guids: Vec<String> = sqlx::query_scalar::<_, String>(
-        "SELECT guid FROM subscription_downloads WHERE subscription_id = ?"
-    )
-    .bind(subscription_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap_or_default();
-    
     // 解析用户选择的版本前缀
     let selected_prefixes: Vec<String> = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
         if let Some(arr) = parsed.get("selectedPrefixes").and_then(|v| v.as_array()) {
@@ -388,7 +379,6 @@ async fn check_subscription_updates(
     };
     let existing_episode_progress = std::cmp::max(max_episode.unwrap_or(0), existing_video_count);
     
-    let mut new_items = Vec::new();
     // 查询视频集中已有的 (season, episode_number) 组合
     let existing_season_episode: Vec<(Option<i32>, Option<i32>)> = if let Some(series_id) = sub.series_id {
         sqlx::query_as::<_, (Option<i32>, Option<i32>)>("SELECT season, episode_number FROM videos WHERE series_id = ?")
@@ -408,123 +398,6 @@ async fn check_subscription_updates(
         .and_then(|v| v.get("feedSeason")?.as_i64())
         .map(|s| s as i32);
 
-    for item in &feed.items {
-        // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
-        if !selected_prefixes.is_empty() {
-            let title_lower = item.title.to_lowercase();
-            let matched = selected_prefixes.iter().any(|prefix| {
-                let prefix_lower = prefix.to_lowercase();
-                let parts: Vec<&str> = prefix_lower.split(' ').collect();
-                parts.iter().all(|part| prefix_part_matches_title(part, &title_lower))
-            });
-            if !matched {
-                continue;
-            }
-        }
-        
-        // 从标题中提取季号和集数，跳过视频集中已有的 (season, episode) 组合
-        // 优先用条目标题的季号，没有则用 RSS feed 级别的季号
-        let item_season = extract_season_number(&item.title).or(feed_season);
-        let item_episode = extract_episode_number(&item.title);
-        if let Some(ep) = item_episode {
-            let dominated = if let Some(season) = item_season {
-                // 有季号：优先按 (season, episode) 精确匹配
-                existing_season_episode.contains(&(Some(season), Some(ep)))
-            } else {
-                // 无季号：按 episode 匹配；如果历史数据没识别出集数，则用已有视频数量/最大集数兜底
-                existing_episodes.contains(&Some(ep)) || ep <= existing_episode_progress
-            };
-            if dominated {
-                continue;
-            }
-        }
-        
-        // 如果 RSS 中没有磁力链接，先尝试用 infoHash 拼接
-        let mut magnet = item.magnet_link.clone();
-        if magnet.is_none() {
-            if let Some(ref hash) = item.info_hash {
-                let hash = hash.trim();
-                if hash.len() == 40 || hash.len() == 32 {
-                    magnet = Some(format!("magnet:?xt=urn:btih:{hash}"));
-                }
-            }
-        }
-        // 如果还没有磁力链接，从详情页提取
-        if magnet.is_none() && !item.link.is_empty() {
-            if let Ok(resp) = reqwest::get(&item.link).await {
-              if let Ok(html) = resp.text().await {
-                // 从 HTML 中提取 magnet:?xt= 链接
-                let lower = html.to_lowercase();
-                if let Some(start) = lower.find("magnet:?xt=") {
-                    let slice = &html[start..];
-                    if let Some(end) = slice.find('"') {
-                        let raw = &slice[..end];
-                        let decoded = raw.replace("&amp;", "&");
-                        magnet = Some(decoded.to_string());
-                    }
-                }
-              }
-            }
-        }
-        
-        // 插入新记录
-        sqlx::query(
-            r#"INSERT OR IGNORE INTO subscription_downloads (subscription_id, guid, title, torrent_url, magnet_link, file_size, pub_date, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')"#
-        )
-        .bind(subscription_id)
-        .bind(&item.guid)
-        .bind(&item.title)
-        .bind(&item.torrent_url)
-        .bind(&magnet)
-        .bind(item.content_length)
-        .bind(&item.pub_date)
-        .execute(&pool)
-        .await
-        .ok();
-        
-        // 查询插入的记录
-        if let Ok(download) = sqlx::query_as::<_, db::SubscriptionDownload>(
-            "SELECT * FROM subscription_downloads WHERE subscription_id = ? AND guid = ?"
-        )
-        .bind(subscription_id)
-        .bind(&item.guid)
-        .fetch_one(&pool)
-        .await
-        {
-            new_items.push(download);
-        }
-    }
-    
-    // 更新最后检查时间
-    sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = datetime('now', 'localtime') WHERE id = ?")
-        .bind(subscription_id)
-        .execute(&pool)
-        .await
-        .ok();
-    
-    // 将新条目的 GUID 加入 knownGuids，避免下次检查重复
-    if !new_items.is_empty() {
-        let mut known = existing_guids;
-        for item in &new_items {
-            if !known.contains(&item.guid) {
-                known.push(item.guid.clone());
-            }
-        }
-        let prefs_str = if let Ok(mut prefs) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
-            prefs["knownGuids"] = serde_json::to_value(&known).unwrap_or_default();
-            serde_json::to_string(&prefs).unwrap_or_default()
-        } else {
-            sub.preferences.clone()
-        };
-        sqlx::query("UPDATE bangumi_subscriptions SET preferences = ? WHERE id = ?")
-            .bind(&prefs_str)
-            .bind(subscription_id)
-            .execute(&pool)
-            .await
-            .ok();
-    }
-    
     let mut new_items = Vec::new();
     
     for item in &feed.items {

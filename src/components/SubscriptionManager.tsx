@@ -349,15 +349,10 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     setError('');
 
     try {
-      // 收集选中组的所有 guid 作为已知条目
-      const knownGuids: string[] = [];
       const matchPatterns: Record<string, string> = {};
       for (const group of rssGroups) {
         if (selectedGroups.has(group.prefix)) {
           matchPatterns[group.prefix] = group.matchPattern;
-          for (const item of group.items) {
-            knownGuids.push(item.guid);
-          }
         }
       }
 
@@ -367,7 +362,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids, feedSeason: feedSeason ?? null }),
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, feedSeason: feedSeason ?? null }),
         'clipboard'
       );
 
@@ -759,12 +754,8 @@ export const SubscriptionEditModal: React.FC<EditModalProps> = ({ open, onClose,
             matchPatterns[group.prefix] = group.matchPattern;
           }
         }
-        const previousKnownGuids = Array.isArray(prefs.knownGuids) ? prefs.knownGuids : [];
-        const redetectedGuids = detectedGroups
-          .filter(group => selectedPrefixes.has(group.prefix))
-          .flatMap(group => group.items.map(item => item.guid));
         prefs.matchPatterns = matchPatterns;
-        prefs.knownGuids = Array.from(new Set([...previousKnownGuids, ...redetectedGuids]));
+        delete prefs.knownGuids;
         prefs.feedSeason = detectedFeedSeason ?? null;
       }
 
