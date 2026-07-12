@@ -6,15 +6,11 @@ import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
 
-type ScopeFilter = 'all' | 'global' | 'category';
-
 const Tags: React.FC = () => {
   const { refreshTags } = useLibraryStore();
   const [loading, setLoading] = useState(true);
   const [tags, setTags] = useState<TagWithCategories[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
 
   // Edit modal state
   const [editingTag, setEditingTag] = useState<TagWithCategories | null>(null);
@@ -48,262 +44,240 @@ const Tags: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  // Filtered tags
-  const filteredTags = useMemo(() => {
-    return tags.filter(tag => {
-      const matchSearch = tag.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchScope = scopeFilter === 'all' || tag.scope === scopeFilter;
-      return matchSearch && matchScope;
-    });
-  }, [tags, searchTerm, scopeFilter]);
+  // Split into global and category
+  const globalTags = useMemo(() => tags.filter(t => t.scope === 'global'), [tags]);
+  const categoryTags = useMemo(() => tags.filter(t => t.scope === 'category'), [tags]);
 
-  // Refresh data
-  const refreshData = async () => {
-    try {
-      const [tagsData, catsData] = await Promise.all([
-        getTagsWithCategories(),
-        getAllCategories(),
-      ]);
-      setTags(tagsData);
-      setCategories(catsData);
-    } catch (err) {
-      console.error('刷新数据失败:', err);
-    }
+  const toggleCategoryKey = (key: string, keys: string[], setKeys: (v: string[]) => void) => {
+    setKeys(keys.includes(key) ? keys.filter(k => k !== key) : [...keys, key]);
   };
 
-  // ---- Create ----
-  const resetCreateForm = () => {
-    setCreateName('');
-    setCreateScope('global');
-    setCreateCategoryKeys([]);
-  };
-
+  // Create
   const handleCreate = async () => {
     const name = createName.trim();
     if (!name) return;
-    if (tags.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
+    if (tags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
       notify({ message: `标签"${name}"已存在`, type: 'info' });
       return;
     }
     try {
       const newTag = await addTag(name);
       if (createScope === 'category' && createCategoryKeys.length > 0) {
-        await updateTag(newTag.id, name, 'category');
         await updateTagCategories(newTag.id, createCategoryKeys);
       }
+      await updateTag(newTag.id, name, createScope);
       setShowCreateModal(false);
-      resetCreateForm();
-      await refreshData();
+      setCreateName('');
+      setCreateScope('global');
+      setCreateCategoryKeys([]);
+      await loadData();
       await refreshTags();
-      notify({ message: `标签"${name}"创建成功`, type: 'success' });
+      notify({ message: `标签"${name}"已创建`, type: 'success' });
     } catch (err) {
       console.error('创建标签失败:', err);
       notify({ message: '创建标签失败', type: 'error' });
     }
   };
 
-  // ---- Edit ----
+  // Edit
   const openEditModal = (tag: TagWithCategories) => {
     setEditingTag(tag);
     setEditName(tag.name);
     setEditScope(tag.scope);
-    setEditCategoryKeys(tag.category_keys || []);
+    setEditCategoryKeys([...tag.category_keys]);
   };
 
   const handleSaveEdit = async () => {
     if (!editingTag) return;
     const name = editName.trim();
     if (!name) return;
-    if (tags.some(t => t.id !== editingTag.id && t.name.trim().toLowerCase() === name.toLowerCase())) {
+    if (tags.some(t => t.id !== editingTag.id && t.name.toLowerCase() === name.toLowerCase())) {
       notify({ message: `标签"${name}"已存在`, type: 'info' });
       return;
     }
     try {
       await updateTag(editingTag.id, name, editScope);
-      await updateTagCategories(editingTag.id, editCategoryKeys);
+      if (editScope === 'category') {
+        await updateTagCategories(editingTag.id, editCategoryKeys);
+      } else {
+        await updateTagCategories(editingTag.id, []);
+      }
       setEditingTag(null);
-      await refreshData();
+      await loadData();
       await refreshTags();
-      notify({ message: '标签已更新', type: 'success' });
     } catch (err) {
       console.error('更新标签失败:', err);
       notify({ message: '更新标签失败', type: 'error' });
     }
   };
 
-  // ---- Delete ----
-  const handleDelete = async (tagId: number) => {
+  // Delete
+  const handleDelete = async (id: number) => {
     try {
-      await deleteTag(tagId);
-      if (editingTag?.id === tagId) setEditingTag(null);
-      await refreshData();
+      await deleteTag(id);
+      await loadData();
       await refreshTags();
-      notify({ message: '标签已删除', type: 'success' });
     } catch (err) {
       console.error('删除标签失败:', err);
       notify({ message: '删除标签失败', type: 'error' });
     }
   };
 
-  const toggleCategoryKey = (key: string, list: string[], setter: (v: string[]) => void) => {
-    if (list.includes(key)) {
-      setter(list.filter(k => k !== key));
-    } else {
-      setter([...list, key]);
-    }
-  };
+  // Category name helper
+  const catName = (key: string) => categories.find(c => c.key === key)?.name || key;
 
-  const scopeLabel = (scope: string) => scope === 'global' ? '通用' : '特殊';
+  // Render tag card
+  const renderTagCard = (tag: TagWithCategories) => (
+    <div
+      key={tag.id}
+      className="changli-panel p-5 cursor-pointer hover:shadow-md transition-all duration-200 relative group"
+      onClick={() => openEditModal(tag)}
+    >
+      {/* Delete button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          requestSecondConfirm(`delete-tag-${tag.id}`, () => handleDelete(tag.id));
+        }}
+        className={`absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 ${
+          pendingKey === `delete-tag-${tag.id}`
+            ? 'bg-red-500 text-white opacity-100'
+            : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
+        }`}
+        title={pendingKey === `delete-tag-${tag.id}` ? '确认删除?' : '删除标签'}
+      >
+        {pendingKey === `delete-tag-${tag.id}` ? '✓' : '×'}
+      </button>
 
-  const scopeFilters: { key: ScopeFilter; label: string }[] = [
-    { key: 'all', label: '全部' },
-    { key: 'global', label: '通用' },
-    { key: 'category', label: '特殊' },
-  ];
+      {/* Tag name */}
+      <h3 className="text-base font-semibold text-gray-900 mb-2 pr-6">{tag.name}</h3>
+
+      {/* Associated categories */}
+      {tag.scope === 'category' && tag.category_keys.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+          {tag.category_keys.slice(0, 4).map(key => (
+            <span key={key} className="changli-brand-badge text-[10px] px-2 py-0.5">
+              {catName(key)}
+            </span>
+          ))}
+          {tag.category_keys.length > 4 && (
+            <span className="text-[10px] text-gray-400 self-center">+{tag.category_keys.length - 4}</span>
+          )}
+        </div>
+      )}
+      {tag.scope === 'category' && tag.category_keys.length === 0 && (
+        <p className="text-[11px] text-gray-400 italic mt-1">未关联分类</p>
+      )}
+    </div>
+  );
+
+  // Scope switch in modal
+  const renderScopeSwitch = (scope: 'global' | 'category', setScope: (v: 'global' | 'category') => void, setKeys: (v: string[]) => void) => (
+    <div>
+      <label className="changli-form-label">标签范围</label>
+      <div className={`changli-status-switch ${scope === 'category' ? 'is-right' : ''}`} role="group" aria-label="标签范围">
+        <button
+          type="button"
+          onClick={() => { setScope('global'); setKeys([]); }}
+          className={scope === 'global' ? 'active' : ''}
+        >全局</button>
+        <button
+          type="button"
+          onClick={() => setScope('category')}
+          className={scope === 'category' ? 'active' : ''}
+        >特殊</button>
+      </div>
+    </div>
+  );
+
+  // Category checkboxes in modal
+  const renderCategoryCheckboxes = (scope: string, keys: string[], setKeys: (v: string[]) => void) => scope === 'category' && (
+    <div>
+      <label className="changli-form-label">关联分类</label>
+      <div className="border border-gray-200 rounded-xl p-3 space-y-1 max-h-52 overflow-y-auto bg-gray-50/50">
+        {categories.length > 0 ? categories.map(cat => (
+          <label
+            key={cat.key}
+            className="flex items-center gap-2.5 py-2 px-3 rounded-lg hover:bg-white cursor-pointer transition-colors"
+          >
+            <input
+              type="checkbox"
+              checked={keys.includes(cat.key)}
+              onChange={() => toggleCategoryKey(cat.key, keys, setKeys)}
+              className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-400"
+            />
+            <span className="text-sm text-gray-700">{cat.name}</span>
+            <span className="text-[10px] text-gray-400 ml-auto">{cat.key}</span>
+          </label>
+        )) : (
+          <p className="text-sm text-gray-400 text-center py-4">暂无分类</p>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="changli-page">
-      {/* Header: title + create button */}
+      {/* Header */}
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">标签管理</h1>
         <button
-          onClick={() => {
-            resetCreateForm();
-            setShowCreateModal(true);
-          }}
+          onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
           className="action-btn action-btn-primary"
         >
           + 创建标签
         </button>
       </div>
 
-      {/* Toolbar: search + scope filter pills */}
-      <div className="changli-toolbar mb-10 p-3">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="搜索标签..."
-          className="search-input"
-        />
-        <div className="flex gap-1 ml-3">
-          {scopeFilters.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setScopeFilter(f.key)}
-              className={`changli-filter-pill ${scopeFilter === f.key ? 'active' : ''}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tag grid */}
+      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <img src={loadingIcon} alt="加载中" className="w-10 h-10 animate-spin" />
+          <div className="text-gray-500 flex items-center gap-2">加载中 <img src={loadingIcon} alt="" className="w-6 h-6" /></div>
         </div>
-      ) : filteredTags.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredTags.map(tag => (
-            <div
-              key={tag.id}
-              className="changli-panel p-5 cursor-pointer hover:shadow-md transition-all duration-200 relative group text-center"
-              onClick={() => openEditModal(tag)}
-            >
-              {/* Delete button (top-right, hover) */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  requestSecondConfirm(
-                    `delete-tag-${tag.id}`,
-                    () => handleDelete(tag.id)
-                  );
-                }}
-                className={`absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 ${
-                  pendingKey === `delete-tag-${tag.id}`
-                    ? 'bg-red-500 text-white opacity-100'
-                    : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
-                }`}
-                title={pendingKey === `delete-tag-${tag.id}` ? '确认删除?' : '删除标签'}
-              >
-                {pendingKey === `delete-tag-${tag.id}` ? '✓' : '×'}
-              </button>
-
-              {/* Tag name */}
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 pr-6">
-                {tag.name}
-              </h3>
-
-              {/* Scope badge */}
-              <span className={`inline-block text-[11px] px-2.5 py-0.5 rounded-full font-medium ${
-                tag.scope === 'global'
-                  ? 'bg-green-50 text-green-600'
-                  : 'bg-blue-50 text-blue-600'
-              }`}>
-                {scopeLabel(tag.scope)}
-              </span>
-
-              {/* Associated categories */}
-              {tag.scope === 'category' && tag.category_keys.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5 mt-3">
-                  {tag.category_keys.slice(0, 5).map(key => {
-                    const cat = categories.find(c => c.key === key);
-                    return (
-                      <span key={key} className="changli-brand-badge text-[10px] px-2 py-0.5">
-                        {cat?.name || key}
-                      </span>
-                    );
-                  })}
-                  {tag.category_keys.length > 5 && (
-                    <span className="text-[10px] text-gray-400 self-center">
-                      +{tag.category_keys.length - 5}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Empty categories hint */}
-              {tag.scope === 'category' && tag.category_keys.length === 0 && (
-                <p className="text-[11px] text-gray-400 italic mt-3">未关联分类</p>
-              )}
-            </div>
-          ))}
+      ) : tags.length === 0 ? (
+        <div className="changli-empty-state">
+          <p className="text-gray-500 text-lg mb-4">暂无标签</p>
+          <button
+            onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
+            className="action-btn action-btn-primary"
+          >
+            创建第一个标签
+          </button>
         </div>
       ) : (
-        <div className="changli-empty-state">
-          <p className="text-gray-500 text-lg mb-2">
-            {searchTerm || scopeFilter !== 'all' ? '没有匹配的标签' : '暂无标签'}
-          </p>
-          {!searchTerm && scopeFilter === 'all' && (
-            <button
-              onClick={() => {
-                resetCreateForm();
-                setShowCreateModal(true);
-              }}
-              className="action-btn action-btn-primary"
-            >
-              创建第一个标签
-            </button>
+        <div className="space-y-10">
+          {/* 全局标签 */}
+          {globalTags.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-gray-400 mb-4">全局标签</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {globalTags.map(renderTagCard)}
+              </div>
+            </section>
+          )}
+
+          {/* 特殊标签 */}
+          {categoryTags.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-gray-400 mb-4">特殊标签</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {categoryTags.map(renderTagCard)}
+              </div>
+            </section>
           )}
         </div>
       )}
 
-      {/* ---- Edit Modal ---- */}
+      {/* Edit Modal */}
       {editingTag && (
         <div className="changli-modal-backdrop" onClick={() => setEditingTag(null)}>
-          <div className="changli-modal-panel max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-panel !p-0" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">编辑</p>
-              <h2 className="mt-1 text-xl font-bold text-gray-900">编辑标签</h2>
+              <h2 className="changli-modal-title">编辑标签</h2>
             </div>
             <div className="changli-modal-body space-y-5">
-              {/* Name */}
               <div>
                 <label className="changli-form-label">标签名称</label>
                 <input
@@ -315,89 +289,29 @@ const Tags: React.FC = () => {
                   autoFocus
                 />
               </div>
-
-              {/* Scope */}
-              <div>
-                <label className="changli-form-label">标签范围</label>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setEditScope('global'); setEditCategoryKeys([]); }}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${
-                      editScope === 'global'
-                        ? 'border-green-300 bg-green-50 text-green-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    通用标签
-                  </button>
-                  <button
-                    onClick={() => setEditScope('category')}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${
-                      editScope === 'category'
-                        ? 'border-blue-300 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    特殊标签
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Checkboxes (only for special) */}
-              {editScope === 'category' && (
-                <div>
-                  <label className="changli-form-label">关联分类</label>
-                  <div className="border border-gray-200 rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
-                    {categories.length > 0 ? categories.map(cat => (
-                      <label
-                        key={cat.key}
-                        className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editCategoryKeys.includes(cat.key)}
-                          onChange={() => toggleCategoryKey(cat.key, editCategoryKeys, setEditCategoryKeys)}
-                          className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-400"
-                        />
-                        <span className="text-sm text-gray-700">{cat.name}</span>
-                        <span className="text-[10px] text-gray-400 ml-auto">{cat.key}</span>
-                      </label>
-                    )) : (
-                      <p className="text-sm text-gray-400 text-center py-4">暂无分类</p>
-                    )}
-                  </div>
-                </div>
-              )}
+              {renderScopeSwitch(editScope, setEditScope, setEditCategoryKeys)}
+              {renderCategoryCheckboxes(editScope, editCategoryKeys, setEditCategoryKeys)}
             </div>
             <div className="changli-modal-footer">
-              <button
-                onClick={() => setEditingTag(null)}
-                className="action-btn text-sm px-4 py-2"
-              >
-                取消
-              </button>
+              <button onClick={() => setEditingTag(null)} className="action-btn">取消</button>
               <button
                 onClick={handleSaveEdit}
                 disabled={!editName.trim()}
-                className="action-btn action-btn-primary text-sm px-4 py-2 disabled:opacity-50"
-              >
-                保存
-              </button>
+                className="action-btn action-btn-primary disabled:opacity-50"
+              >保存</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ---- Create Modal ---- */}
+      {/* Create Modal */}
       {showCreateModal && (
         <div className="changli-modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="changli-modal-panel max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-panel !p-0" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">创建</p>
-              <h2 className="mt-1 text-xl font-bold text-gray-900">新建标签</h2>
+              <h2 className="changli-modal-title">新建标签</h2>
             </div>
             <div className="changli-modal-body space-y-5">
-              {/* Name */}
               <div>
                 <label className="changli-form-label">标签名称</label>
                 <input
@@ -410,74 +324,16 @@ const Tags: React.FC = () => {
                   onKeyDown={(e) => { if (e.key === 'Enter' && createName.trim()) handleCreate(); }}
                 />
               </div>
-
-              {/* Scope */}
-              <div>
-                <label className="changli-form-label">标签范围</label>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setCreateScope('global'); setCreateCategoryKeys([]); }}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${
-                      createScope === 'global'
-                        ? 'border-green-300 bg-green-50 text-green-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    通用标签
-                  </button>
-                  <button
-                    onClick={() => setCreateScope('category')}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${
-                      createScope === 'category'
-                        ? 'border-blue-300 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    特殊标签
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Checkboxes */}
-              {createScope === 'category' && (
-                <div>
-                  <label className="changli-form-label">关联分类</label>
-                  <div className="border border-gray-200 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                    {categories.length > 0 ? categories.map(cat => (
-                      <label
-                        key={cat.key}
-                        className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={createCategoryKeys.includes(cat.key)}
-                          onChange={() => toggleCategoryKey(cat.key, createCategoryKeys, setCreateCategoryKeys)}
-                          className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-400"
-                        />
-                        <span className="text-sm text-gray-700">{cat.name}</span>
-                        <span className="text-[10px] text-gray-400 ml-auto">{cat.key}</span>
-                      </label>
-                    )) : (
-                      <p className="text-sm text-gray-400 text-center py-4">暂无分类</p>
-                    )}
-                  </div>
-                </div>
-              )}
+              {renderScopeSwitch(createScope, setCreateScope, setCreateCategoryKeys)}
+              {renderCategoryCheckboxes(createScope, createCategoryKeys, setCreateCategoryKeys)}
             </div>
             <div className="changli-modal-footer">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="action-btn text-sm px-4 py-2"
-              >
-                取消
-              </button>
+              <button onClick={() => setShowCreateModal(false)} className="action-btn">取消</button>
               <button
                 onClick={handleCreate}
                 disabled={!createName.trim()}
-                className="action-btn action-btn-primary text-sm px-4 py-2 disabled:opacity-50"
-              >
-                创建
-              </button>
+                className="action-btn action-btn-primary disabled:opacity-50"
+              >创建</button>
             </div>
           </div>
         </div>
