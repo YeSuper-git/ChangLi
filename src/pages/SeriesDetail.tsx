@@ -239,14 +239,9 @@ const SeriesDetail: React.FC = () => {
   }, [seriesId]);
 
   const loadEditOptions = useCallback(async () => {
-    if (editOptionsLoaded) return;
-    if (cachedTags.length > 0) setAllTags(cachedTags);
-    if (cachedActors.length > 0) setAllActors(cachedActors);
+    // 每次都重新加载，确保获取最新数据
     try {
-      const [tags, actors] = await Promise.all([
-        cachedTags.length > 0 ? Promise.resolve(cachedTags) : getTags(),
-        cachedActors.length > 0 ? Promise.resolve(cachedActors) : getActors(),
-      ]);
+      const [tags, actors] = await Promise.all([getTags(), getActors()]);
       setAllTags(tags);
       setAllActors(actors);
       setEditOptionsLoaded(true);
