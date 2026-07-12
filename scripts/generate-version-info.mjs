@@ -13,7 +13,7 @@ function parseChangelog(markdown) {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    const versionMatch = line.match(/^##\s+v?([^\s]+)\s*(?:\(([^)]+)\))?/);
+    const versionMatch = line.match(/^##\s+v?\[?([^\s\]]+)\]?\s*(?:\(([^)]+)\))?/);
     if (versionMatch) {
       currentEntry = {
         version: versionMatch[1].trim(),

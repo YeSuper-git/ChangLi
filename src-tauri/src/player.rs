@@ -101,12 +101,16 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
+    eprintln!("[player] close_player_window called");
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        eprintln!("[player] close_player_window: found player window, visible={}", window.is_visible().unwrap_or(false));
         // 窗口已隐藏则跳过，避免重复操作
         if !window.is_visible().unwrap_or(false) {
             return;
         }
         let _ = window.hide();
+    } else {
+        eprintln!("[player] close_player_window: no player window found");
     }
 
     // 延迟销毁，避免 GPU 清理冲突
@@ -211,9 +215,12 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
             }
         }
         WindowEvent::Destroyed => {
-            // 窗口已销毁，无需再操作
+            eprintln!("[player] handle_main_window_event: Destroyed");
         }
-        WindowEvent::CloseRequested { .. } => close_player_window(app),
+        WindowEvent::CloseRequested { .. } => {
+            eprintln!("[player] handle_main_window_event: CloseRequested for main");
+            close_player_window(app);
+        }
         _ => {}
     }
 }

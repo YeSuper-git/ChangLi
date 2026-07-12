@@ -2685,6 +2685,7 @@ async fn open_player_window(
     state: State<'_, AppState>,
     id: i64,
 ) -> Result<(), String> {
+    eprintln!("[player] open_player_window called for video id={}", id);
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()

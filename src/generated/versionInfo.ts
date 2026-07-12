@@ -2,7 +2,7 @@
 export const currentVersion = "1.9.7";
 export const changelogData = [
   {
-    "version": "[1.9.7]",
+    "version": "1.9.7",
     "date": "",
     "changes": [
       {
@@ -19,7 +19,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.6]",
+    "version": "1.9.6",
     "date": "",
     "changes": [
       {
@@ -32,7 +32,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.5]",
+    "version": "1.9.5",
     "date": "",
     "changes": [
       {
@@ -45,7 +45,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.4]",
+    "version": "1.9.4",
     "date": "",
     "changes": [
       {
@@ -58,7 +58,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.3]",
+    "version": "1.9.3",
     "date": "",
     "changes": [
       {
@@ -70,7 +70,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.2]",
+    "version": "1.9.2",
     "date": "",
     "changes": [
       {
@@ -82,7 +82,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.1]",
+    "version": "1.9.1",
     "date": "",
     "changes": [
       {
@@ -94,7 +94,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.9.0]",
+    "version": "1.9.0",
     "date": "",
     "changes": [
       {
@@ -106,7 +106,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.8.0]",
+    "version": "1.8.0",
     "date": "",
     "changes": [
       {
@@ -118,7 +118,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.7.0]",
+    "version": "1.7.0",
     "date": "",
     "changes": [
       {
@@ -130,7 +130,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.6.0]",
+    "version": "1.6.0",
     "date": "",
     "changes": [
       {
@@ -142,7 +142,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.5.0]",
+    "version": "1.5.0",
     "date": "",
     "changes": [
       {
@@ -154,7 +154,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.4.0]",
+    "version": "1.4.0",
     "date": "",
     "changes": [
       {
@@ -166,7 +166,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.3.0]",
+    "version": "1.3.0",
     "date": "",
     "changes": [
       {
@@ -178,7 +178,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.2.0]",
+    "version": "1.2.0",
     "date": "",
     "changes": [
       {
@@ -190,7 +190,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.1.0]",
+    "version": "1.1.0",
     "date": "",
     "changes": [
       {
@@ -202,7 +202,7 @@ export const changelogData = [
     ]
   },
   {
-    "version": "[1.0.0]",
+    "version": "1.0.0",
     "date": "",
     "changes": [
       {
