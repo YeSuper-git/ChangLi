@@ -366,7 +366,7 @@ async fn check_subscription_updates(
         Vec::new()
     };
     
-    // 查询视频集已有的最大集数
+    // 查询视频集已有的最大集数；如果历史视频没有 episode_number，用视频数量兜底
     let max_episode: Option<i32> = if let Some(series_id) = sub.series_id {
         sqlx::query_scalar::<_, Option<i32>>("SELECT MAX(episode_number) FROM videos WHERE series_id = ?")
             .bind(series_id)
@@ -377,6 +377,16 @@ async fn check_subscription_updates(
     } else {
         None
     };
+    let existing_video_count: i32 = if let Some(series_id) = sub.series_id {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM videos WHERE series_id = ?")
+            .bind(series_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap_or(0) as i32
+    } else {
+        0
+    };
+    let existing_episode_progress = std::cmp::max(max_episode.unwrap_or(0), existing_video_count);
     
     let mut new_items = Vec::new();
     // 查询视频集中已有的 (season, episode_number) 组合
@@ -418,11 +428,11 @@ async fn check_subscription_updates(
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
             let dominated = if let Some(season) = item_season {
-                // 有季号：按 (season, episode) 精确匹配
+                // 有季号：优先按 (season, episode) 精确匹配
                 existing_season_episode.contains(&(Some(season), Some(ep)))
             } else {
-                // 无季号：按 episode 匹配（兼容旧数据）
-                existing_episodes.contains(&Some(ep))
+                // 无季号：按 episode 匹配；如果历史数据没识别出集数，则用已有视频数量/最大集数兜底
+                existing_episodes.contains(&Some(ep)) || ep <= existing_episode_progress
             };
             if dominated {
                 continue;
@@ -529,9 +539,15 @@ async fn check_subscription_updates(
             if !matched { continue; }
         }
         
+        let item_season = extract_season_number(&item.title).or(feed_season);
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
-            if existing_episodes.contains(&Some(ep)) { continue; }
+            let dominated = if let Some(season) = item_season {
+                existing_season_episode.contains(&(Some(season), Some(ep)))
+            } else {
+                existing_episodes.contains(&Some(ep)) || ep <= existing_episode_progress
+            };
+            if dominated { continue; }
         }
         
         // 提取磁力链接
