@@ -64,7 +64,7 @@ function extractSiteName(title: string): string {
 
 const Subscriptions: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<BangumiSubscription[]>([]);
-  const [seriesMap, setSeriesMap] = useState<Map<number, string>>(new Map());
+  const [seriesMap, setSeriesMap] = useState<Record<number, string>>({});
   const [showBindModal, setShowBindModal] = useState(false);
 
   // 按网站分组的展开状态
@@ -281,9 +281,9 @@ const Subscriptions: React.FC = () => {
                                 </span>
                               </button>
                               <div className="space-y-0.5">
-                                {sub.series_id && seriesMap.has(sub.series_id) && (
+                                {sub.series_id && sub.series_id in seriesMap && (
                                   <div className="text-xs text-gray-500">
-                                    关联：{seriesMap.get(sub.series_id)}
+                                    关联：{seriesMap[sub.series_id]}
                                   </div>
                                 )}
                                 <div className="text-xs text-gray-400">

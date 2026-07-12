@@ -4,14 +4,17 @@ import type { BangumiSubscription, VideoSeries } from '../utils/api';
 
 interface SubscriptionState {
   subscriptions: BangumiSubscription[];
-  seriesMap: Map<number, string>;
+  seriesMap: Record<number, string>;
   loaded: boolean;
   load: () => Promise<void>;
 }
 
+// 空对象引用，避免每次创建新 Map
+const EMPTY_MAP: Record<number, string> = {};
+
 export const useSubscriptionStore = create<SubscriptionState>((set) => ({
   subscriptions: [],
-  seriesMap: new Map(),
+  seriesMap: EMPTY_MAP,
   loaded: false,
 
   load: async () => {
@@ -20,8 +23,8 @@ export const useSubscriptionStore = create<SubscriptionState>((set) => ({
         getAllSubscriptions(),
         getVideoSeriesList(),
       ]);
-      const map = new Map<number, string>();
-      seriesList.forEach((s: VideoSeries) => map.set(s.id, s.title));
+      const map: Record<number, string> = {};
+      seriesList.forEach((s: VideoSeries) => { map[s.id] = s.title; });
       set({ subscriptions: subs, seriesMap: map, loaded: true });
     } catch (err) {
       console.error('[SubscriptionStore] load failed:', err);
