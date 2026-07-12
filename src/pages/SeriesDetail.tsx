@@ -37,7 +37,6 @@ import {
   getAllCategories,
   parseCategoryFeatures,
   checkSeriesUpdates,
-  addVideoToSeries,
   addVideosToSeries,
 
   getTagColor,
@@ -688,8 +687,8 @@ const SeriesDetail: React.FC = () => {
     const selectedNew = newVideos.filter(video => selectedNewVideos.has(video.file_path));
     const selectedMissing = missVids.filter(video => selectedMissingVideos.has(video.id));
     try {
-      for (const video of selectedNew) {
-        await addVideoToSeries(series.id, video.file_path);
+      if (selectedNew.length > 0) {
+        await addVideosToSeries(series.id, selectedNew.map(video => video.file_path));
       }
       for (const video of selectedMissing) {
         await deleteVideo(video.id);

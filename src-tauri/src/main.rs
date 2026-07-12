@@ -1835,6 +1835,25 @@ async fn switch_series_type_to(state: State<'_, AppState>, series_id: i64, categ
 }
 
 
+
+fn find_season_folder_poster_for_video(video_path: &Path) -> Option<String> {
+    let parent = video_path.parent()?;
+    if let Some(parent_name) = parent.file_name().map(|n| n.to_string_lossy().to_string()) {
+        if matches!(scanner::classify_series_subfolder(&parent_name), scanner::SeriesSubfolderKind::Season(_)) {
+            return scanner::find_folder_poster(parent);
+        }
+    }
+
+    let grandparent = parent.parent()?;
+    if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
+        if matches!(scanner::classify_series_subfolder(&gp_name), scanner::SeriesSubfolderKind::Season(_)) {
+            return scanner::find_folder_poster(grandparent);
+        }
+    }
+
+    None
+}
+
 #[tauri::command]
 async fn add_video_to_series(
     state: State<'_, AppState>,
@@ -1849,7 +1868,8 @@ async fn add_video_to_series(
     if !video_path.is_file() || !scanner::is_video_file(video_path) {
         return Err("请选择支持的视频文件".to_string());
     }
-    let mut video = scanner::scan_video_file(video_path, None)
+    let season_folder_poster = find_season_folder_poster_for_video(video_path);
+    let mut video = scanner::scan_video_file(video_path, season_folder_poster.as_deref())
         .await
         .map_err(|e| e.to_string())?;
     video.series_id = Some(series_id);
@@ -1914,7 +1934,8 @@ async fn add_videos_to_series(
         if !video_path.is_file() || !scanner::is_video_file(video_path) {
             continue;
         }
-        let mut video = scanner::scan_video_file(video_path, None)
+        let season_folder_poster = find_season_folder_poster_for_video(video_path);
+        let mut video = scanner::scan_video_file(video_path, season_folder_poster.as_deref())
             .await
             .map_err(|e| e.to_string())?;
         video.series_id = Some(series_id);
