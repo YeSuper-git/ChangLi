@@ -1654,7 +1654,8 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
         let poster: Option<String> = row.get("poster");
         let poster_base64: Option<String> = row.try_get("series_poster_base64").ok().flatten();
         let created_at: String = row.get("created_at");
-        let poster_data_url = poster_base64.clone().map(|b| format!("data:image/jpeg;base64,{}", b));
+        // poster_base64 已经是完整 data URL，不要再加前缀
+        let poster_data_url = poster_base64.clone();
         results.push(Video {
             id: 0,
             series_id: Some(series_id),
