@@ -394,7 +394,8 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     .title("ChangLi Player")
     .inner_size(PLAYER_WIDTH, PLAYER_HEIGHT)
     .min_inner_size(480.0, 270.0)
-    .resizable(true)
+    // 禁用系统级自由缩放，前端右下角手柄负责等比实时缩放，避免 resize 回调递归导致 mpv/WebView 闪退。
+    .resizable(false)
     .decorations(false)
     .skip_taskbar(true)
     .visible(false);

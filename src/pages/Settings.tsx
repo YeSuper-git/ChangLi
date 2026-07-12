@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { addSite, getUpdatesDir, getStorageInfo, openDataDir, repairMissingPostersSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate, regenerateAllPosterBase64 } from '../utils/api';
+import { addSite, getUpdatesDir, getStorageInfo, openDataDir, startPosterUpdateSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
 import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useLibraryStore } from '../store/libraryStore';
@@ -120,15 +120,12 @@ const Settings: React.FC = () => {
   const handleRepairMissingPosters = async () => {
     if (posterRepairStatus.status === 'running') return;
     try {
-      setPosterRepairStatus({ status: 'running', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
-      // 先修复缺失的海报
-      await repairMissingPostersSilent();
-      // 再重新生成所有海报缓存（1200px）
-      const count = await regenerateAllPosterBase64();
-      setPosterRepairStatus((current) => ({ ...current, status: 'success', updated_series: count }));
-      notify({ message: `已更新 ${count} 张海报缓存`, type: 'success' });
+      const runningStatus: PosterRepairStatus = { status: 'running', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null };
+      setPosterRepairStatus(runningStatus);
+      await startPosterUpdateSilent();
+      notify({ message: '已开始后台更新海报，可继续使用应用', type: 'info' });
     } catch (error) {
-      console.error('启动批量修复海报失败:', error);
+      console.error('启动批量更新海报失败:', error);
       setPosterRepairStatus((current) => ({ ...current, status: 'error', error: '更新失败，请稍后重试' }));
       notify({ message: '启动失败，请稍后重试', type: 'error' });
     }

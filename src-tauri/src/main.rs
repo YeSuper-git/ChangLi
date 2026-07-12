@@ -2369,6 +2369,90 @@ async fn repair_missing_posters_silent(state: State<'_, AppState>) -> Result<(),
 }
 
 #[tauri::command]
+async fn start_poster_update_silent(state: State<'_, AppState>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+
+    let status = state.poster_repair_status.clone();
+    {
+        let mut current = status.lock().await;
+        if current.status == "running" {
+            return Ok(());
+        }
+        *current = PosterRepairStatus {
+            status: "running".to_string(),
+            ..PosterRepairStatus::default()
+        };
+    }
+
+    tauri::async_runtime::spawn(async move {
+        let progress_status = status.clone();
+        let repair_result = db::repair_missing_posters_with_progress(&pool, move |result| {
+            let progress_status = progress_status.clone();
+            let result = result.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut current = progress_status.lock().await;
+                if current.status == "running" {
+                    current.scanned_series = result.scanned_series;
+                    current.updated_series = result.updated_series;
+                    current.scanned_videos = result.scanned_videos;
+                    current.updated_videos = result.updated_videos;
+                    current.skipped = result.skipped;
+                }
+            });
+        }).await;
+
+        let repair_result = match repair_result {
+            Ok(result) => result,
+            Err(error) => {
+                eprintln!("[ChangLi] 批量更新海报修复阶段失败: {error}");
+                let mut current = status.lock().await;
+                *current = PosterRepairStatus {
+                    status: "error".to_string(),
+                    error: Some(error.to_string()),
+                    ..current.clone()
+                };
+                return;
+            }
+        };
+
+        match regenerate_all_poster_base64_internal(&pool, Some(status.clone())).await {
+            Ok(cache_updated) => {
+                eprintln!(
+                    "[ChangLi] 批量更新海报完成: repair_series={}, repair_videos={}, cache_updated={}",
+                    repair_result.updated_series,
+                    repair_result.updated_videos,
+                    cache_updated,
+                );
+                let mut current = status.lock().await;
+                *current = PosterRepairStatus {
+                    status: "success".to_string(),
+                    scanned_series: repair_result.scanned_series,
+                    updated_series: cache_updated as i64,
+                    scanned_videos: repair_result.scanned_videos,
+                    updated_videos: repair_result.updated_videos,
+                    skipped: repair_result.skipped,
+                    error: None,
+                };
+            }
+            Err(error) => {
+                eprintln!("[ChangLi] 批量更新海报缓存阶段失败: {error}");
+                let mut current = status.lock().await;
+                *current = PosterRepairStatus {
+                    status: "error".to_string(),
+                    error: Some(error),
+                    ..current.clone()
+                };
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_poster_repair_status(state: State<'_, AppState>) -> Result<PosterRepairStatus, String> {
     Ok(state.poster_repair_status.lock().await.clone())
 }
@@ -3982,6 +4066,7 @@ fn main() {
             open_data_dir,
             open_series_in_file_manager,
             repair_missing_posters_silent,
+            start_poster_update_silent,
             get_poster_repair_status,
             toggle_favorite,
             toggle_chinese_sub,
@@ -4757,33 +4842,51 @@ async fn disable_preset_template_cmd(
     db::disable_preset_template(&pool, &key).await.map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn regenerate_all_poster_base64(state: State<'_, AppState>) -> Result<i32, String> {
-    let pool = {
-        let guard = state.db.lock().await;
-        guard.as_ref().ok_or("数据库未初始化")?.clone()
-    };
+async fn regenerate_all_poster_base64_internal(
+    pool: &sqlx::SqlitePool,
+    status: Option<Arc<Mutex<PosterRepairStatus>>>,
+) -> Result<i32, String> {
     let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
         "SELECT id, poster FROM video_series WHERE poster IS NOT NULL AND poster != ''"
     )
-    .fetch_all(&pool)
+    .fetch_all(pool)
     .await
     .map_err(|e| e.to_string())?;
 
     let mut updated = 0;
-    for (id, poster) in &rows {
+    let total = rows.len() as i64;
+    for (index, (id, poster)) in rows.iter().enumerate() {
         if let Some(p) = poster {
             let path = std::path::Path::new(p);
             if let Some(b64) = scanner::generate_thumbnail_base64(path) {
                 sqlx::query("UPDATE video_series SET poster_base64 = ? WHERE id = ?")
                     .bind(&b64)
                     .bind(id)
-                    .execute(&pool)
+                    .execute(pool)
                     .await
                     .map_err(|e| e.to_string())?;
                 updated += 1;
             }
         }
+
+        if let Some(status) = &status {
+            if index % 10 == 0 || index + 1 == rows.len() {
+                let mut current = status.lock().await;
+                if current.status == "running" {
+                    current.scanned_series = total;
+                    current.updated_series = updated as i64;
+                }
+            }
+        }
     }
     Ok(updated)
+}
+
+#[tauri::command]
+async fn regenerate_all_poster_base64(state: State<'_, AppState>) -> Result<i32, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    regenerate_all_poster_base64_internal(&pool, None).await
 }

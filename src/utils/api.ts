@@ -45,6 +45,15 @@ export async function repairMissingPostersSilent(): Promise<void> {
   }
 }
 
+export async function startPosterUpdateSilent(): Promise<void> {
+  try {
+    await invoke('start_poster_update_silent');
+  } catch (err) {
+    console.error('[API] startPosterUpdateSilent 失败:', err);
+    throw err;
+  }
+}
+
 export async function getPosterRepairStatus(): Promise<PosterRepairStatus> {
   return invoke<PosterRepairStatus>('get_poster_repair_status');
 }

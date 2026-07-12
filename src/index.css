@@ -2835,10 +2835,11 @@ html.changli-player-html .changli-player-stage {
   right: 0;
   bottom: 0;
   z-index: 40;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   cursor: nwse-resize;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .changli-player-resize-grip::after {
