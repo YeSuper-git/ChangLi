@@ -10,6 +10,7 @@ import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 import { mpvCommand, mpvSetProperty, mpvGetProperty, isMac } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
+import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -97,6 +98,29 @@ const Player: React.FC = () => {
     return next;
   }, []);
 
+  const cleanupPlayerMemory = useCallback((reason = 'manual') => {
+    previewOnLeave();
+    if (cursorTimerRef.current) {
+      clearTimeout(cursorTimerRef.current);
+      cursorTimerRef.current = null;
+    }
+    if (episodeHoverTimerRef.current) {
+      clearTimeout(episodeHoverTimerRef.current);
+      episodeHoverTimerRef.current = null;
+    }
+    if (customResizeRef.current.raf) {
+      cancelAnimationFrame(customResizeRef.current.raf);
+      customResizeRef.current.raf = 0;
+    }
+    customResizeRef.current.pending = null;
+
+    // drop-buffers 只释放 mpv 可重建的 demux/解码缓存；失败静默忽略，避免影响播放。
+    // 播放中只响应后台/手动清理，普通周期清理只在暂停/空闲时触发。
+    if (!mpvInitialized.current || switchingVideoRef.current) return;
+    if (isPlayingRef.current && reason === 'periodic') return;
+    runMpvCommand(() => mpvCommand('drop-buffers')).catch(() => undefined);
+  }, [previewOnLeave, runMpvCommand]);
+
   // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
   useEffect(() => {
     document.documentElement.classList.add('changli-player-html');
@@ -106,6 +130,27 @@ const Player: React.FC = () => {
       document.body.classList.remove('changli-player-body');
     };
   }, []);
+
+  useEffect(() => {
+    const unregister = addMemoryCleanupListener((reason) => cleanupPlayerMemory(reason));
+    const interval = window.setInterval(() => {
+      if (!isPlayingRef.current) cleanupPlayerMemory('periodic');
+    }, 3 * 60 * 1000);
+    const pressureInterval = window.setInterval(() => {
+      const ratio = getJsHeapUsageRatio();
+      if (ratio !== null && ratio >= 0.72) cleanupPlayerMemory('memory-pressure');
+    }, 60 * 1000);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') cleanupPlayerMemory('background');
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      unregister();
+      window.clearInterval(interval);
+      window.clearInterval(pressureInterval);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [cleanupPlayerMemory]);
 
   // 初始化 mpv
   useEffect(() => {
@@ -410,6 +455,7 @@ const Player: React.FC = () => {
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      cleanupPlayerMemory('unmount');
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
@@ -428,7 +474,7 @@ const Player: React.FC = () => {
         }
       }).catch(() => {});
     };
-  }, [runMpvCommand]);
+  }, [runMpvCommand, cleanupPlayerMemory]);
 
   // 保存音量到本地
   useEffect(() => {
@@ -443,6 +489,9 @@ const Player: React.FC = () => {
       isPlayingRef.current = !nextPaused;
       setIsPlaying(!nextPaused);
       await runMpvCommand(() => mpvSetProperty('pause', nextPaused));
+      if (nextPaused) {
+        window.setTimeout(() => cleanupPlayerMemory('paused'), 500);
+      }
     } catch (err) {
       if (isMountedRef.current) {
         isPlayingRef.current = !isPlayingRef.current;
@@ -450,7 +499,7 @@ const Player: React.FC = () => {
       }
       console.error('[Player] 切换播放状态失败:', err);
     }
-  }, [runMpvCommand]);
+  }, [runMpvCommand, cleanupPlayerMemory]);
 
   // 跳转
   const seek = useCallback(async (time: number) => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { addMemoryCleanupListener } from '../utils/memoryCleanup';
 
 interface UsePreviewThumbOptions {
   fileId: string;
@@ -54,6 +55,17 @@ export function usePreviewThumb({ fileId, filePath, duration }: UsePreviewThumbO
       invoke('abort_prebuild_cmd', { fileId }).catch(() => {});
     };
   }, [fileId, filePath, duration]);
+
+  useEffect(() => {
+    return addMemoryCleanupListener(() => {
+      if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
+      seqRef.current++;
+      cacheRef.current.clear();
+      thumbDirRef.current = null;
+      setThumbnailUrl(null);
+      setHoverTime(null);
+    });
+  }, []);
 
   const onHover = useCallback((clientX: number, progressRect: DOMRect, time: number) => {
     const mySeq = ++seqRef.current;

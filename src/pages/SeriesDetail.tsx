@@ -58,6 +58,7 @@ interface SeriesDetailCacheEntry {
 }
 
 const seriesDetailCache = new Map<number, SeriesDetailCacheEntry>();
+export const clearSeriesDetailCache = () => seriesDetailCache.clear();
 
 function toEditData(series: VideoSeries) {
   return {

@@ -20,6 +20,10 @@ import { useLibraryStore } from './store/libraryStore';
 import ToastProvider from './components/ToastProvider';
 import { checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from './utils/api';
 import { currentVersion } from './generated/versionInfo';
+import { clearLibraryFilterCaches } from './pages/Library';
+import { clearSeriesDetailCache } from './pages/SeriesDetail';
+import { clearActorDetailCache } from './pages/ActorDetail';
+import { registerMemoryCleanup, requestAppMemoryCleanup, scheduleIdleMemoryCleanup, getJsHeapUsageRatio } from './utils/memoryCleanup';
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -45,6 +49,34 @@ function App() {
     document.addEventListener('contextmenu', preventBrowserContextMenu);
     return () => document.removeEventListener('contextmenu', preventBrowserContextMenu);
   }, []);
+
+  useEffect(() => {
+    if (isPlayerWindow) return;
+    const unregister = registerMemoryCleanup(() => {
+      clearLibraryFilterCaches();
+      clearSeriesDetailCache();
+      clearActorDetailCache();
+    });
+    const interval = window.setInterval(() => scheduleIdleMemoryCleanup('periodic'), 5 * 60 * 1000);
+    const pressureInterval = window.setInterval(() => {
+      const ratio = getJsHeapUsageRatio();
+      if (ratio !== null && ratio >= 0.72) {
+        scheduleIdleMemoryCleanup('memory-pressure');
+      }
+    }, 60 * 1000);
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') {
+        requestAppMemoryCleanup('background');
+      }
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      unregister();
+      window.clearInterval(interval);
+      window.clearInterval(pressureInterval);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [isPlayerWindow]);
 
   useEffect(() => {
     if (isPlayerWindow) {

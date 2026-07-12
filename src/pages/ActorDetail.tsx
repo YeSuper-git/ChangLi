@@ -21,6 +21,7 @@ interface ActorDetailCacheEntry {
 }
 
 const actorDetailCache = new Map<number, ActorDetailCacheEntry>();
+export const clearActorDetailCache = () => actorDetailCache.clear();
 
 const ActorDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
