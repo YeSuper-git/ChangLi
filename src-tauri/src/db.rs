@@ -1638,7 +1638,7 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
         .collect();
 
     let empty_series = sqlx::query(
-        "SELECT s.id, s.title, s.poster, s.poster_base64, s.display_type, s.created_at
+        "SELECT s.id, s.title, s.poster, s.poster_base64 AS series_poster_base64, s.display_type, s.created_at
          FROM video_series s
          JOIN series_actors sa ON sa.series_id = s.id
          WHERE sa.actor_id = ? AND NOT EXISTS (SELECT 1 FROM videos v WHERE v.series_id = s.id)"
@@ -1652,7 +1652,7 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
         if existing_series_ids.contains(&series_id) { continue; }
         let title: String = row.get("title");
         let poster: Option<String> = row.get("poster");
-        let poster_base64: Option<String> = row.get("poster_base64");
+        let poster_base64: Option<String> = row.try_get("series_poster_base64").ok().flatten();
         let created_at: String = row.get("created_at");
         let poster_data_url = poster_base64.clone().map(|b| format!("data:image/jpeg;base64,{}", b));
         results.push(Video {
