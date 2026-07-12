@@ -56,20 +56,31 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ loading: true });
     try {
       const { sortBy, sortOrder } = get();
-      const [series, actors, tags, categories, favVideos, favSeries] = await Promise.all([
-        getVideoSeriesList(sortBy, sortOrder),
-        getActors(),
+      const t0 = performance.now();
+      const series = await getVideoSeriesList(sortBy, sortOrder);
+      const t1 = performance.now();
+      console.log(`[loadAll] getVideoSeriesList: ${(t1-t0).toFixed(0)}ms, ${series.length} items`);
+      
+      const actors = await getActors();
+      const t2 = performance.now();
+      console.log(`[loadAll] getActors: ${(t2-t1).toFixed(0)}ms, ${actors.length} items`);
+      
+      const [tags, categories, favVideos, favSeries] = await Promise.all([
         getTags(),
         getAllCategories(),
         getFavoriteVideos(),
         getFavoriteSeries(),
       ]);
+      const t3 = performance.now();
+      console.log(`[loadAll] others: ${(t3-t2).toFixed(0)}ms`);
+      
       const favorites: FavoriteItem[] = [...favSeries, ...favVideos];
       const watchedIds = new Set<number>();
       for (const s of series) {
         if (s.is_watched === 1) watchedIds.add(s.id);
       }
       set({ series, actors, tags, categories, favorites, watchedIds, loaded: true });
+      console.log(`[loadAll] total: ${(performance.now()-t0).toFixed(0)}ms`);
     } catch (error) {
       console.error('[LibraryStore] loadAll failed:', error);
     } finally {

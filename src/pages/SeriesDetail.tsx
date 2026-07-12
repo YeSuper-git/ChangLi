@@ -503,13 +503,7 @@ const SeriesDetail: React.FC = () => {
   const backTo = backState?.from || fallbackBackTo;
   const backLabel = backState?.backLabel || fallbackBackLabel;
   const handleBack = () => {
-    // 使用 history.back() 触发 POP 导航，使 Layout 的滚动恢复机制生效
-    // navigate(path) 会创建 PUSH 导航，导致 navigationType !== 'POP'，滚动恢复被跳过
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      navigate(backTo);
-    }
+    navigate(backTo);
   };
 
   // 大类配置

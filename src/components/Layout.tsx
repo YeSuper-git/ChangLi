@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
 import settingsIcon from '../assets/icons/settings.svg';
@@ -15,7 +15,7 @@ const scrollPositions = new Map<string, number>();
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const navigationType = useNavigationType();
+  // navigationType 已不再用于滚动恢复
   const mainRef = useRef<HTMLElement>(null);
   const scrollKeyRef = useRef(location.pathname + location.search);
   scrollKeyRef.current = location.pathname + location.search;
@@ -64,18 +64,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     event.stopPropagation();
   };
 
-  // 保存当前页面滚动位置，仅浏览器/应用返回时恢复；普通切页始终回到顶部。
-  // 注意：这里只监听 pathname，不能监听 search。视频页搜索会同步 q 到 URL，
-  // 如果 search 变化也触发滚动逻辑，就会表现成输入时页面“自动刷新/跳动”。
+  // 滚动恢复机制：
+  // 1. 每次页面离开时保存当前滚动位置（cleanup）
+  // 2. 进入新页面时，如果该路径有保存的滚动位置，恢复它
+  // 3. 否则回到顶部
+  // 这样不依赖 navigationType，兼容所有返回场景（POP/PUSH）
   useLayoutEffect(() => {
     const key = scrollKeyRef.current;
     const main = mainRef.current;
 
-    if (navigationType === 'POP' && scrollPositions.has(key)) {
+    if (scrollPositions.has(key)) {
       const savedTop = scrollPositions.get(key)!;
       setTimeout(() => {
         mainRef.current?.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
-      }, 0);
+      }, 100);
     } else {
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       window.scrollTo(0, 0);
@@ -83,12 +85,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     return () => {
       if (main && main.scrollTop > 0) {
-        // 使用 effect setup 时捕获的 key，而非 scrollKeyRef.current
-        // 因为 cleanup 运行时 scrollKeyRef 已被下一次 render 更新为新页面的 key
         scrollPositions.set(key, main.scrollTop);
       }
     };
-  }, [location.pathname, navigationType]);
+  }, [location.pathname]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
