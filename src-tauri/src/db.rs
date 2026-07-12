@@ -1646,6 +1646,41 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
 
     let mut results: Vec<Video> = rows.iter().map(video_from_row).collect();
 
+    // 补充：确保所有有 series_id 的作品都有 series_poster_data_url
+    // 和视频页用相同的数据路径：直接从 video_series.poster_base64 读取
+    let series_ids: Vec<i64> = results.iter()
+        .filter_map(|v| v.series_id)
+        .filter(|sid| results.iter().any(|r| r.series_id == Some(*sid) && r.series_poster_data_url.is_none()))
+        .collect();
+    if !series_ids.is_empty() {
+        let placeholders = series_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("SELECT id, poster_base64 FROM video_series WHERE id IN ({placeholders})");
+        let mut query = sqlx::query(&sql);
+        for sid in &series_ids {
+            query = query.bind(sid);
+        }
+        if let Ok(series_rows) = query.fetch_all(pool).await {
+            let poster_map: std::collections::HashMap<i64, Option<String>> = series_rows.iter()
+                .filter_map(|row| {
+                    let id: i64 = row.get("id");
+                    let poster: Option<String> = row.try_get("poster_base64").ok().flatten();
+                    Some((id, poster))
+                })
+                .collect();
+            for video in results.iter_mut() {
+                if let Some(sid) = video.series_id {
+                    if video.series_poster_data_url.is_none() {
+                        if let Some(poster) = poster_map.get(&sid) {
+                            video.series_poster_data_url = poster.clone();
+                            // 同时设置 thumbnail_data_url 作为 fallback
+                            video.thumbnail_data_url = poster.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 2. 查空视频集（关联了演员但没有视频的视频集）
     let existing_series_ids: std::collections::HashSet<i64> = results.iter()
         .filter_map(|v| v.series_id)
@@ -1682,6 +1717,7 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
             subtitle: None,
             thumbnail: poster.clone(),
             thumbnail_base64: poster_base64.clone(),
+            // 同时设置 thumbnail_data_url，让 videoPosterDataUrl 能直接获取海报
             thumbnail_data_url: poster_data_url.clone(),
             series_title: Some(title),
             series_poster_data_url: poster_data_url,
