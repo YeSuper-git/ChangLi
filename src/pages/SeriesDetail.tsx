@@ -529,6 +529,7 @@ const SeriesDetail: React.FC = () => {
       status: !isAdult,
       chinese_sub: isAdult,
       episode: !isAdult ? '话' : '部',
+      subscription: !isAdult,
     };
   }, [currentCategory, isAdult]);
 
@@ -967,9 +968,11 @@ const SeriesDetail: React.FC = () => {
                 </div>
 
                 {/* 订阅状态 */}
+                {features.subscription && (
                 <div className="mb-3">
                   <SubscriptionManager seriesId={series.id} onSubscriptionChange={() => loadSeries({ silent: true })} />
                 </div>
+                )}
 
                 <div className={`mb-4 space-y-3 ${!isPortrait ? 'text-center' : ''}`}>
                   {features.tags && (

@@ -8,6 +8,7 @@ import {
   checkSubscriptionUpdates,
   deleteSubscription,
   getVideoSeriesList,
+  getAllCategories,
 } from '../utils/api';
 import type { BangumiSubscription, SubscriptionDownload, VideoSeries } from '../utils/api';
 import { notify } from '../utils/notify';
@@ -228,9 +229,14 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
   useEffect(() => {
     if (open) {
       // Load series and sites list
-      Promise.all([getVideoSeriesList()]).then(([s]) => {
-        setSeriesList(s);
-        }).catch(() => {});
+      Promise.all([getVideoSeriesList(), getAllCategories()]).then(([s, cats]) => {
+        const disabledKeys = new Set(
+          cats.filter(c => {
+            try { return JSON.parse(c.features).subscription === false; } catch { return false; }
+          }).map(c => c.key)
+        );
+        setSeriesList(s.filter(v => !disabledKeys.has(v.display_type || '')));
+      });
     }
   }, [open]);
 

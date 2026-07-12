@@ -998,10 +998,11 @@ export interface CategoryFeatures {
   status: boolean;
   chinese_sub: boolean;
   episode: string;
+  subscription: boolean;
 }
 
 export function parseCategoryFeatures(features: string): CategoryFeatures {
-  const defaults: CategoryFeatures = { tags: false, actors: false, tracking: false, watched: false, status: false, chinese_sub: false, episode: '部' };
+  const defaults: CategoryFeatures = { tags: false, actors: false, tracking: false, watched: false, status: false, chinese_sub: false, episode: '部', subscription: false };
   try {
     const parsed = JSON.parse(features);
     if (typeof parsed.episode === 'boolean') {

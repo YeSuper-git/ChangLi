@@ -106,6 +106,7 @@ const Home: React.FC = () => {
         status: !isLegacyAdult,
         chinese_sub: isLegacyAdult,
         episode: !isLegacyAdult ? '话' : '部',
+        subscription: !isLegacyAdult,
       };
     }
     return parseCategoryFeatures(cat.features);

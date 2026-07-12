@@ -231,7 +231,7 @@ const Settings: React.FC = () => {
     key: '',
     name: '',
     card_layout: 'auto' as 'portrait' | 'landscape' | 'auto',
-    features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' } as CategoryFeatures,
+    features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话', subscription: true } as CategoryFeatures,
     scan_path: '' as string,
   });
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
@@ -250,7 +250,7 @@ const Settings: React.FC = () => {
   const navigate = useNavigate();
   const openAddCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话' }, scan_path: '' });
+    setCategoryForm({ key: Date.now().toString(36), name: '', card_layout: 'auto', features: { tags: true, actors: true, tracking: true, watched: true, status: true, chinese_sub: true, episode: '话', subscription: true }, scan_path: '' });
     setShowCategoryModal(true);
   };
 
@@ -640,8 +640,8 @@ const Settings: React.FC = () => {
               const features = parseCategoryFeatures(cat.features);
               const layoutLabel = cat.card_layout === 'portrait' ? '竖版' : cat.card_layout === 'landscape' ? '横版' : '自动';
               const activeFeatures = Object.entries(features).filter(([k, v]) => v && k !== 'episode').map(([k]) => {
-                const labels: Record<string, string> = { tracking: '追番标记', watched: '观影进度', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字' };
-                const colors: Record<string, string> = { tracking: 'bg-blue-50 text-blue-700', watched: 'bg-amber-50 text-amber-700', status: 'bg-emerald-50 text-emerald-700', tags: 'bg-purple-50 text-purple-700', actors: 'bg-pink-50 text-pink-700', chinese_sub: 'bg-orange-50 text-orange-700' };
+                const labels: Record<string, string> = { tracking: '追番标记', watched: '观影进度', status: '连载状态', tags: '标签', actors: '演员', chinese_sub: '中字', subscription: '关联订阅' };
+                const colors: Record<string, string> = { tracking: 'bg-blue-50 text-blue-700', watched: 'bg-amber-50 text-amber-700', status: 'bg-emerald-50 text-emerald-700', tags: 'bg-purple-50 text-purple-700', actors: 'bg-pink-50 text-pink-700', chinese_sub: 'bg-orange-50 text-orange-700', subscription: 'bg-sky-50 text-sky-700' };
                 return { label: labels[k] || k, color: colors[k] || 'bg-gray-50 text-gray-700' };
               });
               return (
@@ -991,6 +991,7 @@ const Settings: React.FC = () => {
                     { key: 'tags' as const, label: '标签', tip: '控制是否支持给视频集添加标签分类' },
                     { key: 'actors' as const, label: '演员', tip: '控制是否支持给视频集关联演员' },
                     { key: 'chinese_sub' as const, label: '中文字幕', tip: '控制是否支持中文字幕标记' },
+                    { key: 'subscription' as const, label: '关联订阅', tip: '控制是否显示关联订阅功能' },
                   ]).map(({ key, label, tip }) => (
                     <div key={key} className="flex items-center justify-between">
                       <span className="text-sm text-gray-700">{label}</span>
