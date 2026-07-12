@@ -20,6 +20,11 @@ const OBSERVED_PROPERTIES = [
   'dheight',
 ] as const;
 
+// macOS 专用：通过 IPC socket 控制 mpv
+const mpvCommand = async (name: string, args: string[] = []): Promise<any> => {
+  return invoke('mpv_send_command', { cmd: name, args });
+};
+
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -182,16 +187,25 @@ const Player: React.FC = () => {
         const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
-        // macOS 上不用 --wid 嵌入（WebKit 不兼容），改用 mpv 自带 OSC
-        let playerWid: string | undefined;
-        if (!isMac) {
+        // macOS: mpv 由 Rust 端 start_mpv_embedded 启动，前端不调用 init
+        if (isMac) {
+          console.log('[Player] macOS: mpv 由 Rust 端管理，跳过 init');
+          // 通过 mpv_send_command 建立控制通道
           try {
-            const wid = await invoke<number>('get_player_wid');
-            playerWid = String(wid);
-            console.log('[Player] player WID:', playerWid);
+            await invoke('mpv_send_command', { cmd: 'get_property', args: ['pause'] });
+            console.log('[Player] macOS: mpv IPC 通道就绪');
           } catch (e) {
-            console.warn('[Player] get_player_wid failed:', e);
+            console.warn('[Player] macOS: mpv IPC 通道未就绪:', e);
           }
+        } else {
+        // Windows/Linux: 用 tauri-plugin-mpv 正常 init
+        let playerWid: string | undefined;
+        try {
+          const wid = await invoke<number>('get_player_wid');
+          playerWid = String(wid);
+          console.log('[Player] player WID:', playerWid);
+        } catch (e) {
+          console.warn('[Player] get_player_wid failed:', e);
         }
 
         try {
@@ -200,13 +214,12 @@ const Player: React.FC = () => {
             showMpvOutput: true,
             args: [
               '--vo=gpu',
-              isMac ? '--hwdec=auto-safe' : '--hwdec=no',
+              '--hwdec=no',
               ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
               '--keep-open=yes',
-              '--force-window=yes',
-              // macOS 用 mpv 自带 OSC，Windows/Linux 用自定义控制栏
-              isMac ? '--osc=yes' : '--osc=no',
-              isMac ? '--osd-level=1' : '--osd-level=0',
+              '--force-window=no',
+              '--osc=no',
+              '--osd-level=0',
               '--video-sync=audio',
               '--log-file=mpv.log',
               ...(playerWid ? [`--wid=${playerWid}`] : []),
@@ -215,18 +228,17 @@ const Player: React.FC = () => {
           });
         } catch (initErr) {
           console.error('[Player] init 失败:', initErr);
-          // 不传 path 重试一次（系统 PATH 中的 mpv）
           try {
             await init({
               showMpvOutput: true,
               args: [
                 '--vo=gpu',
-                isMac ? '--hwdec=auto-safe' : '--hwdec=no',
+                '--hwdec=no',
                 ...(isWindows ? ['--gpu-api=d3d11', '--gpu-context=d3d11'] : []),
                 '--keep-open=yes',
-                '--force-window=yes',
-                isMac ? '--osc=yes' : '--osc=no',
-                isMac ? '--osd-level=1' : '--osd-level=0',
+                '--force-window=no',
+                '--osc=no',
+                '--osd-level=0',
                 '--video-sync=audio',
                 '--log-file=mpv.log',
                 ...(playerWid ? [`--wid=${playerWid}`] : []),

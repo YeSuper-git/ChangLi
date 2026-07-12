@@ -2761,7 +2761,7 @@ async fn open_player_window(
 ) -> Result<(), String> {
     eprintln!("[player] open_player_window called for video id={}", id);
 
-    // macOS: 直接用系统 mpv 播放（带 OSC），不创建 WebView 播放器窗口
+    // macOS: 用 start_mpv_embedded 启动 mpv 并嵌入到播放器 WebView 窗口
     #[cfg(target_os = "macos")]
     {
         let video_path = {
@@ -2775,13 +2775,7 @@ async fn open_player_window(
                 .ok_or_else(|| "视频不存在".to_string())?;
             video.file_path.clone()
         };
-        let mpv_path = player::find_mpv_path().unwrap_or_else(|_| "mpv".to_string());
-        let _ = std::process::Command::new(&mpv_path)
-            .arg(&video_path)
-            .arg("--osc=yes")
-            .arg("--osd-level=1")
-            .arg("--hwdec=auto-safe")
-            .spawn();
+        player::start_mpv_embedded(&app, &video_path)?;
         return Ok(());
     }
 
@@ -3974,6 +3968,7 @@ fn main() {
             enable_preset_template_cmd,
             disable_preset_template_cmd,
             regenerate_all_poster_base64,
+            player::mpv_send_command,
             set_game_overlay_disabled,
             get_game_overlay_disabled,
             player::get_player_wid,

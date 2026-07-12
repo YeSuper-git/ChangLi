@@ -201,6 +201,120 @@ pub fn get_player_wid(app: AppHandle) -> Result<u64, String> {
     }
 }
 
+// ===== macOS mpv 进程管理（通过 IPC socket 控制）=====
+
+#[cfg(target_os = "macos")]
+mod mpv_ipc {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    use std::sync::Mutex;
+    use std::sync::OnceLock;
+
+    static MPV_SOCKET_PATH: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+    fn socket_mutex() -> &'static Mutex<Option<String>> {
+        MPV_SOCKET_PATH.get_or_init(|| Mutex::new(None))
+    }
+
+    /// 获取 mpv IPC socket 路径
+    pub fn socket_path() -> Option<String> {
+        socket_mutex().lock().unwrap().clone()
+    }
+
+    pub fn set_socket_path(path: String) {
+        *socket_mutex().lock().unwrap() = Some(path);
+    }
+
+    /// 发送 JSON IPC 命令给 mpv
+    pub fn send_command(cmd: &str, args: &[&str]) -> Result<String, String> {
+        let path = socket_path().ok_or("mpv socket 未初始化")?;
+        let mut stream = UnixStream::connect(&path)
+            .map_err(|e| format!("连接 mpv socket 失败: {}", e))?;
+
+        // 构造 JSON IPC 命令
+        let command = if args.is_empty() {
+            format!("{{\"command\": [\"{}\"]}}", cmd)
+        } else {
+            let args_json: Vec<String> = args.iter().map(|a| format!("\"{}\"", a)).collect();
+            format!("{{\"command\": [\"{}\", {}]}}", cmd, args_json.join(", "))
+        };
+
+        // 加换行符（mpv IPC 协议要求）
+        let mut msg = command.clone();
+        msg.push('\n');
+
+        stream.write_all(msg.as_bytes())
+            .map_err(|e| format!("写入 mpv socket 失败: {}", e))?;
+
+        // 读取响应
+        let mut reader = BufReader::new(&stream);
+        let mut response = String::new();
+        reader.read_line(&mut response)
+            .map_err(|e| format!("读取 mpv 响应失败: {}", e))?;
+
+        Ok(response.trim().to_string())
+    }
+}
+
+/// macOS: 启动 mpv 进程并嵌入到播放器窗口
+#[cfg(target_os = "macos")]
+pub fn start_mpv_embedded(app: &AppHandle, video_path: &str) -> Result<(), String> {
+    let window = app.get_webview_window("player")
+        .ok_or("播放器窗口不存在")?;
+
+    // 获取 NSView 指针
+    use raw_window_handle::HasWindowHandle;
+    let wid = if let Ok(handle) = window.window_handle() {
+        if let raw_window_handle::RawWindowHandle::AppKit(h) = handle.as_raw() {
+            h.ns_view.as_ptr() as u64
+        } else {
+            return Err("无法获取 NSView 指针".to_string());
+        }
+    } else {
+        return Err("无法获取窗口句柄".to_string());
+    };
+
+    let mpv_path = find_mpv_path().unwrap_or_else(|_| "mpv".to_string());
+    let wid_arg = format!("--wid={}", wid);
+
+    // IPC socket 路径
+    let socket_path = format!("/tmp/changli-mpv-{}.sock", std::process::id());
+    let socket_arg = format!("--input-ipc-server={}", socket_path);
+
+    let child = std::process::Command::new(&mpv_path)
+        .arg(video_path)
+        .arg(&wid_arg)
+        .arg(&socket_arg)
+        .arg("--no-terminal")
+        .arg("--force-window=no")
+        .arg("--hwdec=auto-safe")
+        .arg("--vo=gpu")
+        .arg("--osc=no")
+        .arg("--osd-level=0")
+        .arg("--keep-open=yes")
+        .spawn()
+        .map_err(|e| format!("启动 mpv 失败: {}", e))?;
+
+    // 保存 socket 路径
+    mpv_ipc::set_socket_path(socket_path);
+
+    // 后台等待 mpv 退出
+    std::thread::spawn(move || {
+        let _ = child.wait_with_output();
+        mpv_ipc::set_socket_path(String::new());
+    });
+
+    Ok(())
+}
+
+/// macOS: 发送命令给 mpv（通过 IPC socket）
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn mpv_send_command(cmd: String, args: Vec<String>) -> Result<String, String> {
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    mpv_ipc::send_command(&cmd, &args_refs)
+}
+
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_) => {
