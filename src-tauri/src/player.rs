@@ -90,7 +90,7 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
+pub fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     let player_window = get_or_create_player_window(app)?;
     position_player_window_next_to_main(app, &player_window)?;
     sync_player_minimize_state(app, &player_window)?;

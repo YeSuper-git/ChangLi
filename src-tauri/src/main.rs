@@ -2761,7 +2761,7 @@ async fn open_player_window(
 ) -> Result<(), String> {
     eprintln!("[player] open_player_window called for video id={}", id);
 
-    // macOS: 用 start_mpv_embedded 启动 mpv 并嵌入到播放器 WebView 窗口
+    // macOS: 先创建播放器窗口，再启动 mpv 并嵌入
     #[cfg(target_os = "macos")]
     {
         let video_path = {
@@ -2775,6 +2775,10 @@ async fn open_player_window(
                 .ok_or_else(|| "视频不存在".to_string())?;
             video.file_path.clone()
         };
+        // 先创建/显示播放器窗口
+        player::play_platform(&app, &std::path::PathBuf::from(&video_path))
+            .map_err(|e| e.to_string())?;
+        // 再启动 mpv 并嵌入
         player::start_mpv_embedded(&app, &video_path)?;
         return Ok(());
     }
