@@ -65,7 +65,7 @@ const Settings: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   const [newTagName, setNewTagName] = useState('');
-  const [editingTag, setEditingTag] = useState<{ id: number; name: string } | null>(null);
+  const [editingTag, setEditingTag] = useState<{ id: number; name: string; scope: string } | null>(null);
   const [editingTagValue, setEditingTagValue] = useState('');
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
@@ -193,7 +193,7 @@ const Settings: React.FC = () => {
       return;
     }
     try {
-      await updateTag(editingTag.id, newName);
+      await updateTag(editingTag.id, newName, editingTag.scope);
       setEditingTag(null);
       loadTags();
     } catch (error) {
