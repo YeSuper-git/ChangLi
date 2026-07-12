@@ -886,17 +886,17 @@ const ActorDetail: React.FC = () => {
         to={target}
         state={{ from: `/actors/${actor.id}`, backLabel: '返回演员详情' }}
         onContextMenu={(event) => openContextMenu(event, isSeries ? 'series' : 'video', isSeries ? resource.series_id! : resource.id, title)}
-        className="card block overflow-hidden"
+        className="cursor-pointer group"
       >
-        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden rounded-t-xl">
+        <div className="card relative w-full overflow-hidden transition-shadow duration-200 group-hover:shadow-xl aspect-video">
           <SmartPoster src={poster} alt={title} posterOrientation={resource.poster_orientation} />
           <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
           {resource.series_has_chinese_sub === 1 && (
             <span className="absolute bottom-2 left-2 changli-brand-badge text-xs font-bold px-2 py-0.5">中字</span>
           )}
         </div>
-        <div className="mt-2 px-1">
-          <h3 className="text-sm font-semibold text-zinc-900 truncate" title={title}>{title}</h3>
+        <div className="mt-2">
+          <h3 className="text-sm font-semibold text-zinc-900 truncate group-hover:text-rose-600" title={title}>{title}</h3>
         </div>
       </Link>
     );
