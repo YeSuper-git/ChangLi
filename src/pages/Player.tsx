@@ -406,7 +406,7 @@ const Player: React.FC = () => {
             } else {
               // Windows/Linux: 正常清理
               await mpvCommand('quit').catch(() => {});
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 800));
               await destroy().catch(() => {});
             }
           } catch { /* ignore */ }

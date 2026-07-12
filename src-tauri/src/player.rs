@@ -112,20 +112,8 @@ pub fn close_player_window(app: &AppHandle) {
     } else {
         eprintln!("[player] close_player_window: no player window found");
     }
-
-    // 延迟销毁，避免 GPU 清理冲突
-    let app_handle = app.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(600)).await;
-        if let Some(window) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
-            // 如果窗口已被重新使用（可见），不销毁
-            if window.is_visible().unwrap_or(false) {
-                return;
-            }
-            let _ = window.destroy();
-            eprintln!("[player] Player window destroyed after delay.");
-        }
-    });
+    // 不再在这里 destroy——由前端 useEffect cleanup 负责 destroy
+    // 避免双重销毁导致堆损坏
 }
 
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
