@@ -1462,6 +1462,57 @@ pub async fn delete_tag(pool: &SqlitePool, id: i64) -> Result<()> {
     Ok(())
 }
 
+pub async fn get_tags_by_scope(pool: &SqlitePool, scope: &str) -> Result<Vec<Tag>> {
+    let rows = sqlx::query("SELECT * FROM tags WHERE scope = ? ORDER BY name")
+        .bind(scope)
+        .fetch_all(pool)
+        .await?;
+    let tags = rows
+        .iter()
+        .map(|row| Tag {
+            id: row.get("id"),
+            name: row.get("name"),
+            scope: row.get("scope"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+    Ok(tags)
+}
+
+pub async fn get_tag_categories(pool: &SqlitePool, tag_id: i64) -> Result<Vec<String>> {
+    let rows = sqlx::query("SELECT category_key FROM tag_categories WHERE tag_id = ? ORDER BY category_key")
+        .bind(tag_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(rows.iter().map(|r| r.get("category_key")).collect())
+}
+
+pub async fn update_tag(pool: &SqlitePool, id: i64, name: &str, scope: &str) -> Result<()> {
+    sqlx::query("UPDATE tags SET name = ?, scope = ? WHERE id = ?")
+        .bind(name)
+        .bind(scope)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_tag_categories(pool: &SqlitePool, tag_id: i64, category_keys: &[String]) -> Result<()> {
+    // 先删后插
+    sqlx::query("DELETE FROM tag_categories WHERE tag_id = ?")
+        .bind(tag_id)
+        .execute(pool)
+        .await?;
+    for key in category_keys {
+        sqlx::query("INSERT OR IGNORE INTO tag_categories (tag_id, category_key) VALUES (?, ?)")
+            .bind(tag_id)
+            .bind(key)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
 pub async fn add_resource_tag(pool: &SqlitePool, resource_id: i64, tag_id: i64) -> Result<()> {
     sqlx::query("INSERT OR IGNORE INTO video_tags (video_id, tag_id) VALUES (?, ?)")
         .bind(resource_id)

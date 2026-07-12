@@ -2398,12 +2398,13 @@ async fn get_tags_by_category(state: State<'_, AppState>, category_key: String) 
 }
 
 #[tauri::command]
-async fn add_tag(state: State<'_, AppState>, name: String) -> Result<db::Tag, String> {
+async fn add_tag(state: State<'_, AppState>, name: String, scope: Option<String>) -> Result<db::Tag, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::add_tag(&pool, &name).await.map_err(|e| e.to_string())
+    let scope_str = scope.as_deref().unwrap_or("global");
+    db::add_tag(&pool, &name, scope_str).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2416,18 +2417,37 @@ async fn delete_tag(state: State<'_, AppState>, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn update_tag(state: State<'_, AppState>, id: i64, name: String) -> Result<(), String> {
+async fn update_tag(state: State<'_, AppState>, id: i64, name: String, scope: Option<String>) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    sqlx::query("UPDATE tags SET name = ? WHERE id = ?")
-        .bind(&name)
-        .bind(id)
-        .execute(&pool)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    let scope_str = scope.as_deref().unwrap_or("global");
+    db::update_tag(&pool, id, &name, scope_str).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<(db::Tag, Vec<String>)>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    let tags = db::get_tags(&pool).await.map_err(|e| e.to_string())?;
+    let mut result = Vec::new();
+    for tag in tags {
+        let categories = db::get_tag_categories(&pool, tag.id).await.map_err(|e| e.to_string())?;
+        result.push((tag, categories));
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+async fn update_tag_categories_cmd(state: State<'_, AppState>, tag_id: i64, category_keys: Vec<String>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_tag_categories(&pool, tag_id, &category_keys).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3764,6 +3784,8 @@ fn main() {
             add_tag,
             delete_tag,
             update_tag,
+            get_tags_with_categories,
+            update_tag_categories_cmd,
             get_resource_tags,
             add_resource_tag,
             remove_resource_tag,
