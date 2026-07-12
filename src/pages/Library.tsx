@@ -403,7 +403,14 @@ const Library: React.FC = () => {
     filterByActor(activeActorId === actorId ? null : actorId);
   };
 
-  const seriesList: VideoSeries[] = actorFilteredSeries ?? tagFilteredSeries ?? storeSeries;
+  const seriesList: VideoSeries[] = (() => {
+    // 双重筛选：标签和演员同时激活时取交集
+    if (tagFilteredSeries && actorFilteredSeries) {
+      const actorIds = new Set(actorFilteredSeries.map(s => s.id));
+      return tagFilteredSeries.filter(s => actorIds.has(s.id));
+    }
+    return actorFilteredSeries ?? tagFilteredSeries ?? storeSeries;
+  })();
 
   // 构建当前筛选状态的 URL 参数字符串
   const buildFilterSearch = () => {

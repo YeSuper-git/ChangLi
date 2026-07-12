@@ -740,7 +740,7 @@ const SeriesDetail: React.FC = () => {
 
       <div className="changli-detail-hero changli-panel p-6 mb-8" data-tutorial="series-hero">
         <div className={`${editing || isPortrait ? 'flex gap-6' : 'flex flex-col gap-5'}`}>
-          <div className={`${editing ? (!isPortrait ? 'w-80 h-80' : 'w-80 aspect-video') : isPortrait ? 'w-52 aspect-[3/4]' : 'w-full aspect-video'} bg-gray-100 rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/5 ${editing || isPortrait ? 'flex-shrink-0' : ''}`}>
+          <div className={`${editing ? (!isPortrait ? 'w-80 h-80' : 'w-80 aspect-video') : isPortrait ? 'w-52 aspect-[3/4]' : 'max-w-md mx-auto aspect-video'} bg-gray-100 rounded-2xl overflow-hidden shadow-sm ring-1 ring-black/5 ${editing || isPortrait ? 'flex-shrink-0' : ''}`}>
             <div
               className={`relative w-full h-full group ${editing ? 'cursor-pointer' : 'cursor-context-menu'}`}
               onClick={editing ? handleSelectPoster : undefined}
