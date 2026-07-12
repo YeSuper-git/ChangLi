@@ -228,12 +228,28 @@ const Tags: React.FC = () => {
       {/* Header */}
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">标签管理</h1>
-        <button
-          onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
-          className="action-btn action-btn-primary"
-        >
-          + 创建标签
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { loadData(); refreshTags(); }}
+            className="action-btn text-sm"
+            title="刷新"
+          >
+            ↻ 刷新
+          </button>
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="action-btn text-sm"
+            title="返回顶部"
+          >
+            ↑ 顶部
+          </button>
+          <button
+            onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
+            className="action-btn action-btn-primary"
+          >
+            + 创建标签
+          </button>
+        </div>
       </div>
 
       {/* Content */}
