@@ -367,10 +367,12 @@ async fn check_subscription_updates(
                     if title_lower.contains(part) {
                         return true;
                     }
+                    // 处理简中变体：简中 应匹配 简日内嵌、简体、CHS 等
+                    if part.contains("简中") {
+                        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封") || title_lower.contains("简体") || title_lower.contains("chs");
+                    }
                     // 处理简繁变体
-                    if part.as_bytes() == b"\xe7\xae\x80\xe7\xb9\x81" ||
-                       part.as_bytes() == b"\xe7\xae\x80\xef\xbc\x8f\xe7\xb9\x81" ||
-                       part.as_bytes() == b"\xe7\xae\x80/\xe7\xb9\x81" {
+                    if part.contains("简繁") || part.contains("简／繁") || part.contains("简/繁") {
                         return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
                     }
                     false
@@ -495,9 +497,11 @@ async fn check_subscription_updates(
                 let parts: Vec<&str> = prefix_lower.split(' ').collect();
                 parts.iter().all(|part| {
                     if title_lower.contains(part) { return true; }
-                    if part.as_bytes() == b"\xe7\xae\x80\xe7\xb9\x81" ||
-                       part.as_bytes() == b"\xe7\xae\x80\xef\xbc\x8f\xe7\xb9\x81" ||
-                       part.as_bytes() == b"\xe7\xae\x80/\xe7\xb9\x81" {
+                    // 处理简中变体
+                    if part.contains("简中") {
+                        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封") || title_lower.contains("简体") || title_lower.contains("chs");
+                    }
+                    if part.contains("简繁") || part.contains("简／繁") || part.contains("简/繁") {
                         return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
                     }
                     false
