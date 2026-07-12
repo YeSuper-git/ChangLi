@@ -281,6 +281,48 @@ async fn update_subscription_cmd(
         .await
         .map_err(|e| e.to_string())
 }
+/// 检查 selectedPrefixes 的一个 part 是否匹配标题中的对应关键词
+/// 支持简中/繁中/简繁等语言变体、画质变体、来源变体、容器变体
+fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
+    if title_lower.contains(part) { return true; }
+    // 语言变体
+    if part.contains("简中") {
+        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封")
+            || title_lower.contains("简体内嵌") || title_lower.contains("简体内封")
+            || title_lower.contains("简体") || title_lower.contains("chs")
+            || title_lower.contains("[gb]");
+    }
+    if part.contains("繁中") {
+        return title_lower.contains("繁日内嵌") || title_lower.contains("繁日内封")
+            || title_lower.contains("繁体内嵌") || title_lower.contains("繁体内封")
+            || title_lower.contains("繁体") || title_lower.contains("cht")
+            || title_lower.contains("[big5]");
+    }
+    if part.contains("简繁") {
+        return title_lower.contains("简繁") || title_lower.contains("简／繁")
+            || title_lower.contains("简/繁") || title_lower.contains("简繁内封")
+            || title_lower.contains("简繁内嵌");
+    }
+    // 画质变体
+    if part.contains("1080p") || part.contains("1920x1080") {
+        return title_lower.contains("1080p") || title_lower.contains("1920x1080");
+    }
+    if part.contains("4k") || part.contains("2160p") || part.contains("3840x2160") {
+        return title_lower.contains("4k") || title_lower.contains("2160p") || title_lower.contains("3840x2160");
+    }
+    // 来源变体
+    if part.contains("cr") {
+        return title_lower.contains("cr ") || title_lower.contains("[cr]")
+            || title_lower.contains("crwebrip") || title_lower.contains("cr webrip") || title_lower.contains("cr web");
+    }
+    if part.contains("abema") { return title_lower.contains("abema"); }
+    if part.contains("baha") { return title_lower.contains("baha"); }
+    // 容器变体
+    if part.contains("mp4") { return title_lower.contains("[mp4]") || title_lower.contains(".mp4"); }
+    if part.contains("mkv") { return title_lower.contains("[mkv]") || title_lower.contains(".mkv"); }
+    false
+}
+
 /// 手动触发订阅检查（获取新集数列表）
 #[tauri::command]
 async fn check_subscription_updates(
@@ -495,17 +537,7 @@ async fn check_subscription_updates(
             let matched = selected_prefixes.iter().any(|prefix| {
                 let prefix_lower = prefix.to_lowercase();
                 let parts: Vec<&str> = prefix_lower.split(' ').collect();
-                parts.iter().all(|part| {
-                    if title_lower.contains(part) { return true; }
-                    // 处理简中变体
-                    if part.contains("简中") {
-                        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封") || title_lower.contains("简体") || title_lower.contains("chs");
-                    }
-                    if part.contains("简繁") || part.contains("简／繁") || part.contains("简/繁") {
-                        return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
-                    }
-                    false
-                })
+                parts.iter().all(|part| prefix_part_matches_title(part, &title_lower))
             });
             if !matched { continue; }
         }
