@@ -216,6 +216,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
   const [rssTitle, setRssTitle] = useState('');
   const [rssGroups, setRssGroups] = useState<RssGroup[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [feedSeason, setFeedSeason] = useState<number | null>(null);
   const [seriesSearch, setSeriesSearch] = useState('');
   const [showSeriesDropdown, setShowSeriesDropdown] = useState(false);
   const [seriesList, setSeriesList] = useState<VideoSeries[]>([]);
@@ -250,7 +251,9 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
     setSelectedGroups(new Set());
 
     try {
-      const { rss_url: rssUrl, feed_season } = await detectRssUrl(bangumiUrl.trim());
+      const detectResult = await detectRssUrl(bangumiUrl.trim());
+      const rssUrl = detectResult.rss_url;
+      setFeedSeason(detectResult.feed_season);
       setDetectedRssUrl(rssUrl);
 
       const rssData = await fetchRss(rssUrl);
@@ -340,7 +343,7 @@ export const SubscriptionBindModal: React.FC<BindModalProps> = ({ open, onClose,
         bangumiUrl.trim(),
         detectedRssUrl,
         rssTitle || bangumiUrl.trim(),
-        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids, feedSeason: feed_season ?? null }),
+        JSON.stringify({ selectedPrefixes: Array.from(selectedGroups), matchPatterns, knownGuids, feedSeason: feedSeason ?? null }),
         'clipboard'
       );
 
