@@ -2449,7 +2449,7 @@ async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<TagW
 }
 
 #[tauri::command]
-async fn update_tag_categories_cmd(state: State<'_, AppState>, tag_id: i64, category_keys: Vec<String>) -> Result<(), String> {
+async fn update_tag_categories(state: State<'_, AppState>, tag_id: i64, category_keys: Vec<String>) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -3792,7 +3792,7 @@ fn main() {
             delete_tag,
             update_tag,
             get_tags_with_categories,
-            update_tag_categories_cmd,
+            update_tag_categories,
             get_resource_tags,
             add_resource_tag,
             remove_resource_tag,

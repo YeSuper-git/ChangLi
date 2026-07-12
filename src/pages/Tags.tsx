@@ -65,7 +65,12 @@ const Tags: React.FC = () => {
     try {
       const newTag = await addTag(name, createScope);
       if (createScope === 'category' && createCategoryKeys.length > 0) {
-        await updateTagCategories(newTag.id, createCategoryKeys);
+        try {
+          await updateTagCategories(newTag.id, createCategoryKeys);
+        } catch (e) {
+          console.error('[Tags] updateTagCategories 失败:', e);
+          notify({ message: `分类关联失败: ${e}`, type: 'error' });
+        }
       }
       setShowCreateModal(false);
       setCreateName('');
