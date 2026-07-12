@@ -405,20 +405,7 @@ async fn check_subscription_updates(
             let matched = selected_prefixes.iter().any(|prefix| {
                 let prefix_lower = prefix.to_lowercase();
                 let parts: Vec<&str> = prefix_lower.split(' ').collect();
-                parts.iter().all(|part| {
-                    if title_lower.contains(part) {
-                        return true;
-                    }
-                    // 处理简中变体：简中 应匹配 简日内嵌、简体、CHS 等
-                    if part.contains("简中") {
-                        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封") || title_lower.contains("简体") || title_lower.contains("chs");
-                    }
-                    // 处理简繁变体
-                    if part.contains("简繁") || part.contains("简／繁") || part.contains("简/繁") {
-                        return title_lower.contains("简繁") || title_lower.contains("简／繁") || title_lower.contains("简/繁");
-                    }
-                    false
-                })
+                parts.iter().all(|part| prefix_part_matches_title(part, &title_lower))
             });
             if !matched {
                 continue;
