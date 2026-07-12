@@ -3877,6 +3877,7 @@ fn main() {
             get_game_overlay_disabled,
             player::get_player_wid,
             player::find_mpv_path,
+            player::kill_mpv,
             preview::thumbnail_service::get_preview_thumb,
             preview::thumbnail_service::prebuild_thumbnails,
             preview::thumbnail_service::get_thumb_cache_dir,

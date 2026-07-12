@@ -560,7 +560,8 @@ fn send_loadfile(ipc_path: &str, video_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn kill_mpv() {
+#[tauri::command]
+pub fn kill_mpv() {
     if let Ok(mut session) = MPV_SESSION.lock() {
         if let Some(existing) = session.take() {
             cleanup_mpv_session(existing);
