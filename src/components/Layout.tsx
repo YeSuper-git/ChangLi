@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
 import settingsIcon from '../assets/icons/settings.svg';
@@ -15,10 +15,8 @@ const scrollPositions = new Map<string, number>();
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  // navigationType 已不再用于滚动恢复
+  const navigationType = useNavigationType();
   const mainRef = useRef<HTMLElement>(null);
-  const scrollKeyRef = useRef(location.pathname + location.search);
-  scrollKeyRef.current = location.pathname + location.search;
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
@@ -64,20 +62,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     event.stopPropagation();
   };
 
-  // 滚动恢复机制：
-  // 1. 每次页面离开时保存当前滚动位置（cleanup）
-  // 2. 进入新页面时，如果该路径有保存的滚动位置，恢复它
-  // 3. 否则回到顶部
-  // 这样不依赖 navigationType，兼容所有返回场景（POP/PUSH）
+  // 滚动恢复机制：返回上一页时恢复原位置；普通跳转进入新页面时回到顶部
   useLayoutEffect(() => {
-    const key = scrollKeyRef.current;
+    const key = location.pathname + location.search;
     const main = mainRef.current;
 
-    if (scrollPositions.has(key)) {
+    if (navigationType === 'POP' && scrollPositions.has(key)) {
       const savedTop = scrollPositions.get(key)!;
       setTimeout(() => {
         mainRef.current?.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
-      }, 100);
+      }, 0);
     } else {
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       window.scrollTo(0, 0);
@@ -88,7 +82,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         scrollPositions.set(key, main.scrollTop);
       }
     };
-  }, [location.pathname]);
+  }, [location.pathname, navigationType]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;

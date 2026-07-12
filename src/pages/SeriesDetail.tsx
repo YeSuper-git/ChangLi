@@ -503,7 +503,11 @@ const SeriesDetail: React.FC = () => {
   const backTo = backState?.from || fallbackBackTo;
   const backLabel = backState?.backLabel || fallbackBackLabel;
   const handleBack = () => {
-    navigate(backTo);
+    if (backState?.from) {
+      navigate(-1);
+    } else {
+      navigate(backTo);
+    }
   };
 
   // 大类配置
