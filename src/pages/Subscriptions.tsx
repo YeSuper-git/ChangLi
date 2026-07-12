@@ -184,21 +184,7 @@ const Subscriptions: React.FC = () => {
     } catch {}
   };
 
-  const handleDownload = async (ep: any) => {
-    const magnet = ep.magnet_link || ep.torrent_url;
-    if (!magnet) {
-      notify({ message: '无可用下载链接', type: 'error' });
-      return;
-    }
-    // 预留：Phase 2 内置 aria2 下载
-    // 暂时复制到剪贴板并提示
-    try {
-      await navigator.clipboard.writeText(magnet);
-      notify({ message: '磁力链接已复制，请使用外部下载器打开', type: 'info' });
-    } catch {
-      notify({ message: '复制失败', type: 'error' });
-    }
-  };
+  // Phase 2: 内置 aria2 下载（暂未实现）
 
   // 不显示全屏 loading，直接显示内容
 
@@ -358,22 +344,23 @@ const Subscriptions: React.FC = () => {
                                       {gItems.map((ep: any) => {
                                         const idx = globalIdx++;
                                         return (
-                                          <div key={idx} className="flex items-center justify-between">
-                                            <span className="text-[11px] text-gray-600 truncate flex-1">{ep.title}</span>
+                                          <div key={idx} className="flex items-center justify-between gap-1.5">
+                                            <span className="text-[11px] text-gray-600 truncate flex-1 min-w-0">{ep.title}</span>
                                             <button
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx
-                                                ? "action-btn text-xs !bg-emerald-50 !text-emerald-700 !border-emerald-200"
-                                                : "action-btn text-xs"
+                                                ? "text-[11px] px-2 py-0.5 rounded !bg-emerald-50 !text-emerald-700 !border-emerald-200 border whitespace-nowrap shrink-0"
+                                                : "text-[11px] px-2 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap shrink-0"
                                               }
                                             >
-                                              {copiedKey === sub.id + '_' + idx ? '复制成功' : '复制磁力'}
+                                              {copiedKey === sub.id + '_' + idx ? '已复制' : '复制磁力'}
                                             </button>
                                             <button
-                                              onClick={() => handleDownload(ep)}
-                                              className="action-btn action-btn-primary text-xs"
+                                              disabled
+                                              className="text-[11px] px-2 py-0.5 rounded border border-blue-200 text-blue-300 bg-blue-50 whitespace-nowrap shrink-0 cursor-not-allowed"
+                                              title="下载功能开发中"
                                             >
-                                              立即下载
+                                              下载
                                             </button>
                                           </div>
                                         );
