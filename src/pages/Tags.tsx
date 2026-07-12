@@ -159,6 +159,12 @@ const Tags: React.FC = () => {
 
   const scopeLabel = (scope: string) => scope === 'global' ? '通用' : '特殊';
 
+  const scopeFilters: { key: ScopeFilter; label: string }[] = [
+    { key: 'all', label: '全部' },
+    { key: 'global', label: '通用' },
+    { key: 'category', label: '特殊' },
+  ];
+
   return (
     <div className="changli-page">
       {/* Header: title + create button */}
@@ -175,7 +181,7 @@ const Tags: React.FC = () => {
         </button>
       </div>
 
-      {/* Toolbar: search + scope filter */}
+      {/* Toolbar: search + scope filter pills */}
       <div className="changli-toolbar mb-10 p-3">
         <input
           type="text"
@@ -185,19 +191,11 @@ const Tags: React.FC = () => {
           className="search-input"
         />
         <div className="flex gap-1 ml-3">
-          {([
-            { key: 'all' as ScopeFilter, label: '全部' },
-            { key: 'global' as ScopeFilter, label: '通用' },
-            { key: 'category' as ScopeFilter, label: '特殊' },
-          ]).map(f => (
+          {scopeFilters.map(f => (
             <button
               key={f.key}
               onClick={() => setScopeFilter(f.key)}
-              className={`text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${
-                scopeFilter === f.key
-                  ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`changli-filter-pill ${scopeFilter === f.key ? 'active' : ''}`}
             >
               {f.label}
             </button>
@@ -211,14 +209,14 @@ const Tags: React.FC = () => {
           <img src={loadingIcon} alt="加载中" className="w-10 h-10 animate-spin" />
         </div>
       ) : filteredTags.length > 0 ? (
-        <div className="changli-auto-grid-actor">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredTags.map(tag => (
             <div
               key={tag.id}
-              className="changli-panel p-4 cursor-pointer hover:shadow-md transition-shadow relative group"
+              className="changli-panel p-5 cursor-pointer hover:shadow-md transition-all duration-200 relative group text-center"
               onClick={() => openEditModal(tag)}
             >
-              {/* Delete button (top-right) */}
+              {/* Delete button (top-right, hover) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -227,7 +225,7 @@ const Tags: React.FC = () => {
                     () => handleDelete(tag.id)
                   );
                 }}
-                className={`absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-xs opacity-0 group-hover:opacity-100 transition-all z-10 ${
+                className={`absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 z-10 ${
                   pendingKey === `delete-tag-${tag.id}`
                     ? 'bg-red-500 text-white opacity-100'
                     : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
@@ -238,24 +236,22 @@ const Tags: React.FC = () => {
               </button>
 
               {/* Tag name */}
-              <h3 className="text-base font-semibold text-gray-900 mb-2 pr-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2 pr-6">
                 {tag.name}
               </h3>
 
               {/* Scope badge */}
-              <div className="mb-3">
-                <span className={`inline-block text-[11px] px-2 py-0.5 rounded-full font-medium ${
-                  tag.scope === 'global'
-                    ? 'bg-green-50 text-green-600'
-                    : 'bg-blue-50 text-blue-600'
-                }`}>
-                  {scopeLabel(tag.scope)}
-                </span>
-              </div>
+              <span className={`inline-block text-[11px] px-2.5 py-0.5 rounded-full font-medium ${
+                tag.scope === 'global'
+                  ? 'bg-green-50 text-green-600'
+                  : 'bg-blue-50 text-blue-600'
+              }`}>
+                {scopeLabel(tag.scope)}
+              </span>
 
               {/* Associated categories */}
               {tag.scope === 'category' && tag.category_keys.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap justify-center gap-1.5 mt-3">
                   {tag.category_keys.slice(0, 5).map(key => {
                     const cat = categories.find(c => c.key === key);
                     return (
@@ -274,7 +270,7 @@ const Tags: React.FC = () => {
 
               {/* Empty categories hint */}
               {tag.scope === 'category' && tag.category_keys.length === 0 && (
-                <p className="text-[11px] text-gray-400 italic">未关联分类</p>
+                <p className="text-[11px] text-gray-400 italic mt-3">未关联分类</p>
               )}
             </div>
           ))}
@@ -301,7 +297,7 @@ const Tags: React.FC = () => {
       {/* ---- Edit Modal ---- */}
       {editingTag && (
         <div className="changli-modal-backdrop" onClick={() => setEditingTag(null)}>
-          <div className="changli-modal-panel !w-[min(100%,420px)] !p-0" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-panel max-w-md" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">编辑</p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">编辑标签</h2>
@@ -395,7 +391,7 @@ const Tags: React.FC = () => {
       {/* ---- Create Modal ---- */}
       {showCreateModal && (
         <div className="changli-modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="changli-modal-panel !w-[min(100%,420px)] !p-0" onClick={e => e.stopPropagation()}>
+          <div className="changli-modal-panel max-w-md" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">创建</p>
               <h2 className="mt-1 text-xl font-bold text-gray-900">新建标签</h2>
