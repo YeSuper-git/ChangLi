@@ -1,4 +1,5 @@
 import React from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import brandIcon from '../assets/brand/app-icon.png';
 
 export function imageDataUrl(value?: string | null): string | null {
@@ -8,6 +9,13 @@ export function imageDataUrl(value?: string | null): string | null {
 
 export function videoPosterDataUrl(video: { thumbnail_data_url?: string | null }): string | null {
   return imageDataUrl(video.thumbnail_data_url);
+}
+
+export function seriesPosterSrc(series: { poster_data_url?: string | null; poster?: string | null }): string | null {
+  const dataUrl = imageDataUrl(series.poster_data_url);
+  if (dataUrl) return dataUrl;
+  if (series.poster) return convertFileSrc(series.poster);
+  return null;
 }
 
 export function actorPhotoDataUrl(actor: { photo_data_url?: string | null }): string | null {

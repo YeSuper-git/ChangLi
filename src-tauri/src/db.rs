@@ -851,20 +851,19 @@ pub async fn get_video_series_list(
         ("created_at", "asc") => "ORDER BY s.created_at ASC, s.id ASC",
         _ => "ORDER BY s.created_at DESC, s.id DESC",
     };
-    // 列表查询排除 poster_base64（1200px缩略图很大），减少IPC传输量
-    // poster_base64 只在详情页单独加载
-    let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
+    // 列表查询必须排除 poster_base64（1200px 缩略图很大），避免启动/刷新时通过 IPC 传输全部海报。
+    // 卡片可用 poster 路径展示，详情页再单独读取高清 poster_base64。
+    let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
-    // 直接构造结构体，不调用 series_from_row（避免读文件转base64，784个视频集会卡1分钟）
+    // 直接构造结构体，不调用 series_from_row（避免 poster_base64 为空时读文件转 base64）。
     let result = rows.iter().map(|row| {
-        let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten();
         VideoSeries {
             id: row.get("id"),
             title: row.get("title"),
             description: row.get("description"),
             poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-            poster_data_url: poster_data_url.clone(),
-            poster_base64: poster_data_url,
+            poster_data_url: None,
+            poster_base64: None,
             folder_path: row.get("folder_path"),
             video_count: row.try_get("video_count").unwrap_or(0),
             poster_orientation: row.try_get("poster_orientation").ok().flatten(),
@@ -2616,10 +2615,31 @@ pub async fn get_favorite_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
 }
 
 pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
-    let rows = sqlx::query("SELECT s.*, COUNT(v.id) AS video_count, (SELECT v2.episode_number FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_episode, (SELECT v2.season FROM videos v2 JOIN play_history ph ON ph.video_id = v2.id WHERE v2.series_id = s.id ORDER BY ph.last_played DESC LIMIT 1) AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
+    let rows = sqlx::query("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
         .fetch_all(pool)
         .await?;
-    Ok(rows.iter().map(series_from_row).collect())
+    Ok(rows.iter().map(|row| VideoSeries {
+        id: row.get("id"),
+        title: row.get("title"),
+        description: row.get("description"),
+        poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
+        poster_data_url: None,
+        poster_base64: None,
+        folder_path: row.get("folder_path"),
+        video_count: row.try_get("video_count").unwrap_or(0),
+        poster_orientation: row.try_get("poster_orientation").ok().flatten(),
+        status: row.try_get("status").ok().flatten(),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+        is_favorite: row.try_get("is_favorite").ok().flatten(),
+        is_watched: row.try_get("is_watched").ok().flatten(),
+        last_watched_episode: None,
+        last_watched_season: None,
+        has_actor: row.try_get::<Option<i64>, _>("has_actor").ok().flatten().map(|v| v > 0).unwrap_or(false),
+        code: None,
+        has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
+        display_type: row.try_get("display_type").ok().flatten(),
+    }).collect())
 }
 
 /// 删除所有视频数据（不删除本地源文件，保留 actors 和 tags）

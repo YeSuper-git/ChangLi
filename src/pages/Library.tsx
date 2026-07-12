@@ -20,7 +20,7 @@ import {
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
-import { SmartPoster } from '../utils/media';
+import { seriesPosterSrc, SmartPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -1009,7 +1009,7 @@ const Library: React.FC = () => {
                         )}
                       </div>
                     )}
-                    <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+                    <SmartPoster src={seriesPosterSrc(series)} alt={series.title} posterOrientation={series.poster_orientation} />
                     <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                     {itemFeatures.chinese_sub && series.has_chinese_sub === 1 && (
                       <span className="absolute bottom-2 left-2 changli-brand-badge text-xs font-bold px-2 py-0.5">

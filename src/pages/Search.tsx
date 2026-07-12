@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures, toggleFavorite, toggleWatched, rescanSingleSeriesMetadata, openSeriesInFileManager, switchSeriesTypeTo, deleteVideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
+import { actorPhotoDataUrl, seriesPosterSrc, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -234,7 +234,7 @@ const Search: React.FC = () => {
               {results.map((item) => {
                 const target = item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
                 const imageDataUrl = item.type === 'series'
-                    ? item.series.poster_data_url
+                    ? seriesPosterSrc(item.series)
                     : actorPhotoDataUrl(item.actor);
                 const aspectClass = item.type === 'series'
                   ? (item.series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video')

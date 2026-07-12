@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures, PlayHistory } from '../utils/api';
 import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, getVideoSeriesMap, parseCategoryFeatures } from '../utils/api';
-import { actorPhotoDataUrl, SmartPoster, StaticImagePlaceholder } from '../utils/media';
+import { actorPhotoDataUrl, seriesPosterSrc, SmartPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
 
@@ -124,7 +124,7 @@ const Home: React.FC = () => {
     return (
       <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="group block min-w-0">
         <div className={`card relative w-full ${aspectClass} overflow-hidden`}>
-          <SmartPoster src={series.poster_data_url} alt={series.title} posterOrientation={series.poster_orientation} />
+          <SmartPoster src={seriesPosterSrc(series)} alt={series.title} posterOrientation={series.poster_orientation} />
           <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/55 to-transparent" />
           {options?.showSubBadge && series.has_chinese_sub === 1 && (
             <span className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-rose-600 shadow-sm backdrop-blur-sm">
