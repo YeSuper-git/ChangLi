@@ -7,7 +7,7 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { init, destroy, setProperty, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
+import { init, destroy, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
 import { mpvCommand, mpvSetProperty, mpvGetProperty, isMac } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 
@@ -20,11 +20,6 @@ const OBSERVED_PROPERTIES = [
   'dwidth',
   'dheight',
 ] as const;
-
-// macOS 专用：通过 IPC socket 控制 mpv
-const mpvCommand = async (name: string, args: string[] = []): Promise<any> => {
-  return invoke('mpv_send_command', { cmd: name, args });
-};
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -469,7 +464,7 @@ const Player: React.FC = () => {
   const seek = useCallback(async (time: number) => {
     if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
-      await mpvCommand('seek', [time, 'absolute']);
+      await mpvCommand('seek', [String(time), 'absolute']);
     } catch (err) {
       console.error('[Player] 跳转失败:', err);
     }
