@@ -2722,12 +2722,16 @@ async fn open_player_window(
     player_w = player_w.max(640.0).min(target_w);
     player_h = player_h.max(360.0).min(target_h);
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis();
-    let label = format!("player-{}-{}", video.id, now);
+    let label = "player";
     let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
+
+    // 关闭旧窗口再创建新窗口
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.destroy();
+        // 等待窗口销毁
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+
     let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)
