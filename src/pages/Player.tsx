@@ -216,10 +216,7 @@ const Player: React.FC = () => {
         } catch (initErr) {
           console.error('[Player] init 失败:', initErr);
           // 不传 path 重试一次（系统 PATH 中的 mpv）
-          try {
-            try { await invoke('kill_mpv'); } catch {}
-            await new Promise(resolve => setTimeout(resolve, 300));
-            await init({
+          await init({
               showMpvOutput: true,
               args: [
                 '--vo=gpu',
