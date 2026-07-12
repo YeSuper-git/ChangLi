@@ -961,9 +961,11 @@ const SeriesDetail: React.FC = () => {
                       )}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
-                        {isCompleted ? '已完结' : '连载中'}
-                      </span>
+                      {features.status && (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${isCompleted ? 'bg-green-100 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {isCompleted ? '已完结' : '连载中'}
+                        </span>
+                      )}
                       <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-100 text-xs font-medium text-gray-600">{episodeCountLabel}</span>
                     </div>
                   </div>
