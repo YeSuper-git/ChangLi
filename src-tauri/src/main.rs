@@ -2722,16 +2722,12 @@ async fn open_player_window(
     player_w = player_w.max(640.0).min(target_w);
     player_h = player_h.max(360.0).min(target_h);
 
-    let label = "player";
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis();
+    let label = format!("player-{}-{}", video.id, now);
     let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
-
-    // 关闭旧窗口再创建新窗口
-    if let Some(existing) = app.get_webview_window(label) {
-        let _ = existing.destroy();
-        // 等待窗口销毁
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    }
-
     let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)
@@ -3721,23 +3717,6 @@ fn main() {
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 player::handle_main_window_event(&window.app_handle(), event);
-            } else if window.label() == "player" {
-                // 播放器窗口关闭时，手动清理 mpv
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    eprintln!("[player] Rust: player CloseRequested - preventing close, cleaning up");
-                    api.prevent_close();
-                    let app = window.app_handle().clone();
-                    let label = window.label().to_string();
-                    tauri::async_runtime::spawn(async move {
-                        // 通过 invoke 销毁 mpv 实例
-                        let _ = app.emit("player-close-cleanup", &label);
-                        eprintln!("[player] emitted player-close-cleanup, now destroying window");
-                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                        if let Some(w) = app.get_webview_window(&label) {
-                            let _ = w.destroy();
-                        }
-                    });
-                }
             }
         })
         .invoke_handler(tauri::generate_handler![
