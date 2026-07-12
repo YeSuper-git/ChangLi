@@ -118,13 +118,13 @@ function extractVersionKey(title: string): string {
   const bracketContents = title.match(/\[([^\]]+)\]/g)?.map(b => b.slice(1, -1).toLowerCase()) || [];
   const allText = lower + ' ' + bracketContents.join(' ');
   
-  if (allText.includes('chs') || allText.includes('简中') || allText.includes('简体') || allText.includes('[gb]') || (allText.includes('简') && allText.includes('日') && !allText.includes('繁'))) parts.push('简中');
-  else if (allText.includes('简繁') || allText.includes('简／繁') || allText.includes('简/繁') || (allText.includes('简') && allText.includes('繁'))) parts.push('简繁');
-  else if (allText.includes('cht') || allText.includes('繁中') || allText.includes('繁体') || allText.includes('[big5]') || (allText.includes('繁') && allText.includes('日') && !allText.includes('简'))) parts.push('繁中');
-  
-  // 日文轨道（如果有）
-  if (allText.includes('日内嵌') || allText.includes('日内封') || allText.includes('日文')) {
-    // 已在上面的语言分类中处理
+  // 保留原始关键词用于前缀匹配，同时归类用于推荐优先级
+  if (allText.includes('chs') || allText.includes('简中') || allText.includes('简体') || allText.includes('[gb]') || (allText.includes('简') && allText.includes('日') && !allText.includes('繁'))) {
+    parts.push(allText.includes('chs') ? 'CHS' : '简中');
+  } else if (allText.includes('简繁') || allText.includes('简／繁') || allText.includes('简/繁') || (allText.includes('简') && allText.includes('繁'))) {
+    parts.push('简繁');
+  } else if (allText.includes('cht') || allText.includes('繁中') || allText.includes('繁体') || allText.includes('[big5]') || (allText.includes('繁') && allText.includes('日') && !allText.includes('简'))) {
+    parts.push(allText.includes('cht') ? 'CHT' : '繁中');
   }
   
   // 来源

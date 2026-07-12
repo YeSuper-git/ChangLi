@@ -551,30 +551,51 @@ async fn check_subscription_updates(
 
 /// 从标题中提取集数
 fn extract_season_number(title: &str) -> Option<i32> {
-    use regex::Regex;
-    // 优先从中文标题提取季号（第三季、第2季 等）
-    // 然后从英文提取（Season 1、3rd Season 等）
-    // 注意：Mikanani 的 S01E25 中 S01 是系列编号不是季号，不能用
-    let patterns = [
-        (r"第\s*(\d+)\s*季", true),                    // 第1季、第三季（中文最高优先）
-        (r"(?i)(\d+)(?:st|nd|rd|th)\s+Season", true),   // 3rd Season
-        (r"(?i)Season\s*(\d+)", true),                   // Season 1
-    ];
-    for (pattern, _) in &patterns {
-        if let Ok(re) = Regex::new(pattern) {
+        use regex::Regex;
+    
+        // 中文数字映射
+        let chinese_num = |s: &str| -> Option<i32> {
+            match s {
+                "一" => Some(1), "二" | "两" => Some(2), "三" => Some(3),
+                "四" => Some(4), "五" => Some(5), "六" => Some(6),
+                "七" => Some(7), "八" => Some(8), "九" => Some(9),
+                "十" => Some(10), "十一" => Some(11), "十二" => Some(12),
+                "十三" => Some(13), "十四" => Some(14), "十五" => Some(15),
+                "十六" => Some(16), "十七" => Some(17), "十八" => Some(18),
+                "十九" => Some(19), "二十" => Some(20),
+                _ => s.parse::<i32>().ok(),
+            }
+        };
+    
+        // 1. 中文格式：第X季（支持中文数字和阿拉伯数字）
+        if let Ok(re) = Regex::new(r"第\s*([^\d\s季]{1,4})\s*季") {
             if let Some(caps) = re.captures(title) {
                 if let Some(s) = caps.get(1) {
-                    if let Ok(season) = s.as_str().parse::<i32>() {
-                        if season >= 1 && season <= 99 {
-                            return Some(season);
+                    if let Some(season) = chinese_num(s.as_str()) {
+                        if season >= 1 && season <= 99 { return Some(season); }
+                    }
+                }
+            }
+        }
+    
+        // 2. 英文格式：3rd Season、Season 1
+        let patterns = [
+            r"(?i)(\d+)(?:st|nd|rd|th)\s+Season",
+            r"(?i)Season\s*(\d+)",
+        ];
+        for pattern in &patterns {
+            if let Ok(re) = Regex::new(pattern) {
+                if let Some(caps) = re.captures(title) {
+                    if let Some(s) = caps.get(1) {
+                        if let Ok(season) = s.as_str().parse::<i32>() {
+                            if season >= 1 && season <= 99 { return Some(season); }
                         }
                     }
                 }
             }
         }
+        None
     }
-    None
-}
 
 fn extract_episode_number(title: &str) -> Option<i32> {
     use regex::Regex;
