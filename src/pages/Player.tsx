@@ -252,6 +252,9 @@ const Player: React.FC = () => {
 
         mpvInitialized.current = true;
 
+        // 等待 mpv 完全就绪（macOS IPC 时序问题）
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // 监听属性变化
         await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
           if (!isMountedRef.current) return;
@@ -320,17 +323,27 @@ const Player: React.FC = () => {
           } catch { /* ignore observer errors */ }
         });
 
-        // 加载视频
-        try {
-          await command('loadfile', [currentVideo.file_path, 'replace']);
-        } catch (loadErr) {
-          console.error('[Player] loadfile 失败:', loadErr);
-          setError('加载视频失败，请确认视频文件仍然存在');
-          setLoading(false);
-          setTimeout(() => {
-            getCurrentWindow().close().catch(() => {});
-          }, 2000);
-          return;
+        // 加载视频（macOS 上 IPC 可能需要重试）
+        let loaded = false;
+        for (let attempt = 0; attempt < 3 && !loaded; attempt++) {
+          try {
+            if (attempt > 0) {
+              console.log(`[Player] loadfile 重试第 ${attempt} 次...`);
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            await command('loadfile', [currentVideo.file_path, 'replace']);
+            loaded = true;
+          } catch (loadErr) {
+            console.error(`[Player] loadfile 失败 (attempt ${attempt + 1}):`, loadErr);
+            if (attempt === 2) {
+              setError('加载视频失败，请确认视频文件仍然存在');
+              setLoading(false);
+              setTimeout(() => {
+                getCurrentWindow().close().catch(() => {});
+              }, 2000);
+              return;
+            }
+          }
         }
         if (currentVideo.subtitle) {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
