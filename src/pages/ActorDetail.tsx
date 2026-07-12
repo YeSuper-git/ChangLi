@@ -872,7 +872,7 @@ const ActorDetail: React.FC = () => {
     }
   };
 
-  // 渲染作品卡片
+  // 渲染作品卡片（和视频页一致）
   const renderWorkCard = (resource: Video) => {
     const isSeries = Boolean(resource.series_id);
     const code = resource.series_code || '';
@@ -889,16 +889,14 @@ const ActorDetail: React.FC = () => {
         className="card block overflow-hidden"
       >
         <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden rounded-t-xl">
-          <SmartPoster src={poster} alt={title} />
-        </div>
-        <div className="p-5">
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2" title={title}>{title}</h3>
+          <SmartPoster src={poster} alt={title} posterOrientation={resource.poster_orientation} />
+          <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
           {resource.series_has_chinese_sub === 1 && (
-            <span className="text-xs text-orange-500">中文字幕</span>
+            <span className="absolute bottom-2 left-2 changli-brand-badge text-xs font-bold px-2 py-0.5">中字</span>
           )}
-          <div className="text-sm text-gray-500">
-            
-          </div>
+        </div>
+        <div className="mt-2 px-1">
+          <h3 className="text-sm font-semibold text-zinc-900 truncate" title={title}>{title}</h3>
         </div>
       </Link>
     );
