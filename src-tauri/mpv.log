@@ -11,7 +11,7 @@
 [   0.001][v][cplayer]    libswscale      9.5.101
 [   0.001][v][cplayer] Configuration: -Dbuildtype=release -Dsysconfdir=/opt/homebrew/etc -Dbuild-date=false -Dhtml-build=enabled -Djavascript=enabled -Dlibmpv=true -Dlua=luajit -Dlibarchive=enabled -Duchardet=enabled -Dvulkan=enabled -Dprefix=/opt/homebrew/Cellar/mpv/0.41.0_6 -Dlibdir=/opt/homebrew/Cellar/mpv/0.41.0_6/lib -Dwrap_mode=nofallback
 [   0.001][v][cplayer] List of enabled features: avfoundation bsd-fstatfs cocoa coreaudio cplugins darwin ffmpeg gl gl-cocoa glob glob-posix gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libdl libplacebo luajit mac-thread-name macos-10-15-4-features macos-11-3-features macos-11-features macos-12-features macos-cocoa-cb macos-media-player macos-touchbar posix posix-shm rubberband rubberband-3 swift uchardet vapoursynth vector videotoolbox-gl videotoolbox-pl vk-khr-display vulkan zimg zimg-st428 zlib
-[   0.001][v][cplayer] Command line options: '--input-ipc-server=/tmp/tauri_plugin_mpv_socket_17979_player-1-1783830088292' '--profile=libmpv' '--wid=46140404864' '--vo=gpu' '--hwdec=auto-safe' '--keep-open=yes' '--force-window=no' '--osc=no' '--osd-level=0' '--video-sync=audio' '--log-file=mpv.log'
+[   0.001][v][cplayer] Command line options: '--input-ipc-server=/tmp/tauri_plugin_mpv_socket_18666_player-1-1783830220655' '--profile=libmpv' '--wid=43958988032' '--vo=gpu' '--hwdec=auto-safe' '--keep-open=yes' '--force-window=no' '--osc=no' '--osd-level=0' '--video-sync=audio' '--log-file=mpv.log'
 [   0.001][v][cplayer] mpv v0.41.0 Copyright © 2000-2025 mpv/MPlayer/mplayer2 projects
 [   0.001][v][cplayer] libplacebo version: v7.360.1
 [   0.001][v][cplayer] FFmpeg version: 8.1.1
@@ -37,7 +37,7 @@
 [   0.001][d][global] config path: 'config' -/-> '/Users/liuzilong/.mpv/config'
 [   0.001][d][global] config path: 'mpv.conf' -/-> '/opt/homebrew/etc/mpv/mpv.conf'
 [   0.001][d][global] config path: 'config' -/-> '/opt/homebrew/etc/mpv/config'
-[   0.001][v][cplayer] Setting option 'input-ipc-server' = '/tmp/tauri_plugin_mpv_socket_17979_player-1-1783830088292' (flags = 8)
+[   0.001][v][cplayer] Setting option 'input-ipc-server' = '/tmp/tauri_plugin_mpv_socket_18666_player-1-1783830220655' (flags = 8)
 [   0.001][v][cplayer] Setting option 'profile' = 'libmpv' (flags = 8)
 [   0.001][v][cplayer] Applying profile 'libmpv'...
 [   0.001][v][cplayer] Setting option 'config' = 'no' (flags = 12)
@@ -49,7 +49,7 @@
 [   0.001][v][cplayer] Setting option 'input-vo-keyboard' = 'no' (flags = 12)
 [   0.001][v][cplayer] Setting option 'input-media-keys' = 'no' (flags = 12)
 [   0.001][v][cplayer] Setting option 'media-controls' = 'no' (flags = 12)
-[   0.001][v][cplayer] Setting option 'wid' = '46140404864' (flags = 8)
+[   0.001][v][cplayer] Setting option 'wid' = '43958988032' (flags = 8)
 [   0.001][v][cplayer] Setting option 'vo' = 'gpu' (flags = 8)
 [   0.001][v][cplayer] Setting option 'hwdec' = 'auto-safe' (flags = 8)
 [   0.001][v][cplayer] Setting option 'keep-open' = 'yes' (flags = 8)
@@ -67,52 +67,49 @@
 [   0.002][d][auto_profiles] Loading lua script @auto_profiles.lua...
 [   0.002][d][select] Loading lua script @select.lua...
 [   0.002][d][positioning] Loading lua script @positioning.lua...
-[   0.002][d][stats] loading mp.defaults
-[   0.002][d][ytdl_hook] loading mp.defaults
-[   0.002][d][console] loading mp.defaults
 [   0.002][d][commands] Loading lua script @commands.lua...
-[   0.003][d][context_menu] Loading lua script @context_menu.lua...
+[   0.002][d][context_menu] Loading lua script @context_menu.lua...
+[   0.002][d][ytdl_hook] loading mp.defaults
+[   0.003][d][context_menu] loading mp.defaults
+[   0.003][d][stats] loading mp.defaults
+[   0.003][d][console] loading mp.defaults
 [   0.003][d][auto_profiles] loading mp.defaults
 [   0.003][d][select] loading mp.defaults
 [   0.003][d][positioning] loading mp.defaults
-[   0.003][d][commands] loading mp.defaults
-[   0.003][d][context_menu] loading mp.defaults
-[   0.003][d][stats] loading @stats.lua
-[   0.003][d][positioning] loading @positioning.lua
-[   0.003][d][ytdl_hook] loading @ytdl_hook.lua
-[   0.003][d][select] loading @select.lua
-[   0.003][d][auto_profiles] loading @auto_profiles.lua
-[   0.003][d][console] loading @console.lua
-[   0.003][d][commands] loading @commands.lua
-[   0.003][d][positioning] reading options for positioning
-[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/positioning.conf'
-[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.mpv/script-opts/positioning.conf'
-[   0.003][d][global] config path: 'script-opts/positioning.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/positioning.conf'
-[   0.003][d][positioning] script-opts/positioning.conf not found.
-[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/positioning.conf'
-[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/positioning.conf'
-[   0.003][d][global] config path: 'lua-settings/positioning.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/positioning.conf'
-[   0.003][d][positioning] lua-settings/positioning.conf not found.
 [   0.003][v][clipboard] Initialized mac clipboard backend.
+[   0.003][d][commands] loading mp.defaults
 [   0.003][d][context_menu] loading @context_menu.lua
-[   0.003][d][select] reading options for select
-[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/select.conf'
-[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.mpv/script-opts/select.conf'
-[   0.003][d][global] config path: 'script-opts/select.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/select.conf'
-[   0.003][d][select] script-opts/select.conf not found.
-[   0.003][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/select.conf'
-[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/select.conf'
-[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/select.conf'
-[   0.004][d][select] lua-settings/select.conf not found.
-[   0.004][d][context_menu] reading options for context_menu
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/context_menu.conf'
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.mpv/script-opts/context_menu.conf'
-[   0.004][d][global] config path: 'script-opts/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/context_menu.conf'
-[   0.004][d][context_menu] script-opts/context_menu.conf not found.
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/context_menu.conf'
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/context_menu.conf'
-[   0.004][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/context_menu.conf'
+[   0.003][d][console] loading @console.lua
+[   0.003][d][ytdl_hook] loading @ytdl_hook.lua
+[   0.003][d][stats] loading @stats.lua
+[   0.003][d][auto_profiles] loading @auto_profiles.lua
+[   0.003][d][select] loading @select.lua
+[   0.003][d][commands] loading @commands.lua
+[   0.003][d][positioning] loading @positioning.lua
+[   0.003][d][context_menu] reading options for context_menu
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/context_menu.conf'
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/Users/liuzilong/.mpv/script-opts/context_menu.conf'
+[   0.003][d][global] config path: 'script-opts/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/context_menu.conf'
+[   0.003][d][context_menu] script-opts/context_menu.conf not found.
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/context_menu.conf'
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/context_menu.conf'
+[   0.003][d][global] config path: 'lua-settings/context_menu.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/context_menu.conf'
 [   0.004][d][context_menu] lua-settings/context_menu.conf not found.
+[   0.004][d][positioning] reading options for positioning
+[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/positioning.conf'
+[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/Users/liuzilong/.mpv/script-opts/positioning.conf'
+[   0.004][d][global] config path: 'script-opts/positioning.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/positioning.conf'
+[   0.004][d][positioning] script-opts/positioning.conf not found.
+[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/positioning.conf'
+[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/positioning.conf'
+[   0.004][d][global] config path: 'lua-settings/positioning.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/positioning.conf'
+[   0.004][d][positioning] lua-settings/positioning.conf not found.
+[   0.004][d][select] reading options for select
+[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/select.conf'
+[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/Users/liuzilong/.mpv/script-opts/select.conf'
+[   0.004][d][global] config path: 'script-opts/select.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/select.conf'
+[   0.004][d][select] script-opts/select.conf not found.
+[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/select.conf'
 [   0.004][d][ytdl_hook] reading options for ytdl_hook
 [   0.004][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/ytdl_hook.conf'
 [   0.004][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/script-opts/ytdl_hook.conf'
@@ -122,179 +119,185 @@
 [   0.004][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/ytdl_hook.conf'
 [   0.004][d][global] config path: 'lua-settings/ytdl_hook.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/ytdl_hook.conf'
 [   0.004][d][ytdl_hook] lua-settings/ytdl_hook.conf not found.
-[   0.005][d][stats] reading options for stats
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/stats.conf'
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.mpv/script-opts/stats.conf'
-[   0.005][d][global] config path: 'script-opts/stats.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/stats.conf'
-[   0.005][d][stats] script-opts/stats.conf not found.
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/stats.conf'
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/stats.conf'
-[   0.005][d][global] config path: 'lua-settings/stats.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/stats.conf'
-[   0.005][d][stats] lua-settings/stats.conf not found.
-[   0.023][v][mac/app] AppHub functionality initialised
-[   0.024][v][ipc] Starting IPC master
-[   0.024][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.config/mpv/scripts'
-[   0.024][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.mpv/scripts'
-[   0.024][d][global] config path: 'scripts' -/-> '/opt/homebrew/etc/mpv/scripts'
-[   0.024][v][cplayer] Waiting for scripts...
-[   0.024][v][ipc] Listening to IPC socket.
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
-[   0.024][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.024][d][commands] reading options for commands
-[   0.024][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/commands.conf'
-[   0.024][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.mpv/script-opts/commands.conf'
-[   0.024][d][global] config path: 'script-opts/commands.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/commands.conf'
-[   0.024][d][commands] script-opts/commands.conf not found.
-[   0.024][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/commands.conf'
-[   0.025][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/commands.conf'
-[   0.025][d][global] config path: 'lua-settings/commands.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/commands.conf'
-[   0.025][d][commands] lua-settings/commands.conf not found.
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][console] reading options for console
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
-[   0.025][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/console.conf'
-[   0.025][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.mpv/script-opts/console.conf'
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][global] config path: 'script-opts/console.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/console.conf'
-[   0.025][d][console] script-opts/console.conf not found.
-[   0.025][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/console.conf'
-[   0.025][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/console.conf'
-[   0.025][d][global] config path: 'lua-settings/console.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/console.conf'
-[   0.025][d][console] lua-settings/console.conf not found.
-[   0.025][d][auto_profiles] Destroying client handle...
-[   0.025][v][cplayer] Done loading scripts.
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.025][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
-[   0.025][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
-[   0.043][v][ipc_0] Client connected
-[   0.044][v][ipc_1] Client connected
-[   0.044][v][cplayer] Set property: video-margin-ratio-left=0.000000 -> 1
-[   0.044][v][ipc_1] Client disconnected
-[   0.044][d][ipc_1] Destroying client handle...
-[   0.044][v][ipc_2] Client connected
-[   0.044][v][cplayer] Set property: video-margin-ratio-right=0.000000 -> 1
-[   0.044][v][ipc_2] Client disconnected
-[   0.044][d][ipc_2] Destroying client handle...
-[   0.044][v][ipc_3] Client connected
-[   0.044][v][cplayer] Set property: video-margin-ratio-top=0.000000 -> 1
-[   0.044][v][ipc_3] Client disconnected
-[   0.044][d][ipc_3] Destroying client handle...
-[   0.044][v][ipc_4] Client connected
-[   0.044][v][cplayer] Set property: video-margin-ratio-bottom=0.000000 -> 1
-[   0.045][v][ipc_4] Client disconnected
-[   0.045][d][ipc_4] Destroying client handle...
-[   0.046][v][ipc_5] Client connected
-[   0.046][d][cplayer] Run command: loadfile, flags=64, args=[url="/Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv", flags="replace", index="-1", options=""]
-[   0.046][v][cplayer] Running hook: auto_profiles/on_before_start_file
-[   0.046][v][cplayer] Failed sending hook command auto_profiles/on_before_start_file. Removing hook.
-[   0.046][v][ipc_5] Client disconnected
-[   0.046][d][ipc_5] Destroying client handle...
-[   0.046][d][global] state path: 'watch_later' -> '/Users/liuzilong/.config/mpv/watch_later'
-[   0.046][v][cplayer] Running hook: auto_profiles/on_load
-[   0.046][v][cplayer] Failed sending hook command auto_profiles/on_load. Removing hook.
-[   0.046][v][cplayer] Running hook: ytdl_hook/on_load
-[   0.046][v][cplayer] Running hook: ytdl_hook/on_load
-[   0.046][v][ytdl_hook] playlist hook
-[   0.046][v][bdmv/bluray] Opening /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
-[   0.046][v][file] Opening /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
-[   0.046][d][file] resize stream to 131072 bytes, drop 0 bytes
-[   0.046][d][file] Stream opened successfully.
-[   0.046][v][demux] Trying demuxers for level=normal.
-[   0.046][d][demux] Trying demuxer: directory (force-level: normal)
-[   0.046][v][ipc_6] Client connected
-[   0.047][v][cplayer] Set property: pause=false -> 1
-[   0.047][v][ipc_6] Client disconnected
-[   0.047][d][ipc_6] Destroying client handle...
-[   0.047][d][demux] Trying demuxer: disc (force-level: normal)
-[   0.047][d][demux] Trying demuxer: edl (force-level: normal)
-[   0.047][d][demux] Trying demuxer: cue (force-level: normal)
-[   0.047][d][demux] Trying demuxer: rawaudio (force-level: normal)
-[   0.047][d][demux] Trying demuxer: rawvideo (force-level: normal)
-[   0.047][d][demux] Trying demuxer: mkv (force-level: normal)
-[   0.047][d][mkv] Found the head...
-[   0.047][d][mkv] + a segment...
-[   0.047][d][mkv] Parsing seek head...
-[   0.047][d][mkv] |+ segment information...
-[   0.047][d][mkv] float 270896.000000
-[   0.047][d][mkv] | + muxing app: libebml v1.4.0 + libmatroska v1.6.0
-[   0.047][d][mkv] | + writing app: mkvmerge v48.0.0 ('Fortress Around Your Heart') 64-bit
-[   0.047][d][mkv] | + timecode scale: 1000000
-[   0.047][d][mkv] | + duration: 270.896s
-[   0.047][d][mkv] | + segment uid b1 37 80 41 1b 68 3e 4f 70 07 77 6e c5 84 36 8c
-[   0.047][d][mkv] |+ segment tracks...
-[   0.047][d][mkv] float 44100.000000
-[   0.047][d][mkv] | + a track...
-[   0.047][d][mkv] |  + Track number: 1
-[   0.047][d][mkv] |  + Track type: Video
-[   0.047][d][mkv] |  + Video track
-[   0.047][d][mkv] |   + Display width: 1920
-[   0.047][d][mkv] |   + Display height: 1080
-[   0.047][d][mkv] |   + Pixel width: 1920
-[   0.047][d][mkv] |   + Pixel height: 1080
-[   0.047][d][mkv] |  + Codec ID: V_MPEGH/ISO/HEVC
-[   0.047][d][mkv] |  + CodecPrivate, length 2702
-[   0.047][d][mkv] |  + Language: und
-[   0.047][d][mkv] |  + Default duration: 41.708ms ( = 23.976 fps)
-[   0.047][d][mkv] | + a track...
-[   0.047][d][mkv] |  + Track number: 2
-[   0.047][d][mkv] |  + Track type: Audio
-[   0.047][d][mkv] |  + Audio track
-[   0.047][d][mkv] |   + Sampling frequency: 44100.000000
-[   0.047][d][mkv] |   + Channels: 2
-[   0.047][d][mkv] |  + Codec ID: A_AAC
-[   0.047][d][mkv] |  + CodecPrivate, length 2
-[   0.047][d][mkv] |  + Language: jpn
-[   0.047][d][mkv] |  + Default duration: 23.220ms ( = 43.066 fps)
-[   0.047][d][mkv] | + a track...
-[   0.047][d][mkv] |  + Track number: 3
-[   0.047][d][mkv] |  + Name: 简体
-[   0.047][d][mkv] |  + Track type: Subtitle
-[   0.047][d][mkv] |  + Codec ID: S_TEXT/UTF8
-[   0.047][d][mkv] |  + Language: chi
-[   0.047][d][mkv] | + a track...
-[   0.047][d][mkv] |  + Track number: 4
-[   0.047][d][mkv] |  + Name: 繁体
-[   0.047][d][mkv] |  + Track type: Subtitle
-[   0.047][d][mkv] |  + Codec ID: S_TEXT/UTF8
-[   0.047][d][mkv] |  + Language: chi
-[   0.047][d][mkv] |  + Default flag: 0
-[   0.047][d][mkv] |+ found cluster
-[   0.047][v][mkv] Seeking to 105031197 to read header element 0x1c53bb6b.
-[   0.047][v][file] stream level seek from 131072 to 105031197
-[   0.047][v][ipc_7] Client connected
-[   0.047][d][cplayer] Run command: quit, flags=64, args=[code="0"]
-[   0.047][v][ipc_7] Client disconnected
-[   0.047][d][ipc_7] Destroying client handle...
-[   0.047][v][mkv] Parsing cues...
-[   0.047][v][mkv] Seeking to 105035817 to read header element 0x1254c367.
-[   0.047][v][file] stream level seek from 105037396 to 8415
-[   0.047][v][mkv] All headers are parsed!
-[   0.048][v][demux] Detected file format: Matroska
-[   0.048][v][cplayer] Opening done: /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
-[   0.048][v][cplayer] finished playback, success (reason 3)
-[   0.048][v][cplayer] Running hook: ytdl_hook/on_after_end_file
-[   0.048][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/ytdl/json-subprocess-result"]
-[   0.048][i][cplayer] Exiting... (Quit)
-[   0.048][d][mac] Destroying client handle...
-[   0.048][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/console"]
-[   0.048][d][ipc_0] Destroying client handle...
-[   0.048][d][ytdl_hook] Destroying client handle...
-[   0.048][d][positioning] Destroying client handle...
-[   0.048][d][console] Destroying client handle...
-[   0.048][d][commands] Destroying client handle...
-[   0.048][d][select] Destroying client handle...
-[   0.048][d][context_menu] Destroying client handle...
-[   0.049][d][stats] Destroying client handle...
-[   0.049][v][mac/app] Initialising Input
+[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/select.conf'
+[   0.004][d][global] config path: 'lua-settings/select.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/select.conf'
+[   0.004][d][select] lua-settings/select.conf not found.
+[   0.004][d][stats] reading options for stats
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/stats.conf'
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/Users/liuzilong/.mpv/script-opts/stats.conf'
+[   0.004][d][global] config path: 'script-opts/stats.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/stats.conf'
+[   0.004][d][stats] script-opts/stats.conf not found.
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/stats.conf'
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/stats.conf'
+[   0.004][d][global] config path: 'lua-settings/stats.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/stats.conf'
+[   0.004][d][stats] lua-settings/stats.conf not found.
+[   0.026][v][mac/app] AppHub functionality initialised
+[   0.026][v][ipc] Starting IPC master
+[   0.026][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.config/mpv/scripts'
+[   0.026][d][global] config path: 'scripts' -/-> '/Users/liuzilong/.mpv/scripts'
+[   0.026][d][global] config path: 'scripts' -/-> '/opt/homebrew/etc/mpv/scripts'
+[   0.026][v][cplayer] Waiting for scripts...
+[   0.026][v][ipc] Listening to IPC socket.
+[   0.027][d][console] reading options for console
+[   0.027][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/console.conf'
+[   0.027][d][global] config path: 'script-opts/console.conf' -/-> '/Users/liuzilong/.mpv/script-opts/console.conf'
+[   0.027][d][commands] reading options for commands
+[   0.027][d][global] config path: 'script-opts/console.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/console.conf'
+[   0.027][d][console] script-opts/console.conf not found.
+[   0.027][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/console.conf'
+[   0.027][d][global] config path: 'lua-settings/console.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/console.conf'
+[   0.027][d][global] config path: 'lua-settings/console.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/console.conf'
+[   0.027][d][console] lua-settings/console.conf not found.
+[   0.027][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.config/mpv/script-opts/commands.conf'
+[   0.027][d][global] config path: 'script-opts/commands.conf' -/-> '/Users/liuzilong/.mpv/script-opts/commands.conf'
+[   0.027][d][global] config path: 'script-opts/commands.conf' -/-> '/opt/homebrew/etc/mpv/script-opts/commands.conf'
+[   0.027][d][commands] script-opts/commands.conf not found.
+[   0.027][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.config/mpv/lua-settings/commands.conf'
+[   0.027][d][global] config path: 'lua-settings/commands.conf' -/-> '/Users/liuzilong/.mpv/lua-settings/commands.conf'
+[   0.027][d][global] config path: 'lua-settings/commands.conf' -/-> '/opt/homebrew/etc/mpv/lua-settings/commands.conf'
+[   0.027][d][commands] lua-settings/commands.conf not found.
+[   0.027][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
+[   0.027][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.027][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
+[   0.027][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
+[   0.028][v][cplayer] Done loading scripts.
+[   0.028][d][auto_profiles] Destroying client handle...
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.028][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
+[   0.028][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.040][v][ipc_0] Client connected
+[   0.041][v][ipc_1] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-left=0.000000 -> 1
+[   0.041][v][ipc_1] Client disconnected
+[   0.041][d][ipc_1] Destroying client handle...
+[   0.041][v][ipc_2] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-right=0.000000 -> 1
+[   0.041][v][ipc_2] Client disconnected
+[   0.041][d][ipc_2] Destroying client handle...
+[   0.041][v][ipc_3] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-top=0.000000 -> 1
+[   0.041][v][ipc_3] Client disconnected
+[   0.041][d][ipc_3] Destroying client handle...
+[   0.041][v][ipc_4] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-bottom=0.000000 -> 1
+[   0.041][v][ipc_4] Client disconnected
+[   0.041][d][ipc_4] Destroying client handle...
+[   0.546][v][ipc_5] Client connected
+[   0.546][d][cplayer] Run command: loadfile, flags=64, args=[url="/Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv", flags="replace", index="-1", options=""]
+[   0.546][v][cplayer] Running hook: auto_profiles/on_before_start_file
+[   0.546][v][cplayer] Failed sending hook command auto_profiles/on_before_start_file. Removing hook.
+[   0.547][e][ipc_5] Write error (Broken pipe)
+[   0.547][d][global] state path: 'watch_later' -> '/Users/liuzilong/.config/mpv/watch_later'
+[   0.547][d][ipc_5] Destroying client handle...
+[   0.547][v][cplayer] Running hook: auto_profiles/on_load
+[   0.547][v][cplayer] Failed sending hook command auto_profiles/on_load. Removing hook.
+[   0.547][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.547][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.547][v][ytdl_hook] playlist hook
+[   0.547][v][bdmv/bluray] Opening /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
+[   0.548][v][file] Opening /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
+[   0.548][d][file] resize stream to 131072 bytes, drop 0 bytes
+[   0.548][d][file] Stream opened successfully.
+[   0.548][v][demux] Trying demuxers for level=normal.
+[   0.548][d][demux] Trying demuxer: directory (force-level: normal)
+[   0.548][d][demux] Trying demuxer: disc (force-level: normal)
+[   0.548][d][demux] Trying demuxer: edl (force-level: normal)
+[   0.548][d][demux] Trying demuxer: cue (force-level: normal)
+[   0.548][d][demux] Trying demuxer: rawaudio (force-level: normal)
+[   0.549][d][demux] Trying demuxer: rawvideo (force-level: normal)
+[   0.549][d][demux] Trying demuxer: mkv (force-level: normal)
+[   0.549][d][mkv] Found the head...
+[   0.549][d][mkv] + a segment...
+[   0.549][v][ipc_6] Client connected
+[   0.549][v][cplayer] Set property: pause=false -> 1
+[   0.549][d][mkv] Parsing seek head...
+[   0.549][d][mkv] |+ segment information...
+[   0.549][d][mkv] float 270896.000000
+[   0.549][d][mkv] | + muxing app: libebml v1.4.0 + libmatroska v1.6.0
+[   0.549][d][mkv] | + writing app: mkvmerge v48.0.0 ('Fortress Around Your Heart') 64-bit
+[   0.549][d][mkv] | + timecode scale: 1000000
+[   0.549][d][mkv] | + duration: 270.896s
+[   0.549][d][mkv] | + segment uid b1 37 80 41 1b 68 3e 4f 70 07 77 6e c5 84 36 8c
+[   0.549][v][ipc_6] Client disconnected
+[   0.549][d][ipc_6] Destroying client handle...
+[   0.549][d][mkv] |+ segment tracks...
+[   0.549][d][mkv] float 44100.000000
+[   0.549][d][mkv] | + a track...
+[   0.549][d][mkv] |  + Track number: 1
+[   0.549][d][mkv] |  + Track type: Video
+[   0.549][d][mkv] |  + Video track
+[   0.549][d][mkv] |   + Display width: 1920
+[   0.549][d][mkv] |   + Display height: 1080
+[   0.549][d][mkv] |   + Pixel width: 1920
+[   0.549][d][mkv] |   + Pixel height: 1080
+[   0.549][d][mkv] |  + Codec ID: V_MPEGH/ISO/HEVC
+[   0.549][d][mkv] |  + CodecPrivate, length 2702
+[   0.549][d][mkv] |  + Language: und
+[   0.549][d][mkv] |  + Default duration: 41.708ms ( = 23.976 fps)
+[   0.549][d][mkv] | + a track...
+[   0.549][d][mkv] |  + Track number: 2
+[   0.549][d][mkv] |  + Track type: Audio
+[   0.549][d][mkv] |  + Audio track
+[   0.549][d][mkv] |   + Sampling frequency: 44100.000000
+[   0.549][d][mkv] |   + Channels: 2
+[   0.549][d][mkv] |  + Codec ID: A_AAC
+[   0.549][d][mkv] |  + CodecPrivate, length 2
+[   0.549][d][mkv] |  + Language: jpn
+[   0.549][d][mkv] |  + Default duration: 23.220ms ( = 43.066 fps)
+[   0.549][d][mkv] | + a track...
+[   0.549][d][mkv] |  + Track number: 3
+[   0.549][d][mkv] |  + Name: 简体
+[   0.549][d][mkv] |  + Track type: Subtitle
+[   0.549][d][mkv] |  + Codec ID: S_TEXT/UTF8
+[   0.549][d][mkv] |  + Language: chi
+[   0.549][d][mkv] | + a track...
+[   0.549][d][mkv] |  + Track number: 4
+[   0.549][d][mkv] |  + Name: 繁体
+[   0.549][d][mkv] |  + Track type: Subtitle
+[   0.549][d][mkv] |  + Codec ID: S_TEXT/UTF8
+[   0.549][d][mkv] |  + Language: chi
+[   0.549][d][mkv] |  + Default flag: 0
+[   0.549][d][mkv] |+ found cluster
+[   0.549][v][mkv] Seeking to 105031197 to read header element 0x1c53bb6b.
+[   0.549][v][file] stream level seek from 131072 to 105031197
+[   0.549][v][mkv] Parsing cues...
+[   0.549][v][mkv] Seeking to 105035817 to read header element 0x1254c367.
+[   0.549][v][file] stream level seek from 105037396 to 8415
+[   0.549][v][mkv] All headers are parsed!
+[   0.550][v][demux] Detected file format: Matroska
+[   0.550][v][cplayer] Opening done: /Users/liuzilong/Desktop/一脸嫌弃表情的妹子给你看胖次R 01.mkv
+[   0.551][v][ipc_7] Client connected
+[   0.560][v][find_files] Loading external files in /Users/liuzilong/Desktop/
+[   0.561][d][global] config path: 'sub' -/-> '/Users/liuzilong/.config/mpv/sub'
+[   0.561][d][global] config path: 'sub' -/-> '/Users/liuzilong/.mpv/sub'
+[   0.561][d][global] config path: 'sub' -/-> '/opt/homebrew/etc/mpv/sub'
+[   0.561][d][cplayer] Run command: quit, flags=64, args=[code="0"]
+[   0.561][v][ipc_7] Client disconnected
+[   0.561][d][ipc_7] Destroying client handle...
+[   0.561][v][cplayer] finished playback, success (reason 3)
+[   0.561][v][cplayer] Running hook: ytdl_hook/on_after_end_file
+[   0.561][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/ytdl/json-subprocess-result"]
+[   0.561][i][cplayer] Exiting... (Quit)
+[   0.561][d][ytdl_hook] Destroying client handle...
+[   0.561][d][cplayer] Run command: del, flags=64, args=[name="user-data/mpv/console"]
+[   0.561][d][positioning] Destroying client handle...
+[   0.561][d][select] Destroying client handle...
+[   0.561][d][ipc_0] Destroying client handle...
+[   0.561][d][commands] Destroying client handle...
+[   0.561][d][context_menu] Destroying client handle...
+[   0.561][d][stats] Destroying client handle...
+[   0.561][d][console] Destroying client handle...
+[   0.565][d][mac] Destroying client handle...

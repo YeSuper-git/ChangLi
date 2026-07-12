@@ -196,11 +196,6 @@ const Player: React.FC = () => {
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
         try {
-          // 先清理可能残留的旧实例（多次确保彻底清理）
-          await destroy().catch(() => {});
-          await new Promise(resolve => setTimeout(resolve, 300));
-          await destroy().catch(() => {});
-          await new Promise(resolve => setTimeout(resolve, 300));
           await init({
             ...(mpvPath ? { path: mpvPath } : {}),
             showMpvOutput: true,
@@ -222,10 +217,6 @@ const Player: React.FC = () => {
           console.error('[Player] init 失败:', initErr);
           // 不传 path 重试一次（系统 PATH 中的 mpv）
           try {
-            await destroy().catch(() => {});
-            await new Promise(resolve => setTimeout(resolve, 300));
-            await destroy().catch(() => {});
-            await new Promise(resolve => setTimeout(resolve, 300));
             await init({
               showMpvOutput: true,
               args: [
@@ -323,27 +314,17 @@ const Player: React.FC = () => {
           } catch { /* ignore observer errors */ }
         });
 
-        // 加载视频（macOS 上 IPC 可能需要重试）
-        let loaded = false;
-        for (let attempt = 0; attempt < 3 && !loaded; attempt++) {
-          try {
-            if (attempt > 0) {
-              console.log(`[Player] loadfile 重试第 ${attempt} 次...`);
-              await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            await command('loadfile', [currentVideo.file_path, 'replace']);
-            loaded = true;
-          } catch (loadErr) {
-            console.error(`[Player] loadfile 失败 (attempt ${attempt + 1}):`, loadErr);
-            if (attempt === 2) {
-              setError('加载视频失败，请确认视频文件仍然存在');
-              setLoading(false);
-              setTimeout(() => {
-                getCurrentWindow().close().catch(() => {});
-              }, 2000);
-              return;
-            }
-          }
+        // 加载视频
+        try {
+          await command('loadfile', [currentVideo.file_path, 'replace']);
+        } catch (loadErr) {
+          console.error('[Player] loadfile 失败:', loadErr);
+          setError('加载视频失败，请确认视频文件仍然存在');
+          setLoading(false);
+          setTimeout(() => {
+            getCurrentWindow().close().catch(() => {});
+          }, 2000);
+          return;
         }
         if (currentVideo.subtitle) {
           await command('sub-add', [currentVideo.subtitle, 'auto']).catch(() => undefined);
