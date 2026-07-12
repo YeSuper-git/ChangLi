@@ -17,6 +17,7 @@ import {
   addSeriesTag,
   addTag,
   deleteVideo,
+  deleteVideosBatch,
   deleteSeason,
   getActors,
   getSeriesActors,
@@ -452,7 +453,7 @@ const SeriesDetail: React.FC = () => {
     setSelectedEpisodes(new Set());
     setSelectMode(false);
     try {
-      await Promise.all(idsToDelete.map(id => deleteVideo(id)));
+      await deleteVideosBatch(idsToDelete);
       // 后台同步
       refreshSeries().catch(() => {});
       notify({ message: `已删除 ${count} 个分集`, type: 'success' });
@@ -1040,7 +1041,7 @@ const SeriesDetail: React.FC = () => {
               <button className="action-btn text-xs" onClick={() => { setSelectMode(false); setSelectedEpisodes(new Set()); episodeClearPending(); }}>取消</button>
             </>
           ) : (
-            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>批量删除</button>
+            <button className="action-btn text-xs" onClick={() => setSelectMode(true)}>编辑</button>
           )}
         </div>
       </div>
