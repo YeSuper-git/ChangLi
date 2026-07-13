@@ -1,18 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import brandIcon from '../assets/brand/app-icon.png';
 
 export function imageDataUrl(value?: string | null): string | null {
-  if (!value) return null;
-  return value.startsWith('data:image/') ? value : null;
+  const raw = value?.trim();
+  if (!raw) return null;
+  if (raw.startsWith('data:image/')) return raw;
+  // 兼容历史数据：旧缓存里可能只存纯 base64，没有 data:image 前缀。
+  // 只对看起来像 base64 的长字符串补前缀，避免把普通文件路径误判成图片数据。
+  if (raw.length > 100 && /^[A-Za-z0-9+/=\r\n]+$/.test(raw)) {
+    return `data:image/jpeg;base64,${raw.replace(/\s+/g, '')}`;
+  }
+  return null;
 }
 
 export function videoPosterDataUrl(video: { thumbnail_data_url?: string | null }): string | null {
   return imageDataUrl(video.thumbnail_data_url);
 }
 
-export function seriesPosterSrc(series: { poster_data_url?: string | null; poster?: string | null }): string | null {
-  const dataUrl = imageDataUrl(series.poster_data_url);
+export function seriesPosterSrc(series: { poster_data_url?: string | null; poster_base64?: string | null; poster?: string | null }): string | null {
+  const dataUrl = imageDataUrl(series.poster_data_url) || imageDataUrl(series.poster_base64);
   if (dataUrl) return dataUrl;
   if (series.poster) return convertFileSrc(series.poster);
   return null;
@@ -60,7 +67,13 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
   className = '',
   imageClassName = '',
 }) => {
-  if (!src) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFailedSrc(null);
+  }, [src]);
+
+  if (!src || failedSrc === src) {
     return <StaticImagePlaceholder kind={kind} className={className} />;
   }
 
@@ -70,6 +83,7 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
         src={src}
         alt={alt}
         className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${imageClassName}`}
+        onError={() => setFailedSrc(src)}
       />
     </div>
   );

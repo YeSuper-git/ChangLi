@@ -69,27 +69,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     latestScrollKeyRef.current = currentScrollKey;
   }, [currentScrollKey]);
 
-  // 滚动恢复机制：返回上一页时恢复原位置；普通跳转进入新页面时回到顶部。
-  // 注意：真实滚动容器是 .changli-main，不是 window；并且筛选参数在 search 里，离开页面时必须保存最新 pathname + search。
+  // 滚动恢复机制：返回上一页时恢复目标页面的位置；普通跳转进入新页面时回到顶部。
+  // 注意：真实滚动容器是 .changli-main，不是 window；cleanup 用本轮闭包里的 key 保存“正在离开的页面”。
   useLayoutEffect(() => {
-    const restoreKey = latestScrollKeyRef.current;
+    const routeKey = currentScrollKey;
     const main = mainRef.current;
     let cancelled = false;
-    let frame = 0;
+    let timer = 0;
 
-    if (navigationType === 'POP' && scrollPositions.has(restoreKey)) {
-      const savedTop = scrollPositions.get(restoreKey)!;
+    if (navigationType === 'POP' && scrollPositions.has(routeKey)) {
+      const savedTop = scrollPositions.get(routeKey)!;
       const restore = (attempt = 0) => {
         if (cancelled) return;
         const el = mainRef.current;
         if (!el) return;
         el.scrollTo({ top: savedTop, left: 0, behavior: 'auto' });
-        // 列表页返回时可能先渲染骨架/缓存数据，内容高度稍后才撑开；多试几帧避免恢复失败。
+        // 列表页返回时可能先渲染骨架/缓存数据，内容高度稍后才撑开；多试几次避免恢复失败。
         if (attempt < 12 && Math.abs(el.scrollTop - savedTop) > 2) {
-          frame = requestAnimationFrame(() => restore(attempt + 1));
+          timer = window.setTimeout(() => restore(attempt + 1), 50);
         }
       };
-      frame = requestAnimationFrame(() => restore());
+      timer = window.setTimeout(() => restore(), 0);
     } else {
       mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       window.scrollTo(0, 0);
@@ -97,7 +97,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     return () => {
       cancelled = true;
-      if (frame) cancelAnimationFrame(frame);
+      if (timer) window.clearTimeout(timer);
       if (main && main.scrollTop > 0) {
         scrollPositions.set(latestScrollKeyRef.current, main.scrollTop);
       }

@@ -283,6 +283,7 @@ export interface VideoSeries {
   description?: string;
   poster?: string;
   poster_data_url?: string;
+  poster_base64?: string;
   folder_path?: string;
   video_count: number;
   poster_orientation?: string;

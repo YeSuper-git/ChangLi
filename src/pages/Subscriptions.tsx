@@ -76,6 +76,19 @@ function formatTimeAgo(dateStr: string | null): string {
   return `${diffD} 天前`;
 }
 
+function getSubscriptionVersionLabels(subscription: BangumiSubscription): string[] {
+  try {
+    const prefs = JSON.parse(subscription.preferences || '{}');
+    const selectedPrefixes: unknown[] = Array.isArray(prefs.selectedPrefixes) ? prefs.selectedPrefixes : [];
+    const labels = selectedPrefixes
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map(item => item.trim());
+    return labels.length > 0 ? labels : ['全部版本'];
+  } catch {
+    return ['全部版本'];
+  }
+}
+
 /// 从订阅标题提取网站名（"-" 前面的部分）
 function extractSiteName(title: string): string {
   const idx = title.indexOf(' - ');
@@ -271,6 +284,7 @@ const Subscriptions: React.FC = () => {
                     {subs.map((sub) => {
                       const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
                       const cardColor = subscriptionColors[colorIndex(sub.id || displayName || sub.rss_url)];
+                      const versionLabels = getSubscriptionVersionLabels(sub);
                       return (
                         <div key={sub.id} className="mx-3 my-2 rounded-2xl border px-4 py-4 shadow-sm transition-shadow hover:shadow-md" style={cardColor}>
                           <div className="flex items-start justify-between gap-4">
@@ -289,12 +303,21 @@ const Subscriptions: React.FC = () => {
                                   {displayName}
                                 </span>
                               </button>
-                              <div className="space-y-0.5">
+                              <div className="space-y-1.5">
                                 {sub.series_id && sub.series_title && (
                                   <div className="text-xs text-gray-500">
                                     关联：{sub.series_title}
                                   </div>
                                 )}
+                                <div
+                                  className="inline-flex items-center gap-1.5 max-w-full rounded-full border border-white/70 bg-white/60 px-2.5 py-1 text-xs text-gray-600"
+                                  title={versionLabels.join(' / ')}
+                                >
+                                  <span className="text-gray-400 shrink-0">版本</span>
+                                  <span className="truncate max-w-[360px] font-medium text-gray-700">
+                                    {versionLabels.join(' / ')}
+                                  </span>
+                                </div>
                                 <div className="text-xs text-gray-400">
                                   上次检查：{formatTimeAgo(sub.last_check_at)}
                                 </div>
