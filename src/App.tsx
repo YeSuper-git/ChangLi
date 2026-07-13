@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { BrowserRouter as Router, MemoryRouter, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter as Router, MemoryRouter, Routes, Route } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
@@ -24,6 +24,7 @@ import { clearLibraryFilterCaches } from './pages/Library';
 import { clearSeriesDetailCache } from './pages/SeriesDetail';
 import { clearActorDetailCache } from './pages/ActorDetail';
 import { registerMemoryCleanup, requestAppMemoryCleanup, scheduleIdleMemoryCleanup, getJsHeapUsageRatio } from './utils/memoryCleanup';
+import { preloadVideoSeriesPosters } from './utils/media';
 
 function App() {
   const windowLabel = getCurrentWindow().label;
@@ -88,9 +89,11 @@ function App() {
         console.log('[App] calling init_db...');
         await invoke('init_db');
         console.log('[App] init_db done, calling loadAll...');
-        setDbReady(true);
         await loadAll();
-        console.log('[App] loadAll done');
+        const series = useLibraryStore.getState().series;
+        await preloadVideoSeriesPosters(series.map(item => item.id), 8);
+        setDbReady(true);
+        console.log('[App] loadAll and poster preload done');
       } catch (err: any) {
         console.error('[App] 初始化失败:', err, JSON.stringify(err));
         setError(`初始化失败: ${err?.message || err || 'unknown'}`);
@@ -163,47 +166,8 @@ function App() {
     );
   }
 
-  // ScrollRestoration: POP(返回)恢复位置，PUSH/REPLACE(导航)滚到顶部
-  const ScrollRestoration: React.FC = () => {
-    const location = useLocation();
-    const navigationType = useNavigationType();
-    const positions = useRef<Map<string, number>>(new Map());
-
-    // 保存离开前的位置
-    useEffect(() => {
-      return () => {
-        // cleanup 时保存当前位置（仅在 POP 前的正常导航时）
-        const key = location.key || location.pathname;
-        positions.current.set(key, window.scrollY);
-      };
-    }, [location]);
-
-    // 页面渲染后决定滚动位置
-    const prevPathname = useRef(location.pathname);
-    useEffect(() => {
-      // 只在路由路径变化时处理滚动，search params变化（筛选）不影响
-      if (prevPathname.current === location.pathname) return;
-      prevPathname.current = location.pathname;
-
-      const key = location.pathname;
-      if (navigationType === 'POP') {
-        // 返回：恢复之前保存的位置
-        const saved = positions.current.get(key);
-        if (saved !== undefined && saved > 0) {
-          requestAnimationFrame(() => window.scrollTo(0, saved));
-          return;
-        }
-      }
-      // PUSH 或 REPLACE：滚到顶部
-      window.scrollTo(0, 0);
-    }, [location.pathname]);
-
-    return null;
-  };
-
   return (
     <Router>
-      <ScrollRestoration />
       <Layout>
         <ToastProvider />
         <Routes>

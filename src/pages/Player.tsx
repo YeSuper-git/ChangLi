@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getCurrentWindow, currentMonitor, Window } from '@tauri-apps/api/window';
 import { LogicalSize, LogicalPosition } from '@tauri-apps/api/dpi';
 import { invoke } from '@tauri-apps/api/core';
@@ -11,6 +11,7 @@ import { init, destroy, observeProperties, setVideoMarginRatio } from 'tauri-plu
 import { mpvCommand, mpvSetProperty, mpvGetProperty, isMac } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
+import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 const OBSERVED_PROPERTIES = [
   'pause',
@@ -1079,7 +1080,7 @@ const Player: React.FC = () => {
       <div className="changli-player-loading">
         <div className="changli-player-error-card">
           <div>{error}</div>
-          <Link to="/library" className="changli-player-textbtn">返回视频库</Link>
+          <button type="button" onClick={() => navigateToLibraryReady(navigate, '/library')} className="changli-player-textbtn">返回视频库</button>
         </div>
       </div>
     );

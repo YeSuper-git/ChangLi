@@ -21,7 +21,7 @@ import {
 } from '../utils/api';
 import type { VideoSeries, Category, CategoryFeatures, Tag, Actor, CategoryUpdateResult } from '../utils/api';
 import { open } from '@tauri-apps/plugin-dialog';
-import { seriesPosterSrc, SmartPoster } from '../utils/media';
+import { SeriesPoster } from '../utils/media';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
 import FloatingActions from '../components/FloatingActions';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -161,8 +161,6 @@ const Library: React.FC = () => {
 
   // 播放/扫描/删除后只在进入视频页时补刷新一次；搜索输入和筛选 URL 同步不触发刷新。
   useEffect(() => {
-    // 滚动恢复已由 Layout 组件的 useLayoutEffect 统一处理（基于 mainRef 的 scrollTop），
-    // 此处不再使用 sessionStorage + window.scrollTo（因为实际滚动容器是 <main> 而非 window）。
     if (seriesDirty) {
       refreshSeries().catch(() => {});
     }
@@ -1010,7 +1008,7 @@ const Library: React.FC = () => {
                         )}
                       </div>
                     )}
-                    <SmartPoster src={seriesPosterSrc(series)} alt={series.title} posterOrientation={series.poster_orientation} />
+                    <SeriesPoster series={series} alt={series.title} posterOrientation={series.poster_orientation} />
                     <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/50 to-transparent"></div>
                     {itemFeatures.chinese_sub && series.has_chinese_sub === 1 && (
                       <span className="absolute bottom-2 left-2 changli-brand-badge text-xs font-bold px-2 py-0.5">

@@ -840,6 +840,33 @@ pub async fn get_video_series_list_lite(
     Ok(rows)
 }
 
+pub async fn get_video_series_poster_data_url(pool: &SqlitePool, id: i64) -> Result<Option<String>> {
+    let row = sqlx::query("SELECT poster, poster_base64 FROM video_series WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
+    let Some(row) = row else { return Ok(None); };
+
+    if let Some(data_url) = row.try_get::<Option<String>, _>("poster_base64").ok().flatten() {
+        if !data_url.trim().is_empty() {
+            return Ok(Some(data_url));
+        }
+    }
+
+    let poster = row.try_get::<Option<String>, _>("poster").ok().flatten();
+    let Some(poster) = poster else { return Ok(None); };
+    let resolved = storage::resolve_data_path(&poster);
+    let data_url = image_data_url(Path::new(&resolved));
+    if let Some(ref value) = data_url {
+        let _ = sqlx::query("UPDATE video_series SET poster_base64 = ? WHERE id = ?")
+            .bind(value)
+            .bind(id)
+            .execute(pool)
+            .await;
+    }
+    Ok(data_url)
+}
+
 pub async fn get_video_series_list(
     pool: &SqlitePool,
     sort_by: &str,
@@ -851,8 +878,8 @@ pub async fn get_video_series_list(
         ("created_at", "asc") => "ORDER BY s.created_at ASC, s.id ASC",
         _ => "ORDER BY s.created_at DESC, s.id DESC",
     };
-    // 列表查询不再通过 series_from_row 读文件转 base64。SQL 可以读 poster_base64，
-    // 但映射时只在海报路径为空或本地文件不存在时返回给前端，避免全量 IPC 传输大图。
+    // 列表查询保持轻量：不调用 series_from_row，不批量返回 poster_base64，避免大列表 IPC 卡顿。
+    // 进入视频库前由前端按 series_id 预加载海报缓存，确保页面显示时卡片已有可用海报。
     let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.poster_base64 AS poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
     // 直接构造结构体，不调用 series_from_row（避免 poster_base64 为空时读文件转 base64）。
@@ -862,16 +889,8 @@ pub async fn get_video_series_list(
             title: row.get("title"),
             description: row.get("description"),
             poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-            poster_data_url: {
-                let resolved_poster = row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string());
-                let has_usable_poster_file = resolved_poster.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
-                if has_usable_poster_file { None } else { row.try_get("poster_base64").ok().flatten() }
-            },
-            poster_base64: {
-                let resolved_poster = row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string());
-                let has_usable_poster_file = resolved_poster.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
-                if has_usable_poster_file { None } else { row.try_get("poster_base64").ok().flatten() }
-            },
+            poster_data_url: None,
+            poster_base64: None,
             folder_path: row.get("folder_path"),
             video_count: row.try_get("video_count").unwrap_or(0),
             poster_orientation: row.try_get("poster_orientation").ok().flatten(),
@@ -2631,16 +2650,8 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
         title: row.get("title"),
         description: row.get("description"),
         poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-        poster_data_url: {
-            let resolved_poster = row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string());
-            let has_usable_poster_file = resolved_poster.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
-            if has_usable_poster_file { None } else { row.try_get("poster_base64").ok().flatten() }
-        },
-        poster_base64: {
-            let resolved_poster = row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string());
-            let has_usable_poster_file = resolved_poster.as_ref().map(|p| Path::new(p).exists()).unwrap_or(false);
-            if has_usable_poster_file { None } else { row.try_get("poster_base64").ok().flatten() }
-        },
+        poster_data_url: None,
+        poster_base64: None,
         folder_path: row.get("folder_path"),
         video_count: row.try_get("video_count").unwrap_or(0),
         poster_orientation: row.try_get("poster_orientation").ok().flatten(),

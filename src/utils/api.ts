@@ -333,6 +333,10 @@ export async function getVideoSeriesListLite(): Promise<[number, string, string 
   return invoke('get_video_series_list_lite');
 }
 
+export async function getVideoSeriesPosterDataUrl(id: number): Promise<string | null> {
+  return invoke<string | null>('get_video_series_poster_data_url', { id });
+}
+
 
 
 export async function getVideoSeriesByTag(tagId: number): Promise<VideoSeries[]> {

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { Actor, VideoSeries, Category, CategoryFeatures } from '../utils/api';
 import { formatSeriesEpisodeCountLabel, getAllCategories, parseCategoryFeatures, toggleWatched, rescanSingleSeriesMetadata, openSeriesInFileManager, switchSeriesTypeTo, deleteVideoSeries } from '../utils/api';
-import { actorPhotoDataUrl, seriesPosterSrc, SmartPoster, StaticImagePlaceholder } from '../utils/media';
+import { actorPhotoDataUrl, SeriesPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import { notify } from '../utils/notify';
 import { useSecondConfirm } from '../utils/useSecondConfirm';
@@ -237,9 +237,9 @@ const Search: React.FC = () => {
             <div className="changli-auto-grid-video">
               {results.map((item) => {
                 const target = item.type === 'series' ? `/series/${item.id}` : `/actors/${item.id}`;
-                const imageDataUrl = item.type === 'series'
-                    ? seriesPosterSrc(item.series)
-                    : actorPhotoDataUrl(item.actor);
+                const imageDataUrl = item.type === 'actor'
+                    ? actorPhotoDataUrl(item.actor)
+                    : null;
                 const aspectClass = item.type === 'series'
                   ? (item.series.poster_orientation === 'portrait' ? 'aspect-[2/3]' : 'aspect-video')
                   : item.type === 'actor'
@@ -255,10 +255,10 @@ const Search: React.FC = () => {
                           <StaticImagePlaceholder kind="actor" />
                         )
                       ) : (
-                        <SmartPoster
-                          src={imageDataUrl}
+                        <SeriesPoster
+                          series={item.series}
                           alt={item.title}
-                          posterOrientation={item.type === 'series' ? item.series.poster_orientation : undefined}
+                          posterOrientation={item.series.poster_orientation}
                         />
                       )}
                     </div>

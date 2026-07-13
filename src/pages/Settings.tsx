@@ -14,6 +14,7 @@ import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../utils/notify';
 import { changelogData, currentVersion } from '../generated/versionInfo';
+import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 type GitHubRelease = {
   tag_name: string;
@@ -232,7 +233,7 @@ const Settings: React.FC = () => {
       await loadCategories();
       // 如果是从视频页跳转过来的，保存后返回视频页
       if (searchParams.get('openCategoryModal') === 'true') {
-        navigate('/library');
+        navigateToLibraryReady(navigate, '/library');
       }
     } catch (error) {
       console.error('保存分类失败:', error);
@@ -914,7 +915,7 @@ const Settings: React.FC = () => {
                 onClick={() => {
                   setShowCategoryModal(false);
                   if (searchParams.get('openCategoryModal') === 'true') {
-                    navigate('/library');
+                    navigateToLibraryReady(navigate, '/library');
                   }
                 }}
                 className="action-btn flex-1"

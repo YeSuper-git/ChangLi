@@ -1606,6 +1606,20 @@ async fn get_video_series_list_lite(
 }
 
 #[tauri::command]
+async fn get_video_series_poster_data_url(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<Option<String>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_video_series_poster_data_url(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_video_series_list(
     state: State<'_, AppState>,
     sort_by: Option<String>,
@@ -4018,6 +4032,7 @@ fn main() {
             get_video,
             delete_video,
             get_video_series_list,
+            get_video_series_poster_data_url,
             get_video_series_by_tag,
             get_video_series_by_tag_name,
             get_video_series_by_actor,

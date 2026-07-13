@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { VideoSeries, Category, CategoryFeatures, PlayHistory } from '../utils/api';
 import { formatSeriesEpisodeCountLabel, formatSeriesWatchLabel, getAllCategories, getPlayHistory, getVideoSeriesMap, parseCategoryFeatures } from '../utils/api';
-import { actorPhotoDataUrl, seriesPosterSrc, SmartPoster, StaticImagePlaceholder } from '../utils/media';
+import { actorPhotoDataUrl, SeriesPoster, StaticImagePlaceholder } from '../utils/media';
 import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
+import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
   const { actors, series: storeSeries, favorites, refreshSeries, categories: storeCategories } = useLibraryStore();
   const [categories, setCategories] = useState<Category[]>(storeCategories);
   const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
@@ -124,7 +126,7 @@ const Home: React.FC = () => {
     return (
       <Link key={`series-${series.id}`} to={`/series/${series.id}`} state={{ from: '/', backLabel: '返回首页' }} className="group block min-w-0">
         <div className={`card relative w-full ${aspectClass} overflow-hidden`}>
-          <SmartPoster src={seriesPosterSrc(series)} alt={series.title} posterOrientation={series.poster_orientation} />
+          <SeriesPoster series={series} alt={series.title} posterOrientation={series.poster_orientation} />
           <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-black/55 to-transparent" />
           {options?.showSubBadge && series.has_chinese_sub === 1 && (
             <span className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-rose-600 shadow-sm backdrop-blur-sm">
@@ -157,7 +159,7 @@ const Home: React.FC = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/library" className="action-btn action-btn-primary" data-tutorial="go-library">进入视频库</Link>
+              <button type="button" className="action-btn action-btn-primary" data-tutorial="go-library" onClick={() => navigateToLibraryReady(navigate, '/library')}>进入视频库</button>
               <Link to="/actors" className="action-btn">演员库</Link>
             </div>
           </div>
@@ -180,7 +182,7 @@ const Home: React.FC = () => {
         <section className="mb-16" data-tutorial="home-favorites">
           <div className="changli-section-title">
             <h2 className="text-2xl font-bold text-gray-900">我的追番</h2>
-            <Link to="/library?favorite=1&scope=all" className="changli-section-link">查看全部 ›</Link>
+            <button type="button" className="changli-section-link" onClick={() => navigateToLibraryReady(navigate, '/library?favorite=1&scope=all')}>查看全部 ›</button>
           </div>
           {favorites.length > 0 ? (
             <div className="changli-auto-grid-series changli-home-one-row changli-home-one-row-series">
@@ -209,7 +211,7 @@ const Home: React.FC = () => {
             <section key={cat.key} className="mb-16" data-tutorial="home-example-category">
               <div className="changli-section-title">
                 <h2 className="text-2xl font-bold text-gray-900">我的{cat.name}</h2>
-                <Link to={`/library?cat=${cat.key}`} className="changli-section-link">查看全部 ›</Link>
+                <button type="button" className="changli-section-link" onClick={() => navigateToLibraryReady(navigate, `/library?cat=${cat.key}`)}>查看全部 ›</button>
               </div>
               {catSeries.length > 0 ? (
                 <div className={`${isPortrait ? 'changli-auto-grid-series changli-home-one-row-series' : 'changli-auto-grid-video changli-home-one-row-video'} changli-home-one-row`}>

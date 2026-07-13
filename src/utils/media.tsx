@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { getVideoSeriesPosterDataUrl } from './api';
 import brandIcon from '../assets/brand/app-icon.png';
 
 export function imageDataUrl(value?: string | null): string | null {
@@ -85,6 +86,73 @@ export const SmartPoster: React.FC<SmartPosterProps> = ({
         className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${imageClassName}`}
         onError={() => setFailedSrc(src)}
       />
+    </div>
+  );
+};
+
+const seriesPosterCache = new Map<number, string | null>();
+const seriesPosterInflight = new Map<number, Promise<string | null>>();
+
+export function loadSeriesPosterDataUrl(id: number): Promise<string | null> {
+  if (seriesPosterCache.has(id)) return Promise.resolve(seriesPosterCache.get(id) || null);
+  const existing = seriesPosterInflight.get(id);
+  if (existing) return existing;
+  const promise = getVideoSeriesPosterDataUrl(id)
+    .then((value) => {
+      const dataUrl = imageDataUrl(value);
+      seriesPosterCache.set(id, dataUrl);
+      return dataUrl;
+    })
+    .catch((error) => {
+      console.error('[SeriesPoster] 加载海报失败:', error);
+      seriesPosterCache.set(id, null);
+      return null;
+    })
+    .finally(() => {
+      seriesPosterInflight.delete(id);
+    });
+  seriesPosterInflight.set(id, promise);
+  return promise;
+}
+
+export async function preloadVideoSeriesPosters(ids: number[], concurrency = 8): Promise<void> {
+  const uniqueIds = Array.from(new Set(ids)).filter(id => !seriesPosterCache.has(id));
+  let index = 0;
+  const workers = Array.from({ length: Math.min(concurrency, uniqueIds.length) }, async () => {
+    while (index < uniqueIds.length) {
+      const id = uniqueIds[index++];
+      await loadSeriesPosterDataUrl(id);
+    }
+  });
+  await Promise.all(workers);
+}
+
+interface SeriesPosterProps extends Omit<SmartPosterProps, 'src'> {
+  series: { id: number; poster_data_url?: string | null; poster_base64?: string | null; poster?: string | null };
+}
+
+export const SeriesPoster: React.FC<SeriesPosterProps> = ({ series, alt, ...props }) => {
+  const immediateDataUrl = imageDataUrl(series.poster_data_url) || imageDataUrl(series.poster_base64);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(() => immediateDataUrl || seriesPosterCache.get(series.id) || null);
+
+  useEffect(() => {
+    const next = imageDataUrl(series.poster_data_url) || imageDataUrl(series.poster_base64) || seriesPosterCache.get(series.id) || null;
+    setLoadedSrc(next);
+  }, [series.id, series.poster_data_url, series.poster_base64]);
+
+  useEffect(() => {
+    if (loadedSrc) return;
+    let cancelled = false;
+    loadSeriesPosterDataUrl(series.id).then((src) => {
+      if (!cancelled && src) setLoadedSrc(src);
+    });
+    return () => { cancelled = true; };
+  }, [series.id, loadedSrc]);
+
+  const pathSrc = !loadedSrc && series.poster ? convertFileSrc(series.poster) : null;
+  return (
+    <div className="h-full w-full">
+      <SmartPoster src={loadedSrc || pathSrc} alt={alt} {...props} />
     </div>
   );
 };
