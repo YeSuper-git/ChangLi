@@ -426,11 +426,15 @@ impl<R: Runtime> Mpv<R> {
                 }
             }
 
-            let valid_lib_path: String = search_dirs
+            let searched_paths: Vec<String> = search_dirs
                 .iter()
-                .map(|dir| dir.join(lib_name))
-                .find(|path| path.exists())
-                .map(|path| path.to_string_lossy().into_owned())
+                .map(|dir| dir.join(lib_name).to_string_lossy().into_owned())
+                .collect();
+
+            let valid_lib_path: String = searched_paths
+                .iter()
+                .find(|path| PathBuf::from(path).exists())
+                .cloned()
                 .unwrap_or_else(|| lib_name.to_string());
 
             info!("Attempting to load libmpv-wrapper from: {}", valid_lib_path);
@@ -442,8 +446,10 @@ impl<R: Runtime> Mpv<R> {
                     Ok(wrapper)
                 }
                 Err(e) => Err(Error::FFI(format!(
-                    "Failed to load libmpv-wrapper from '{}'. Error: {:?}",
-                    valid_lib_path, e
+                    "[CL-MAC-LIBMPV-WRAPPER] Failed to load libmpv-wrapper from '{}'. Searched: [{}]. Error: {:?}",
+                    valid_lib_path,
+                    searched_paths.join(", "),
+                    e
                 ))
                 .into()),
             }

@@ -14,6 +14,17 @@ import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 const OBSERVED_PROPERTIES = MPV_OBSERVED_PROPERTIES;
 
+function playerErrorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try { return JSON.stringify(error); } catch { return String(error); }
+}
+
+function formatPlayerError(code: string, stage: string, error: unknown): string {
+  const platform = isMac ? 'macOS/libmpv' : 'Windows/mpv';
+  return `[${code}] ${platform} ${stage}失败：${playerErrorText(error)}`;
+}
+
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -197,7 +208,7 @@ const Player: React.FC = () => {
         // 获取视频信息
         const currentVideo = await getVideo(parseInt(id));
         if (!currentVideo) {
-          setError('视频不存在');
+          setError(`[CL-PLAYER-DATA-404] 视频不存在：videoId=${id}`);
           return;
         }
         setCurrentVideo(currentVideo);
@@ -231,7 +242,7 @@ const Player: React.FC = () => {
             await runMpvCommand(() => mpvCommand('loadfile', [currentVideo.file_path, 'replace']));
           } catch (loadErr) {
             console.error('[Player] loadfile 失败:', loadErr);
-            setError('加载视频失败，请确认视频文件仍然存在');
+            setError(formatPlayerError('CL-PLAYER-SWITCH-LOADFILE', '切换分集 loadfile', loadErr));
             setLoading(false);
             switchingVideoRef.current = false;
             return;
@@ -268,7 +279,7 @@ const Player: React.FC = () => {
           } catch (e) {
             console.error('[Player] find_mpv_path failed:', e);
             // 后端找不到，报错给用户
-            throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
+            throw new Error(formatPlayerError('CL-PLAYER-FIND-MPV', '查找 mpv 可执行文件', e));
           }
         }
 
@@ -280,6 +291,9 @@ const Player: React.FC = () => {
           console.log('[Player] player WID:', playerWid);
         } catch (e) {
           console.warn('[Player] get_player_wid failed:', e);
+          if (isMac) {
+            console.warn('[CL-PLAYER-WID-DIAG] macOS libmpv 会由插件自动注入 wid，此处失败仅作诊断:', e);
+          }
         }
 
         try {
@@ -321,7 +335,7 @@ const Player: React.FC = () => {
             });
           } catch (retryErr) {
             console.error('[Player] init 重试失败:', retryErr);
-            throw retryErr;
+            throw new Error(formatPlayerError('CL-PLAYER-INIT-RETRY', '初始化重试', retryErr));
           }
         }
 
@@ -368,7 +382,7 @@ const Player: React.FC = () => {
           await runMpvCommand(() => mpvCommand('loadfile', [currentVideo.file_path, 'replace']));
         } catch (loadErr) {
           console.error('[Player] loadfile 失败:', loadErr);
-          setError('加载视频失败，请确认视频文件仍然存在');
+          setError(formatPlayerError('CL-PLAYER-FIRST-LOADFILE', '首次加载视频 loadfile', loadErr));
           setLoading(false);
           return;
         }
@@ -389,8 +403,7 @@ const Player: React.FC = () => {
         setLoading(false);
       } catch (err) {
         console.error('[Player] 初始化失败:', err);
-        const errMsg = err instanceof Error ? err.message : String(err);
-        setError(`播放器启动失败: ${errMsg}`);
+        setError(formatPlayerError('CL-PLAYER-BOOT', '播放器启动', err));
         setLoading(false);
         // 初始化失败时显示错误（不自动关闭）
       }
