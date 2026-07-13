@@ -3905,9 +3905,15 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
 }
 
 fn main() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_mpv::init())
-        .plugin(tauri_plugin_libmpv::init())
+    let builder = tauri::Builder::default();
+    // macOS must never register the external-process mpv plugin: even accidental
+    // plugin:mpv|init calls must fail instead of opening an external player.
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_libmpv::init());
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_mpv::init());
+
+    builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
