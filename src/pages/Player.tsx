@@ -8,7 +8,7 @@ import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
 import { init, destroy, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
-import { mpvCommand, mpvSetProperty, mpvGetProperty, isMac } from '../utils/mpv-bridge';
+import { mpvCommand, mpvSetProperty } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
@@ -265,6 +265,9 @@ const Player: React.FC = () => {
           return;
         }
 
+        // 平台检测
+        const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
+
         // 初始化 mpv — 用 Rust 后端查找 mpv.exe（检查实际文件是否存在）
         let mpvPath: string | undefined;
         try {
@@ -276,60 +279,6 @@ const Player: React.FC = () => {
           throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
         }
 
-        // 平台检测
-        const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
-        const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
-
-        // macOS: mpv 由 Rust 端 start_mpv_embedded 启动，前端只通过 IPC 控制，彻底避开 tauri-plugin-mpv。
-        if (isMac) {
-          console.log('[Player] macOS: 使用长离播放器窗口内嵌 mpv，跳过插件 init/observe');
-          let ipcReady = false;
-          for (let attempt = 0; attempt < 20; attempt += 1) {
-            try {
-              await mpvGetProperty('pause');
-              ipcReady = true;
-              break;
-            } catch {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-          }
-          if (!ipcReady) {
-            throw new Error('mpv IPC 通道未就绪');
-          }
-
-          mpvInitialized.current = true;
-          setHasVideoFrame(true);
-
-          const pollInterval = setInterval(async () => {
-            if (!isMountedRef.current || !mpvInitialized.current) {
-              clearInterval(pollInterval);
-              return;
-            }
-            try {
-              const [pauseVal, timeVal, durVal, volVal, spdVal, dwidthVal, dheightVal] = await Promise.all([
-                mpvGetProperty('pause').catch(() => null),
-                mpvGetProperty('time-pos').catch(() => null),
-                mpvGetProperty('duration').catch(() => null),
-                mpvGetProperty('volume').catch(() => null),
-                mpvGetProperty('speed').catch(() => null),
-                mpvGetProperty('dwidth').catch(() => null),
-                mpvGetProperty('dheight').catch(() => null),
-              ]);
-              if (!isMountedRef.current) return;
-              if (pauseVal !== null) {
-                const playing = !pauseVal;
-                isPlayingRef.current = playing;
-                setIsPlaying(playing);
-              }
-              if (timeVal !== null) setCurrentTime(Number(timeVal) || 0);
-              if (durVal !== null) setDuration(Number(durVal) || 0);
-              if (volVal !== null) setVolume(Number(volVal) || 80);
-              if (spdVal !== null) setSpeed(Number(spdVal) || 1);
-              if (dwidthVal !== null) handleObservedVideoSize('dwidth', dwidthVal);
-              if (dheightVal !== null) handleObservedVideoSize('dheight', dheightVal);
-            } catch {}
-          }, 500);
-        } else {
         // Windows/Linux: 用 tauri-plugin-mpv 正常 init
         let playerWid: string | undefined;
         try {
@@ -382,48 +331,44 @@ const Player: React.FC = () => {
             throw retryErr;
           }
         }
-        } // end else (Windows/Linux)
 
-        if (!isMac) {
-          await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
+        await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
 
-          mpvInitialized.current = true;
+        mpvInitialized.current = true;
 
-          await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-          // Windows/Linux 监听插件属性变化；macOS 只用上面的 IPC 轮询，避免插件接管窗口生命周期。
-          await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
-            if (!isMountedRef.current) return;
-            try {
-              switch (name) {
-              case 'pause':
-                {
-                  const playing = !data;
-                  isPlayingRef.current = playing;
-                  setIsPlaying(playing);
-                }
-                break;
-              case 'time-pos':
-                setCurrentTime((data as number) ?? 0);
-                break;
-              case 'duration':
-                setDuration((data as number) ?? 0);
-                break;
-              case 'volume':
-                setVolume((data as number) ?? 80);
-                break;
-              case 'speed':
-                setSpeed((data as number) ?? 1);
-                break;
-              case 'dwidth':
-              case 'dheight':
-                // Windows observer 与 macOS 轮询共用同一套窗口比例/画面就绪逻辑，保证 UI 交互一致。
-                handleObservedVideoSize(name, data);
-                break;
-            }
-            } catch { /* ignore observer errors */ }
-          });
-        }
+        // 全平台监听插件属性变化；macOS/Windows 都由同一套 mpv 状态驱动 UI。
+        await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
+          if (!isMountedRef.current) return;
+          try {
+            switch (name) {
+            case 'pause':
+              {
+                const playing = !data;
+                isPlayingRef.current = playing;
+                setIsPlaying(playing);
+              }
+              break;
+            case 'time-pos':
+              setCurrentTime((data as number) ?? 0);
+              break;
+            case 'duration':
+              setDuration((data as number) ?? 0);
+              break;
+            case 'volume':
+              setVolume((data as number) ?? 80);
+              break;
+            case 'speed':
+              setSpeed((data as number) ?? 1);
+              break;
+            case 'dwidth':
+            case 'dheight':
+              handleObservedVideoSize(name, data);
+              break;
+          }
+          } catch { /* ignore observer errors */ }
+        });
 
         // 加载视频
         try {
@@ -475,16 +420,9 @@ const Player: React.FC = () => {
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
-            if (isMac) {
-              // macOS: 通过 IPC socket 发送 quit，不调用 destroy
-              await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
-              await new Promise(resolve => setTimeout(resolve, 300));
-            } else {
-              // Windows/Linux: 正常清理
-              await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
-              await new Promise(resolve => setTimeout(resolve, 800));
-              await runMpvCommand(() => destroy()).catch(() => {});
-            }
+            await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
+            await new Promise(resolve => setTimeout(resolve, 800));
+            await runMpvCommand(() => destroy()).catch(() => {});
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }

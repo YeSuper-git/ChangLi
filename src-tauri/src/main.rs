@@ -2915,7 +2915,7 @@ async fn play_video(
 
     let video = db::get_video(&pool, id).await.map_err(|e| e.to_string())?;
     if let Some(video) = video {
-        player::play(&app, &video.file_path).map_err(|e| e.to_string())?;
+        open_player_window(app, state, id).await?;
         db::record_play_history(&pool, video.id, 0.0, video.duration)
             .await
             .map_err(|e| e.to_string())?;
@@ -2933,27 +2933,8 @@ async fn open_player_window(
 ) -> Result<(), String> {
     eprintln!("[player] open_player_window called for video id={}", id);
 
-    // macOS: 先创建播放器窗口，再启动 mpv 并嵌入
-    #[cfg(target_os = "macos")]
-    {
-        let video_path = {
-            let pool = {
-                let guard = state.db.lock().await;
-                guard.as_ref().ok_or("数据库未初始化")?.clone()
-            };
-            let video = db::get_video(&pool, id)
-                .await
-                .map_err(|e| e.to_string())?
-                .ok_or_else(|| "视频不存在".to_string())?;
-            video.file_path.clone()
-        };
-        // 先创建/显示播放器窗口
-        player::play_platform(&app, &std::path::PathBuf::from(&video_path))
-            .map_err(|e| e.to_string())?;
-        // 再启动 mpv 并嵌入
-        player::start_mpv_embedded(&app, &video_path)?;
-        return Ok(());
-    }
+    // 最终播放器方案：所有平台统一由 tauri-plugin-mpv + mpv --wid 嵌入播放，
+    // 播放器窗口必须固定 label=player，保证插件实例、窗口句柄、get_player_wid 和清理逻辑指向同一窗口。
 
     let pool = {
         let guard = state.db.lock().await;
@@ -2991,12 +2972,19 @@ async fn open_player_window(
     player_w = player_w.max(640.0).min(target_w);
     player_h = player_h.max(360.0).min(target_h);
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis();
-    let label = format!("player-{}-{}", video.id, now);
+    let label = "player";
     let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
+
+    if let Some(window) = app.get_webview_window(label) {
+        window.set_title(&format!("ChangLi Player - {}", video.file_name)).map_err(|e| e.to_string())?;
+        window.set_size(tauri::LogicalSize::new(player_w, player_h)).map_err(|e| e.to_string())?;
+        let js = format!("window.location.replace('index.html?window=player&videoId={}');", video.id);
+        window.eval(&js).map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
     let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
         .title(format!("ChangLi Player - {}", video.file_name))
         .inner_size(player_w, player_h)

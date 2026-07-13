@@ -268,66 +268,18 @@ mod mpv_ipc {
     }
 }
 
-/// macOS: 启动 mpv 进程并嵌入到播放器窗口
+/// 已废弃：最终播放器不再走后端 macOS 专用 mpv 进程。
+/// 所有平台统一由 tauri-plugin-mpv-api 按固定窗口 label=player 嵌入和控制 mpv。
 #[cfg(target_os = "macos")]
-pub fn start_mpv_embedded(app: &AppHandle, video_path: &str) -> Result<(), String> {
-    let window = app
-        .get_webview_window(PLAYER_WINDOW_LABEL)
-        .ok_or("播放器窗口不存在")?;
-
-    // 清理上一次残留的 macOS mpv 进程。这里不走 tauri-plugin-mpv，避免插件实例表残留。
-    if mpv_ipc::socket_path().is_some() {
-        let _ = mpv_ipc::send_command("quit", &[]);
-        mpv_ipc::set_socket_path(None);
-    }
-
-    use raw_window_handle::HasWindowHandle;
-    let wid = match window.window_handle().map_err(|e| format!("无法获取窗口句柄: {}", e))?.as_raw() {
-        raw_window_handle::RawWindowHandle::AppKit(h) => h.ns_view.as_ptr() as u64,
-        _ => return Err("无法获取 macOS NSView 指针".to_string()),
-    };
-
-    let mpv_path = find_mpv_path().unwrap_or_else(|_| "mpv".to_string());
-    let wid_arg = format!("--wid={}", wid);
-    let socket_path = format!("/tmp/changli-mpv-{}-{}.sock", std::process::id(),
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis());
-    let socket_arg = format!("--input-ipc-server={}", socket_path);
-    let _ = std::fs::remove_file(&socket_path);
-
-    let mut child = std::process::Command::new(&mpv_path)
-        .arg(&wid_arg)
-        .arg(&socket_arg)
-        .arg("--no-config")
-        .arg("--no-terminal")
-        .arg("--input-terminal=no")
-        .arg("--force-window=no")
-        .arg("--hwdec=auto-safe")
-        .arg("--vo=gpu")
-        .arg("--osc=no")
-        .arg("--osd-level=0")
-        .arg("--keep-open=yes")
-        .arg("--idle=no")
-        .arg(video_path)
-        .spawn()
-        .map_err(|e| format!("启动 mpv 失败: {}", e))?;
-
-    let socket_path_for_thread = socket_path.clone();
-    mpv_ipc::set_socket_path(Some(socket_path));
-    std::thread::spawn(move || {
-        let _ = child.wait();
-        mpv_ipc::clear_socket_path_if_current(&socket_path_for_thread);
-        let _ = std::fs::remove_file(&socket_path_for_thread);
-    });
-
-    Ok(())
+pub fn start_mpv_embedded(_app: &AppHandle, _video_path: &str) -> Result<(), String> {
+    Err("start_mpv_embedded 已废弃：请使用前端 tauri-plugin-mpv-api 播放器链路".to_string())
 }
 
-/// macOS: 发送命令给 mpv（通过 IPC socket）
+/// 已废弃：mpv 控制统一通过 tauri-plugin-mpv-api，不再使用 macOS 自建 IPC socket。
 #[cfg(target_os = "macos")]
 #[tauri::command]
-pub fn mpv_send_command(cmd: String, args: Vec<String>) -> Result<String, String> {
-    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    mpv_ipc::send_command(&cmd, &args_refs)
+pub fn mpv_send_command(_cmd: String, _args: Vec<String>) -> Result<String, String> {
+    Err("mpv_send_command 已废弃：请使用 tauri-plugin-mpv-api command/setProperty".to_string())
 }
 
 /// Windows/Linux: mpv_send_command 空实现（Windows 用 tauri-plugin-mpv）
