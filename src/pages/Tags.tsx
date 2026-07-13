@@ -216,11 +216,11 @@ const Tags: React.FC = () => {
     );
   };
 
-  // Scope switch in modal
+  // Tag type switch in modal
   const renderScopeSwitch = (scope: 'global' | 'category', setScope: (v: 'global' | 'category') => void, setKeys: (v: string[]) => void) => (
     <div>
-      <label className="changli-form-label">标签范围</label>
-      <div className={`changli-status-switch ${scope === 'category' ? 'is-right' : ''}`} role="group" aria-label="标签范围">
+      <label className="changli-form-label">标签类型</label>
+      <div className={`changli-status-switch ${scope === 'category' ? 'is-right' : ''}`} role="group" aria-label="标签类型">
         <button
           type="button"
           onClick={() => { setScope('global'); setKeys([]); }}
@@ -235,25 +235,20 @@ const Tags: React.FC = () => {
     </div>
   );
 
-  // Category checkboxes in modal
+  // Category bubbles in modal
   const renderCategoryCheckboxes = (scope: string, keys: string[], setKeys: (v: string[]) => void) => scope === 'category' && (
     <div>
       <label className="changli-form-label">关联分类</label>
       <div className="changli-tag-category-picker">
         {categories.length > 0 ? categories.map(cat => (
-          <label
+          <button
+            type="button"
             key={cat.key}
-            className="changli-tag-category-option"
+            onClick={() => toggleCategoryKey(cat.key, keys, setKeys)}
+            className={`changli-tag-category-option ${keys.includes(cat.key) ? 'is-selected' : ''}`}
           >
-            <input
-              type="checkbox"
-              checked={keys.includes(cat.key)}
-              onChange={() => toggleCategoryKey(cat.key, keys, setKeys)}
-              className="w-4 h-4 rounded border-gray-300 text-rose-500 focus:ring-rose-400"
-            />
-            <span className="text-sm text-gray-700 font-semibold">{cat.name}</span>
-            <span className="changli-tag-category-key">{cat.key}</span>
-          </label>
+            <span>{cat.name}</span>
+          </button>
         )) : (
           <p className="text-sm text-gray-400 text-center py-4">暂无分类</p>
         )}
@@ -393,7 +388,7 @@ const Tags: React.FC = () => {
         <div className="changli-modal-backdrop" onClick={() => setShowCreateModal(false)}>
           <div className="changli-modal-panel !p-0" onClick={e => e.stopPropagation()}>
             <div className="changli-modal-header">
-              <h2 className="changli-modal-title">新建标签</h2>
+              <h2 className="changli-modal-title">创建标签</h2>
             </div>
             <div className="changli-modal-body space-y-5">
               <div>

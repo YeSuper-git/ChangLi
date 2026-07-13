@@ -851,9 +851,9 @@ pub async fn get_video_series_list(
         ("created_at", "asc") => "ORDER BY s.created_at ASC, s.id ASC",
         _ => "ORDER BY s.created_at DESC, s.id DESC",
     };
-    // 列表查询必须排除 poster_base64（海报缓存较大），避免启动/刷新时通过 IPC 传输全部海报。
-    // 卡片可用 poster 路径展示，详情页再单独读取高清 poster_base64。
-    let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
+    // 列表查询默认排除 poster_base64（海报缓存较大），避免启动/刷新时通过 IPC 传输全部海报。
+    // 但历史数据可能只有 poster_base64、没有 poster 文件路径；这种情况下返回 base64 兜底，避免首页/视频页卡片变成占位图。
+    let sql = format!("SELECT s.id, s.title, s.description, s.poster, CASE WHEN s.poster IS NULL OR s.poster = '' THEN s.poster_base64 ELSE NULL END AS poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
     // 直接构造结构体，不调用 series_from_row（避免 poster_base64 为空时读文件转 base64）。
     let result = rows.iter().map(|row| {
@@ -862,8 +862,8 @@ pub async fn get_video_series_list(
             title: row.get("title"),
             description: row.get("description"),
             poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-            poster_data_url: None,
-            poster_base64: None,
+            poster_data_url: row.try_get("poster_base64").ok().flatten(),
+            poster_base64: row.try_get("poster_base64").ok().flatten(),
             folder_path: row.get("folder_path"),
             video_count: row.try_get("video_count").unwrap_or(0),
             poster_orientation: row.try_get("poster_orientation").ok().flatten(),
@@ -2615,7 +2615,7 @@ pub async fn get_favorite_videos(pool: &SqlitePool) -> Result<Vec<Video>> {
 }
 
 pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> {
-    let rows = sqlx::query("SELECT s.id, s.title, s.description, s.poster, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
+    let rows = sqlx::query("SELECT s.id, s.title, s.description, s.poster, CASE WHEN s.poster IS NULL OR s.poster = '' THEN s.poster_base64 ELSE NULL END AS poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
         .fetch_all(pool)
         .await?;
     Ok(rows.iter().map(|row| VideoSeries {
@@ -2623,8 +2623,8 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
         title: row.get("title"),
         description: row.get("description"),
         poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-        poster_data_url: None,
-        poster_base64: None,
+        poster_data_url: row.try_get("poster_base64").ok().flatten(),
+        poster_base64: row.try_get("poster_base64").ok().flatten(),
         folder_path: row.get("folder_path"),
         video_count: row.try_get("video_count").unwrap_or(0),
         poster_orientation: row.try_get("poster_orientation").ok().flatten(),

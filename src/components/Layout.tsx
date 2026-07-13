@@ -64,7 +64,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const currentScrollKey = location.pathname + location.search;
   const latestScrollKeyRef = useRef(currentScrollKey);
-  latestScrollKeyRef.current = currentScrollKey;
+
+  useEffect(() => {
+    latestScrollKeyRef.current = currentScrollKey;
+  }, [currentScrollKey]);
 
   // 滚动恢复机制：返回上一页时恢复原位置；普通跳转进入新页面时回到顶部。
   // 注意：真实滚动容器是 .changli-main，不是 window；并且筛选参数在 search 里，离开页面时必须保存最新 pathname + search。

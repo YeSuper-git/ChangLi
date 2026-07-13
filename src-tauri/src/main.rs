@@ -600,6 +600,7 @@ fn extract_episode_number(title: &str) -> Option<i32> {
     let patterns = [
         (r"EP\.?\s*(\d+)", true),                    // "EP02", "EP.02" (高优先)
         (r"(?:-|–|—)\s*(\d+)\s*(?:\[|$)", true),   // "- 02 [" 或 "- 02" 在末尾
+        (r"\[(\d{1,3})(?:v\d+)?\]\s*(?:\[|$)", true), // "[01][1080P]"、"[01v2][1080P]"
         (r"#(\d+)", true),                              // "#02"
         (r"第\s*(\d+)\s*集", true),                   // "第02集"
         (r"(\d+)\s*话", true),                         // "02话"
@@ -623,6 +624,23 @@ fn extract_episode_number(title: &str) -> Option<i32> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod subscription_title_tests {
+    use super::extract_episode_number;
+
+    #[test]
+    fn extracts_mikanani_bracket_episode_before_quality_tags() {
+        let title = "[桜都字幕组] 关于同组的染谷同学是性感女优这件事。 / Onaji Zemi no Someya-san ga Sexy Joyuu Datta Hanashi. [01][1080P][简体内嵌]";
+        assert_eq!(extract_episode_number(title), Some(1));
+    }
+
+    #[test]
+    fn ignores_quality_tag_when_episode_is_absent() {
+        let title = "[桜都字幕组] 测试番组 [1080P][简体内嵌]";
+        assert_eq!(extract_episode_number(title), None);
+    }
 }
 
 /// 更新订阅关键词偏好

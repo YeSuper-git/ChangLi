@@ -53,6 +53,19 @@ function formatTimeAgo(dateStr: string | null): string {
   return `${diffD} 天前`;
 }
 
+function getSubscriptionVersionLabels(subscription: BangumiSubscription): string[] {
+  try {
+    const prefs = JSON.parse(subscription.preferences || '{}');
+    const selectedPrefixes: unknown[] = Array.isArray(prefs.selectedPrefixes) ? prefs.selectedPrefixes : [];
+    const labels = selectedPrefixes
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .map(item => item.trim());
+    return labels.length > 0 ? labels : ['全部版本'];
+  } catch {
+    return ['全部版本'];
+  }
+}
+
 // ==================== Subscription Bind Modal ====================
 
 interface RssItem {
@@ -1185,6 +1198,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
     );
   }
 
+  const subscriptionVersionLabels = subscription ? getSubscriptionVersionLabels(subscription) : [];
+
   return (
     <>
       {loadingSub ? (
@@ -1192,10 +1207,19 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
           加载订阅 <img src={loadingIcon} alt="" className="w-3 h-3" />
         </div>
       ) : subscription ? (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             已订阅
+          </div>
+          <div
+            className="inline-flex items-center gap-1.5 min-w-0 max-w-full px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-medium"
+            title={subscriptionVersionLabels.join(' / ')}
+          >
+            <span className="text-rose-400">版本</span>
+            <span className="truncate max-w-[320px]">
+              {subscriptionVersionLabels.join(' / ')}
+            </span>
           </div>
           <span className="text-xs text-gray-400">
             上次检查: {formatTimeAgo(subscription.last_check_at)}

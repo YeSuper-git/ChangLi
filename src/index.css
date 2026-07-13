@@ -3204,36 +3204,48 @@ html.changli-player-html .changli-speed-options {
 .changli-tag-category-picker {
   max-height: 220px;
   overflow-y: auto;
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   border: 1px solid rgba(232, 235, 242, 0.96);
   border-radius: 18px;
   background: rgba(246, 247, 251, 0.72);
-  padding: 8px;
+  padding: 10px;
 }
 
 .changli-tag-category-option {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: 13px;
-  padding: 9px 10px;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid rgba(226, 229, 236, 0.96);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #4b5563;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 
 .changli-tag-category-option:hover {
-  border-color: rgba(232, 235, 242, 0.96);
-  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(251, 91, 123, 0.28);
+  color: #fb5b7b;
+  background: #fff;
   transform: translateY(-1px);
 }
 
-.changli-tag-category-key {
-  margin-left: auto;
-  color: #a0a6b1;
-  font-size: 10px;
-  font-weight: 800;
+.changli-tag-category-option.is-selected {
+  border-color: rgba(251, 91, 123, 0.42);
+  background: linear-gradient(135deg, #fb5b7b, #ff8a4c);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(251, 91, 123, 0.22);
+}
+
+.changli-tag-category-option:active {
+  transform: scale(0.97);
 }
 
 @media (max-width: 900px) {
