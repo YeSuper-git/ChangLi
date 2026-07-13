@@ -7,21 +7,12 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { init, destroy, observeProperties, setVideoMarginRatio } from 'tauri-plugin-mpv-api';
-import { mpvCommand, mpvSetProperty } from '../utils/mpv-bridge';
+import { MPV_OBSERVED_PROPERTIES, isMac, mpvCommand, mpvDestroy, mpvInit, mpvObserveProperties, mpvSetProperty, mpvSetVideoMarginRatio } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
-const OBSERVED_PROPERTIES = [
-  'pause',
-  'time-pos',
-  'duration',
-  'volume',
-  'speed',
-  'dwidth',
-  'dheight',
-] as const;
+const OBSERVED_PROPERTIES = MPV_OBSERVED_PROPERTIES;
 
 const Player: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -268,15 +259,17 @@ const Player: React.FC = () => {
         // 平台检测
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
-        // 初始化 mpv — 用 Rust 后端查找 mpv.exe（检查实际文件是否存在）
+        // 初始化 mpv：Windows 进程模式需要 mpv 可执行文件；macOS libmpv 进程内模式不需要 mpv binary。
         let mpvPath: string | undefined;
-        try {
-          mpvPath = await invoke<string>('find_mpv_path');
-          console.log('[Player] find_mpv_path:', mpvPath);
-        } catch (e) {
-          console.error('[Player] find_mpv_path failed:', e);
-          // 后端找不到，报错给用户
-          throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
+        if (!isMac) {
+          try {
+            mpvPath = await invoke<string>('find_mpv_path');
+            console.log('[Player] find_mpv_path:', mpvPath);
+          } catch (e) {
+            console.error('[Player] find_mpv_path failed:', e);
+            // 后端找不到，报错给用户
+            throw new Error(typeof e === 'string' ? e : 'mpv.exe 未找到');
+          }
         }
 
         // Windows/Linux: 用 tauri-plugin-mpv 正常 init
@@ -290,8 +283,8 @@ const Player: React.FC = () => {
         }
 
         try {
-          await init({
-            ...(mpvPath ? { path: mpvPath } : {}),
+          await mpvInit({
+            path: mpvPath,
             showMpvOutput: true,
             args: [
               '--vo=gpu',
@@ -310,7 +303,7 @@ const Player: React.FC = () => {
         } catch (initErr) {
           console.error('[Player] init 失败:', initErr);
           try {
-            await init({
+            await mpvInit({
               showMpvOutput: true,
               args: [
                 '--vo=gpu',
@@ -332,14 +325,14 @@ const Player: React.FC = () => {
           }
         }
 
-        await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
+        await runMpvCommand(() => mpvSetVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
 
         mpvInitialized.current = true;
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // 全平台监听插件属性变化；macOS/Windows 都由同一套 mpv 状态驱动 UI。
-        await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
+        await mpvObserveProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
           if (!isMountedRef.current) return;
           try {
             switch (name) {
@@ -422,7 +415,7 @@ const Player: React.FC = () => {
           try {
             await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
             await new Promise(resolve => setTimeout(resolve, 800));
-            await runMpvCommand(() => destroy()).catch(() => {});
+            await runMpvCommand(() => mpvDestroy()).catch(() => {});
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }
