@@ -411,6 +411,44 @@ export async function toggleWatched(id: number): Promise<void> {
   await invoke('toggle_watched', { id });
 }
 
+export interface SeriesCompletionRecord {
+  id?: number;
+  series_id: number;
+  title: string;
+  description?: string;
+  poster?: string;
+  poster_data_url?: string;
+  poster_orientation?: string;
+  video_count: number;
+  display_type?: string;
+  status?: string;
+  rating?: number;
+  review?: string;
+  completed_at?: string;
+  last_played?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CompletionRecordInput {
+  series_id: number;
+  rating?: number;
+  review?: string;
+  completed_at?: string;
+}
+
+export async function getCompletionRecords(): Promise<SeriesCompletionRecord[]> {
+  return invoke<SeriesCompletionRecord[]>('get_completion_records');
+}
+
+export async function saveCompletionRecord(input: CompletionRecordInput): Promise<SeriesCompletionRecord> {
+  return invoke<SeriesCompletionRecord>('save_completion_record', { input });
+}
+
+export async function deleteCompletionRecord(seriesId: number): Promise<void> {
+  return invoke('delete_completion_record', { seriesId });
+}
+
 export async function toggleChineseSub(id: number): Promise<void> {
   await invoke('toggle_chinese_sub', { id });
 }

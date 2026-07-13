@@ -260,6 +260,34 @@ pub struct PlayHistory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompletionRecordInput {
+    pub series_id: i64,
+    pub rating: Option<i32>,
+    pub review: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeriesCompletionRecord {
+    pub id: Option<i64>,
+    pub series_id: i64,
+    pub title: String,
+    pub description: Option<String>,
+    pub poster: Option<String>,
+    pub poster_data_url: Option<String>,
+    pub poster_orientation: Option<String>,
+    pub video_count: i64,
+    pub display_type: Option<String>,
+    pub status: Option<String>,
+    pub rating: Option<i32>,
+    pub review: Option<String>,
+    pub completed_at: Option<String>,
+    pub last_played: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentWatchItem {
     pub video: Video,
     pub series: Option<VideoSeries>,
@@ -2240,6 +2268,120 @@ pub async fn get_play_history(pool: &SqlitePool) -> Result<Vec<PlayHistory>> {
 }
 
 /// 返回 video_id → series_id 的轻量映射（只查两列，用于首页排序）
+pub async fn get_completion_records(pool: &SqlitePool) -> Result<Vec<SeriesCompletionRecord>> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            r.id AS record_id,
+            s.id AS series_id,
+            s.title,
+            s.description,
+            s.poster,
+            s.poster_base64,
+            s.poster_orientation,
+            s.status,
+            s.display_type,
+            s.created_at AS series_created_at,
+            s.updated_at AS series_updated_at,
+            COALESCE((SELECT COUNT(*) FROM videos v WHERE v.series_id = s.id), 0) AS video_count,
+            r.rating,
+            r.review,
+            r.completed_at,
+            r.created_at AS record_created_at,
+            r.updated_at AS record_updated_at,
+            (
+                SELECT MAX(ph.last_played)
+                FROM play_history ph
+                JOIN videos hv ON hv.id = ph.video_id
+                WHERE hv.series_id = s.id
+            ) AS last_played
+        FROM video_series s
+        LEFT JOIN series_completion_records r ON r.series_id = s.id
+        WHERE COALESCE(s.is_watched, 0) = 1 OR r.id IS NOT NULL
+        ORDER BY COALESCE(r.completed_at, last_played, s.updated_at, s.created_at) DESC
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let poster: Option<String> = row.get("poster");
+            let resolved_poster = poster.map(|path| {
+                storage::resolve_data_path(&path)
+                    .to_string_lossy()
+                    .to_string()
+            });
+            let poster_data_url: Option<String> = row.try_get("poster_base64").ok().flatten();
+            SeriesCompletionRecord {
+                id: row.try_get("record_id").ok(),
+                series_id: row.get("series_id"),
+                title: row.get("title"),
+                description: row.get("description"),
+                poster: resolved_poster,
+                poster_data_url,
+                poster_orientation: row.try_get("poster_orientation").ok(),
+                video_count: row.get("video_count"),
+                display_type: row.try_get("display_type").ok(),
+                status: row.try_get("status").ok(),
+                rating: row.try_get("rating").ok().flatten(),
+                review: row.try_get("review").ok().flatten(),
+                completed_at: row.try_get("completed_at").ok().flatten(),
+                last_played: row.try_get("last_played").ok().flatten(),
+                created_at: row.try_get("record_created_at").ok().flatten(),
+                updated_at: row.try_get("record_updated_at").ok().flatten(),
+            }
+        })
+        .collect())
+}
+
+pub async fn upsert_completion_record(
+    pool: &SqlitePool,
+    input: CompletionRecordInput,
+) -> Result<SeriesCompletionRecord> {
+    let completed_at = input.completed_at.unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    let review = input.review.map(|text| text.trim().to_string()).filter(|text| !text.is_empty());
+    let rating = input.rating.map(|value| value.clamp(1, 10));
+
+    sqlx::query(
+        r#"
+        INSERT INTO series_completion_records (series_id, rating, review, completed_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(series_id) DO UPDATE SET
+            rating = excluded.rating,
+            review = excluded.review,
+            completed_at = excluded.completed_at,
+            updated_at = CURRENT_TIMESTAMP
+        "#,
+    )
+    .bind(input.series_id)
+    .bind(rating)
+    .bind(review)
+    .bind(completed_at)
+    .execute(pool)
+    .await?;
+
+    sqlx::query("UPDATE video_series SET is_watched = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .bind(input.series_id)
+        .execute(pool)
+        .await?;
+
+    let records = get_completion_records(pool).await?;
+    records
+        .into_iter()
+        .find(|record| record.series_id == input.series_id)
+        .ok_or_else(|| anyhow::anyhow!("展览记录保存后未找到"))
+}
+
+pub async fn delete_completion_record(pool: &SqlitePool, series_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM series_completion_records WHERE series_id = ?")
+        .bind(series_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn get_video_series_map(pool: &SqlitePool) -> Result<Vec<(i64, i64)>> {
     let rows = sqlx::query("SELECT id, series_id FROM videos WHERE series_id IS NOT NULL")
         .fetch_all(pool)

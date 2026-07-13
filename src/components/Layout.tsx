@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors');
+  const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors') || location.pathname.startsWith('/completion');
   const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
 
   const navItems = [
@@ -29,6 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/tags', label: '标签' },
     { path: '/subscriptions', label: '订阅' },
     { path: '/downloads', label: '下载' },
+    { path: '/completion', label: '展览柜' },
   ];
 
   const handleGlobalSearch = (event: React.FormEvent) => {

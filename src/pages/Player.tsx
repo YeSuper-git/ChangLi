@@ -122,6 +122,44 @@ const Player: React.FC = () => {
     runMpvCommand(() => mpvCommand('drop-buffers')).catch(() => undefined);
   }, [previewOnLeave, runMpvCommand]);
 
+  const handleObservedVideoSize = useCallback((name: 'dwidth' | 'dheight', value: unknown) => {
+    if (!isMountedRef.current) return;
+    const numData = Number(value);
+    if (!Number.isFinite(numData) || numData <= 0) return;
+
+    if (name === 'dwidth') observedVideoSizeRef.current.width = numData;
+    if (name === 'dheight') observedVideoSizeRef.current.height = numData;
+
+    const videoW = observedVideoSizeRef.current.width;
+    const videoH = observedVideoSizeRef.current.height;
+    if (videoW && videoH && videoW > 0 && videoH > 0) setHasVideoFrame(true);
+
+    if (windowRatioAdjustedRef.current) return;
+    if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return;
+
+    const win = getCurrentWindow();
+    win.outerSize().then((size) => {
+      if (windowRatioAdjustedRef.current) return;
+      const scale = window.devicePixelRatio || 1;
+      const currentW = size.width / scale;
+      const currentH = size.height / scale;
+      const currentRatio = currentW / Math.max(1, currentH);
+      const videoRatio = Math.max(0.45, Math.min(3.2, videoW / videoH));
+      const ratioDelta = Math.abs(currentRatio - videoRatio) / videoRatio;
+      if (ratioDelta < 0.08) {
+        windowRatioAdjustedRef.current = true;
+        return;
+      }
+      const newH = Math.max(360, Math.round(currentW / videoRatio));
+      if (Math.abs(newH - currentH) < 48 || newH > 2000) {
+        windowRatioAdjustedRef.current = true;
+        return;
+      }
+      windowRatioAdjustedRef.current = true;
+      win.setSize(new LogicalSize(currentW, newH)).catch(() => {});
+    }).catch(() => {});
+  }, []);
+
   // 透明 WebView 让 libmpv 视频层可见，避免 WebView/CSS 背景盖住画面
   useEffect(() => {
     document.documentElement.classList.add('changli-player-html');
@@ -242,31 +280,40 @@ const Player: React.FC = () => {
         const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
         const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
 
-        // macOS: mpv 由 Rust 端 start_mpv_embedded 启动，前端不调用 init
+        // macOS: mpv 由 Rust 端 start_mpv_embedded 启动，前端只通过 IPC 控制，彻底避开 tauri-plugin-mpv。
         if (isMac) {
-          console.log('[Player] macOS: mpv 由 Rust 端管理，跳过 init');
-          // 通过 mpv_send_command 建立控制通道
-          try {
-            await invoke('mpv_send_command', { cmd: 'get_property', args: ['pause'] });
-            console.log('[Player] macOS: mpv IPC 通道就绪');
-          } catch (e) {
-            console.warn('[Player] macOS: mpv IPC 通道未就绪:', e);
+          console.log('[Player] macOS: 使用长离播放器窗口内嵌 mpv，跳过插件 init/observe');
+          let ipcReady = false;
+          for (let attempt = 0; attempt < 20; attempt += 1) {
+            try {
+              await mpvGetProperty('pause');
+              ipcReady = true;
+              break;
+            } catch {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+          if (!ipcReady) {
+            throw new Error('mpv IPC 通道未就绪');
           }
 
           mpvInitialized.current = true;
-          // macOS: 用轮询替代 observeProperties
+          setHasVideoFrame(true);
+
           const pollInterval = setInterval(async () => {
             if (!isMountedRef.current || !mpvInitialized.current) {
               clearInterval(pollInterval);
               return;
             }
             try {
-              const [pauseVal, timeVal, durVal, volVal, spdVal] = await Promise.all([
+              const [pauseVal, timeVal, durVal, volVal, spdVal, dwidthVal, dheightVal] = await Promise.all([
                 mpvGetProperty('pause').catch(() => null),
                 mpvGetProperty('time-pos').catch(() => null),
                 mpvGetProperty('duration').catch(() => null),
                 mpvGetProperty('volume').catch(() => null),
                 mpvGetProperty('speed').catch(() => null),
+                mpvGetProperty('dwidth').catch(() => null),
+                mpvGetProperty('dheight').catch(() => null),
               ]);
               if (!isMountedRef.current) return;
               if (pauseVal !== null) {
@@ -278,6 +325,8 @@ const Player: React.FC = () => {
               if (durVal !== null) setDuration(Number(durVal) || 0);
               if (volVal !== null) setVolume(Number(volVal) || 80);
               if (spdVal !== null) setSpeed(Number(spdVal) || 1);
+              if (dwidthVal !== null) handleObservedVideoSize('dwidth', dwidthVal);
+              if (dheightVal !== null) handleObservedVideoSize('dheight', dheightVal);
             } catch {}
           }, 500);
         } else {
@@ -335,18 +384,18 @@ const Player: React.FC = () => {
         }
         } // end else (Windows/Linux)
 
-        await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
+        if (!isMac) {
+          await runMpvCommand(() => setVideoMarginRatio({ top: 0, right: 0, bottom: 0, left: 0 })).catch(() => undefined);
 
-        mpvInitialized.current = true;
+          mpvInitialized.current = true;
 
-        // 等待 mpv 完全就绪（macOS IPC 时序问题）
-        await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 500));
 
-        // 监听属性变化
-        await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
-          if (!isMountedRef.current) return;
-          try {
-            switch (name) {
+          // Windows/Linux 监听插件属性变化；macOS 只用上面的 IPC 轮询，避免插件接管窗口生命周期。
+          await observeProperties(OBSERVED_PROPERTIES, ({ name, data }: { name: string; data?: unknown }) => {
+            if (!isMountedRef.current) return;
+            try {
+              switch (name) {
               case 'pause':
                 {
                   const playing = !data;
@@ -368,47 +417,13 @@ const Player: React.FC = () => {
                 break;
               case 'dwidth':
               case 'dheight':
-                // 后端已按数据库中的视频尺寸创建并立即显示窗口。
-                // 这里仅在 mpv 报告的真实比例与当前窗口比例明显不一致时做一次微调，
-                // 不再负责首次显示，避免 dwidth/dheight 未触发时窗口一直隐藏。
-                if (data && (data as number) > 0 && isMountedRef.current) {
-                  const numData = data as number;
-                  if (name === 'dwidth') observedVideoSizeRef.current.width = numData;
-                  if (name === 'dheight') observedVideoSizeRef.current.height = numData;
-                  const videoW = observedVideoSizeRef.current.width;
-                  const videoH = observedVideoSizeRef.current.height;
-                  if (videoW && videoH && videoW > 0 && videoH > 0) setHasVideoFrame(true);
-                }
-                if (!windowRatioAdjustedRef.current && isMountedRef.current) {
-                  const videoW = observedVideoSizeRef.current.width;
-                  const videoH = observedVideoSizeRef.current.height;
-                  if (!videoW || !videoH || videoW <= 0 || videoH <= 0) break;
-                  const win = getCurrentWindow();
-                  win.outerSize().then((size) => {
-                    if (windowRatioAdjustedRef.current) return;
-                    const scale = window.devicePixelRatio || 1;
-                    const currentW = size.width / scale;
-                    const currentH = size.height / scale;
-                    const currentRatio = currentW / Math.max(1, currentH);
-                    const videoRatio = Math.max(0.45, Math.min(3.2, videoW / videoH));
-                    const ratioDelta = Math.abs(currentRatio - videoRatio) / videoRatio;
-                    if (ratioDelta < 0.08) {
-                      windowRatioAdjustedRef.current = true;
-                      return;
-                    }
-                    const newH = Math.max(360, Math.round(currentW / videoRatio));
-                    if (Math.abs(newH - currentH) < 48 || newH > 2000) {
-                      windowRatioAdjustedRef.current = true;
-                      return;
-                    }
-                    windowRatioAdjustedRef.current = true;
-                    win.setSize(new LogicalSize(currentW, newH)).catch(() => {});
-                  }).catch(() => {});
-                }
+                // Windows observer 与 macOS 轮询共用同一套窗口比例/画面就绪逻辑，保证 UI 交互一致。
+                handleObservedVideoSize(name, data);
                 break;
             }
-          } catch { /* ignore observer errors */ }
-        });
+            } catch { /* ignore observer errors */ }
+          });
+        }
 
         // 加载视频
         try {
@@ -450,7 +465,7 @@ const Player: React.FC = () => {
       // 不在这里 destroy — 由下次 init 或组件卸载时处理
       // 避免 destroy/init 竞态导致闪退
     };
-  }, [id, runMpvCommand]);
+  }, [id, runMpvCommand, handleObservedVideoSize]);
 
   // 组件卸载时清理 mpv — 延迟 destroy，等 mpv 完全退出后再销毁窗口
   useEffect(() => {

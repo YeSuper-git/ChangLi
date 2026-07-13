@@ -12,7 +12,6 @@ use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_mpv::MpvExt;
 
 const PLAYER_WINDOW_LABEL: &str = "player";
 const PLAYER_OFFSET_X: f64 = 40.0;
@@ -193,10 +192,12 @@ pub fn get_player_wid(app: AppHandle) -> Result<u64, String> {
 
 #[cfg(target_os = "macos")]
 mod mpv_ipc {
+    use serde_json::{json, Value};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
     use std::sync::Mutex;
     use std::sync::OnceLock;
+    use std::time::Duration;
 
     static MPV_SOCKET_PATH: OnceLock<Mutex<Option<String>>> = OnceLock::new();
 
@@ -204,40 +205,63 @@ mod mpv_ipc {
         MPV_SOCKET_PATH.get_or_init(|| Mutex::new(None))
     }
 
-    /// 获取 mpv IPC socket 路径
     pub fn socket_path() -> Option<String> {
         socket_mutex().lock().unwrap().clone()
     }
 
-    pub fn set_socket_path(path: String) {
-        *socket_mutex().lock().unwrap() = Some(path);
+    pub fn set_socket_path(path: Option<String>) {
+        *socket_mutex().lock().unwrap() = path;
     }
 
-    /// 发送 JSON IPC 命令给 mpv
+    pub fn clear_socket_path_if_current(path: &str) {
+        let mut guard = socket_mutex().lock().unwrap();
+        if guard.as_deref() == Some(path) {
+            *guard = None;
+        }
+    }
+
+    fn parse_arg(arg: &str) -> Value {
+        if arg == "true" {
+            Value::Bool(true)
+        } else if arg == "false" {
+            Value::Bool(false)
+        } else if let Ok(value) = arg.parse::<i64>() {
+            json!(value)
+        } else if let Ok(value) = arg.parse::<f64>() {
+            json!(value)
+        } else {
+            json!(arg)
+        }
+    }
+
     pub fn send_command(cmd: &str, args: &[&str]) -> Result<String, String> {
         let path = socket_path().ok_or("mpv socket 未初始化")?;
-        let mut stream = UnixStream::connect(&path)
+        let stream = UnixStream::connect(&path)
             .map_err(|e| format!("连接 mpv socket 失败: {}", e))?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .map_err(|e| format!("设置 mpv socket 超时失败: {}", e))?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .map_err(|e| format!("设置 mpv socket 超时失败: {}", e))?;
 
-        // 构造 JSON IPC 命令
-        let command = if args.is_empty() {
-            format!("{{\"command\": [\"{}\"]}}", cmd)
-        } else {
-            let args_json: Vec<String> = args.iter().map(|a| format!("\"{}\"", a)).collect();
-            format!("{{\"command\": [\"{}\", {}]}}", cmd, args_json.join(", "))
-        };
-
-        // 加换行符（mpv IPC 协议要求）
-        let mut msg = command.clone();
+        let mut command_args = Vec::with_capacity(args.len() + 1);
+        command_args.push(json!(cmd));
+        command_args.extend(args.iter().map(|arg| parse_arg(arg)));
+        let mut msg = json!({ "command": command_args }).to_string();
         msg.push('\n');
 
-        stream.write_all(msg.as_bytes())
+        let mut writer = stream
+            .try_clone()
+            .map_err(|e| format!("克隆 mpv socket 失败: {}", e))?;
+        writer
+            .write_all(msg.as_bytes())
             .map_err(|e| format!("写入 mpv socket 失败: {}", e))?;
 
-        // 读取响应
-        let mut reader = BufReader::new(&stream);
+        let mut reader = BufReader::new(stream);
         let mut response = String::new();
-        reader.read_line(&mut response)
+        reader
+            .read_line(&mut response)
             .map_err(|e| format!("读取 mpv 响应失败: {}", e))?;
 
         Ok(response.trim().to_string())
@@ -247,49 +271,52 @@ mod mpv_ipc {
 /// macOS: 启动 mpv 进程并嵌入到播放器窗口
 #[cfg(target_os = "macos")]
 pub fn start_mpv_embedded(app: &AppHandle, video_path: &str) -> Result<(), String> {
-    let window = app.get_webview_window("player")
+    let window = app
+        .get_webview_window(PLAYER_WINDOW_LABEL)
         .ok_or("播放器窗口不存在")?;
 
-    // 获取 NSView 指针
+    // 清理上一次残留的 macOS mpv 进程。这里不走 tauri-plugin-mpv，避免插件实例表残留。
+    if mpv_ipc::socket_path().is_some() {
+        let _ = mpv_ipc::send_command("quit", &[]);
+        mpv_ipc::set_socket_path(None);
+    }
+
     use raw_window_handle::HasWindowHandle;
-    let wid = if let Ok(handle) = window.window_handle() {
-        if let raw_window_handle::RawWindowHandle::AppKit(h) = handle.as_raw() {
-            h.ns_view.as_ptr() as u64
-        } else {
-            return Err("无法获取 NSView 指针".to_string());
-        }
-    } else {
-        return Err("无法获取窗口句柄".to_string());
+    let wid = match window.window_handle().map_err(|e| format!("无法获取窗口句柄: {}", e))?.as_raw() {
+        raw_window_handle::RawWindowHandle::AppKit(h) => h.ns_view.as_ptr() as u64,
+        _ => return Err("无法获取 macOS NSView 指针".to_string()),
     };
 
     let mpv_path = find_mpv_path().unwrap_or_else(|_| "mpv".to_string());
     let wid_arg = format!("--wid={}", wid);
-
-    // IPC socket 路径
-    let socket_path = format!("/tmp/changli-mpv-{}.sock", std::process::id());
+    let socket_path = format!("/tmp/changli-mpv-{}-{}.sock", std::process::id(),
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis());
     let socket_arg = format!("--input-ipc-server={}", socket_path);
+    let _ = std::fs::remove_file(&socket_path);
 
-    let child = std::process::Command::new(&mpv_path)
-        .arg(video_path)
+    let mut child = std::process::Command::new(&mpv_path)
         .arg(&wid_arg)
         .arg(&socket_arg)
+        .arg("--no-config")
         .arg("--no-terminal")
+        .arg("--input-terminal=no")
         .arg("--force-window=no")
         .arg("--hwdec=auto-safe")
         .arg("--vo=gpu")
         .arg("--osc=no")
         .arg("--osd-level=0")
         .arg("--keep-open=yes")
+        .arg("--idle=no")
+        .arg(video_path)
         .spawn()
         .map_err(|e| format!("启动 mpv 失败: {}", e))?;
 
-    // 保存 socket 路径
-    mpv_ipc::set_socket_path(socket_path);
-
-    // 后台等待 mpv 退出
+    let socket_path_for_thread = socket_path.clone();
+    mpv_ipc::set_socket_path(Some(socket_path));
     std::thread::spawn(move || {
-        let _ = child.wait_with_output();
-        mpv_ipc::set_socket_path(String::new());
+        let _ = child.wait();
+        mpv_ipc::clear_socket_path_if_current(&socket_path_for_thread);
+        let _ = std::fs::remove_file(&socket_path_for_thread);
     });
 
     Ok(())

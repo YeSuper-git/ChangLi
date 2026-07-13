@@ -4104,6 +4104,9 @@ fn main() {
             toggle_favorite,
             toggle_chinese_sub,
             toggle_watched,
+            get_completion_records,
+            save_completion_record,
+            delete_completion_record,
             get_favorite_videos_cmd,
             get_favorite_series_cmd,
             rescan_all_series_metadata,
@@ -4259,6 +4262,44 @@ async fn toggle_watched(state: State<'_, AppState>, id: i64) -> Result<(), Strin
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::toggle_watched_series(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_completion_records(
+    state: State<'_, AppState>,
+) -> Result<Vec<db::SeriesCompletionRecord>, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::get_completion_records(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_completion_record(
+    state: State<'_, AppState>,
+    input: db::CompletionRecordInput,
+) -> Result<db::SeriesCompletionRecord, String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::upsert_completion_record(&pool, input)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_completion_record(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_completion_record(&pool, series_id)
         .await
         .map_err(|e| e.to_string())
 }

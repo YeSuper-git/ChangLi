@@ -8,6 +8,7 @@ import { OnboardingTutorial } from './components/OnboardingTutorial';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Downloads from './pages/Downloads';
+import CompletionGallery from './pages/CompletionGallery';
 import Library from './pages/Library';
 import Player from './pages/Player';
 import Actors from './pages/Actors';
@@ -174,6 +175,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
           <Route path="/downloads" element={<Downloads />} />
+          <Route path="/completion" element={<CompletionGallery />} />
           <Route path="/library" element={<Library />} />
           <Route path="/player/:id" element={<Player />} />
           <Route path="/actors" element={<Actors />} />

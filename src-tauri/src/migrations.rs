@@ -347,6 +347,24 @@ async fn create_base_tables(pool: &SqlitePool) -> Result<()> {
     )
     .await?;
 
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS series_completion_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_id INTEGER NOT NULL REFERENCES video_series(id) ON DELETE CASCADE,
+            rating INTEGER,
+            review TEXT,
+            completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(series_id)
+        )
+        "#,
+        "create series_completion_records table",
+    )
+    .await?;
+
     // 大类配置表
     execute(
         pool,
@@ -477,6 +495,12 @@ async fn migrate_existing_tables(pool: &SqlitePool) -> Result<()> {
         Column::new("watch_progress", "position", "REAL DEFAULT 0"),
         Column::new("watch_progress", "duration", "REAL DEFAULT 0"),
         Column::new("watch_progress", "updated_at", "TEXT"),
+        Column::new("series_completion_records", "series_id", "INTEGER"),
+        Column::new("series_completion_records", "rating", "INTEGER"),
+        Column::new("series_completion_records", "review", "TEXT"),
+        Column::new("series_completion_records", "completed_at", "TEXT"),
+        Column::new("series_completion_records", "created_at", "TEXT"),
+        Column::new("series_completion_records", "updated_at", "TEXT"),
     ] {
         add_column_if_not_exists(pool, column.table, column.name, column.definition).await?;
     }
