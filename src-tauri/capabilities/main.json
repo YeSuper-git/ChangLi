@@ -48,6 +48,7 @@
     "http:allow-fetch-read-body",
     "http:allow-fetch-send",
     "mpv:default",
+    "libmpv:default",
     "core:window:allow-set-decorations",
     "core:window:allow-set-resizable",
     "core:window:allow-set-title-bar-style"
