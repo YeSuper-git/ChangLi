@@ -359,7 +359,7 @@ pub fn disable_game_dvr() {
     let _ = set_game_overlay_disabled(true);
 }
 
-fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
+pub fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
         apply_player_window_style(&window)?;
         return Ok(window);
@@ -379,18 +379,9 @@ fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     .skip_taskbar(true)
     .visible(false);
 
-    #[cfg(target_os = "windows")]
-    {
-        // Windows + mpv --wid 嵌入到透明 WebView 窗口时容易被 DWM/WebView2 合成成
-        // 悬浮透明孤儿窗或有声音无画面。Windows 播放承载窗改为不透明黑底，
-        // 让 mpv 子窗口严格限制在 Tauri 的黑色播放区域内。
-        builder = builder.transparent(false);
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        builder = builder.transparent(true);
-    }
+    // libmpv 在 WebView 窗口下方渲染视频层；如果 WebView 不透明，
+    // 会出现"有声音但白屏"的遮挡。播放窗口必须保持透明，控制栏自身再绘制深色背景。
+    builder = builder.transparent(true);
 
     let window = builder.build().context("create player window")?;
 

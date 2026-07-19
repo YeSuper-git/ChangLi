@@ -506,6 +506,20 @@ export async function updateSeasonGroup(
   });
 }
 
+export async function moveVideosToSeason(
+  seriesId: number,
+  videoIds: number[],
+  season: number,
+  subtitle?: string,
+): Promise<void> {
+  return invoke('move_videos_to_season', {
+    seriesId,
+    videoIds,
+    season,
+    subtitle: subtitle || null,
+  });
+}
+
 export async function updateVideoSubtitle(videoId: number, subtitle?: string): Promise<void> {
   return invoke('update_video_subtitle', { videoId, subtitle });
 }

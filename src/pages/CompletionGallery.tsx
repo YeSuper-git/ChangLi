@@ -53,8 +53,8 @@ const CompletionGallery: React.FC = () => {
         if (updated) setActive(updated);
       }
     } catch (error) {
-      console.error('[CompletionGallery] 加载金番奖失败:', error);
-      notify({ message: '金番奖加载失败，请稍后重试', type: 'error' });
+      console.error('[CompletionGallery] 加载影评失败:', error);
+      notify({ message: '影评加载失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -127,9 +127,9 @@ const CompletionGallery: React.FC = () => {
       });
       setRecords(prev => prev.map(item => item.series_id === saved.series_id ? saved : item));
       setActive(saved);
-      notify({ message: '金番奖记录已保存', type: 'success' });
+      notify({ message: '影评已保存', type: 'success' });
     } catch (error) {
-      console.error('[CompletionGallery] 保存金番奖记录失败:', error);
+      console.error('[CompletionGallery] 保存影评失败:', error);
       notify({ message: '保存失败，请稍后重试', type: 'error' });
     } finally {
       setSaving(false);
@@ -140,12 +140,12 @@ const CompletionGallery: React.FC = () => {
     <div className="completion-gallery-page">
       <section className="completion-gallery-hero">
         <div>
-          <p className="completion-gallery-kicker">已看完的视频集评选</p>
-          <h1>金番奖</h1>
-          <p>给看完后的影视打个分吧。</p>
+          <p className="completion-gallery-kicker">看完记录</p>
+          <h1>影评</h1>
+          <p>记录每部作品看完后的评分、时间和短评。</p>
         </div>
-        <div className="completion-gallery-stats" aria-label="金番奖统计">
-          <div><strong>{stats.total}</strong><span>已入馆</span></div>
+        <div className="completion-gallery-stats" aria-label="影评统计">
+          <div><strong>{stats.total}</strong><span>已看完</span></div>
           <div><strong>{stats.rated}</strong><span>已评价</span></div>
           <div><strong>{stats.avg ? stats.avg.toFixed(1) : '-'}</strong><span>平均分</span></div>
         </div>
@@ -154,16 +154,16 @@ const CompletionGallery: React.FC = () => {
       {loading ? (
         <div className="completion-gallery-loading">
           <img src={loadingIcon} alt="" />
-          <span>正在整理金番奖</span>
+          <span>正在整理影评</span>
         </div>
       ) : records.length === 0 ? (
         <div className="completion-gallery-empty">
-          <h3>金番奖还是空的</h3>
-          <p>在视频库里把视频集标记为已看完后，它会自动进入金番奖。</p>
+          <h3>还没有影评</h3>
+          <p>在视频库里把视频集标记为已看完后，可以在这里补充评分和短评。</p>
           <Link to="/library" className="completion-gallery-link">去视频库看看</Link>
         </div>
       ) : (
-        <div className="completion-shelf" aria-label="金番奖证书陈列">
+        <div className="completion-shelf" aria-label="影评列表">
           {records.map((record, index) => {
             const poster = seriesPosterSrc(record);
             return (
@@ -174,7 +174,6 @@ const CompletionGallery: React.FC = () => {
                 style={{ '--award-index': index } as React.CSSProperties}
                 onClick={(event) => openRecord(record, event)}
               >
-                <span className="completion-award-ribbon">金番奖证书</span>
                 <div className="completion-award-poster">
                   <SmartPoster src={poster} alt={record.title} posterOrientation={record.poster_orientation} />
                 </div>
@@ -192,24 +191,24 @@ const CompletionGallery: React.FC = () => {
         </div>
       )}
 
-      <FloatingActions onRefresh={loadRecords} refreshLabel="刷新金番奖" />
+      <FloatingActions onRefresh={loadRecords} refreshLabel="刷新影评" />
 
       {active && (
         <div className={`completion-detail-backdrop ${closing ? 'is-closing' : ''}`} onClick={closeDetail}>
           <section
-            className="completion-certificate-back"
+            className="completion-review-panel"
             style={{ '--close-x': `${closeTarget.x}px`, '--close-y': `${closeTarget.y}px` } as React.CSSProperties}
             onClick={(event) => event.stopPropagation()}
           >
             <button className="completion-detail-close" type="button" aria-label="关闭" onClick={closeDetail}><span aria-hidden="true">×</span></button>
-            <div className="completion-certificate-head">
+            <div className="completion-review-head">
               <h2>{active.title}</h2>
             </div>
-            <div className="completion-certificate-grid">
-              <div className="completion-certificate-poster">
+            <div className="completion-review-grid">
+              <div className="completion-review-poster">
                 <SmartPoster src={seriesPosterSrc(active)} alt={active.title} posterOrientation={active.poster_orientation} />
               </div>
-              <div className="completion-certificate-form">
+              <div className="completion-review-form">
                 <div className="completion-meta-row">
                   <label className="completion-rating-field">
                     <span>我的评分</span>

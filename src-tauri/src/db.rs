@@ -3465,6 +3465,39 @@ pub async fn update_season_group(
     Ok(())
 }
 
+pub async fn move_videos_to_season(
+    pool: &SqlitePool,
+    series_id: i64,
+    video_ids: Vec<i64>,
+    season: i32,
+    subtitle: Option<String>,
+) -> Result<()> {
+    if video_ids.is_empty() {
+        return Ok(());
+    }
+    let target_season = normalize_season(season);
+    let target_subtitle = normalize_subtitle(subtitle.as_deref());
+
+    sqlx::query("INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)")
+        .bind(series_id)
+        .bind(target_season)
+        .bind(&target_subtitle)
+        .execute(pool)
+        .await?;
+
+    for video_id in video_ids {
+        sqlx::query("UPDATE videos SET season = ?, subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND series_id = ?")
+            .bind(target_season)
+            .bind(&target_subtitle)
+            .bind(video_id)
+            .bind(series_id)
+            .execute(pool)
+            .await?;
+    }
+
+    Ok(())
+}
+
 pub async fn update_video_subtitle(
     pool: &SqlitePool,
     video_id: i64,

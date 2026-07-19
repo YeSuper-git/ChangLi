@@ -6,7 +6,8 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tauri::{plugin::PluginApi, AppHandle, Manager, Runtime};
 
@@ -31,26 +32,45 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 
 pub struct Mpv<R: Runtime> {
     app: AppHandle<R>,
-    pub instances: Mutex<HashMap<String, MpvInstance>>,
+    pub instances: Mutex<HashMap<String, MpvInstance<R>>>,
     pub wrapper: OnceCell<LibmpvWrapper>,
 }
 
+/// Event callback invoked from native libmpv worker threads.
+///
+/// SAFETY: `userdata` was created with `Arc::into_raw` in `init_wid_mode`.
+/// Each callback first increments the strong count, then reconstructs one
+/// temporary `Arc`, so the native raw pointer remains valid for future
+/// callbacks until `destroy()` reclaims it.
 pub unsafe extern "C" fn event_callback<R: Runtime>(event: *const c_char, userdata: *mut c_void) {
     if event.is_null() || userdata.is_null() {
         return;
     }
 
-    let EventUserData {
-        app,
-        free_fn,
-        window_label,
-    } = unsafe { &*(userdata as *const EventUserData<R>) };
+    let userdata_ptr = userdata as *const EventUserData<R>;
+    unsafe {
+        Arc::increment_strong_count(userdata_ptr);
+    }
+    let event_data_arc: Arc<EventUserData<R>> = unsafe { Arc::from_raw(userdata_ptr) };
 
+    // Free the native event string. free_fn is a plain function pointer, safe to read.
+    let free_fn = event_data_arc.free_fn;
     let event_string = unsafe { CStr::from_ptr(event).to_string_lossy().to_string() };
-
     unsafe {
         free_fn(event as *mut c_char);
     }
+
+    // Guard: if the instance is being destroyed, skip event emission.
+    if !event_data_arc.is_alive.load(Ordering::Acquire) {
+        // Drop our Arc clone; if this was the last reference, the data is freed here.
+        drop(event_data_arc);
+        return;
+    }
+
+    // Clone out the fields we need for the async task, then drop the Arc.
+    let app = event_data_arc.app.clone();
+    let window_label = event_data_arc.window_label.clone();
+    drop(event_data_arc);
 
     tauri::async_runtime::spawn(async move {
         match serde_json::from_str::<serde_json::Value>(&event_string) {
@@ -128,12 +148,18 @@ impl<R: Runtime> Mpv<R> {
         let c_initial_options = CString::new(initial_options_string)?;
         let c_observed_properties = CString::new(observed_properties_string)?;
 
-        let event_callback_data = Box::new(EventUserData {
+        // Create EventUserData wrapped in Arc for safe shared ownership.
+        let event_data: Arc<EventUserData<R>> = Arc::new(EventUserData {
             app,
             free_fn,
             window_label: window_label.to_string(),
+            is_alive: AtomicBool::new(true),
         });
-        let event_userdata = Box::into_raw(event_callback_data) as *mut c_void;
+
+        // Pass a raw pointer to the Arc to native libmpv. We also keep a
+        // clone in MpvInstance so the allocation stays alive even if the
+        // native side's callback hasn't fired yet when destroy() runs.
+        let event_userdata = Arc::into_raw(event_data.clone()) as *mut c_void;
 
         let mpv_handle = unsafe {
             wrapper.mpv_wrapper_create(
@@ -145,7 +171,10 @@ impl<R: Runtime> Mpv<R> {
         };
 
         if mpv_handle.is_null() {
-            let _ = unsafe { Box::from_raw(event_userdata as *mut (AppHandle<R>, String)) };
+            // Signal callbacks to stop, then reclaim the Arc.
+            event_data.is_alive.store(false, Ordering::Release);
+            // Reconstruct and drop the Arc that was passed to the native side.
+            let _ = unsafe { Arc::from_raw(event_userdata as *const EventUserData<R>) };
             return Err(crate::Error::CreateInstance);
         }
 
@@ -154,6 +183,7 @@ impl<R: Runtime> Mpv<R> {
         let instance = MpvInstance {
             handle: mpv_handle,
             event_userdata: event_userdata,
+            event_data: event_data,
         };
 
         instances_lock.insert(window_label.to_string(), instance);
@@ -164,14 +194,42 @@ impl<R: Runtime> Mpv<R> {
     }
 
     pub fn destroy(&self, window_label: &str) -> Result<()> {
-        if let Some(instance) = self.remove_instance(window_label)? {
-            let wrapper = self.get_wrapper()?;
+        // Phase 1: Under the lock, mark is_alive = false and remove the instance.
+        // Any event_callback that checks is_alive after this point will return early.
+        // The Arc in MpvInstance.event_data keeps EventUserData alive even after
+        // the instance is removed from the map, so in-flight callbacks are safe.
+        let removed = {
+            let mut instances_lock = match self.instances.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    warn!("Mutex was poisoned, recovering.");
+                    poisoned.into_inner()
+                }
+            };
+            // Signal callbacks to stop while holding the lock.
+            if let Some(instance) = instances_lock.get(window_label) {
+                instance.event_data.is_alive.store(false, Ordering::Release);
+            }
+            instances_lock.remove(window_label)
+        };
 
+        if let Some(instance) = removed {
+            // Phase 2: Destroy the native mpv handle. After this returns,
+            // no new callbacks should be generated by the native side.
+            let wrapper = self.get_wrapper()?;
             unsafe {
                 wrapper.mpv_wrapper_destroy(instance.handle);
             }
 
-            let _ = unsafe { Box::from_raw(instance.event_userdata as *mut EventUserData<R>) };
+            // Phase 3: Reclaim the raw Arc pointer that was passed to native libmpv.
+            // This balances the Arc::into_raw in init_wid_mode.
+            // The allocation will only be freed when both this Arc AND the one in
+            // instance.event_data are dropped (i.e., after this function returns).
+            let _ = unsafe { Arc::from_raw(instance.event_userdata as *const EventUserData<R>) };
+
+            // Phase 4: Drop the MpvInstance (and its event_data Arc clone).
+            // If no in-flight callback holds a clone, the EventUserData is freed now.
+            drop(instance);
 
             info!(
                 "mpv instance for window '{}' has been destroyed.",
@@ -352,7 +410,7 @@ impl<R: Runtime> Mpv<R> {
     fn lock_and_check_existence<'a>(
         &'a self,
         window_label: &str,
-    ) -> Result<Option<std::sync::MutexGuard<'a, HashMap<String, MpvInstance>>>> {
+    ) -> Result<Option<std::sync::MutexGuard<'a, HashMap<String, MpvInstance<R>>>>> {
         let instances_lock = match self.instances.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -371,7 +429,7 @@ impl<R: Runtime> Mpv<R> {
 
     fn with_instance<F, T>(&self, window_label: &str, operation: F) -> Result<T>
     where
-        F: FnOnce(&MpvInstance) -> Result<T>,
+        F: FnOnce(&MpvInstance<R>) -> Result<T>,
     {
         let instances_lock = match self.instances.lock() {
             Ok(guard) => guard,
@@ -389,17 +447,6 @@ impl<R: Runtime> Mpv<R> {
         })?;
 
         operation(instance)
-    }
-
-    fn remove_instance(&self, window_label: &str) -> Result<Option<MpvInstance>> {
-        let mut instances_lock = match self.instances.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                warn!("Mutex was poisoned, recovering.");
-                poisoned.into_inner()
-            }
-        };
-        Ok(instances_lock.remove(window_label))
     }
 
     fn get_wrapper(&self) -> Result<&LibmpvWrapper> {

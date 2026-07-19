@@ -2984,35 +2984,18 @@ async fn open_player_window(
     player_w = player_w.max(640.0).min(target_w);
     player_h = player_h.max(360.0).min(target_h);
 
-    let label = "player";
-    let url = tauri::WebviewUrl::App(format!("index.html?window=player&videoId={}", video.id).into());
-
-    if let Some(window) = app.get_webview_window(label) {
-        window.set_title(&format!("ChangLi Player - {}", video.file_name)).map_err(|e| e.to_string())?;
-        window.set_size(tauri::LogicalSize::new(player_w, player_h)).map_err(|e| e.to_string())?;
-        let js = format!("window.location.replace('index.html?window=player&videoId={}');", video.id);
-        window.eval(&js).map_err(|e| e.to_string())?;
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-
-    let mut builder = tauri::WebviewWindowBuilder::new(&app, label, url)
-        .title(format!("ChangLi Player - {}", video.file_name))
-        .inner_size(player_w, player_h)
-        .min_inner_size(520.0, 292.0)
-        // 禁用系统级自由拉伸，只允许前端右下角等比拉伸
-        .resizable(false)
-        .decorations(false)
-        .visible(false);
-
-    // libmpv 在 WebView 窗口下方渲染视频层；Windows 上如果 WebView 不透明，
-    // 会出现"有声音但白屏"的遮挡。播放窗口必须保持透明，控制栏自身再绘制深色背景。
-    builder = builder.transparent(true);
-
-    let window = builder
-        .build()
+    // Use the same window creation path as player.rs to ensure consistent
+    // window properties (transparent, decorations, skip_taskbar, etc.).
+    let window = player::get_or_create_player_window(&app)
         .map_err(|e| e.to_string())?;
+
+    window.set_title(&format!("ChangLi Player - {}", video.file_name)).map_err(|e| e.to_string())?;
+    window.set_size(tauri::LogicalSize::new(player_w, player_h)).map_err(|e| e.to_string())?;
+
+    // Navigate to the video — if the window already existed, replace the URL;
+    // if newly created, the URL was set to a default by get_or_create_player_window.
+    let js = format!("window.location.replace('index.html?window=player&videoId={}');", video.id);
+    window.eval(&js).map_err(|e| e.to_string())?;
 
     if let Some(main) = app.get_webview_window("main") {
         let main_pos = main.outer_position().map_err(|e| e.to_string())?;
@@ -3220,6 +3203,23 @@ async fn update_season_group(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::update_season_group(&pool, series_id, from_season, from_subtitle, to_season, to_subtitle)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn move_videos_to_season(
+    state: State<'_, AppState>,
+    series_id: i64,
+    video_ids: Vec<i64>,
+    season: i32,
+    subtitle: Option<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::move_videos_to_season(&pool, series_id, video_ids, season, subtitle)
         .await
         .map_err(|e| e.to_string())
 }
@@ -4151,6 +4151,7 @@ fn main() {
             delete_season,
             create_season,
             update_season_group,
+            move_videos_to_season,
             update_video_subtitle,
             get_actor_periods,
             add_actor_period,

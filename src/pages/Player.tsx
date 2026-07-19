@@ -426,9 +426,14 @@ const Player: React.FC = () => {
       mpvOperationLock.current = mpvOperationLock.current.then(async () => {
         if (mpvInitialized.current) {
           try {
+            // Send quit to let mpv flush and stop cleanly.
             await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
-            await new Promise(resolve => setTimeout(resolve, 800));
-            await runMpvCommand(() => mpvDestroy()).catch(() => {});
+            // Wait for mpv to process quit; the Rust is_alive guard prevents
+            // use-after-free even if destroy() is called before mpv fully stops.
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // Destroy the plugin instance. Safe even if already destroyed by
+            // the lib.rs CloseRequested handler — destroy() is idempotent.
+            await mpvDestroy().catch(() => {});
           } catch { /* ignore */ }
           mpvInitialized.current = false;
         }
@@ -523,6 +528,7 @@ const Player: React.FC = () => {
   }, [isFullscreen]);
 
   const playerWindow = getCurrentWindow();
+  const markSeriesDirty = useLibraryStore(s => s.markSeriesDirty);
 
   const runPlayerWindowAction = useCallback((action: () => Promise<void>, name: string) => {
     action().catch((error) => console.error(`[Player] ${name}失败:`, error));
@@ -707,7 +713,16 @@ const Player: React.FC = () => {
   }, [getCurrentVideoRatio, isFullscreen, isPiP, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
+    const _markDirty = markSeriesDirty;
     runPlayerWindowAction(async () => {
+      // Save playback progress BEFORE closing — the plugin's CloseRequested
+      // handler will destroy mpv, after which get_property calls would fail.
+      if (currentVideo && currentTime > 1) {
+        try {
+          await updatePlayHistory(currentVideo.id, currentTime, duration || currentVideo.duration);
+          _markDirty();
+        } catch { /* best-effort */ }
+      }
       try {
         const mainWindow = await Window.getByLabel('main').catch(() => null);
         if (mainWindow) {
@@ -718,9 +733,10 @@ const Player: React.FC = () => {
           await mainWindow.setAlwaysOnTop(false).catch(() => undefined);
         }
       } catch { /* 主窗口操作失败不影响关闭 */ }
+      // This triggers CloseRequested → plugin destroys mpv → window.close()
       await playerWindow.close();
     }, '关闭');
-  }, [playerWindow, runPlayerWindowAction]);
+  }, [playerWindow, runPlayerWindowAction, currentVideo, currentTime, duration, markSeriesDirty]);
 
   // 切换画中画
   const togglePiP = useCallback(async () => {
@@ -901,8 +917,6 @@ const Player: React.FC = () => {
   }, []);
 
   // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
-
-  const markSeriesDirty = useLibraryStore(s => s.markSeriesDirty);
 
   const savePlaybackProgress = useCallback(async () => {
     if (!currentVideo || currentTime < 1) return;

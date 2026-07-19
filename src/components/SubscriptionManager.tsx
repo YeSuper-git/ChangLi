@@ -1100,6 +1100,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
   const [newEpisodes, setNewEpisodes] = useState<any[]>([]);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [loadingSub, setLoadingSub] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Load existing subscription for this series
   useEffect(() => {
@@ -1212,6 +1213,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
   }
 
   const subscriptionVersionLabels = subscription ? getSubscriptionVersionLabels(subscription) : [];
+  void subscriptionVersionLabels;
+  void checkingUpdates;
+  void handleCheckUpdates;
+  void handleDelete;
+  void formatTimeAgo;
 
   return (
     <>
@@ -1225,30 +1231,11 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             已订阅
           </div>
-          <div
-            className="inline-flex items-center gap-1.5 min-w-0 max-w-full px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-medium"
-            title={subscriptionVersionLabels.join(' / ')}
-          >
-            <span className="text-rose-400">版本</span>
-            <span className="truncate max-w-[320px]">
-              {subscriptionVersionLabels.join(' / ')}
-            </span>
-          </div>
-          <span className="text-xs text-gray-400">
-            上次检查: {formatTimeAgo(subscription.last_check_at)}
-          </span>
           <button
-            onClick={handleCheckUpdates}
-            disabled={checkingUpdates}
+            onClick={() => setShowEditModal(true)}
             className="action-btn text-xs px-3 py-1 disabled:opacity-50"
           >
-            {checkingUpdates ? <>检查中 <img src={loadingIcon} alt='' className='w-3 h-3 inline' /></> : '检查更新'}
-          </button>
-          <button
-            onClick={handleDelete}
-            className="action-btn action-btn-danger text-xs px-3 py-1"
-          >
-            取消订阅
+            管理订阅
           </button>
         </div>
 
@@ -1331,6 +1318,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
           onClose={() => setShowBindModal(false)}
           onBind={handleBind}
           initialSeriesId={seriesId}
+        />,
+        document.body
+      )}
+
+      {createPortal(
+        <SubscriptionEditModal
+          open={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          subscription={subscription}
+          onSave={(sub) => {
+            setSubscription(sub);
+            setShowEditModal(false);
+            getSubscriptionBySeries(seriesId!).then(setSubscription).catch(() => {});
+            onSubscriptionChange?.();
+          }}
         />,
         document.body
       )}
