@@ -257,7 +257,7 @@ const Tags: React.FC = () => {
   );
 
   return (
-    <div className="changli-page">
+    <div className="changli-page" data-tutorial="tags-page">
       {/* Header */}
       <div className="changli-page-header changli-tags-header">
         <div>

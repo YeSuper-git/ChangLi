@@ -152,7 +152,7 @@ const Home: React.FC = () => {
         <section className="changli-detail-hero changli-panel mb-12 overflow-hidden p-7" data-tutorial="home-hero">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="changli-heading-xl mb-3">今天想看什么</h1>
+              <h1 className="changli-heading-xl mb-3">从哪一部开始今天的片刻</h1>
               <p className="changli-muted max-w-2xl text-sm leading-6">
                 快速回到追番进度，浏览最近入库的视频集，也可以直接进入演员库继续整理收藏。
               </p>

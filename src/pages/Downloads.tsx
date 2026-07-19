@@ -97,7 +97,7 @@ const Downloads: React.FC = () => {
   }
 
   return (
-    <div className="changli-page">
+    <div className="changli-page" data-tutorial="downloads-page">
       <div className="changli-page-header">
         <div className="flex items-baseline gap-3">
           <h1 className="changli-heading-xl">下载管理</h1>

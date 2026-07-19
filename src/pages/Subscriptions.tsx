@@ -296,7 +296,7 @@ const Subscriptions: React.FC = () => {
   }
 
   return (
-    <div className="changli-page subscriptions-page">
+    <div className="changli-page subscriptions-page" data-tutorial="subscriptions-page">
       <div className="changli-page-header subscriptions-header">
         <div>
           <h1 className="changli-heading-xl">订阅管理</h1>

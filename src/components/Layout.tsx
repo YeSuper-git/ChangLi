@@ -5,7 +5,7 @@ import appIcon from '../assets/brand/app-icon.png';
 import settingsIcon from '../assets/icons/settings.svg';
 import PageMotion from './PageMotion';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
-import { NAV_VISIBILITY_CHANGED_EVENT, readNavVisibility, type NavVisibility } from '../utils/navVisibility';
+import { NAV_VISIBILITY_CHANGED_EVENT, readNavVisibility, type NavItemKey, type NavVisibility } from '../utils/navVisibility';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -30,17 +30,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors') || location.pathname.startsWith('/completion');
   const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
 
-  const navItems = [
-    { path: '/', label: '首页' },
-    { path: '/library', label: '视频' },
-    { path: '/actors', label: '演员', tutorial: 'nav-actors' },
-    { path: '/tags', label: '标签' },
-    { path: '/subscriptions', label: '订阅', visibilityKey: 'subscriptions' as const },
-    { path: '/downloads', label: '下载', visibilityKey: 'downloads' as const },
-    { path: '/completion', label: '影评', visibilityKey: 'completion' as const },
+  const navItems: Array<{ key: NavItemKey; path: string; label: string; tutorial?: string }> = [
+    { key: 'home', path: '/', label: '首页' },
+    { key: 'library', path: '/library', label: '视频' },
+    { key: 'actors', path: '/actors', label: '演员', tutorial: 'nav-actors' },
+    { key: 'tags', path: '/tags', label: '标签' },
+    { key: 'subscriptions', path: '/subscriptions', label: '订阅' },
+    { key: 'downloads', path: '/downloads', label: '下载' },
+    { key: 'completion', path: '/completion', label: '影评' },
   ];
 
-  const visibleNavItems = navItems.filter((item) => !item.visibilityKey || navVisibility[item.visibilityKey]);
+  const navItemMap = new Map(navItems.map((item) => [item.key, item]));
+  const visibleNavItems = navVisibility.order
+    .map((key) => navItemMap.get(key))
+    .filter((item): item is (typeof navItems)[number] => item !== undefined && navVisibility[item.key]);
 
   const handleGlobalSearch = (event: React.FormEvent) => {
     event.preventDefault();

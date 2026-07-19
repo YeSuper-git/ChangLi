@@ -9,13 +9,16 @@ import loadingIcon from '../assets/icons/loading.svg';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BubbleSelect from '../components/BubbleSelect';
 import Switch from '../components/Switch';
+import alipayQr from '../assets/sponsor/alipay.jpg';
+import wechatPayQr from '../assets/sponsor/wechat-pay.jpg';
+import douyinQr from '../assets/sponsor/douyin.jpg';
 import { open } from '@tauri-apps/plugin-dialog';
 import { open as openExternal } from '@tauri-apps/plugin-shell';
 import { listen } from '@tauri-apps/api/event';
 import { notify } from '../utils/notify';
 import { changelogData, currentVersion } from '../generated/versionInfo';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
-import { readNavVisibility, saveNavVisibility, type NavVisibility } from '../utils/navVisibility';
+import { LOCKED_NAV_KEYS, readNavVisibility, saveNavVisibility, type NavItemKey, type NavVisibility } from '../utils/navVisibility';
 
 type GitHubRelease = {
   tag_name: string;
@@ -42,6 +45,8 @@ const compareVersions = (a: string, b: string) => {
   return 0;
 };
 
+const PROJECT_GITHUB_URL = 'https://github.com/YeSuper-git/ChangLi';
+
 const findPlatformInstaller = (release: GitHubRelease) => {
   const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
   if (isMac) {
@@ -64,6 +69,7 @@ const Settings: React.FC = () => {
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [downloadCompletedUpdate, setDownloadCompletedUpdate] = useState<{path: string; version: string; size: number} | null>(null);
   const [navVisibility, setNavVisibility] = useState<NavVisibility>(() => readNavVisibility());
+  const [aboutModal, setAboutModal] = useState<'feedback' | 'sponsor' | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   useEffect(() => {
@@ -144,8 +150,21 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleToggleNavVisibility = (key: keyof NavVisibility, checked: boolean) => {
+  const handleToggleNavVisibility = (key: NavItemKey, checked: boolean) => {
+    if (LOCKED_NAV_KEYS.includes(key)) return;
     const next = { ...navVisibility, [key]: checked };
+    setNavVisibility(next);
+    saveNavVisibility(next);
+  };
+
+  const handleMoveNavItem = (key: NavItemKey, direction: 'up' | 'down') => {
+    if (LOCKED_NAV_KEYS.includes(key)) return;
+    const order = [...navVisibility.order];
+    const index = order.indexOf(key);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < LOCKED_NAV_KEYS.length || targetIndex >= order.length) return;
+    [order[index], order[targetIndex]] = [order[targetIndex], order[index]];
+    const next = { ...navVisibility, order };
     setNavVisibility(next);
     saveNavVisibility(next);
   };
@@ -640,29 +659,61 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
-      {/* 导航栏显示 */}
-      <section className="mb-12">
+      {/* 导航栏控制 */}
+      <section className="mb-12" data-tutorial="settings-nav">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-semibold">导航栏显示</h2>
-            <p className="text-sm text-gray-500 mt-1">控制导航栏中可选功能入口的显示状态</p>
+            <h2 className="text-xl font-semibold">导航栏控制</h2>
+            <p className="text-sm text-gray-500 mt-1">控制导航栏入口显示，也可以调整可选页面的排列顺序</p>
           </div>
         </div>
-        <div className="changli-panel p-6 space-y-4">
-          {[
-            { key: 'subscriptions' as const, label: '订阅' },
-            { key: 'downloads' as const, label: '下载' },
-            { key: 'completion' as const, label: '影评' },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-gray-700">显示{item.label}</span>
-              <Switch
-                checked={navVisibility[item.key]}
-                onChange={(checked) => handleToggleNavVisibility(item.key, checked)}
-                ariaLabel={`显示${item.label}`}
-              />
-            </div>
-          ))}
+        <div className="changli-panel p-6 space-y-3">
+          {navVisibility.order.map((key, index) => {
+            const labels: Record<NavItemKey, string> = {
+              home: '首页',
+              library: '视频',
+              actors: '演员',
+              tags: '标签',
+              subscriptions: '订阅',
+              downloads: '下载',
+              completion: '影评',
+            };
+            const locked = LOCKED_NAV_KEYS.includes(key);
+            const canMoveUp = !locked && index > LOCKED_NAV_KEYS.length;
+            const canMoveDown = !locked && index < navVisibility.order.length - 1;
+            return (
+              <div key={key} className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white/70 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-gray-800">{labels[key]}</div>
+                  {locked && <div className="text-xs text-gray-400 mt-0.5">基础入口，固定显示</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="action-btn action-btn-secondary !px-3 !py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!canMoveUp}
+                    onClick={() => handleMoveNavItem(key, 'up')}
+                  >
+                    上移
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn action-btn-secondary !px-3 !py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!canMoveDown}
+                    onClick={() => handleMoveNavItem(key, 'down')}
+                  >
+                    下移
+                  </button>
+                  <Switch
+                    checked={navVisibility[key]}
+                    disabled={locked}
+                    onChange={(checked) => handleToggleNavVisibility(key, checked)}
+                    ariaLabel={`显示${labels[key]}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -1249,7 +1300,7 @@ const Settings: React.FC = () => {
             <h2 className="text-xl font-semibold">关于</h2>
             <p className="text-sm text-gray-500 mt-1">当前版本：v{currentVersion}</p>
           </div>
-          <div className="flex gap-2 items-center" data-tutorial="settings-about">
+          <div className="flex flex-wrap gap-2 items-center justify-end" data-tutorial="settings-about">
             {downloadedUpdate && (
               <button
                 onClick={() => handleInstallUpdate()}
@@ -1289,7 +1340,78 @@ const Settings: React.FC = () => {
             </button>
           </div>
         </div>
+        <div className="changli-panel p-6 space-y-5" data-tutorial="settings-about-content">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">ChangLi 开源项目</p>
+              <p className="text-sm text-gray-500 mt-1">欢迎查看源码、提交建议，也可以把遇到的问题反馈给我们。</p>
+            </div>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={() => openExternal(PROJECT_GITHUB_URL)}
+            >
+              打开 GitHub
+            </button>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/70 px-4 py-3 text-sm text-gray-600 break-all">
+            {PROJECT_GITHUB_URL}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="action-btn" onClick={() => setAboutModal('feedback')}>反馈问题</button>
+            <button type="button" className="action-btn" onClick={() => setAboutModal('sponsor')}>友情赞助</button>
+          </div>
+        </div>
       </section>
+
+
+      {/* 反馈 / 赞助弹窗 */}
+      {aboutModal && (
+        <div className="changli-modal-backdrop" onClick={() => setAboutModal(null)}>
+          <div className="changli-modal-panel !w-[min(100%,620px)] !p-0" onClick={(event) => event.stopPropagation()}>
+            <div className="changli-modal-header flex items-start justify-between gap-4">
+              <div>
+                <h2 className="changli-modal-title !mb-0">{aboutModal === 'feedback' ? '反馈问题' : '友情赞助'}</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {aboutModal === 'feedback' ? '感谢你帮我们把 ChangLi 变得更好。' : '感谢你的支持，这会让 ChangLi 继续保持更新。'}
+                </p>
+              </div>
+              <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl leading-none" onClick={() => setAboutModal(null)}>✕</button>
+            </div>
+            <div className="changli-modal-body space-y-5">
+              <p className="text-sm leading-6 text-gray-600">
+                {aboutModal === 'feedback'
+                  ? '如果你遇到问题，可以扫码通过抖音社交平台联系我反馈。描述清楚操作步骤、问题表现和当前版本，会更方便我们定位和修复。'
+                  : 'ChangLi 是免费项目，所有功能都可以正常使用。这里仅用于自愿赞助和打赏，感谢你愿意支持项目继续维护。'}
+              </p>
+              {aboutModal === 'sponsor' ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-4 text-center">
+                    <img src={alipayQr} alt="支付宝赞助二维码" className="mx-auto h-40 w-40 rounded-2xl object-contain shadow-sm" />
+                    <p className="mt-3 text-sm font-semibold text-gray-700">支付宝</p>
+                  </div>
+                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-4 text-center">
+                    <img src={wechatPayQr} alt="微信赞助二维码" className="mx-auto h-40 w-40 rounded-2xl object-contain shadow-sm" />
+                    <p className="mt-3 text-sm font-semibold text-gray-700">微信支付</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 text-center">
+                  <img src={douyinQr} alt="抖音反馈联系二维码" className="mx-auto h-44 w-44 rounded-2xl object-contain shadow-sm" />
+                  <p className="mt-4 text-sm leading-6 text-gray-600">
+                    也可以通过抖音社交平台联系我反馈问题，扫码后发送你遇到的问题、操作步骤和当前版本即可。
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="changli-modal-footer">
+              <button type="button" className="action-btn action-btn-primary" onClick={() => setAboutModal(null)}>
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* 版本更新记录弹窗 */}
