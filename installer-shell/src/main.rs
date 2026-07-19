@@ -2,6 +2,7 @@
 
 use std::{
     env, fs,
+    io::Write,
     path::{Path, PathBuf},
     process::Command,
     thread,
@@ -41,7 +42,11 @@ enum InstallerEvent {
     ChooseDir,
     Install,
     CloseAndLaunch,
-    InstallDone { success: bool, code: Option<i32> },
+    InstallDone {
+        success: bool,
+        code: Option<i32>,
+        message: String,
+    },
 }
 
 #[cfg(target_os = "windows")]
@@ -119,23 +124,77 @@ fn path_label(path: &Path) -> String {
     path.to_string_lossy().replace('\\', " / ")
 }
 
-fn write_embedded(name: &str, bytes: &[u8]) -> PathBuf {
+fn installer_log_path() -> PathBuf {
+    env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("APPDATA").map(PathBuf::from))
+        .unwrap_or_else(env::temp_dir)
+        .join("ChangLi")
+        .join("installer.log")
+}
+
+fn write_installer_log(message: &str) {
+    let log_path = installer_log_path();
+    if let Some(parent) = log_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let _ = writeln!(file, "{}", message);
+    }
+}
+
+fn write_embedded(name: &str, bytes: &[u8]) -> Result<PathBuf, String> {
     let mut p = env::temp_dir();
     p.push(name);
-    let _ = fs::write(&p, bytes);
-    p
+    fs::write(&p, bytes).map_err(|err| format!("释放安装组件失败：{}", err))?;
+    Ok(p)
 }
 
 fn start_install(install_dir: PathBuf, proxy: EventLoopProxy<InstallerEvent>) {
     thread::spawn(move || {
-        let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES);
-        let status = Command::new(&setup)
-            .arg("/S")
-            .arg(format!("/D={}", install_dir.display()))
-            .status();
-        let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
-        let code = status.ok().and_then(|s| s.code());
-        let _ = proxy.send_event(InstallerEvent::InstallDone { success, code });
+        write_installer_log(&format!("start install: {}", install_dir.display()));
+        let result = (|| -> Result<(bool, Option<i32>, String), String> {
+            fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败：{}", err))?;
+            let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES)?;
+            write_installer_log(&format!("inner setup: {}", setup.display()));
+            let status = Command::new(&setup)
+                .arg("/S")
+                .arg(format!("/D={}", install_dir.display()))
+                .status()
+                .map_err(|err| format!("启动安装后端失败：{}", err))?;
+            let code = status.code();
+            if status.success() {
+                Ok((true, code, "安装完成".to_string()))
+            } else {
+                Ok((
+                    false,
+                    code,
+                    format!(
+                        "安装后端返回失败{}。如安装在系统目录，请在管理员授权后重试。日志：{}",
+                        code.map(|c| format!("，退出码 {}", c)).unwrap_or_default(),
+                        installer_log_path().display()
+                    ),
+                ))
+            }
+        })();
+
+        let (success, code, message) = match result {
+            Ok(value) => value,
+            Err(message) => (false, None, message),
+        };
+        write_installer_log(&format!(
+            "finish install: success={} code={:?} message={}",
+            success, code, message
+        ));
+        let _ = proxy.send_event(InstallerEvent::InstallDone {
+            success,
+            code,
+            message,
+        });
     });
 }
 
@@ -387,13 +446,13 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     }}, 90);
   }};
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
-  window.installDone = (ok, code) => {{
+  window.installDone = (ok, code, message) => {{
     if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
       setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '完成并启动'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '完成'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       progress.classList.remove('active');
-      setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = '安装失败' + (code == null ? '' : '，退出码 ' + code); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
+      setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = message || ('安装失败' + (code == null ? '' : '，退出码 ' + code)); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
   }};
   requestAnimationFrame(() => requestAnimationFrame(() => {{ window.location.href = 'changli://ready'; }}));
@@ -545,11 +604,16 @@ fn main() -> wry::Result<()> {
                 let _ = webview.evaluate_script("window.setInstalling && window.setInstalling();");
                 start_install(install_dir.clone(), proxy.clone())
             }
-            Event::UserEvent(InstallerEvent::InstallDone { success, code }) => {
+            Event::UserEvent(InstallerEvent::InstallDone {
+                success,
+                code,
+                message,
+            }) => {
                 let script = format!(
-                    "window.installDone({}, {});",
+                    "window.installDone({}, {}, {});",
                     success,
-                    code.map(|c| c.to_string()).unwrap_or_else(|| "null".into())
+                    code.map(|c| c.to_string()).unwrap_or_else(|| "null".into()),
+                    serde_json::to_string(&message).unwrap_or_else(|_| "\"安装失败\"".into())
                 );
                 let _ = webview.evaluate_script(&script);
             }
