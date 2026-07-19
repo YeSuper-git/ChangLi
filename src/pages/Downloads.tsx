@@ -14,7 +14,6 @@ const Downloads: React.FC = () => {
   const { pendingKey, requestSecondConfirm } = useSecondConfirm();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     loadDownloads();
   }, []);
 
@@ -100,7 +99,10 @@ const Downloads: React.FC = () => {
   return (
     <div className="changli-page">
       <div className="changli-page-header">
-        <h1 className="changli-heading-xl">下载管理</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="changli-heading-xl">下载管理</h1>
+          <span className="text-xs font-medium text-gray-400">暂未上线</span>
+        </div>
         <span className="changli-soft-chip">{downloads.length} 个任务</span>
       </div>
 

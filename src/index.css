@@ -3330,10 +3330,14 @@ html.changli-player-html .changli-speed-options {
 }
 
 .completion-gallery-stats {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(86px, 1fr));
   gap: 10px;
   min-width: 330px;
+  align-self: start;
+  transform: translateY(-12px);
 }
 
 .completion-gallery-stats div {
@@ -3454,7 +3458,8 @@ html.changli-player-html .changli-speed-options {
 .completion-award-score {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
   margin-top: 2px;
   padding-top: 10px;
   border-top: 1px solid rgba(94, 56, 24, 0.22);
@@ -3542,10 +3547,13 @@ html.changli-player-html .changli-speed-options {
 }
 
 .completion-certificate-back {
+  --close-x: 0px;
+  --close-y: 0px;
   position: relative;
   width: min(920px, 100%);
   max-height: min(780px, calc(100vh - 56px));
   overflow: auto;
+  transform-origin: center center;
   padding: 30px;
   border-radius: 28px;
   color: #2d160d;
@@ -3562,17 +3570,42 @@ html.changli-player-html .changli-speed-options {
   to { opacity: 1; transform: rotateY(0deg) translateY(0) scale(1); }
 }
 
+.completion-detail-backdrop.is-closing {
+  pointer-events: none;
+  animation: completionBackdropOut 0.36s ease forwards;
+}
+
+.completion-detail-backdrop.is-closing .completion-certificate-back {
+  animation: completionShrinkToCard 0.36s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes completionBackdropOut {
+  to { opacity: 0; backdrop-filter: blur(0); }
+}
+
+@keyframes completionShrinkToCard {
+  to {
+    opacity: 0;
+    transform: translate(var(--close-x), var(--close-y)) rotateY(-52deg) rotateZ(-4deg) scale(0.18);
+  }
+}
+
 .completion-detail-close {
   position: absolute;
   top: 18px;
   right: 18px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
   border: 1px solid rgba(120, 53, 15, 0.18);
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 0;
   color: #78350f;
   background: rgba(255, 255, 255, 0.48);
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 500;
 }
 
 .completion-certificate-head {
@@ -3649,23 +3682,18 @@ html.changli-player-html .changli-speed-options {
 .completion-rating-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
-.completion-rating-row button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(120, 53, 15, 0.16);
-  border-radius: 12px;
-  color: #7c4a22;
-  background: rgba(255, 255, 255, 0.45);
-  font-weight: 950;
+.completion-rating-row input {
+  width: 130px;
 }
 
-.completion-rating-row button.active {
-  color: #fff7ed;
-  border-color: transparent;
-  background: linear-gradient(135deg, #8a4b1f, #d18b3c);
+.completion-rating-row span {
+  color: #9a5d23;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .completion-detail-actions {

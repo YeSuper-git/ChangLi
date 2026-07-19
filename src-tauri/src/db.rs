@@ -262,7 +262,7 @@ pub struct PlayHistory {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionRecordInput {
     pub series_id: i64,
-    pub rating: Option<i32>,
+    pub rating: Option<f64>,
     pub review: Option<String>,
     pub completed_at: Option<String>,
 }
@@ -279,7 +279,7 @@ pub struct SeriesCompletionRecord {
     pub video_count: i64,
     pub display_type: Option<String>,
     pub status: Option<String>,
-    pub rating: Option<i32>,
+    pub rating: Option<f64>,
     pub review: Option<String>,
     pub completed_at: Option<String>,
     pub last_played: Option<String>,
@@ -2325,7 +2325,10 @@ pub async fn get_completion_records(pool: &SqlitePool) -> Result<Vec<SeriesCompl
                 video_count: row.get("video_count"),
                 display_type: row.try_get("display_type").ok(),
                 status: row.try_get("status").ok(),
-                rating: row.try_get("rating").ok().flatten(),
+                rating: row.try_get::<Option<f64>, _>("rating").ok().flatten().map(|value| {
+                    let normalized = if value > 5.0 { value / 2.0 } else { value };
+                    (normalized.clamp(0.1, 5.0) * 10.0).round() / 10.0
+                }),
                 review: row.try_get("review").ok().flatten(),
                 completed_at: row.try_get("completed_at").ok().flatten(),
                 last_played: row.try_get("last_played").ok().flatten(),
@@ -2342,7 +2345,10 @@ pub async fn upsert_completion_record(
 ) -> Result<SeriesCompletionRecord> {
     let completed_at = input.completed_at.unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
     let review = input.review.map(|text| text.trim().to_string()).filter(|text| !text.is_empty());
-    let rating = input.rating.map(|value| value.clamp(1, 10));
+    let rating = input.rating.map(|value| {
+        let normalized = if value > 5.0 { value / 2.0 } else { value };
+        (normalized.clamp(0.1, 5.0) * 10.0).round() / 10.0
+    });
 
     sqlx::query(
         r#"
@@ -2371,7 +2377,7 @@ pub async fn upsert_completion_record(
     records
         .into_iter()
         .find(|record| record.series_id == input.series_id)
-        .ok_or_else(|| anyhow::anyhow!("展览记录保存后未找到"))
+        .ok_or_else(|| anyhow::anyhow!("金番奖记录保存后未找到"))
 }
 
 pub async fn delete_completion_record(pool: &SqlitePool, series_id: i64) -> Result<()> {
@@ -3295,30 +3301,83 @@ pub struct SeasonInfo {
     pub video_count: i64,
 }
 
+fn normalize_season(season: i32) -> i32 {
+    if season == 999 { 999 } else if season > 0 { season } else { 1 }
+}
+
+fn normalize_subtitle(subtitle: Option<&str>) -> String {
+    subtitle.unwrap_or("").trim().to_string()
+}
+
 pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec<SeasonInfo>> {
-    let rows = sqlx::query(
-        "SELECT season, subtitle, COUNT(*) as video_count FROM videos WHERE series_id = ? GROUP BY season, subtitle ORDER BY season"
+    let mut groups: std::collections::BTreeMap<(i32, String), i64> = std::collections::BTreeMap::new();
+
+    let meta_rows = sqlx::query("SELECT season, COALESCE(subtitle, '') AS subtitle FROM series_seasons WHERE series_id = ?")
+        .bind(series_id)
+        .fetch_all(pool)
+        .await?;
+    for row in meta_rows {
+        let season: i32 = row.get("season");
+        let subtitle: String = row.get("subtitle");
+        groups.entry((normalize_season(season), subtitle)).or_insert(0);
+    }
+
+    let video_rows = sqlx::query(
+        "SELECT season, COALESCE(subtitle, '') AS subtitle, COUNT(*) as video_count FROM videos WHERE series_id = ? GROUP BY season, subtitle"
     )
     .bind(series_id)
     .fetch_all(pool)
     .await?;
+    for row in video_rows {
+        let season: i32 = row.try_get("season").unwrap_or(0);
+        let subtitle: String = row.try_get("subtitle").unwrap_or_default();
+        let count: i64 = row.get("video_count");
+        *groups.entry((normalize_season(season), subtitle)).or_insert(0) += count;
+    }
 
-    Ok(rows
-        .iter()
-        .map(|row| SeasonInfo {
-            season: row.get("season"),
-            subtitle: row.try_get("subtitle").ok(),
-            video_count: row.get("video_count"),
+    groups.entry((1, String::new())).or_insert(0);
+
+    let mut seasons: Vec<SeasonInfo> = groups
+        .into_iter()
+        .map(|((season, subtitle), video_count)| SeasonInfo {
+            season,
+            subtitle: if subtitle.trim().is_empty() { None } else { Some(subtitle) },
+            video_count,
         })
-        .collect())
+        .collect();
+    seasons.sort_by(|a, b| {
+        let ak = if a.season == 999 { i32::MAX } else { a.season };
+        let bk = if b.season == 999 { i32::MAX } else { b.season };
+        ak.cmp(&bk).then_with(|| a.subtitle.cmp(&b.subtitle))
+    });
+    Ok(seasons)
 }
 
-pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32) -> Result<()> {
-    sqlx::query("DELETE FROM videos WHERE series_id = ? AND season = ?")
+pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32, subtitle: Option<String>) -> Result<()> {
+    let target_season = normalize_season(season);
+    let target_subtitle = normalize_subtitle(subtitle.as_deref());
+
+    sqlx::query("DELETE FROM series_seasons WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?")
         .bind(series_id)
-        .bind(season)
+        .bind(target_season)
+        .bind(&target_subtitle)
         .execute(pool)
         .await?;
+
+    if target_season == 1 {
+        sqlx::query("DELETE FROM videos WHERE series_id = ? AND (season IS NULL OR season = 0 OR season = 1) AND COALESCE(subtitle, '') = ?")
+            .bind(series_id)
+            .bind(&target_subtitle)
+            .execute(pool)
+            .await?;
+    } else {
+        sqlx::query("DELETE FROM videos WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?")
+            .bind(series_id)
+            .bind(target_season)
+            .bind(&target_subtitle)
+            .execute(pool)
+            .await?;
+    }
     Ok(())
 }
 
@@ -3328,33 +3387,81 @@ pub async fn create_season(
     season: i32,
     subtitle: Option<&str>,
 ) -> Result<()> {
-    // 获取当前最大 season 编号（排除 999）
-    // 如果 season 参数传 0，自动分配下一个季号
-    // 如果 season 参数传 999，创建剧场版
     let target_season = if season == 0 {
-        let max_season: i32 = sqlx::query_scalar(
-            "SELECT COALESCE(MAX(season), 0) FROM videos WHERE series_id = ? AND season < 999",
+        let max_video_season: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(CASE WHEN season IS NULL OR season = 0 THEN 1 ELSE season END), 0) FROM videos WHERE series_id = ? AND COALESCE(season, 0) < 999",
         )
         .bind(series_id)
         .fetch_one(pool)
         .await?;
-        max_season + 1
+        let max_meta_season: i32 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(season), 0) FROM series_seasons WHERE series_id = ? AND season < 999",
+        )
+        .bind(series_id)
+        .fetch_one(pool)
+        .await?;
+        std::cmp::max(1, std::cmp::max(max_video_season, max_meta_season)) + 1
     } else {
-        season
+        normalize_season(season)
     };
-
-    // 插入一个占位视频记录，season 字段标记季号
-    // 使用一个特殊的占位路径，后续可被真实视频覆盖
+    let subtitle_text = normalize_subtitle(subtitle);
     sqlx::query(
-        "INSERT INTO videos (file_path, file_name, series_id, season, subtitle) VALUES (?, ?, ?, ?, ?)"
+        "INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)"
     )
-    .bind(format!("__placeholder__/series_{}/season_{}", series_id, target_season))
-    .bind(format!("占位-第{}季", target_season))
     .bind(series_id)
     .bind(target_season)
-    .bind(subtitle)
+    .bind(&subtitle_text)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+pub async fn update_season_group(
+    pool: &SqlitePool,
+    series_id: i64,
+    from_season: i32,
+    from_subtitle: Option<String>,
+    to_season: i32,
+    to_subtitle: Option<String>,
+) -> Result<()> {
+    let source_season = normalize_season(from_season);
+    let source_subtitle = normalize_subtitle(from_subtitle.as_deref());
+    let target_season = normalize_season(to_season);
+    let target_subtitle = normalize_subtitle(to_subtitle.as_deref());
+
+    sqlx::query("INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)")
+        .bind(series_id)
+        .bind(target_season)
+        .bind(&target_subtitle)
+        .execute(pool)
+        .await?;
+
+    if source_season == 1 {
+        sqlx::query("UPDATE videos SET season = ?, subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE series_id = ? AND (season IS NULL OR season = 0 OR season = 1) AND COALESCE(subtitle, '') = ?")
+            .bind(target_season)
+            .bind(&target_subtitle)
+            .bind(series_id)
+            .bind(&source_subtitle)
+            .execute(pool)
+            .await?;
+    } else {
+        sqlx::query("UPDATE videos SET season = ?, subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?")
+            .bind(target_season)
+            .bind(&target_subtitle)
+            .bind(series_id)
+            .bind(source_season)
+            .bind(&source_subtitle)
+            .execute(pool)
+            .await?;
+    }
+
+    sqlx::query("DELETE FROM series_seasons WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?")
+        .bind(series_id)
+        .bind(source_season)
+        .bind(&source_subtitle)
+        .execute(pool)
+        .await?;
+
     Ok(())
 }
 

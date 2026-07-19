@@ -53,6 +53,18 @@ function formatTimeAgo(dateStr: string | null): string {
   return `${diffD} 天前`;
 }
 
+function updateFingerprint(items: any[]): string {
+  return items
+    .map(item => String(item.guid || item.magnet_link || item.torrent_url || item.title || ''))
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
+function isSameUpdateResult(prev: any[] | undefined, next: any[]): boolean {
+  return Boolean(prev && prev.length === next.length && updateFingerprint(prev) === updateFingerprint(next));
+}
+
 function getSubscriptionVersionLabels(subscription: BangumiSubscription): string[] {
   try {
     const prefs = JSON.parse(subscription.preferences || '{}');
@@ -1105,13 +1117,14 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
     setCheckingUpdates(true);
     try {
       const items = await checkSubscriptionUpdates(subscription.id);
+      const repeatedPositiveResult = items.length > 0 && isSameUpdateResult(newEpisodes, items);
       const updated = await getSubscriptionBySeries(seriesId!);
       setSubscription(updated);
       setNewEpisodes(items);
       setExpandedId(expandedId === subscription.id ? null : subscription.id);
-      if (items.length > 0) {
+      if (items.length > 0 && !repeatedPositiveResult) {
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
-      } else {
+      } else if (items.length === 0) {
         notify({ message: '暂无新剧集更新', type: 'info' });
       }
     } catch (err: any) {

@@ -10,13 +10,8 @@ const FloatingActions: React.FC<FloatingActionsProps> = ({ onRefresh, refreshLab
   const [refreshing, setRefreshing] = useState(false);
 
   const scrollToTop = () => {
-    // 优先滚动 .changli-main 容器（Layout 的主内容区）
     const main = document.querySelector('.changli-main');
-    if (main) {
-      main.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    main?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRefresh = async () => {

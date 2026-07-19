@@ -77,7 +77,36 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     
     // === 订阅相关表 ===
     create_subscription_tables(pool).await?;
+    create_series_seasons_table(pool).await?;
 
+    Ok(())
+}
+
+
+async fn create_series_seasons_table(pool: &SqlitePool) -> Result<()> {
+    execute(
+        pool,
+        r#"
+        CREATE TABLE IF NOT EXISTS series_seasons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_id INTEGER NOT NULL,
+            season INTEGER NOT NULL,
+            subtitle TEXT NOT NULL DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(series_id) REFERENCES video_series(id) ON DELETE CASCADE,
+            UNIQUE(series_id, season, subtitle)
+        )
+        "#,
+        "create series_seasons table",
+    )
+    .await?;
+    execute(
+        pool,
+        "CREATE INDEX IF NOT EXISTS idx_series_seasons_series_id ON series_seasons(series_id)",
+        "create series_seasons series index",
+    )
+    .await?;
     Ok(())
 }
 

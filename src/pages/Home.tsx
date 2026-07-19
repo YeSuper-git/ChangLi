@@ -23,7 +23,6 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     // 只在数据为空时加载，避免从其他页面导航过来时重新加载
     if (categories.length === 0) {
       getAllCategories()

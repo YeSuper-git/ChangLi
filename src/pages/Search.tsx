@@ -45,7 +45,6 @@ const Search: React.FC = () => {
 
   // 加载大类配置
   useEffect(() => {
-    window.scrollTo(0, 0);
     getAllCategories().then(setCategories).catch(() => {});
   }, []);
 

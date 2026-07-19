@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { addSite, getUpdatesDir, getStorageInfo, openDataDir, startPosterUpdateSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
+import { addSite, getUpdatesDir, getStorageInfo, openDataDir, setDownloadDir, setAutoUseLastDownloadDir, startPosterUpdateSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
 import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useLibraryStore } from '../store/libraryStore';
@@ -15,6 +15,7 @@ import { listen } from '@tauri-apps/api/event';
 import { notify } from '../utils/notify';
 import { changelogData, currentVersion } from '../generated/versionInfo';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
+import { readNavVisibility, saveNavVisibility, type NavVisibility } from '../utils/navVisibility';
 
 type GitHubRelease = {
   tag_name: string;
@@ -62,10 +63,10 @@ const Settings: React.FC = () => {
   // envDeps 已移除
   const [downloadedUpdate, setDownloadedUpdate] = useState<{path: string; name: string; size: number} | null>(null);
   const [downloadCompletedUpdate, setDownloadCompletedUpdate] = useState<{path: string; version: string; size: number} | null>(null);
+  const [navVisibility, setNavVisibility] = useState<NavVisibility>(() => readNavVisibility());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSite, setNewSite] = useState({ name: '', url: '', parser_type: 'auto', config: '{}' });
   useEffect(() => {
-    window.scrollTo(0, 0);
     loadSettingsData();
     getPosterRepairStatus().then(setPosterRepairStatus).catch(() => {});
   }, []);
@@ -116,6 +117,37 @@ const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectDownloadDir = async () => {
+    try {
+      const selected = await open({ directory: true, title: '选择下载目录' });
+      if (!selected) return;
+      const storage = await setDownloadDir(selected as string);
+      setStorageInfo(storage);
+      notify({ message: '下载目录已更新', type: 'success' });
+    } catch (error) {
+      console.error('更换下载目录失败:', error);
+      notify({ message: '更换下载目录失败，请稍后重试', type: 'error' });
+    }
+  };
+
+  const handleToggleAutoUseLastDownloadDir = async (enabled: boolean) => {
+    try {
+      setStorageInfo((current: any) => current ? { ...current, auto_use_last_download_dir: enabled } : current);
+      const storage = await setAutoUseLastDownloadDir(enabled);
+      setStorageInfo(storage);
+    } catch (error) {
+      console.error('保存下载目录偏好失败:', error);
+      setStorageInfo((current: any) => current ? { ...current, auto_use_last_download_dir: !enabled } : current);
+      notify({ message: '保存失败，请稍后重试', type: 'error' });
+    }
+  };
+
+  const handleToggleNavVisibility = (key: keyof NavVisibility, checked: boolean) => {
+    const next = { ...navVisibility, [key]: checked };
+    setNavVisibility(next);
+    saveNavVisibility(next);
   };
 
   const handleRepairMissingPosters = async () => {
@@ -575,19 +607,62 @@ const Settings: React.FC = () => {
             </code>
           </div>
           <div className="flex items-start gap-3">
-            <span className="text-sm text-gray-500 w-24 shrink-0">数据库</span>
-            <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
-              {storageInfo?.db_path || '加载中...'}
-            </code>
-          </div>
-          <div className="flex items-start gap-3">
             <span className="text-sm text-gray-500 w-24 shrink-0">缓存目录</span>
             <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
               {updatesDir || '加载中...'}
             </code>
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="flex items-start gap-3">
+            <span className="text-sm text-gray-500 w-24 shrink-0 pt-2">下载目录</span>
+            <div className="flex-1 min-w-0 space-y-3">
+              <div className="flex items-start gap-3">
+                <code className="text-sm text-gray-800 break-all bg-gray-50 px-3 py-2 rounded-lg flex-1">
+                  {storageInfo?.download_dir || '加载中...'}
+                </code>
+                <button
+                  onClick={handleSelectDownloadDir}
+                  className="action-btn action-btn-secondary text-sm shrink-0"
+                >
+                  更换目录
+                </button>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={Boolean(storageInfo?.auto_use_last_download_dir)}
+                  onChange={(event) => handleToggleAutoUseLastDownloadDir(event.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                />
+                自动使用上次下载目录
+              </label>
+            </div>
           </div>
+        </div>
+      </section>
+
+      {/* 导航栏显示 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">导航栏显示</h2>
+            <p className="text-sm text-gray-500 mt-1">控制导航栏中可选功能入口的显示状态</p>
+          </div>
+        </div>
+        <div className="changli-panel p-6 space-y-4">
+          {[
+            { key: 'subscriptions' as const, label: '订阅' },
+            { key: 'downloads' as const, label: '下载' },
+            { key: 'completion' as const, label: '金番奖' },
+          ].map((item) => (
+            <div key={item.key} className="flex items-center justify-between gap-4">
+              <span className="text-sm text-gray-700">显示{item.label}</span>
+              <Switch
+                checked={navVisibility[item.key]}
+                onChange={(checked) => handleToggleNavVisibility(item.key, checked)}
+                ariaLabel={`显示${item.label}`}
+              />
+            </div>
+          ))}
         </div>
       </section>
 

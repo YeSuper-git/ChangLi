@@ -123,7 +123,7 @@ const ActorDetail: React.FC = () => {
 
   const loadActor = async (actorId: number, options: { scrollToTop?: boolean; resetPhoto?: boolean; silent?: boolean } = {}) => {
     try {
-      if (options.scrollToTop) window.scrollTo(0, 0);
+      if (options.scrollToTop) document.querySelector('.changli-main')?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
       if (!options.silent) setLoading(true);
       const [actorData, resourcesData, periodsData, periodMap, photosData, actorFieldsData] = await Promise.all([
         getActor(actorId),

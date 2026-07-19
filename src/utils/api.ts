@@ -5,6 +5,8 @@ export interface StorageInfo {
   data_dir: string;
   db_path: string;
   portable_root?: string;
+  download_dir: string;
+  auto_use_last_download_dir: boolean;
 }
 
 export async function getStorageInfo(): Promise<StorageInfo> {
@@ -24,6 +26,14 @@ export async function openDataDir(): Promise<void> {
     console.error('[API] openDataDir 失败:', err);
     throw err;
   }
+}
+
+export async function setDownloadDir(path: string): Promise<StorageInfo> {
+  return invoke<StorageInfo>('set_download_dir', { path });
+}
+
+export async function setAutoUseLastDownloadDir(enabled: boolean): Promise<StorageInfo> {
+  return invoke<StorageInfo>('set_auto_use_last_download_dir', { enabled });
 }
 
 export interface PosterRepairStatus {
@@ -472,8 +482,28 @@ export async function getSeriesSeasons(seriesId: number): Promise<SeasonInfo[]> 
   return invoke<SeasonInfo[]>('get_series_seasons', { seriesId });
 }
 
-export async function deleteSeason(seriesId: number, season: number): Promise<void> {
-  return invoke('delete_season', { seriesId, season });
+export async function deleteSeason(seriesId: number, season: number, subtitle?: string): Promise<void> {
+  return invoke('delete_season', { seriesId, season, subtitle: subtitle || null });
+}
+
+export async function createSeason(seriesId: number, season: number, subtitle?: string): Promise<void> {
+  return invoke('create_season', { seriesId, season, subtitle: subtitle || null });
+}
+
+export async function updateSeasonGroup(
+  seriesId: number,
+  fromSeason: number,
+  fromSubtitle: string | undefined,
+  toSeason: number,
+  toSubtitle?: string,
+): Promise<void> {
+  return invoke('update_season_group', {
+    seriesId,
+    fromSeason,
+    fromSubtitle: fromSubtitle || null,
+    toSeason,
+    toSubtitle: toSubtitle || null,
+  });
 }
 
 export async function updateVideoSubtitle(videoId: number, subtitle?: string): Promise<void> {

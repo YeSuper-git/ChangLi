@@ -48,6 +48,18 @@ function saveSubUpdates(updates: Map<number, any[]>) {
   localStorage.setItem('changli_sub_updates', JSON.stringify(obj));
 }
 
+function updateFingerprint(items: any[]): string {
+  return items
+    .map(item => String(item.guid || item.magnet_link || item.torrent_url || item.title || ''))
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
+function isSameUpdateResult(prev: any[] | undefined, next: any[]): boolean {
+  return Boolean(prev && prev.length === next.length && updateFingerprint(prev) === updateFingerprint(next));
+}
+
 /// 从 localStorage 读取展开状态
 function loadExpandedSubs(): Set<number> {
   try {
@@ -111,6 +123,7 @@ const Subscriptions: React.FC = () => {
 
   // Per-subscription checking state
   const [checkingId, setCheckingId] = useState<number | null>(null);
+  const [checkingAll, setCheckingAll] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -132,7 +145,6 @@ const Subscriptions: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     const { subscriptions: cached, loaded } = useSubscriptionStore.getState();
     if (loaded && cached.length > 0) {
       setSubscriptions(cached);
@@ -165,6 +177,8 @@ const Subscriptions: React.FC = () => {
     setCheckingId(sub.id);
     try {
       const items = await checkSubscriptionUpdates(sub.id);
+      const previousItems = subUpdates.get(sub.id);
+      const repeatedPositiveResult = items.length > 0 && isSameUpdateResult(previousItems, items);
       await loadData();
 
       setSubUpdates(prev => {
@@ -174,9 +188,9 @@ const Subscriptions: React.FC = () => {
         return next;
       });
       setExpandedSubs(prev => { const next = new Set([...prev, sub.id]); saveExpandedSubs(next); return next; });
-      if (items.length > 0) {
+      if (items.length > 0 && !repeatedPositiveResult) {
         notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
-      } else {
+      } else if (items.length === 0) {
         notify({ message: '暂无新剧集更新', type: 'info' });
       }
     } catch (err) {
@@ -184,6 +198,51 @@ const Subscriptions: React.FC = () => {
       notify({ message: '检查更新失败', type: 'error' });
     } finally {
       setCheckingId(null);
+    }
+  };
+
+  const handleCheckAllUpdates = async () => {
+    if (checkingAll || subscriptions.length === 0) return;
+    setCheckingAll(true);
+    setCheckingId(null);
+    try {
+      let totalNew = 0;
+      let hasChangedPositiveResult = false;
+      const nextUpdates = new Map(subUpdates);
+      const nextExpanded = new Set(expandedSubs);
+
+      for (const sub of subscriptions) {
+        setCheckingId(sub.id);
+        const items = await checkSubscriptionUpdates(sub.id);
+        const previousItems = nextUpdates.get(sub.id);
+        if (items.length > 0 && !isSameUpdateResult(previousItems, items)) {
+          hasChangedPositiveResult = true;
+        }
+        nextUpdates.set(sub.id, items);
+        if (items.length > 0) {
+          totalNew += items.length;
+          nextExpanded.add(sub.id);
+        }
+      }
+
+      saveSubUpdates(nextUpdates);
+      saveExpandedSubs(nextExpanded);
+      setSubUpdates(nextUpdates);
+      setExpandedSubs(nextExpanded);
+      useSubscriptionStore.getState().markDirty();
+      await loadData();
+
+      if (totalNew > 0 && hasChangedPositiveResult) {
+        notify({ message: `一键检查完成，发现 ${totalNew} 个新剧集`, type: 'success' });
+      } else if (totalNew === 0) {
+        notify({ message: '一键检查完成，暂无新剧集更新', type: 'info' });
+      }
+    } catch (err) {
+      console.error('[Subscriptions] 一键检查失败:', err);
+      notify({ message: '一键检查失败', type: 'error' });
+    } finally {
+      setCheckingId(null);
+      setCheckingAll(false);
     }
   };
 
@@ -236,12 +295,25 @@ const Subscriptions: React.FC = () => {
     <div className="changli-page">
       <div className="changli-page-header">
         <h1 className="changli-heading-xl">订阅管理</h1>
-        <button
-          onClick={() => setShowBindModal(true)}
-          className="action-btn action-btn-primary text-sm"
-        >
-          + 添加订阅
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCheckAllUpdates}
+            disabled={checkingAll || subscriptions.length === 0}
+            className="action-btn text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {checkingAll ? (
+              <span className="flex items-center gap-1">
+                检查中 <img src={loadingIcon} alt="" className="w-3 h-3" />
+              </span>
+            ) : '一键检查'}
+          </button>
+          <button
+            onClick={() => setShowBindModal(true)}
+            className="action-btn action-btn-primary text-sm"
+          >
+            + 添加订阅
+          </button>
+        </div>
       </div>
 
       {subscriptions.length === 0 ? (
@@ -336,7 +408,7 @@ const Subscriptions: React.FC = () => {
                               </button>
                               <button
                                 onClick={() => handleCheckUpdates(sub)}
-                                disabled={checkingId === sub.id}
+                                disabled={checkingAll || checkingId === sub.id}
                                 className="action-btn text-xs px-3 py-1 disabled:opacity-50"
                               >
                                 {checkingId === sub.id ? (

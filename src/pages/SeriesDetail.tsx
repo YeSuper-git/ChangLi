@@ -19,6 +19,8 @@ import {
   deleteVideo,
   deleteVideosBatch,
   deleteSeason,
+  createSeason,
+  updateSeasonGroup,
   getActors,
   getSeriesActors,
   getSeriesSeasons,
@@ -144,6 +146,12 @@ const SeriesDetail: React.FC = () => {
   const [showSeasonManager, setShowSeasonManager] = useState(false);
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [seasonActionBusy, setSeasonActionBusy] = useState(false);
+  const [movieTitleInput, setMovieTitleInput] = useState('');
+  const [seasonEditTarget, setSeasonEditTarget] = useState<SeasonInfo | null>(null);
+  const [seasonEditMode, setSeasonEditMode] = useState<'season' | 'movie'>('season');
+  const [seasonEditSeason, setSeasonEditSeason] = useState('1');
+  const [seasonEditSubtitle, setSeasonEditSubtitle] = useState('');
   const [missingVideos, setMissingVideos] = useState<Video[]>([]);
   const [updateDialog, setUpdateDialog] = useState<{
     newVideos: Video[];
@@ -153,7 +161,7 @@ const SeriesDetail: React.FC = () => {
     renamedVideosCount: number;
     posterUpdated: boolean;
   } | null>(null);
-  const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; label: string; videoCount: number } | null>(null);
+  const [seasonDeleteConfirm, setSeasonDeleteConfirm] = useState<{ season: number; subtitle?: string; label: string; videoCount: number } | null>(null);
 
   useEffect(() => {
     setEditOptionsLoaded(false);
@@ -487,12 +495,83 @@ const SeriesDetail: React.FC = () => {
     }
   };
 
-  const handleDeleteSeason = async (season: number) => {
+  const refreshSeasonData = async () => {
+    const data = await getSeriesSeasons(seriesId);
+    setSeasons(data);
+    await loadSeries({ silent: true });
+  };
+
+  const handleCreateNextSeason = async () => {
+    if (seasonActionBusy) return;
+    setSeasonActionBusy(true);
     try {
-      await deleteSeason(seriesId, season);
-      const data = await getSeriesSeasons(seriesId);
-      setSeasons(data);
-      await loadSeries();
+      await createSeason(seriesId, 0);
+      await refreshSeasonData();
+      notify({ message: '已新增一季', type: 'success' });
+    } catch (error) {
+      console.error('新增季失败:', error);
+      notify({ message: '新增季失败，请稍后重试', type: 'error' });
+    } finally {
+      setSeasonActionBusy(false);
+    }
+  };
+
+  const handleCreateMovie = async () => {
+    if (seasonActionBusy) return;
+    const title = movieTitleInput.trim() || '剧场版';
+    setSeasonActionBusy(true);
+    try {
+      await createSeason(seriesId, 999, title);
+      setMovieTitleInput('');
+      await refreshSeasonData();
+      notify({ message: '已新增剧场版', type: 'success' });
+    } catch (error) {
+      console.error('新增剧场版失败:', error);
+      notify({ message: '新增剧场版失败，请稍后重试', type: 'error' });
+    } finally {
+      setSeasonActionBusy(false);
+    }
+  };
+
+  const openSeasonEdit = (source: SeasonInfo, mode: 'season' | 'movie') => {
+    setSeasonEditTarget(source);
+    setSeasonEditMode(mode);
+    setSeasonEditSeason(source.season === 999 ? '1' : String(source.season));
+    setSeasonEditSubtitle(source.subtitle || (mode === 'movie' ? '剧场版' : ''));
+  };
+
+  const handleSubmitSeasonEdit = async () => {
+    if (!seasonEditTarget || seasonActionBusy) return;
+    const targetSeason = seasonEditMode === 'movie' ? 999 : Number(seasonEditSeason);
+    if (seasonEditMode === 'season' && (!Number.isFinite(targetSeason) || targetSeason <= 0 || targetSeason >= 999)) {
+      notify({ message: '季号需要填写 1-998 之间的数字', type: 'error' });
+      return;
+    }
+    const targetSubtitle = seasonEditMode === 'movie' ? (seasonEditSubtitle.trim() || '剧场版') : undefined;
+    setSeasonActionBusy(true);
+    try {
+      await updateSeasonGroup(
+        seriesId,
+        seasonEditTarget.season,
+        seasonEditTarget.subtitle,
+        targetSeason,
+        targetSubtitle,
+      );
+      setSeasonEditTarget(null);
+      await refreshSeasonData();
+      notify({ message: '已更新分组', type: 'success' });
+    } catch (error) {
+      console.error('更新分组失败:', error);
+      notify({ message: '更新失败，请稍后重试', type: 'error' });
+    } finally {
+      setSeasonActionBusy(false);
+    }
+  };
+
+  const handleDeleteSeason = async (season: number, subtitle?: string) => {
+    try {
+      await deleteSeason(seriesId, season, subtitle);
+      await refreshSeasonData();
     } catch (error) {
       console.error('删除季失败:', error);
       notify({ message: '删除季失败，请稍后重试', type: 'error' });
@@ -1058,19 +1137,15 @@ const SeriesDetail: React.FC = () => {
           )}
         </div>
       </div>
-      {videos.length > 0 ? (
-        <VideoGrid
-          videos={videos}
-          posterOrientation="landscape"
-          episodeWord={features.episode || '部'}
-          fallbackPoster={series?.poster_data_url}
-          selectMode={selectMode}
-          selectedEpisodes={selectedEpisodes}
-          onToggleSelect={toggleEpisodeSelect}
-        />
-      ) : (
-        <div className="changli-empty-state text-gray-500">暂无资源</div>
-      )}
+      <VideoGrid
+        videos={videos}
+        posterOrientation="landscape"
+        episodeWord={features.episode || '部'}
+        fallbackPoster={series?.poster_data_url}
+        selectMode={selectMode}
+        selectedEpisodes={selectedEpisodes}
+        onToggleSelect={toggleEpisodeSelect}
+      />
       </div>
 
 
@@ -1207,7 +1282,88 @@ const SeriesDetail: React.FC = () => {
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">管理</p>
               <h2 className="mt-1 text-2xl font-bold text-gray-900">季管理</h2>
             </div>
-            <div className="changli-modal-body max-h-96 overflow-y-auto">
+            <div className="changli-modal-body max-h-96 overflow-y-auto space-y-4">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleCreateNextSeason}
+                    disabled={seasonActionBusy}
+                    className="action-btn action-btn-primary text-xs disabled:opacity-50"
+                  >
+                    新增一季
+                  </button>
+                  <input
+                    type="text"
+                    value={movieTitleInput}
+                    onChange={(event) => setMovieTitleInput(event.target.value)}
+                    placeholder="剧场版名称"
+                    className="search-input !py-2 !text-xs flex-1 min-w-[160px]"
+                  />
+                  <button
+                    onClick={handleCreateMovie}
+                    disabled={seasonActionBusy}
+                    className="action-btn text-xs disabled:opacity-50"
+                  >
+                    新增剧场版
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">季和剧场版是独立分组，不再用占位视频模拟。</p>
+              </div>
+              {seasonEditTarget && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 space-y-3">
+                  <div className="text-sm font-semibold text-gray-900">
+                    调整「{getSeasonLabel(seasonEditTarget.season, seasonEditTarget.subtitle || undefined)}」
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSeasonEditMode('season')}
+                      className={`action-btn text-xs ${seasonEditMode === 'season' ? 'action-btn-primary' : ''}`}
+                    >
+                      设为季
+                    </button>
+                    <button
+                      onClick={() => setSeasonEditMode('movie')}
+                      className={`action-btn text-xs ${seasonEditMode === 'movie' ? 'action-btn-primary' : ''}`}
+                    >
+                      设为剧场版
+                    </button>
+                  </div>
+                  {seasonEditMode === 'season' ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={998}
+                      value={seasonEditSeason}
+                      onChange={(event) => setSeasonEditSeason(event.target.value)}
+                      placeholder="季号"
+                      className="search-input !py-2 !text-xs w-full"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={seasonEditSubtitle}
+                      onChange={(event) => setSeasonEditSubtitle(event.target.value)}
+                      placeholder="剧场版名称"
+                      className="search-input !py-2 !text-xs w-full"
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitSeasonEdit}
+                      disabled={seasonActionBusy}
+                      className="action-btn action-btn-primary text-xs disabled:opacity-50"
+                    >
+                      保存调整
+                    </button>
+                    <button
+                      onClick={() => setSeasonEditTarget(null)}
+                      className="action-btn text-xs"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              )}
               {loadingSeasons ? (
                 <div className="text-gray-500 text-sm flex items-center gap-2 py-4">
                   <span>检查更新中</span> <img src={loadingIcon} alt="" className="w-5 h-5" />
@@ -1215,25 +1371,42 @@ const SeriesDetail: React.FC = () => {
               ) : seasons.length > 0 ? (
                 <div className="space-y-3">
                   {seasons.map((s) => (
-                    <div key={`${s.season}-${s.subtitle || ''}`} className="flex items-center justify-between rounded-2xl border border-gray-100 bg-[#f8f9fc] p-3">
+                    <div key={`${s.season}-${s.subtitle || ''}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-[#f8f9fc] p-3">
                       <div>
                         <span className="text-sm font-medium text-gray-900">
-                          {s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`}
+                          {getSeasonLabel(s.season, s.subtitle || undefined)}
                         </span>
                         {s.season === 999 && s.subtitle && (
                           <span className="ml-2 text-xs text-gray-400">(剧场版)</span>
                         )}
                         <span className="ml-3 text-xs text-gray-500">{s.video_count} 个视频</span>
                       </div>
-                      <button
-                        onClick={() => {
-                          const label = s.season === 999 ? (s.subtitle || '剧场版') : `第${s.season}季`;
-                          setSeasonDeleteConfirm({ season: s.season, label, videoCount: s.video_count });
-                        }}
-                        className="action-btn action-btn-danger text-xs"
-                      >
-                        删除
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => openSeasonEdit(s, s.season === 999 ? 'movie' : 'season')}
+                          disabled={seasonActionBusy}
+                          className="action-btn text-xs disabled:opacity-50"
+                        >
+                          {s.season === 999 ? '改名' : '改季号'}
+                        </button>
+                        <button
+                          onClick={() => openSeasonEdit(s, s.season === 999 ? 'season' : 'movie')}
+                          disabled={seasonActionBusy}
+                          className="action-btn text-xs disabled:opacity-50"
+                        >
+                          {s.season === 999 ? '改为季' : '改为剧场版'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const label = getSeasonLabel(s.season, s.subtitle || undefined);
+                            setSeasonDeleteConfirm({ season: s.season, subtitle: s.subtitle, label, videoCount: s.video_count });
+                          }}
+                          disabled={seasonActionBusy}
+                          className="action-btn action-btn-danger text-xs disabled:opacity-50"
+                        >
+                          删除
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1261,7 +1434,7 @@ const SeriesDetail: React.FC = () => {
         danger
         onConfirm={() => {
           if (!seasonDeleteConfirm) return;
-          handleDeleteSeason(seasonDeleteConfirm.season);
+          handleDeleteSeason(seasonDeleteConfirm.season, seasonDeleteConfirm.subtitle);
           setSeasonDeleteConfirm(null);
         }}
         onCancel={() => setSeasonDeleteConfirm(null)}
@@ -1343,14 +1516,13 @@ const SeriesDetail: React.FC = () => {
 /** 获取季标题 */
 function getSeasonLabel(season: number, subtitle?: string): string {
   if (season === 999) return subtitle || '剧场版';
-  if (season >= 1 && season <= 998) return `第${season}季`;
-  return `第${season}季`;
+  const normalizedSeason = season > 0 ? season : 1;
+  return `第${normalizedSeason}季`;
 }
 
 function formatLastWatchedEpisodeLabel(episode: number, season: number, epWord: string): string {
-  if (season > 0 && season !== 999) return `第${season}季第${episode}${epWord}`;
   if (season === 999) return `剧场版第${episode}${epWord}`;
-  return `第${episode}${epWord}`;
+  return `第${season > 0 ? season : 1}季第${episode}${epWord}`;
 }
 
 interface VideoGridProps {
@@ -1372,21 +1544,16 @@ const VideoGrid: React.FC<VideoGridProps> = ({
   selectedEpisodes,
   onToggleSelect,
 }) => {
-  // 判断是否有任何视频设置了 season（非 0）
-  const hasSeason = useMemo(
-    () => videos.some((v) => v.season != null && v.season !== 0),
-    [videos]
-  );
-
-  // 按 season 分组并排序
+  // 统一展示定义：一个视频集默认包含“第一季”；历史无 season/season=0 的视频也归入第一季。
   const seasonGroups = useMemo(() => {
-    if (!hasSeason) return [];
-    // 对于 season=999（剧场版），按 subtitle 再分组
+    if (videos.length === 0) {
+      return [['1', { season: 1, videos: [] }] as [string, { season: number; subtitle?: string; videos: Video[] }]];
+    }
     const map = new Map<string, { season: number; subtitle?: string; videos: Video[] }>();
     for (const v of videos) {
-      const s = v.season ?? 0;
+      const rawSeason = v.season ?? 0;
+      const s = rawSeason === 999 ? 999 : (rawSeason > 0 ? rawSeason : 1);
       if (s === 999) {
-        // 剧场版按 subtitle 分组
         const key = `999-${v.subtitle || ''}`;
         if (!map.has(key)) map.set(key, { season: 999, subtitle: v.subtitle, videos: [] });
         map.get(key)!.videos.push(v);
@@ -1397,14 +1564,13 @@ const VideoGrid: React.FC<VideoGridProps> = ({
       }
     }
     const entries = Array.from(map.entries());
-    // 排序：普通季（1,2,3...）在前，999 在最后
     entries.sort(([, a], [, b]) => {
       if (a.season === 999 && b.season !== 999) return 1;
       if (b.season === 999 && a.season !== 999) return -1;
       return a.season - b.season;
     });
     return entries;
-  }, [videos, hasSeason]);
+  }, [videos]);
 
   
   const gridClass = 'changli-auto-grid-episode auto-rows-max';
@@ -1454,26 +1620,21 @@ const VideoGrid: React.FC<VideoGridProps> = ({
     );
   };
 
-  // 无 season 信息时保持原有扁平展示
-  if (!hasSeason) {
-    return (
-      <div className={gridClass}>
-        {videos.map((video) => renderVideoCard(video))}
-      </div>
-    );
-  }
-
   // 按季分组展示
   return (
     <div className="space-y-8">
       {seasonGroups.map(([, group]) => (
         <div key={`${group.season}-${group.subtitle || ''}`} className="changli-panel p-5">
           <h3 className="text-xl font-semibold mb-4">{getSeasonLabel(group.season, group.subtitle)}</h3>
-          <div className={gridClass}>
-            {group.videos
-              .sort((a, b) => (a.episode_number ?? 0) - (b.episode_number ?? 0))
-              .map((video) => renderVideoCard(video))}
-          </div>
+          {group.videos.length > 0 ? (
+            <div className={gridClass}>
+              {group.videos
+                .sort((a, b) => (a.episode_number ?? 0) - (b.episode_number ?? 0))
+                .map((video) => renderVideoCard(video))}
+            </div>
+          ) : (
+            <div className="changli-empty-state text-gray-500">暂无资源</div>
+          )}
         </div>
       ))}
     </div>

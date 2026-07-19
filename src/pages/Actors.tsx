@@ -19,7 +19,6 @@ const Actors: React.FC = () => {
   const { pendingKey, requestSecondConfirm, clearPending } = useSecondConfirm();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     const closeMenu = () => {
       setContextMenu(null);
       clearPending();

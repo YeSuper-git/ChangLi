@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 const APP_DATA_DIR_NAME: &str = "changli";
@@ -12,6 +12,23 @@ pub struct StorageInfo {
     pub data_dir: String,
     pub db_path: String,
     pub portable_root: Option<String>,
+    pub download_dir: String,
+    pub auto_use_last_download_dir: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct StorageSettings {
+    download_dir: Option<String>,
+    auto_use_last_download_dir: bool,
+}
+
+impl Default for StorageSettings {
+    fn default() -> Self {
+        Self {
+            download_dir: None,
+            auto_use_last_download_dir: false,
+        }
+    }
 }
 
 pub fn default_data_dir() -> PathBuf {
@@ -60,6 +77,57 @@ pub fn db_path() -> PathBuf {
     active_data_dir().join("changli.db")
 }
 
+fn storage_settings_path() -> PathBuf {
+    active_data_dir().join("storage-settings.json")
+}
+
+fn default_download_dir() -> PathBuf {
+    dirs::download_dir()
+        .or_else(|| dirs::home_dir().map(|home| home.join("Downloads")))
+        .unwrap_or_else(active_data_dir)
+}
+
+fn read_storage_settings() -> StorageSettings {
+    let path = storage_settings_path();
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<StorageSettings>(&content).ok())
+        .unwrap_or_default()
+}
+
+fn write_storage_settings(settings: &StorageSettings) -> Result<()> {
+    std::fs::create_dir_all(active_data_dir())?;
+    let content = serde_json::to_string_pretty(settings)?;
+    std::fs::write(storage_settings_path(), content)?;
+    Ok(())
+}
+
+pub fn download_dir() -> PathBuf {
+    read_storage_settings()
+        .download_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(default_download_dir)
+}
+
+pub fn set_download_dir(path: &str) -> Result<PathBuf> {
+    let selected = PathBuf::from(path);
+    std::fs::create_dir_all(&selected)?;
+    let mut settings = read_storage_settings();
+    settings.download_dir = Some(selected.to_string_lossy().to_string());
+    write_storage_settings(&settings)?;
+    Ok(selected)
+}
+
+pub fn set_auto_use_last_download_dir(enabled: bool) -> Result<()> {
+    let mut settings = read_storage_settings();
+    settings.auto_use_last_download_dir = enabled;
+    write_storage_settings(&settings)
+}
+
+pub fn auto_use_last_download_dir() -> bool {
+    read_storage_settings().auto_use_last_download_dir
+}
+
 pub fn actor_photos_dir() -> PathBuf {
     active_data_dir().join("actors").join("photos")
 }
@@ -89,6 +157,11 @@ pub fn storage_info() -> Result<StorageInfo> {
     let data_dir = active_data_dir();
     let db_path = db_path();
     let portable_root = portable_root_dir();
+    let settings = read_storage_settings();
+    let download_dir = settings
+        .download_dir
+        .clone()
+        .unwrap_or_else(|| default_download_dir().to_string_lossy().to_string());
 
     Ok(StorageInfo {
         mode: if portable_root.is_some() {
@@ -99,6 +172,8 @@ pub fn storage_info() -> Result<StorageInfo> {
         data_dir: data_dir.to_string_lossy().to_string(),
         db_path: db_path.to_string_lossy().to_string(),
         portable_root: portable_root.map(|path| path.to_string_lossy().to_string()),
+        download_dir,
+        auto_use_last_download_dir: settings.auto_use_last_download_dir,
     })
 }
 

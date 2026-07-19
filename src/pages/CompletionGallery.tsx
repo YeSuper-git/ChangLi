@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCompletionRecords, saveCompletionRecord } from '../utils/api';
 import type { SeriesCompletionRecord } from '../utils/api';
 import { seriesPosterSrc, SmartPoster } from '../utils/media';
 import { notify } from '../utils/notify';
 import loadingIcon from '../assets/icons/loading.svg';
+import FloatingActions from '../components/FloatingActions';
 
 const formatDate = (value?: string | null) => {
   if (!value) return '待记录';
@@ -35,8 +36,11 @@ const CompletionGallery: React.FC = () => {
   const [records, setRecords] = useState<SeriesCompletionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<SeriesCompletionRecord | null>(null);
-  const [rating, setRating] = useState(8);
+  const [rating, setRating] = useState('');
   const [review, setReview] = useState('');
+  const [closing, setClosing] = useState(false);
+  const [closeTarget, setCloseTarget] = useState({ x: 0, y: 0 });
+  const closeTimerRef = useRef<number | null>(null);
   const [completedAt, setCompletedAt] = useState(todayInputValue());
   const [saving, setSaving] = useState(false);
 
@@ -49,8 +53,8 @@ const CompletionGallery: React.FC = () => {
         if (updated) setActive(updated);
       }
     } catch (error) {
-      console.error('[CompletionGallery] 加载展览柜失败:', error);
-      notify({ message: '展览柜加载失败，请稍后重试', type: 'error' });
+      console.error('[CompletionGallery] 加载金番奖失败:', error);
+      notify({ message: '金番奖加载失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -58,6 +62,9 @@ const CompletionGallery: React.FC = () => {
 
   useEffect(() => {
     loadRecords();
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,11 +74,32 @@ const CompletionGallery: React.FC = () => {
     return { total: records.length, rated, avg };
   }, [records]);
 
-  const openRecord = (record: SeriesCompletionRecord) => {
+  const openRecord = (record: SeriesCompletionRecord, event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setCloseTarget({
+      x: rect.left + rect.width / 2 - window.innerWidth / 2,
+      y: rect.top + rect.height / 2 - window.innerHeight / 2,
+    });
+    setClosing(false);
     setActive(record);
-    setRating(record.rating || 8);
+    setRating(record.rating ? record.rating.toFixed(1) : '');
     setReview(record.review || '');
     setCompletedAt(toInputDate(record.completed_at || record.last_played));
+  };
+
+  const closeDetail = () => {
+    if (closing) return;
+    setClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      setActive(null);
+      setClosing(false);
+    }, 360);
+  };
+
+  const normalizedRating = () => {
+    const value = Number(rating);
+    if (!Number.isFinite(value) || value <= 0) return undefined;
+    return Math.round(Math.min(5, Math.max(0.1, value)) * 10) / 10;
   };
 
   const handleSave = async () => {
@@ -80,15 +108,15 @@ const CompletionGallery: React.FC = () => {
     try {
       const saved = await saveCompletionRecord({
         series_id: active.series_id,
-        rating,
+        rating: normalizedRating(),
         review,
         completed_at: completedAt,
       });
       setRecords(prev => prev.map(item => item.series_id === saved.series_id ? saved : item));
       setActive(saved);
-      notify({ message: '展览记录已保存', type: 'success' });
+      notify({ message: '金番奖记录已保存', type: 'success' });
     } catch (error) {
-      console.error('[CompletionGallery] 保存展览记录失败:', error);
+      console.error('[CompletionGallery] 保存金番奖记录失败:', error);
       notify({ message: '保存失败，请稍后重试', type: 'error' });
     } finally {
       setSaving(false);
@@ -99,11 +127,11 @@ const CompletionGallery: React.FC = () => {
     <div className="completion-gallery-page">
       <section className="completion-gallery-hero">
         <div>
-          <p className="completion-gallery-kicker">已看完的视频集陈列</p>
-          <h1>展览柜</h1>
-          <p>把每一部看完的番装进展示柜，补上评分、短评和看完日期，像收藏证书一样留下记录。</p>
+          <p className="completion-gallery-kicker">已看完的视频集评选</p>
+          <h1>金番奖</h1>
+          <p>把每一部看完的番纳入金番奖，补上评分、短评和看完日期，像收藏奖项一样留下记录。</p>
         </div>
-        <div className="completion-gallery-stats" aria-label="展览柜统计">
+        <div className="completion-gallery-stats" aria-label="金番奖统计">
           <div><strong>{stats.total}</strong><span>已入馆</span></div>
           <div><strong>{stats.rated}</strong><span>已评价</span></div>
           <div><strong>{stats.avg ? stats.avg.toFixed(1) : '-'}</strong><span>平均分</span></div>
@@ -113,16 +141,16 @@ const CompletionGallery: React.FC = () => {
       {loading ? (
         <div className="completion-gallery-loading">
           <img src={loadingIcon} alt="" />
-          <span>正在整理展柜</span>
+          <span>正在整理金番奖</span>
         </div>
       ) : records.length === 0 ? (
         <div className="completion-gallery-empty">
-          <h3>展柜还是空的</h3>
-          <p>在视频库里把视频集标记为已看完后，它会自动出现在这里。</p>
+          <h3>金番奖还是空的</h3>
+          <p>在视频库里把视频集标记为已看完后，它会自动进入金番奖。</p>
           <Link to="/library" className="completion-gallery-link">去视频库看看</Link>
         </div>
       ) : (
-        <div className="completion-shelf" aria-label="展览证书展示柜">
+        <div className="completion-shelf" aria-label="金番奖证书陈列">
           {records.map((record, index) => {
             const poster = seriesPosterSrc(record);
             return (
@@ -131,9 +159,9 @@ const CompletionGallery: React.FC = () => {
                 type="button"
                 className="completion-award-card"
                 style={{ '--award-index': index } as React.CSSProperties}
-                onClick={() => openRecord(record)}
+                onClick={(event) => openRecord(record, event)}
               >
-                <span className="completion-award-ribbon">展览证书</span>
+                <span className="completion-award-ribbon">金番奖证书</span>
                 <div className="completion-award-poster">
                   <SmartPoster src={poster} alt={record.title} posterOrientation={record.poster_orientation} />
                 </div>
@@ -141,8 +169,8 @@ const CompletionGallery: React.FC = () => {
                   <span className="completion-award-date">{formatDate(record.completed_at || record.last_played)}</span>
                   <h3>{record.title}</h3>
                   <div className="completion-award-score">
-                    <strong>{record.rating ? `${record.rating}` : '待评'}</strong>
-                    <span>{record.rating ? '/ 10' : '补评价'}</span>
+                    <strong>{record.rating ? record.rating.toFixed(1) : '待评'}</strong>
+                    {!record.rating && <span>补评价</span>}
                   </div>
                 </div>
               </button>
@@ -151,12 +179,17 @@ const CompletionGallery: React.FC = () => {
         </div>
       )}
 
+      <FloatingActions onRefresh={loadRecords} refreshLabel="刷新金番奖" />
+
       {active && (
-        <div className="completion-detail-backdrop" onClick={() => setActive(null)}>
-          <section className="completion-certificate-back" onClick={(event) => event.stopPropagation()}>
-            <button className="completion-detail-close" type="button" onClick={() => setActive(null)}>关闭</button>
+        <div className={`completion-detail-backdrop ${closing ? 'is-closing' : ''}`} onClick={closeDetail}>
+          <section
+            className="completion-certificate-back"
+            style={{ '--close-x': `${closeTarget.x}px`, '--close-y': `${closeTarget.y}px` } as React.CSSProperties}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button className="completion-detail-close" type="button" aria-label="关闭" onClick={closeDetail}>×</button>
             <div className="completion-certificate-head">
-              <span>证书背面</span>
               <h2>{active.title}</h2>
               <p>{active.video_count > 0 ? `全 ${active.video_count} 话` : '暂无资源'}</p>
             </div>
@@ -168,16 +201,20 @@ const CompletionGallery: React.FC = () => {
                 <label>
                   <span>我的评分</span>
                   <div className="completion-rating-row">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(score => (
-                      <button
-                        key={score}
-                        type="button"
-                        className={score <= rating ? 'active' : ''}
-                        onClick={() => setRating(score)}
-                      >
-                        {score}
-                      </button>
-                    ))}
+                    <input
+                      type="number"
+                      min="0.1"
+                      max="5"
+                      step="0.1"
+                      value={rating}
+                      onChange={(event) => setRating(event.target.value)}
+                      onBlur={() => {
+                        const value = normalizedRating();
+                        setRating(value ? value.toFixed(1) : '');
+                      }}
+                      placeholder="例如 4.6"
+                    />
+                    <span>满分 5 分，支持一位小数</span>
                   </div>
                 </label>
                 <label>
@@ -189,12 +226,12 @@ const CompletionGallery: React.FC = () => {
                   <textarea
                     value={review}
                     onChange={(event) => setReview(event.target.value)}
-                    placeholder="写下这部番留给你的印象"
+                    placeholder="最想说的话"
                     rows={6}
                   />
                 </label>
                 <div className="completion-detail-actions">
-                  <Link to={`/series/${active.series_id}`} className="completion-secondary-action">查看详情</Link>
+                  <Link to={`/series/${active.series_id}`} className="completion-secondary-action">查看视频</Link>
                   <button type="button" className="completion-primary-action" disabled={saving} onClick={handleSave}>
                     {saving ? '保存中' : '保存记录'}
                   </button>

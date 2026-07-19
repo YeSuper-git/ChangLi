@@ -2299,6 +2299,18 @@ async fn open_data_dir() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn set_download_dir(path: String) -> Result<storage::StorageInfo, String> {
+    storage::set_download_dir(&path).map_err(|e| e.to_string())?;
+    storage::storage_info().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_auto_use_last_download_dir(enabled: bool) -> Result<storage::StorageInfo, String> {
+    storage::set_auto_use_last_download_dir(enabled).map_err(|e| e.to_string())?;
+    storage::storage_info().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn open_series_in_file_manager(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -3166,12 +3178,13 @@ async fn delete_season(
     state: State<'_, AppState>,
     series_id: i64,
     season: i32,
+    subtitle: Option<String>,
 ) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::delete_season(&pool, series_id, season)
+    db::delete_season(&pool, series_id, season, subtitle)
         .await
         .map_err(|e| e.to_string())
 }
@@ -3188,6 +3201,25 @@ async fn create_season(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     db::create_season(&pool, series_id, season, subtitle.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+
+#[tauri::command]
+async fn update_season_group(
+    state: State<'_, AppState>,
+    series_id: i64,
+    from_season: i32,
+    from_subtitle: Option<String>,
+    to_season: i32,
+    to_subtitle: Option<String>,
+) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::update_season_group(&pool, series_id, from_season, from_subtitle, to_season, to_subtitle)
         .await
         .map_err(|e| e.to_string())
 }
@@ -4092,6 +4124,8 @@ fn main() {
             delete_preview_file,
             get_storage_info,
             open_data_dir,
+            set_download_dir,
+            set_auto_use_last_download_dir,
             open_series_in_file_manager,
             repair_missing_posters_silent,
             start_poster_update_silent,
@@ -4116,6 +4150,7 @@ fn main() {
             get_series_seasons,
             delete_season,
             create_season,
+            update_season_group,
             update_video_subtitle,
             get_actor_periods,
             add_actor_period,
