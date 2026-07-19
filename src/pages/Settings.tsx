@@ -652,7 +652,7 @@ const Settings: React.FC = () => {
           {[
             { key: 'subscriptions' as const, label: '订阅' },
             { key: 'downloads' as const, label: '下载' },
-            { key: 'completion' as const, label: '金番奖' },
+            { key: 'completion' as const, label: '影评' },
           ].map((item) => (
             <div key={item.key} className="flex items-center justify-between gap-4">
               <span className="text-sm text-gray-700">显示{item.label}</span>

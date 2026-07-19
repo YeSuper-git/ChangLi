@@ -69,10 +69,23 @@ const CompletionGallery: React.FC = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const rated = records.filter(item => item.rating).length;
+    const rated = records.filter(item => item.rating !== null && item.rating !== undefined).length;
     const avg = rated ? records.reduce((sum, item) => sum + (item.rating || 0), 0) / rated : 0;
     return { total: records.length, rated, avg };
   }, [records]);
+
+  const ratingValue = () => {
+    const value = Number(rating);
+    if (!Number.isFinite(value)) return 0;
+    return Math.round(Math.min(5, Math.max(0, value)) * 10) / 10;
+  };
+
+  const ratingTier = (value: number) => {
+    if (value >= 4.5) return '神作';
+    if (value >= 3) return '不错';
+    if (value >= 2) return '还行';
+    return '一般';
+  };
 
   const openRecord = (record: SeriesCompletionRecord, event: React.MouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -82,7 +95,7 @@ const CompletionGallery: React.FC = () => {
     });
     setClosing(false);
     setActive(record);
-    setRating(record.rating ? record.rating.toFixed(1) : '');
+    setRating(record.rating !== null && record.rating !== undefined ? record.rating.toFixed(1) : '0');
     setReview(record.review || '');
     setCompletedAt(toInputDate(record.completed_at || record.last_played));
   };
@@ -93,13 +106,13 @@ const CompletionGallery: React.FC = () => {
     closeTimerRef.current = window.setTimeout(() => {
       setActive(null);
       setClosing(false);
-    }, 360);
+    }, 460);
   };
 
   const normalizedRating = () => {
     const value = Number(rating);
-    if (!Number.isFinite(value) || value <= 0) return undefined;
-    return Math.round(Math.min(5, Math.max(0.1, value)) * 10) / 10;
+    if (!Number.isFinite(value)) return undefined;
+    return Math.round(Math.min(5, Math.max(0, value)) * 10) / 10;
   };
 
   const handleSave = async () => {
@@ -129,7 +142,7 @@ const CompletionGallery: React.FC = () => {
         <div>
           <p className="completion-gallery-kicker">已看完的视频集评选</p>
           <h1>金番奖</h1>
-          <p>把每一部看完的番纳入金番奖，补上评分、短评和看完日期，像收藏奖项一样留下记录。</p>
+          <p>给看完后的影视打个分吧。</p>
         </div>
         <div className="completion-gallery-stats" aria-label="金番奖统计">
           <div><strong>{stats.total}</strong><span>已入馆</span></div>
@@ -169,8 +182,8 @@ const CompletionGallery: React.FC = () => {
                   <span className="completion-award-date">{formatDate(record.completed_at || record.last_played)}</span>
                   <h3>{record.title}</h3>
                   <div className="completion-award-score">
-                    <strong>{record.rating ? record.rating.toFixed(1) : '待评'}</strong>
-                    {!record.rating && <span>补评价</span>}
+                    <strong>{record.rating !== null && record.rating !== undefined ? record.rating.toFixed(1) : '待评'}</strong>
+                    {(record.rating === null || record.rating === undefined) && <span>补评价</span>}
                   </div>
                 </div>
               </button>
@@ -188,39 +201,48 @@ const CompletionGallery: React.FC = () => {
             style={{ '--close-x': `${closeTarget.x}px`, '--close-y': `${closeTarget.y}px` } as React.CSSProperties}
             onClick={(event) => event.stopPropagation()}
           >
-            <button className="completion-detail-close" type="button" aria-label="关闭" onClick={closeDetail}>×</button>
+            <button className="completion-detail-close" type="button" aria-label="关闭" onClick={closeDetail}><span aria-hidden="true">×</span></button>
             <div className="completion-certificate-head">
               <h2>{active.title}</h2>
-              <p>{active.video_count > 0 ? `全 ${active.video_count} 话` : '暂无资源'}</p>
             </div>
             <div className="completion-certificate-grid">
               <div className="completion-certificate-poster">
                 <SmartPoster src={seriesPosterSrc(active)} alt={active.title} posterOrientation={active.poster_orientation} />
               </div>
               <div className="completion-certificate-form">
-                <label>
-                  <span>我的评分</span>
-                  <div className="completion-rating-row">
-                    <input
-                      type="number"
-                      min="0.1"
-                      max="5"
-                      step="0.1"
-                      value={rating}
-                      onChange={(event) => setRating(event.target.value)}
-                      onBlur={() => {
-                        const value = normalizedRating();
-                        setRating(value ? value.toFixed(1) : '');
-                      }}
-                      placeholder="例如 4.6"
-                    />
-                    <span>满分 5 分，支持一位小数</span>
-                  </div>
-                </label>
-                <label>
-                  <span>看完时间</span>
-                  <input type="date" value={completedAt} onChange={(event) => setCompletedAt(event.target.value)} />
-                </label>
+                <div className="completion-meta-row">
+                  <label className="completion-rating-field">
+                    <span>我的评分</span>
+                    <div className="completion-rating-row">
+                      <span className="completion-rating-value">{ratingValue().toFixed(1)}</span>
+                      <div
+                        className="completion-rating-slider"
+                        style={{ '--rating-progress': `${(ratingValue() / 5) * 100}%` } as React.CSSProperties}
+                      >
+                        <input
+                          type="range"
+                          min="0"
+                          max="5"
+                          step="0.1"
+                          value={ratingValue()}
+                          aria-label="我的评分"
+                          onChange={(event) => setRating(Number(event.target.value).toFixed(1))}
+                        />
+                        <div className="completion-rating-scale" aria-hidden="true">
+                          <span>一般</span>
+                          <span>还行</span>
+                          <span>不错</span>
+                          <span>神作</span>
+                        </div>
+                      </div>
+                      <span className="completion-rating-tier">{ratingTier(ratingValue())}</span>
+                    </div>
+                  </label>
+                  <label className="completion-date-field">
+                    <span>看完时间</span>
+                    <input className="completion-date-input" type="date" value={completedAt} onChange={(event) => setCompletedAt(event.target.value)} />
+                  </label>
+                </div>
                 <label>
                   <span>我的短评</span>
                   <textarea

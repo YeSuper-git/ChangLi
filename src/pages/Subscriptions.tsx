@@ -189,9 +189,11 @@ const Subscriptions: React.FC = () => {
       });
       setExpandedSubs(prev => { const next = new Set([...prev, sub.id]); saveExpandedSubs(next); return next; });
       if (items.length > 0 && !repeatedPositiveResult) {
-        notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
+        notify({ message: `已更新 ${items.length} 集`, type: 'success' });
+      } else if (repeatedPositiveResult) {
+        notify({ message: '检查成功，暂无更新', type: 'info' });
       } else if (items.length === 0) {
-        notify({ message: '暂无新剧集更新', type: 'info' });
+        notify({ message: '检查成功，暂无更新', type: 'info' });
       }
     } catch (err) {
       console.error('[Subscriptions] 检查更新失败:', err);
@@ -206,8 +208,8 @@ const Subscriptions: React.FC = () => {
     setCheckingAll(true);
     setCheckingId(null);
     try {
-      let totalNew = 0;
-      let hasChangedPositiveResult = false;
+      let totalPending = 0;
+      let changedSubscriptions = 0;
       const nextUpdates = new Map(subUpdates);
       const nextExpanded = new Set(expandedSubs);
 
@@ -216,11 +218,11 @@ const Subscriptions: React.FC = () => {
         const items = await checkSubscriptionUpdates(sub.id);
         const previousItems = nextUpdates.get(sub.id);
         if (items.length > 0 && !isSameUpdateResult(previousItems, items)) {
-          hasChangedPositiveResult = true;
+          changedSubscriptions += 1;
         }
         nextUpdates.set(sub.id, items);
         if (items.length > 0) {
-          totalNew += items.length;
+          totalPending += items.length;
           nextExpanded.add(sub.id);
         }
       }
@@ -232,10 +234,12 @@ const Subscriptions: React.FC = () => {
       useSubscriptionStore.getState().markDirty();
       await loadData();
 
-      if (totalNew > 0 && hasChangedPositiveResult) {
-        notify({ message: `一键检查完成，发现 ${totalNew} 个新剧集`, type: 'success' });
-      } else if (totalNew === 0) {
-        notify({ message: '一键检查完成，暂无新剧集更新', type: 'info' });
+      if (changedSubscriptions > 0) {
+        notify({ message: `发现了 ${changedSubscriptions} 个作品有更新`, type: 'success' });
+      } else if (totalPending > 0) {
+        notify({ message: '批量检查成功，暂无更新', type: 'info' });
+      } else {
+        notify({ message: '批量检查成功，暂无更新', type: 'info' });
       }
     } catch (err) {
       console.error('[Subscriptions] 一键检查失败:', err);
@@ -292,9 +296,12 @@ const Subscriptions: React.FC = () => {
   }
 
   return (
-    <div className="changli-page">
-      <div className="changli-page-header">
-        <h1 className="changli-heading-xl">订阅管理</h1>
+    <div className="changli-page subscriptions-page">
+      <div className="changli-page-header subscriptions-header">
+        <div>
+          <h1 className="changli-heading-xl">订阅管理</h1>
+          <p className="subscriptions-header-desc">订阅番剧网站，智能获取下载链接</p>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleCheckAllUpdates}
@@ -328,75 +335,75 @@ const Subscriptions: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="subscriptions-site-list">
           {Object.entries(siteGroups).map(([site, subs]) => {
             const isExpanded = expandedSites.has(site);
             return (
-              <div key={site} className="changli-panel overflow-hidden">
+              <div key={site} className="changli-panel subscription-site-panel">
                 {/* 网站标题栏 */}
                 <button
                   onClick={() => toggleSite(site)}
-                  className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
+                  className="subscription-site-toggle"
                 >
                   <div className="flex items-center gap-2">
                     <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                      className={`subscription-arrow ${isExpanded ? 'rotate-90' : ''}`}
                       fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="text-sm font-medium text-gray-700">{site}</span>
-                    <span className="text-xs text-gray-400">({subs.length})</span>
+                    <span className="subscription-site-name">{site}</span>
+                    <span className="subscription-site-count">{subs.length} 个订阅</span>
                   </div>
                 </button>
 
                 {/* 该网站下的订阅列表 */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                  <div className="subscription-card-list">
                     {subs.map((sub) => {
                       const displayName = sub.title?.replace(/^[^-]+\s*-\s*/, '') || sub.title;
                       const cardColor = subscriptionColors[colorIndex(sub.id || displayName || sub.rss_url)];
                       const versionLabels = getSubscriptionVersionLabels(sub);
                       return (
-                        <div key={sub.id} className="mx-3 my-2 rounded-2xl border px-4 py-4 shadow-sm transition-shadow hover:shadow-md" style={cardColor}>
-                          <div className="flex items-start justify-between gap-4">
+                        <div key={sub.id} className="subscription-card" style={cardColor}>
+                          <div className="subscription-card-main">
                             <div className="flex-1 min-w-0">
                               <button
                                 onClick={() => toggleSub(sub.id)}
-                                className="flex items-center gap-1.5 mb-1 group"
+                                className="subscription-title-button group"
                               >
                                 <svg
-                                  className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expandedSubs.has(sub.id) ? 'rotate-90' : ''}`}
+                                  className={`subscription-arrow subscription-arrow-sm ${expandedSubs.has(sub.id) ? 'rotate-90' : ''}`}
                                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
-                                <span className="text-sm font-medium text-gray-900 truncate group-hover:text-rose-600 transition-colors">
+                                <span className="subscription-title-text">
                                   {displayName}
                                 </span>
                               </button>
-                              <div className="space-y-1.5">
+                              <div className="subscription-meta-list">
                                 {sub.series_id && sub.series_title && (
-                                  <div className="text-xs text-gray-500">
+                                  <div className="subscription-related-series">
                                     关联：{sub.series_title}
                                   </div>
                                 )}
                                 <div
-                                  className="inline-flex items-center gap-1.5 max-w-full rounded-full border border-white/70 bg-white/60 px-2.5 py-1 text-xs text-gray-600"
+                                  className="subscription-version-pill"
                                   title={versionLabels.join(' / ')}
                                 >
-                                  <span className="text-gray-400 shrink-0">版本</span>
-                                  <span className="truncate max-w-[360px] font-medium text-gray-700">
+                                  <span className="subscription-version-label">版本</span>
+                                  <span className="subscription-version-value">
                                     {versionLabels.join(' / ')}
                                   </span>
                                 </div>
-                                <div className="text-xs text-gray-400">
+                                <div className="subscription-check-time">
                                   上次检查：{formatTimeAgo(sub.last_check_at)}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="subscription-card-actions">
                               <button
                                 onClick={() => {
                                   setEditingSubscription(sub);
@@ -431,8 +438,8 @@ const Subscriptions: React.FC = () => {
                             const episodes = subUpdates.get(sub.id) || [];
                             if (episodes.length === 0 && checkingId !== sub.id) {
                               return (
-                                <div className="mt-3 text-xs text-gray-500 border-t border-white/60 pt-3">
-                                  暂无新剧集更新
+                                <div className="subscription-empty-updates">
+                                  暂无更新
                                 </div>
                               );
                             }
@@ -461,31 +468,31 @@ const Subscriptions: React.FC = () => {
                             }
                             let globalIdx = 0;
                             return (
-                              <div className="mt-3 space-y-2 border-t border-white/60 pt-3">
+                              <div className="subscription-updates-panel">
                                 {Object.entries(groups).map(([gKey, gItems]) => (
-                                  <div key={gKey} className="rounded-xl border border-white/70 bg-white/55 p-2.5">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                      <span className="text-xs font-medium text-gray-700">{gKey}</span>
-                                      <span className="text-[10px] text-gray-400">{gItems.length} 集</span>
+                                  <div key={gKey} className="subscription-update-group">
+                                    <div className="subscription-update-group-head">
+                                      <span>{gKey}</span>
+                                      <span>{gItems.length} 集</span>
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="subscription-update-items">
                                       {gItems.map((ep: any) => {
                                         const idx = globalIdx++;
                                         return (
-                                          <div key={idx} className="flex items-center justify-between gap-1.5">
-                                            <span className="text-[11px] text-gray-600 truncate flex-1 min-w-0">{ep.title}</span>
+                                          <div key={idx} className="subscription-update-item">
+                                            <span className="subscription-update-title">{ep.title}</span>
                                             <button
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx
-                                                ? "text-[11px] px-2 py-0.5 rounded !bg-emerald-50 !text-emerald-700 !border-emerald-200 border whitespace-nowrap shrink-0"
-                                                : "text-[11px] px-2 py-0.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap shrink-0"
+                                                ? "subscription-mini-btn is-copied"
+                                                : "subscription-mini-btn"
                                               }
                                             >
                                               {copiedKey === sub.id + '_' + idx ? '已复制' : '复制磁力'}
                                             </button>
                                             <button
                                               disabled
-                                              className="text-[11px] px-2 py-0.5 rounded border border-blue-200 text-blue-300 bg-blue-50 whitespace-nowrap shrink-0 cursor-not-allowed"
+                                              className="subscription-mini-btn is-disabled"
                                               title="下载功能开发中"
                                             >
                                               下载

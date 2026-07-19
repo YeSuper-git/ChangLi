@@ -37,7 +37,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/tags', label: '标签' },
     { path: '/subscriptions', label: '订阅', visibilityKey: 'subscriptions' as const },
     { path: '/downloads', label: '下载', visibilityKey: 'downloads' as const },
-    { path: '/completion', label: '金番奖', visibilityKey: 'completion' as const },
+    { path: '/completion', label: '影评', visibilityKey: 'completion' as const },
   ];
 
   const visibleNavItems = navItems.filter((item) => !item.visibilityKey || navVisibility[item.visibilityKey]);

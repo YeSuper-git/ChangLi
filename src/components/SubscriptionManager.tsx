@@ -1029,9 +1029,9 @@ export const NewEpisodeModal: React.FC<NewEpisodeModalProps> = ({ open, episodes
     <div className="changli-modal-backdrop" onClick={onClose}>
       <div className="changli-modal-panel !w-[min(100%,600px)] !p-0" onClick={e => e.stopPropagation()}>
         <div className="changli-modal-header">
-          <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">新剧集更新</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-500">订阅更新</p>
           <h2 className="mt-1 text-2xl font-bold text-gray-900">
-            发现 {episodes.length} 个新剧集
+            发现 {episodes.length} 集更新
           </h2>
         </div>
 
@@ -1123,9 +1123,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
       setNewEpisodes(items);
       setExpandedId(expandedId === subscription.id ? null : subscription.id);
       if (items.length > 0 && !repeatedPositiveResult) {
-        notify({ message: `发现 ${items.length} 个新剧集`, type: 'success' });
-      } else if (items.length === 0) {
-        notify({ message: '暂无新剧集更新', type: 'info' });
+        notify({ message: `已更新 ${items.length} 集`, type: 'success' });
+      } else if (repeatedPositiveResult || items.length === 0) {
+        notify({ message: '检查成功，暂无更新', type: 'info' });
       }
     } catch (err: any) {
       console.error('检查更新失败:', err);
@@ -1221,8 +1221,8 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ seriesId, sit
         </div>
       ) : subscription ? (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             已订阅
           </div>
           <div
