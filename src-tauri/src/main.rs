@@ -2336,7 +2336,6 @@ async fn list_installed_players() -> Result<Vec<InstalledPlayer>, String> {
 fn discover_installed_players() -> Vec<InstalledPlayer> {
     let mut players = Vec::new();
     let mut seen = std::collections::HashSet::<String>::new();
-
     if let Some(default_name) = system_default_video_player_name() {
         players.push(InstalledPlayer {
             name: format!("系统默认播放器（{}）", default_name),
@@ -2344,19 +2343,9 @@ fn discover_installed_players() -> Vec<InstalledPlayer> {
         });
         seen.insert(String::new());
     }
-
+    // macOS: 直接扫描 Applications 目录（不使用 mdfind，避免 GUI 应用中弹出终端窗口）
     #[cfg(target_os = "macos")]
     {
-        let query = r#"kMDItemContentType == "com.apple.application-bundle" && (kMDItemDisplayName == "*IINA*" || kMDItemDisplayName == "*VLC*" || kMDItemDisplayName == "*QuickTime*" || kMDItemDisplayName == "*Movist*" || kMDItemDisplayName == "*mpv*" || kMDItemDisplayName == "*Player*" || kMDItemDisplayName == "*播放器*" || kMDItemDisplayName == "*视频*")"#;
-        if let Ok(output) = std::process::Command::new("mdfind").arg(query).output() {
-            if output.status.success() {
-                let text = String::from_utf8_lossy(&output.stdout);
-                for line in text.lines() {
-                    push_player_candidate(Path::new(line), &mut players, &mut seen);
-                }
-            }
-        }
-
         for path in [
             PathBuf::from("/System/Applications"),
             PathBuf::from("/Applications"),
@@ -3883,8 +3872,16 @@ async fn cancel_update_download(state: State<'_, AppState>) -> Result<(), String
 }
 
 #[tauri::command]
-async fn install_update(file_path: String) -> Result<(), String> {
-    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))
+async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
+    // 先打开安装包，再关闭主程序，避免 macOS 覆盖安装时主程序仍在运行
+    open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))?;
+    // 延迟 500ms 确保安装程序已启动
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // 关闭主程序窗口
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.close();
+    }
+    Ok(())
 }
 
 /// 安装 WebView2 运行时（静默安装）

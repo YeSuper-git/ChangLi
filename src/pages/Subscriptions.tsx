@@ -481,6 +481,18 @@ const Subscriptions: React.FC = () => {
                                         return (
                                           <div key={idx} className="subscription-update-item">
                                             <span className="subscription-update-title">{ep.title}</span>
+                                            {ep.pub_date && (() => {
+                                              try {
+                                                const d = new Date(ep.pub_date);
+                                                if (!isNaN(d.getTime())) {
+                                                  const yyyy = d.getFullYear();
+                                                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                                  const dd = String(d.getDate()).padStart(2, '0');
+                                                  return <span className="subscription-update-date">{yyyy}/{mm}/{dd}</span>;
+                                                }
+                                              } catch {}
+                                              return null;
+                                            })()}
                                             <button
                                               onClick={() => handleCopyMagnet(sub.id + '_' + idx, ep.magnet_link || ep.torrent_url || '')}
                                               className={copiedKey === sub.id + '_' + idx

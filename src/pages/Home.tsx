@@ -6,6 +6,7 @@ import { actorPhotoDataUrl, SeriesPoster, StaticImagePlaceholder } from '../util
 import { useLibraryStore } from '../store/libraryStore';
 import FloatingActions from '../components/FloatingActions';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
+import { getDailyQuote } from '../data/quotes';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ const Home: React.FC = () => {
   const [playHistory, setPlayHistory] = useState<PlayHistory[]>([]);
   const [videoSeriesMap, setVideoSeriesMap] = useState<Map<number, number>>(new Map());
   const hotActorsRef = useRef<HTMLDivElement>(null);
+  const dailyQuote = useMemo(() => getDailyQuote(), []);
 
   const scrollHotActors = (direction: 'left' | 'right') => {
     const el = hotActorsRef.current;
@@ -152,9 +154,13 @@ const Home: React.FC = () => {
         <section className="changli-detail-hero changli-panel mb-12 overflow-hidden p-7" data-tutorial="home-hero">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="changli-heading-xl mb-3">从哪一部开始今天的片刻</h1>
+              <h1 className="changli-heading-xl mb-3">今天想看什么</h1>
               <p className="changli-muted max-w-2xl text-sm leading-6">
                 快速回到追番进度，浏览最近入库的视频集，也可以直接进入演员库继续整理收藏。
+              </p>
+              <p className="mt-3 text-sm italic text-gray-400" style={{ fontFamily: "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif" }}>
+                「{dailyQuote.text}」
+                <span className="not-italic ml-1">—— {dailyQuote.author}</span>
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
