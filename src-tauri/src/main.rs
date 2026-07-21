@@ -2334,43 +2334,82 @@ async fn list_installed_players() -> Result<Vec<InstalledPlayer>, String> {
 }
 
 fn discover_installed_players() -> Vec<InstalledPlayer> {
-    if !cfg!(target_os = "macos") {
-        return Vec::new();
-    }
-
     let mut players = Vec::new();
     let mut seen = std::collections::HashSet::<String>::new();
 
-    let query = r#"kMDItemContentType == "com.apple.application-bundle" && (kMDItemDisplayName == "*IINA*" || kMDItemDisplayName == "*VLC*" || kMDItemDisplayName == "*QuickTime*" || kMDItemDisplayName == "*Movist*" || kMDItemDisplayName == "*mpv*" || kMDItemDisplayName == "*Player*" || kMDItemDisplayName == "*播放器*" || kMDItemDisplayName == "*视频*")"#;
-    if let Ok(output) = std::process::Command::new("mdfind").arg(query).output() {
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout);
-            for line in text.lines() {
-                push_player_candidate(Path::new(line), &mut players, &mut seen);
+    if let Some(default_name) = system_default_video_player_name() {
+        players.push(InstalledPlayer {
+            name: format!("系统默认播放器（{}）", default_name),
+            path: String::new(),
+        });
+        seen.insert(String::new());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let query = r#"kMDItemContentType == "com.apple.application-bundle" && (kMDItemDisplayName == "*IINA*" || kMDItemDisplayName == "*VLC*" || kMDItemDisplayName == "*QuickTime*" || kMDItemDisplayName == "*Movist*" || kMDItemDisplayName == "*mpv*" || kMDItemDisplayName == "*Player*" || kMDItemDisplayName == "*播放器*" || kMDItemDisplayName == "*视频*")"#;
+        if let Ok(output) = std::process::Command::new("mdfind").arg(query).output() {
+            if output.status.success() {
+                let text = String::from_utf8_lossy(&output.stdout);
+                for line in text.lines() {
+                    push_player_candidate(Path::new(line), &mut players, &mut seen);
+                }
+            }
+        }
+
+        for path in [
+            PathBuf::from("/System/Applications"),
+            PathBuf::from("/Applications"),
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("~"))
+                .join("Applications"),
+        ] {
+            if !path.exists() {
+                continue;
+            }
+            for entry in walkdir::WalkDir::new(path).max_depth(2).into_iter().filter_map(Result::ok) {
+                let app_path = entry.path();
+                if app_path.extension().and_then(|ext| ext.to_str()) == Some("app") {
+                    push_player_candidate(app_path, &mut players, &mut seen);
+                }
             }
         }
     }
 
-    for path in [
-        PathBuf::from("/System/Applications"),
-        PathBuf::from("/Applications"),
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("~"))
-            .join("Applications"),
-    ] {
-        if !path.exists() {
-            continue;
-        }
-        for entry in walkdir::WalkDir::new(path).max_depth(2).into_iter().filter_map(Result::ok) {
-            let app_path = entry.path();
-            if app_path.extension().and_then(|ext| ext.to_str()) == Some("app") {
-                push_player_candidate(app_path, &mut players, &mut seen);
-            }
-        }
+    #[cfg(target_os = "windows")]
+    {
+        discover_windows_players(&mut players, &mut seen);
     }
 
-    players.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-    players
+    let mut default_entries = Vec::new();
+    let mut other_entries = Vec::new();
+    for player in players {
+        if player.path.is_empty() {
+            default_entries.push(player);
+        } else {
+            other_entries.push(player);
+        }
+    }
+    other_entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    default_entries.extend(other_entries);
+    default_entries
+}
+
+fn system_default_video_player_name() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows_default_video_player().map(|(name, _path)| name)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        None
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        None
+    }
 }
 
 fn push_player_candidate(
@@ -2404,6 +2443,12 @@ fn looks_like_video_player(name: &str) -> bool {
         "quicktime",
         "movist",
         "mpv",
+        "mpvnet",
+        "potplayer",
+        "mpc-hc",
+        "mpc-be",
+        "kmplayer",
+        "wmplayer",
         "infuse",
         "elmedia",
         "player",
@@ -2413,6 +2458,126 @@ fn looks_like_video_player(name: &str) -> bool {
     .iter()
     .any(|keyword| lower.contains(keyword))
 }
+
+#[cfg(target_os = "windows")]
+fn windows_default_video_player() -> Option<(String, Option<String>)> {
+    use winreg::enums::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER, KEY_READ};
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let user_choice = hkcu
+        .open_subkey_with_flags(
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.mp4\UserChoice",
+            KEY_READ,
+        )
+        .ok()?;
+    let prog_id: String = user_choice.get_value("ProgId").ok()?;
+
+    let hkcr = RegKey::predef(HKEY_CLASSES_ROOT);
+    let class_key = hkcr.open_subkey_with_flags(&prog_id, KEY_READ).ok()?;
+    let app_name = class_key
+        .open_subkey_with_flags("Application", KEY_READ)
+        .ok()
+        .and_then(|key| key.get_value::<String, _>("ApplicationName").ok())
+        .or_else(|| class_key.get_value::<String, _>("").ok())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| prog_id.clone());
+
+    let command = class_key
+        .open_subkey_with_flags(r"shell\open\command", KEY_READ)
+        .ok()
+        .and_then(|key| key.get_value::<String, _>("").ok());
+    let exe_path = command.as_deref().and_then(parse_windows_command_exe);
+
+    Some((app_name, exe_path))
+}
+
+#[cfg(target_os = "windows")]
+fn parse_windows_command_exe(command: &str) -> Option<String> {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(rest) = trimmed.strip_prefix('"') {
+        let end = rest.find('"')?;
+        let candidate = rest[..end].to_string();
+        return Path::new(&candidate).exists().then_some(candidate);
+    }
+    let lower = trimmed.to_lowercase();
+    if let Some(index) = lower.find(".exe") {
+        let candidate = trimmed[..index + 4].trim().to_string();
+        return Path::new(&candidate).exists().then_some(candidate);
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn discover_windows_players(
+    players: &mut Vec<InstalledPlayer>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if let Some((_name, Some(path))) = windows_default_video_player() {
+        push_windows_player_path(Path::new(&path), players, seen);
+    }
+
+    for exe in ["vlc.exe", "mpv.exe", "mpvnet.exe", "PotPlayerMini64.exe", "PotPlayerMini.exe", "mpc-hc64.exe", "mpc-hc.exe", "mpc-be64.exe", "mpc-be.exe", "KMPlayer.exe", "wmplayer.exe"] {
+        if let Ok(output) = std::process::Command::new("where").arg(exe).output() {
+            if output.status.success() {
+                let text = String::from_utf8_lossy(&output.stdout);
+                for line in text.lines() {
+                    push_windows_player_path(Path::new(line.trim()), players, seen);
+                }
+            }
+        }
+    }
+
+    let mut roots = Vec::<PathBuf>::new();
+    for key in ["ProgramFiles", "ProgramFiles(x86)", "LocalAppData"] {
+        if let Some(value) = std::env::var_os(key) {
+            roots.push(PathBuf::from(value));
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        roots.push(home.join("AppData").join("Local").join("Programs"));
+    }
+
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(root).max_depth(4).into_iter().filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_file()
+                && path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.eq_ignore_ascii_case("exe")).unwrap_or(false)
+                && path.file_name().and_then(|name| name.to_str()).map(looks_like_video_player).unwrap_or(false)
+            {
+                push_windows_player_path(path, players, seen);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn push_windows_player_path(
+    exe_path: &Path,
+    players: &mut Vec<InstalledPlayer>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if !exe_path.exists() {
+        return;
+    }
+    let path = exe_path.to_string_lossy().to_string();
+    if !seen.insert(path.clone()) {
+        return;
+    }
+    let name = exe_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("播放器")
+        .to_string();
+    players.push(InstalledPlayer { name, path });
+}
+
 
 #[tauri::command]
 async fn open_series_in_file_manager(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
@@ -3062,10 +3227,9 @@ async fn open_player_window(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "视频不存在".to_string())?;
 
-    // macOS 播放器临时策略：先交给用户系统默认播放器打开。
-    // 定制播放器（tauri-plugin-mpv/libmpv + player window）链路保留在下方，
-    // 暂时只在 macOS 入口隐藏，后续修好进程内 libmpv 后可恢复。
-    if use_external_player_on_macos() {
+    // 系统播放器模式：交给操作系统默认播放器，或用户在设置中指定的本地播放器。
+    // 内置「离火播放器」链路保留在下方，Windows 默认仍走内置播放体验。
+    if use_external_player() {
         let video_path = Path::new(&video.file_path);
         if !video_path.is_file() {
             return Err("视频文件不存在，请确认文件仍在原位置".to_string());
@@ -3075,21 +3239,7 @@ async fn open_player_window(
             let _ = player_window.close();
         }
 
-        let mut command = std::process::Command::new("open");
-        if let Some(player_path) = storage::external_player_path() {
-            let player_path = player_path.trim().to_string();
-            if !player_path.is_empty() {
-                if !Path::new(&player_path).exists() {
-                    return Err("选择的播放器不存在，请在设置中重新选择".to_string());
-                }
-                command.arg("-a").arg(player_path);
-            }
-        }
-
-        command
-            .arg(video_path)
-            .spawn()
-            .map_err(|e| format!("打开本地播放器失败：{e}"))?;
+        open_video_with_system_player(video_path)?;
         return Ok(());
     }
 
@@ -3152,8 +3302,52 @@ async fn open_player_window(
     Ok(())
 }
 
-fn use_external_player_on_macos() -> bool {
-    cfg!(target_os = "macos") && storage::player_mode() != "builtin"
+fn use_external_player() -> bool {
+    cfg!(any(target_os = "macos", target_os = "windows")) && storage::player_mode() != "builtin"
+}
+
+fn open_video_with_system_player(video_path: &Path) -> Result<(), String> {
+    let player_path = storage::external_player_path()
+        .map(|path| path.trim().to_string())
+        .filter(|path| !path.is_empty());
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = std::process::Command::new("open");
+        if let Some(player_path) = player_path {
+            if !Path::new(&player_path).exists() {
+                return Err("选择的播放器不存在，请在设置中重新选择".to_string());
+            }
+            command.arg("-a").arg(player_path);
+        }
+        command
+            .arg(video_path)
+            .spawn()
+            .map_err(|e| format!("打开系统播放器失败：{e}"))?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(player_path) = player_path {
+            if !Path::new(&player_path).exists() {
+                return Err("选择的播放器不存在，请在设置中重新选择".to_string());
+            }
+            std::process::Command::new(player_path)
+                .arg(video_path)
+                .spawn()
+                .map_err(|e| format!("打开系统播放器失败：{e}"))?;
+            return Ok(());
+        }
+        open::that(video_path).map_err(|e| format!("打开系统默认播放器失败：{e}"))?;
+        return Ok(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = video_path;
+        Err("当前平台不支持系统播放器模式".to_string())
+    }
 }
 
 /// 一键切换游戏覆盖禁用状态

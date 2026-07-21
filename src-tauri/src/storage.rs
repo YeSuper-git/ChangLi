@@ -138,7 +138,15 @@ pub fn player_mode() -> String {
     read_storage_settings()
         .player_mode
         .filter(|mode| mode == "system" || mode == "builtin")
-        .unwrap_or_else(|| "system".to_string())
+        .unwrap_or_else(default_player_mode)
+}
+
+fn default_player_mode() -> String {
+    if cfg!(target_os = "macos") {
+        "system".to_string()
+    } else {
+        "builtin".to_string()
+    }
 }
 
 pub fn external_player_path() -> Option<String> {
@@ -148,7 +156,7 @@ pub fn external_player_path() -> Option<String> {
 pub fn set_player_mode(mode: &str) -> Result<()> {
     let normalized = match mode {
         "system" | "builtin" => mode.to_string(),
-        _ => "system".to_string(),
+        _ => default_player_mode(),
     };
     let mut settings = read_storage_settings();
     settings.player_mode = Some(normalized);
@@ -202,7 +210,7 @@ pub fn storage_info() -> Result<StorageInfo> {
         .player_mode
         .clone()
         .filter(|mode| mode == "system" || mode == "builtin")
-        .unwrap_or_else(|| "system".to_string());
+        .unwrap_or_else(default_player_mode);
 
     Ok(StorageInfo {
         mode: if portable_root.is_some() {

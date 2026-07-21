@@ -61,6 +61,8 @@ const findPlatformInstaller = (release: GitHubRelease) => {
 
 const Settings: React.FC = () => {
   const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
+  const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
+  const showPlayerSettings = isMac || isWindows;
   const [storageInfo, setStorageInfo] = useState<any>(null);
   const [installedPlayers, setInstalledPlayers] = useState<InstalledPlayer[]>([]);
   const [updatesDir, setUpdatesDir] = useState<string>('');
@@ -100,7 +102,7 @@ const Settings: React.FC = () => {
       const [storage, catsList, fieldsList] = await Promise.all([getStorageInfo(), getAllCategories(), getAllActorFields()]);
       const [uDir, players] = await Promise.all([
         getUpdatesDir().catch(() => ''),
-        isMac ? listInstalledPlayers().catch(() => []) : Promise.resolve([]),
+        showPlayerSettings ? listInstalledPlayers().catch(() => []) : Promise.resolve([]),
       ]);
       setUpdatesDir(uDir);
       setInstalledPlayers(players);
@@ -161,6 +163,13 @@ const Settings: React.FC = () => {
       setStorageInfo((current: any) => current ? { ...current, player_mode: mode } : current);
       const storage = await setPlayerMode(mode);
       setStorageInfo(storage);
+      if (mode === 'builtin') {
+        if (isMac) {
+          notify({ message: '离火播放器暂时无法在 macOS 上正常播放，已推荐使用系统播放器', type: 'info' });
+        } else if (isWindows) {
+          notify({ message: '已开启离火播放器；如果遇到闪退或兼容问题，可以切回系统播放器播放', type: 'info' });
+        }
+      }
     } catch (error) {
       console.error('保存播放方式失败:', error);
       setStorageInfo((current: any) => current ? { ...current, player_mode: previousMode } : current);
@@ -170,7 +179,12 @@ const Settings: React.FC = () => {
 
   const handleSelectExternalPlayer = async () => {
     try {
-      const selected = await open({ directory: true, title: '选择播放器应用' });
+      const selected = await open({
+        directory: isMac,
+        multiple: false,
+        title: isWindows ? '选择播放器程序' : '选择播放器应用',
+        filters: isWindows ? [{ name: '播放器程序', extensions: ['exe'] }] : undefined,
+      });
       if (!selected) return;
       const storage = await setExternalPlayerPath(selected as string);
       setStorageInfo(storage);
@@ -182,11 +196,10 @@ const Settings: React.FC = () => {
   };
 
   const handleSelectDetectedPlayer = async (path: string) => {
-    if (!path) return;
     try {
-      const storage = await setExternalPlayerPath(path);
+      const storage = await setExternalPlayerPath(path || null);
       setStorageInfo(storage);
-      notify({ message: '本地播放器已更新', type: 'success' });
+      notify({ message: path ? '系统播放器已更新' : '已恢复为系统默认播放器', type: 'success' });
     } catch (error) {
       console.error('保存播放器失败:', error);
       notify({ message: '保存失败，请稍后重试', type: 'error' });
@@ -725,7 +738,7 @@ const Settings: React.FC = () => {
       </section>
 
       {/* 播放设置 */}
-      {isMac ? (
+      {showPlayerSettings ? (
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -743,7 +756,7 @@ const Settings: React.FC = () => {
                 onClick={() => handleSetPlayerMode('system')}
                 className={`text-left rounded-2xl border px-4 py-3 transition ${storageInfo?.player_mode !== 'builtin' ? 'border-rose-200 bg-rose-50/80 text-rose-700' : 'border-gray-100 bg-white/70 text-gray-700 hover:border-rose-100'}`}
               >
-                <div className="text-sm font-semibold">本地播放器</div>
+                <div className="text-sm font-semibold">系统播放器</div>
                 <div className="text-xs mt-1 opacity-80">使用系统默认播放器，或指定一个本机播放器打开视频。</div>
               </button>
               <button
@@ -751,20 +764,20 @@ const Settings: React.FC = () => {
                 onClick={() => handleSetPlayerMode('builtin')}
                 className={`text-left rounded-2xl border px-4 py-3 transition ${storageInfo?.player_mode === 'builtin' ? 'border-amber-200 bg-amber-50/80 text-amber-800' : 'border-gray-100 bg-white/70 text-gray-700 hover:border-amber-100'}`}
               >
-                <div className="text-sm font-semibold">内置播放器</div>
-                <div className="text-xs mt-1 opacity-80">保留内置播放体验；macOS 当前暂时无法正常播放。</div>
+                <div className="text-sm font-semibold">离火播放器</div>
+                <div className="text-xs mt-1 opacity-80">使用 ChangLi 内置播放体验，保留播放进度和选集控制。</div>
               </button>
             </div>
           </div>
 
-          {isMac && storageInfo?.player_mode === 'builtin' && (
+          {storageInfo?.player_mode === 'builtin' && (
             <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              macOS 内置播放器暂时无法正常播放，建议先使用本地播放器。
+              {isMac ? 'macOS 离火播放器暂时无法正常播放，建议先使用系统播放器。' : '开启离火播放器后，如果遇到闪退或兼容问题，可以切回系统播放器播放。'}
             </div>
           )}
 
           <div className="flex items-start gap-3">
-            <span className="text-sm text-gray-500 w-24 shrink-0 pt-2">本地播放器</span>
+            <span className="text-sm text-gray-500 w-24 shrink-0 pt-2">系统播放器</span>
             <div className="flex-1 min-w-0 space-y-3">
               <div className="flex items-start gap-3">
                 <select
@@ -773,11 +786,11 @@ const Settings: React.FC = () => {
                   disabled={storageInfo?.player_mode === 'builtin'}
                   className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">系统默认播放器</option>
+                  <option value="">{installedPlayers.find((player) => player.path === '')?.name || '系统默认播放器'}</option>
                   {storageInfo?.external_player_path && !installedPlayers.some((player) => player.path === storageInfo.external_player_path) && (
                     <option value={storageInfo.external_player_path}>当前选择的播放器</option>
                   )}
-                  {installedPlayers.map((player) => (
+                  {installedPlayers.filter((player) => player.path !== '').map((player) => (
                     <option key={player.path} value={player.path}>{player.name}</option>
                   ))}
                 </select>
@@ -809,10 +822,10 @@ const Settings: React.FC = () => {
                 )}
               </div>
               <code className="block text-xs text-gray-500 break-all bg-gray-50 px-3 py-2 rounded-lg">
-                {storageInfo?.external_player_path || '当前使用系统默认播放器'}
+                {storageInfo?.external_player_path || installedPlayers.find((player) => player.path === '')?.name || '当前使用系统默认播放器'}
               </code>
               <p className="text-xs text-gray-400">
-                ChangLi 会自动检测常见播放器；如果列表里没有，也可以手动选择播放器应用。
+                ChangLi 会先显示系统默认播放器；如果想换其他播放器，可以从列表里选择，或手动选择播放器程序。
               </p>
             </div>
           </div>
