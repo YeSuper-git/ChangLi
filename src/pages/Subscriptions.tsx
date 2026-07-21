@@ -318,7 +318,7 @@ const Subscriptions: React.FC = () => {
             onClick={() => setShowBindModal(true)}
             className="action-btn action-btn-primary text-sm"
           >
-            + 添加订阅
+            添加订阅
           </button>
         </div>
       </div>

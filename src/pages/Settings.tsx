@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { addSite, getUpdatesDir, getStorageInfo, openDataDir, setDownloadDir, setAutoUseLastDownloadDir, setPlayerMode, setExternalPlayerPath, listInstalledPlayers, startPosterUpdateSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
-import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus, InstalledPlayer } from '../utils/api';
+import { addSite, getUpdatesDir, getStorageInfo, openDataDir, setDownloadDir, setAutoUseLastDownloadDir, setPlayerMode, startPosterUpdateSilent, getPosterRepairStatus, deleteVideosByCategory, getAllCategories, createCategory, updateCategory, deleteCategory, parseCategoryFeatures, scanCategory, getAllActorFields, updateActorField, createActorField, deleteActorField, getPresetTemplates, getExtensionPresetTemplates, enablePresetTemplate, disablePresetTemplate, reorderCategories, checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from '../utils/api';
+import type { Category, CategoryFeatures, ActorField, PresetTemplate, PosterRepairStatus } from '../utils/api';
 // confirm dialog removed — using custom React modal instead
 import { useLibraryStore } from '../store/libraryStore';
 import loadingIcon from '../assets/icons/loading.svg';
@@ -64,7 +64,6 @@ const Settings: React.FC = () => {
   const isWindows = navigator.platform.includes('Win') || navigator.userAgent.includes('Windows');
   const showPlayerSettings = isMac || isWindows;
   const [storageInfo, setStorageInfo] = useState<any>(null);
-  const [installedPlayers, setInstalledPlayers] = useState<InstalledPlayer[]>([]);
   const [updatesDir, setUpdatesDir] = useState<string>('');
   const [posterRepairStatus, setPosterRepairStatus] = useState<PosterRepairStatus>({ status: 'idle', scanned_series: 0, updated_series: 0, scanned_videos: 0, updated_videos: 0, skipped: 0, error: null });
   const [loading, setLoading] = useState(true);
@@ -100,12 +99,8 @@ const Settings: React.FC = () => {
   const loadSettingsData = async () => {
     try {
       const [storage, catsList, fieldsList] = await Promise.all([getStorageInfo(), getAllCategories(), getAllActorFields()]);
-      const [uDir, players] = await Promise.all([
-        getUpdatesDir().catch(() => ''),
-        showPlayerSettings ? listInstalledPlayers().catch(() => []) : Promise.resolve([]),
-      ]);
+      const uDir = await getUpdatesDir().catch(() => '');
       setUpdatesDir(uDir);
-      setInstalledPlayers(players);
       setStorageInfo(storage);
       setCategories(catsList);
       setActorFields(fieldsList);
@@ -163,67 +158,9 @@ const Settings: React.FC = () => {
       setStorageInfo((current: any) => current ? { ...current, player_mode: mode } : current);
       const storage = await setPlayerMode(mode);
       setStorageInfo(storage);
-      if (mode === 'builtin') {
-        if (isMac) {
-          notify({ message: '离火播放器暂时无法在 macOS 上正常播放，已推荐使用系统播放器', type: 'info' });
-        } else if (isWindows) {
-          notify({ message: '已开启离火播放器；如果遇到闪退或兼容问题，可以切回系统播放器播放', type: 'info' });
-        }
-      }
     } catch (error) {
       console.error('保存播放方式失败:', error);
       setStorageInfo((current: any) => current ? { ...current, player_mode: previousMode } : current);
-      notify({ message: '保存失败，请稍后重试', type: 'error' });
-    }
-  };
-
-  const handleSelectExternalPlayer = async () => {
-    try {
-      const selected = await open({
-        directory: isMac,
-        multiple: false,
-        title: isWindows ? '选择播放器程序' : '选择播放器应用',
-        filters: isWindows ? [{ name: '播放器程序', extensions: ['exe'] }] : undefined,
-      });
-      if (!selected) return;
-      const storage = await setExternalPlayerPath(selected as string);
-      setStorageInfo(storage);
-      notify({ message: '本地播放器已更新', type: 'success' });
-    } catch (error) {
-      console.error('选择播放器失败:', error);
-      notify({ message: '选择播放器失败，请稍后重试', type: 'error' });
-    }
-  };
-
-  const handleSelectDetectedPlayer = async (path: string) => {
-    try {
-      const storage = await setExternalPlayerPath(path || null);
-      setStorageInfo(storage);
-      notify({ message: path ? '系统播放器已更新' : '已恢复为系统默认播放器', type: 'success' });
-    } catch (error) {
-      console.error('保存播放器失败:', error);
-      notify({ message: '保存失败，请稍后重试', type: 'error' });
-    }
-  };
-
-  const handleRefreshInstalledPlayers = async () => {
-    try {
-      const players = await listInstalledPlayers();
-      setInstalledPlayers(players);
-      notify({ message: players.length > 0 ? `已检测到 ${players.length} 个播放器` : '未检测到可用播放器，可手动选择', type: 'info' });
-    } catch (error) {
-      console.error('检测播放器失败:', error);
-      notify({ message: '检测播放器失败，请手动选择', type: 'error' });
-    }
-  };
-
-  const handleClearExternalPlayer = async () => {
-    try {
-      const storage = await setExternalPlayerPath(null);
-      setStorageInfo(storage);
-      notify({ message: '已恢复为系统默认播放器', type: 'success' });
-    } catch (error) {
-      console.error('清除播放器设置失败:', error);
       notify({ message: '保存失败，请稍后重试', type: 'error' });
     }
   };
@@ -738,97 +675,36 @@ const Settings: React.FC = () => {
       </section>
 
       {/* 播放设置 */}
+      {/* 播放设置 */}
       {showPlayerSettings ? (
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">播放设置</h2>
-            <p className="text-sm text-gray-500 mt-1">选择视频打开方式和本地播放器</p>
+            <p className="text-sm text-gray-500 mt-1">选择视频打开方式</p>
           </div>
         </div>
-
-        <div className="changli-panel p-6 space-y-5">
-          <div className="space-y-3">
-            <div className="text-sm text-gray-500">播放方式</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleSetPlayerMode('system')}
-                className={`text-left rounded-2xl border px-4 py-3 transition ${storageInfo?.player_mode !== 'builtin' ? 'border-rose-200 bg-rose-50/80 text-rose-700' : 'border-gray-100 bg-white/70 text-gray-700 hover:border-rose-100'}`}
-              >
-                <div className="text-sm font-semibold">系统播放器</div>
-                <div className="text-xs mt-1 opacity-80">使用系统默认播放器，或指定一个本机播放器打开视频。</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetPlayerMode('builtin')}
-                className={`text-left rounded-2xl border px-4 py-3 transition ${storageInfo?.player_mode === 'builtin' ? 'border-amber-200 bg-amber-50/80 text-amber-800' : 'border-gray-100 bg-white/70 text-gray-700 hover:border-amber-100'}`}
-              >
-                <div className="text-sm font-semibold">离火播放器</div>
-                <div className="text-xs mt-1 opacity-80">使用 ChangLi 内置播放体验，保留播放进度和选集控制。</div>
-              </button>
+        <div className="changli-panel p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-800">离火播放器</div>
+              <div className="text-xs text-gray-500 mt-0.5">开启后使用内置播放器播放视频</div>
             </div>
+            <button
+              type="button"
+              onClick={() => handleSetPlayerMode(storageInfo?.player_mode === 'builtin' ? 'system' : 'builtin')}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 ${storageInfo?.player_mode === 'builtin' ? 'bg-rose-500' : 'bg-gray-200'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${storageInfo?.player_mode === 'builtin' ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
           </div>
-
           {storageInfo?.player_mode === 'builtin' && (
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {isMac ? 'macOS 离火播放器暂时无法正常播放，建议先使用系统播放器。' : '开启离火播放器后，如果遇到闪退或兼容问题，可以切回系统播放器播放。'}
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800 leading-relaxed">
+              {isMac ? 'macOS 上离火播放器暂时无法正常使用，建议使用系统播放器。' : '如果遇到闪退或兼容问题，可以关闭此开关切回系统播放器播放。'}
             </div>
           )}
-
-          <div className="flex items-start gap-3">
-            <span className="text-sm text-gray-500 w-24 shrink-0 pt-2">系统播放器</span>
-            <div className="flex-1 min-w-0 space-y-3">
-              <div className="flex items-start gap-3">
-                <select
-                  value={storageInfo?.external_player_path || ''}
-                  onChange={(event) => handleSelectDetectedPlayer(event.target.value)}
-                  disabled={storageInfo?.player_mode === 'builtin'}
-                  className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">{installedPlayers.find((player) => player.path === '')?.name || '系统默认播放器'}</option>
-                  {storageInfo?.external_player_path && !installedPlayers.some((player) => player.path === storageInfo.external_player_path) && (
-                    <option value={storageInfo.external_player_path}>当前选择的播放器</option>
-                  )}
-                  {installedPlayers.filter((player) => player.path !== '').map((player) => (
-                    <option key={player.path} value={player.path}>{player.name}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleRefreshInstalledPlayers}
-                  disabled={storageInfo?.player_mode === 'builtin'}
-                  className="action-btn action-btn-secondary text-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  重新检测
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSelectExternalPlayer}
-                  disabled={storageInfo?.player_mode === 'builtin'}
-                  className="action-btn action-btn-secondary text-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  手动选择
-                </button>
-                {storageInfo?.external_player_path && (
-                  <button
-                    type="button"
-                    onClick={handleClearExternalPlayer}
-                    disabled={storageInfo?.player_mode === 'builtin'}
-                    className="action-btn text-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    恢复默认
-                  </button>
-                )}
-              </div>
-              <code className="block text-xs text-gray-500 break-all bg-gray-50 px-3 py-2 rounded-lg">
-                {storageInfo?.external_player_path || installedPlayers.find((player) => player.path === '')?.name || '当前使用系统默认播放器'}
-              </code>
-              <p className="text-xs text-gray-400">
-                ChangLi 会先显示系统默认播放器；如果想换其他播放器，可以从列表里选择，或手动选择播放器程序。
-              </p>
-            </div>
-          </div>
         </div>
       </section>
       ) : null}

@@ -155,13 +155,10 @@ const Home: React.FC = () => {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="changli-heading-xl mb-3">今天想看什么</h1>
-              <p className="changli-muted max-w-2xl text-sm leading-6">
-                快速回到追番进度，浏览最近入库的视频集，也可以直接进入演员库继续整理收藏。
-              </p>
-              <p className="mt-3 text-sm italic text-gray-400" style={{ fontFamily: "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif" }}>
+              <p className="changli-muted max-w-2xl text-sm leading-6 italic" style={{ fontFamily: "'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif" }}>
                 「{dailyQuote.text}」
-                <span className="not-italic ml-1">—— {dailyQuote.author}</span>
               </p>
+              <p className="text-xs text-gray-400 mt-1">—— {dailyQuote.author}</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button type="button" className="action-btn action-btn-primary" data-tutorial="go-library" onClick={() => navigateToLibraryReady(navigate, '/library')}>进入视频库</button>

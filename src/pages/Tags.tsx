@@ -273,7 +273,7 @@ const Tags: React.FC = () => {
             onClick={() => { setCreateName(''); setCreateScope('global'); setCreateCategoryKeys([]); setShowCreateModal(true); }}
             className="action-btn action-btn-primary"
           >
-            + 创建标签
+            创建标签
           </button>
         </div>
       </div>

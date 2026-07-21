@@ -3602,11 +3602,9 @@ html.changli-player-html .changli-speed-options {
 .completion-gallery-hero h1 {
   margin: 0;
   color: var(--changli-ink);
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, 'Times New Roman', serif;
-  font-size: clamp(22px, 3.2vw, 34px);
-  font-weight: 600;
+  font-size: clamp(36px, 5vw, 56px);
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.052em;
 }
 
 .completion-gallery-hero p:not(.completion-gallery-kicker) {
