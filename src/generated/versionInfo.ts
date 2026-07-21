@@ -2,6 +2,18 @@
 export const currentVersion = "1.9.32";
 export const changelogData = [
   {
+    "version": "1.9.32",
+    "date": "",
+    "changes": [
+      {
+        "category": "Changed",
+        "items": [
+          "**检查更新体验**：网络请求失败时明确提示「GitHub 访问超时，可在更换 VPN 后重试」，与「已是最新版本」结果明显区分，避免用户误解。"
+        ]
+      }
+    ]
+  },
+  {
     "version": "1.9.31",
     "date": "",
     "changes": [
