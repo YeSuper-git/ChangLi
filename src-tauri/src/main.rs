@@ -2957,6 +2957,27 @@ async fn open_player_window(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "视频不存在".to_string())?;
+
+    // macOS 播放器临时策略：先交给用户系统默认播放器打开。
+    // 定制播放器（tauri-plugin-mpv/libmpv + player window）链路保留在下方，
+    // 暂时只在 macOS 入口隐藏，后续修好进程内 libmpv 后可恢复。
+    if use_system_default_player_on_macos() {
+        let video_path = Path::new(&video.file_path);
+        if !video_path.is_file() {
+            return Err("视频文件不存在，请确认文件仍在原位置".to_string());
+        }
+
+        if let Some(player_window) = app.get_webview_window("player") {
+            let _ = player_window.close();
+        }
+
+        std::process::Command::new("open")
+            .arg(video_path)
+            .spawn()
+            .map_err(|e| format!("打开系统默认播放器失败：{e}"))?;
+        return Ok(());
+    }
+
     let mut target_w = 1280.0;
     let mut target_h = 720.0;
     if let Some(main) = app.get_webview_window("main") {
@@ -3014,6 +3035,10 @@ async fn open_player_window(
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn use_system_default_player_on_macos() -> bool {
+    cfg!(target_os = "macos")
 }
 
 /// 一键切换游戏覆盖禁用状态
