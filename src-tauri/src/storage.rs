@@ -14,12 +14,16 @@ pub struct StorageInfo {
     pub portable_root: Option<String>,
     pub download_dir: String,
     pub auto_use_last_download_dir: bool,
+    pub player_mode: String,
+    pub external_player_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct StorageSettings {
     download_dir: Option<String>,
     auto_use_last_download_dir: bool,
+    player_mode: Option<String>,
+    external_player_path: Option<String>,
 }
 
 impl Default for StorageSettings {
@@ -27,6 +31,8 @@ impl Default for StorageSettings {
         Self {
             download_dir: None,
             auto_use_last_download_dir: false,
+            player_mode: None,
+            external_player_path: None,
         }
     }
 }
@@ -128,6 +134,36 @@ pub fn auto_use_last_download_dir() -> bool {
     read_storage_settings().auto_use_last_download_dir
 }
 
+pub fn player_mode() -> String {
+    read_storage_settings()
+        .player_mode
+        .filter(|mode| mode == "system" || mode == "builtin")
+        .unwrap_or_else(|| "system".to_string())
+}
+
+pub fn external_player_path() -> Option<String> {
+    read_storage_settings().external_player_path
+}
+
+pub fn set_player_mode(mode: &str) -> Result<()> {
+    let normalized = match mode {
+        "system" | "builtin" => mode.to_string(),
+        _ => "system".to_string(),
+    };
+    let mut settings = read_storage_settings();
+    settings.player_mode = Some(normalized);
+    write_storage_settings(&settings)
+}
+
+pub fn set_external_player_path(path: Option<&str>) -> Result<()> {
+    let mut settings = read_storage_settings();
+    settings.external_player_path = path
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string);
+    write_storage_settings(&settings)
+}
+
 pub fn actor_photos_dir() -> PathBuf {
     active_data_dir().join("actors").join("photos")
 }
@@ -162,6 +198,11 @@ pub fn storage_info() -> Result<StorageInfo> {
         .download_dir
         .clone()
         .unwrap_or_else(|| default_download_dir().to_string_lossy().to_string());
+    let player_mode = settings
+        .player_mode
+        .clone()
+        .filter(|mode| mode == "system" || mode == "builtin")
+        .unwrap_or_else(|| "system".to_string());
 
     Ok(StorageInfo {
         mode: if portable_root.is_some() {
@@ -174,6 +215,8 @@ pub fn storage_info() -> Result<StorageInfo> {
         portable_root: portable_root.map(|path| path.to_string_lossy().to_string()),
         download_dir,
         auto_use_last_download_dir: settings.auto_use_last_download_dir,
+        player_mode,
+        external_player_path: settings.external_player_path,
     })
 }
 

@@ -46,6 +46,12 @@ impl Default for PosterRepairStatus {
     }
 }
 
+#[derive(Clone, serde::Serialize)]
+struct InstalledPlayer {
+    name: String,
+    path: String,
+}
+
 // 应用状态
 struct AppState {
     db: Mutex<Option<sqlx::SqlitePool>>,
@@ -2311,6 +2317,104 @@ async fn set_auto_use_last_download_dir(enabled: bool) -> Result<storage::Storag
 }
 
 #[tauri::command]
+async fn set_player_mode(mode: String) -> Result<storage::StorageInfo, String> {
+    storage::set_player_mode(&mode).map_err(|e| e.to_string())?;
+    storage::storage_info().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_external_player_path(path: Option<String>) -> Result<storage::StorageInfo, String> {
+    storage::set_external_player_path(path.as_deref()).map_err(|e| e.to_string())?;
+    storage::storage_info().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_installed_players() -> Result<Vec<InstalledPlayer>, String> {
+    Ok(discover_installed_players())
+}
+
+fn discover_installed_players() -> Vec<InstalledPlayer> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+
+    let mut players = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+
+    let query = r#"kMDItemContentType == "com.apple.application-bundle" && (kMDItemDisplayName == "*IINA*" || kMDItemDisplayName == "*VLC*" || kMDItemDisplayName == "*QuickTime*" || kMDItemDisplayName == "*Movist*" || kMDItemDisplayName == "*mpv*" || kMDItemDisplayName == "*Player*" || kMDItemDisplayName == "*播放器*" || kMDItemDisplayName == "*视频*")"#;
+    if let Ok(output) = std::process::Command::new("mdfind").arg(query).output() {
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            for line in text.lines() {
+                push_player_candidate(Path::new(line), &mut players, &mut seen);
+            }
+        }
+    }
+
+    for path in [
+        PathBuf::from("/System/Applications"),
+        PathBuf::from("/Applications"),
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("~"))
+            .join("Applications"),
+    ] {
+        if !path.exists() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(path).max_depth(2).into_iter().filter_map(Result::ok) {
+            let app_path = entry.path();
+            if app_path.extension().and_then(|ext| ext.to_str()) == Some("app") {
+                push_player_candidate(app_path, &mut players, &mut seen);
+            }
+        }
+    }
+
+    players.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    players
+}
+
+fn push_player_candidate(
+    app_path: &Path,
+    players: &mut Vec<InstalledPlayer>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if !app_path.exists() {
+        return;
+    }
+    let name = app_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if name.is_empty() || !looks_like_video_player(&name) {
+        return;
+    }
+    let path = app_path.to_string_lossy().to_string();
+    if seen.insert(path.clone()) {
+        players.push(InstalledPlayer { name, path });
+    }
+}
+
+fn looks_like_video_player(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    [
+        "iina",
+        "vlc",
+        "quicktime",
+        "movist",
+        "mpv",
+        "infuse",
+        "elmedia",
+        "player",
+        "播放器",
+        "视频",
+    ]
+    .iter()
+    .any(|keyword| lower.contains(keyword))
+}
+
+#[tauri::command]
 async fn open_series_in_file_manager(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -2961,7 +3065,7 @@ async fn open_player_window(
     // macOS 播放器临时策略：先交给用户系统默认播放器打开。
     // 定制播放器（tauri-plugin-mpv/libmpv + player window）链路保留在下方，
     // 暂时只在 macOS 入口隐藏，后续修好进程内 libmpv 后可恢复。
-    if use_system_default_player_on_macos() {
+    if use_external_player_on_macos() {
         let video_path = Path::new(&video.file_path);
         if !video_path.is_file() {
             return Err("视频文件不存在，请确认文件仍在原位置".to_string());
@@ -2971,10 +3075,21 @@ async fn open_player_window(
             let _ = player_window.close();
         }
 
-        std::process::Command::new("open")
+        let mut command = std::process::Command::new("open");
+        if let Some(player_path) = storage::external_player_path() {
+            let player_path = player_path.trim().to_string();
+            if !player_path.is_empty() {
+                if !Path::new(&player_path).exists() {
+                    return Err("选择的播放器不存在，请在设置中重新选择".to_string());
+                }
+                command.arg("-a").arg(player_path);
+            }
+        }
+
+        command
             .arg(video_path)
             .spawn()
-            .map_err(|e| format!("打开系统默认播放器失败：{e}"))?;
+            .map_err(|e| format!("打开本地播放器失败：{e}"))?;
         return Ok(());
     }
 
@@ -3037,8 +3152,8 @@ async fn open_player_window(
     Ok(())
 }
 
-fn use_system_default_player_on_macos() -> bool {
-    cfg!(target_os = "macos")
+fn use_external_player_on_macos() -> bool {
+    cfg!(target_os = "macos") && storage::player_mode() != "builtin"
 }
 
 /// 一键切换游戏覆盖禁用状态
@@ -4151,6 +4266,9 @@ fn main() {
             open_data_dir,
             set_download_dir,
             set_auto_use_last_download_dir,
+            set_player_mode,
+            set_external_player_path,
+            list_installed_players,
             open_series_in_file_manager,
             repair_missing_posters_silent,
             start_poster_update_silent,

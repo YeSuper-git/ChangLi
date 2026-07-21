@@ -7,6 +7,8 @@ export interface StorageInfo {
   portable_root?: string;
   download_dir: string;
   auto_use_last_download_dir: boolean;
+  player_mode: 'system' | 'builtin';
+  external_player_path?: string | null;
 }
 
 export async function getStorageInfo(): Promise<StorageInfo> {
@@ -34,6 +36,23 @@ export async function setDownloadDir(path: string): Promise<StorageInfo> {
 
 export async function setAutoUseLastDownloadDir(enabled: boolean): Promise<StorageInfo> {
   return invoke<StorageInfo>('set_auto_use_last_download_dir', { enabled });
+}
+
+export async function setPlayerMode(mode: 'system' | 'builtin'): Promise<StorageInfo> {
+  return invoke<StorageInfo>('set_player_mode', { mode });
+}
+
+export async function setExternalPlayerPath(path?: string | null): Promise<StorageInfo> {
+  return invoke<StorageInfo>('set_external_player_path', { path: path ?? null });
+}
+
+export interface InstalledPlayer {
+  name: string;
+  path: string;
+}
+
+export async function listInstalledPlayers(): Promise<InstalledPlayer[]> {
+  return invoke<InstalledPlayer[]>('list_installed_players');
 }
 
 export interface PosterRepairStatus {
