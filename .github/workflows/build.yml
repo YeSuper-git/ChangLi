@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          lfs: true
+          lfs: false
 
       - name: Get version
         id: version
@@ -36,6 +36,18 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Restore Windows bundled deps
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "src-tauri/resources/mpv", "src-tauri/resources/ffmpeg", "build-deps" | Out-Null
+          gh release download build-deps --repo $env:GITHUB_REPOSITORY --pattern changli-mpv.exe --pattern changli-ffmpeg.exe --dir build-deps --clobber
+          Copy-Item "build-deps/changli-mpv.exe" "src-tauri/resources/mpv/mpv.exe" -Force
+          Copy-Item "build-deps/changli-ffmpeg.exe" "src-tauri/resources/ffmpeg/ffmpeg.exe" -Force
+          Get-Item "src-tauri/resources/mpv/mpv.exe", "src-tauri/resources/ffmpeg/ffmpeg.exe" | Select-Object FullName, Length
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -106,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          lfs: true
+          lfs: false
 
       - name: Get version
         id: version
