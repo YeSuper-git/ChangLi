@@ -554,7 +554,7 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('检查更新失败:', error);
       setUpdateStatus('检查更新失败');
-      notify({ message: '检查更新失败，请稍后重试', type: 'error' });
+      notify({ message: '检查更新失败，请检查网络或稍后再试', type: 'error' });
       setTimeout(() => setUpdateStatus(null), 5000);
     }
   };
