@@ -30,8 +30,6 @@
 
 ## 截图预览
 
-<img src="docs/screenshots/home.png" width="800">
-
 <img src="docs/screenshots/library.png" width="800">
 
 <img src="docs/screenshots/tags.png" width="800">
