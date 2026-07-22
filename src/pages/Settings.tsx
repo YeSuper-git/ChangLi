@@ -688,7 +688,7 @@ const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold text-gray-800">离火播放器</div>
-              <div className="text-xs text-gray-500 mt-0.5">开启后使用内置播放器播放视频</div>
+              <div className="text-xs text-gray-500 mt-0.5">开启后使用内置播放器播放视频，关闭时使用系统默认播放器</div>
             </div>
             <button
               type="button"

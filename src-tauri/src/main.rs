@@ -3873,14 +3873,12 @@ async fn cancel_update_download(state: State<'_, AppState>) -> Result<(), String
 
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<(), String> {
-    // 先打开安装包，再关闭主程序，避免 macOS 覆盖安装时主程序仍在运行
+    // 先打开安装包，再退出程序，避免 macOS 覆盖安装时主程序仍在运行
     open::that(&file_path).map_err(|e| format!("打开安装包失败: {e}"))?;
     // 延迟 500ms 确保安装程序已启动
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    // 关闭主程序窗口
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.close();
-    }
+    // 退出程序（macOS 关窗口不等于退出，必须用 app.exit）
+    app.exit(0);
     Ok(())
 }
 
