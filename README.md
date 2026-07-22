@@ -1,12 +1,14 @@
 # 长离 ChangLi
 
-> 智能视频管理播放平台 — 自动识别、智能分类、海报匹配、内置播放器
+> 智能视频资源管理平台 — 本地识别 · 智能分类 · 海报匹配 · 内置播放器
 
 <p align="center">
-  <img src="docs/screenshots/home.png" width="800" alt="ChangLi 首页">
+  <img src="docs/screenshots/home.png" width="800" alt="ChangLi">
 </p>
 
-**支持 macOS / Windows** · **MIT License** · **免费开源**
+<p align="center">
+  <strong>支持 macOS / Windows</strong> · MIT License · 免费开源
+</p>
 
 > ⚠️ **免责声明**：ChangLi 是一个本地视频资源管理工具，所有视频文件均存储于用户本地磁盘，本软件不提供、不托管、不分发任何视频内容。RSS 订阅功能仅解析用户自定义的信息源，磁力链接仅作为复制操作由用户自行决定是否使用。用户应自行确保所管理的内容符合当地法律法规。
 >
@@ -14,19 +16,19 @@
 
 ---
 
-## ✨ 核心功能
+## 核心功能
 
-- **智能识别** — 自动识别视频集、季、选集层级
-- **分类管理** — 自定义分类、标签文件夹自动识别、一体化筛选
-- **演员系统** — 演员信息管理、参演作品自动关联
-- **海报匹配** — 自动匹配视频集和分集海报
-- **内置播放器** — mpv 引擎，原片画质，倍速播放，画中画
-- **RSS 订阅** — 自动检查更新，磁力链接一键复制
+- **智能识别** — 自动扫描本地视频，识别视频集、季、选集层级
+- **分类管理** — 自定义分类体系，标签筛选，文件夹自动识别
+- **演员管理** — 演员信息维护，参演作品自动关联
+- **海报匹配** — 自动匹配视频集海报，支持手动修复
+- **内置播放器** — 基于 mpv 引擎，原片画质，倍速播放，画中画
+- **RSS 订阅** — 订阅源管理，自动检查更新，磁力链接一键复制
 - **影评记录** — 看完后记录评分、时间和短评
 
 ---
 
-## 📸 截图预览
+## 截图预览
 
 <img src="docs/screenshots/home.png" width="800">
 
@@ -38,7 +40,7 @@
 
 ---
 
-## 📥 下载安装
+## 下载安装
 
 ### macOS
 1. 下载 [最新 Release](https://github.com/YeSuper-git/ChangLi/releases/latest) 中的 `.dmg` 文件
@@ -52,36 +54,41 @@
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
-1. **启动应用** → 首次进入会显示新手引导
-2. **添加视频目录** → 设置 → 数据存储 → 更换下载目录
-3. **扫描视频** → 应用会自动识别视频集和分集
-4. **开始播放** → 点击任意视频集即可播放
-
----
-
-## 🛠️ 技术栈
-
-React + TypeScript + Tailwind CSS + Tauri 2.0 + Rust + mpv + SQLite
+1. 启动应用，首次进入会显示新手引导
+2. 进入设置 → 数据存储 → 选择视频目录
+3. 应用会自动扫描并识别视频集和分集
+4. 点击任意视频集即可播放
 
 ---
 
-## 📋 系统要求
+## 技术栈
+
+| 层 | 技术 |
+|---|------|
+| 前端 | React + TypeScript + Tailwind CSS |
+| 后端 | Tauri 2.0 + Rust |
+| 播放器 | mpv（内置）/ 系统播放器 |
+| 数据库 | SQLite（纯本地） |
+
+---
+
+## 系统要求
 
 | 平台 | 最低要求 |
 |------|----------|
 | macOS | macOS 11.0+ |
-| Windows | Windows 10 1903+ (64-bit) |
+| Windows | Windows 10 1903+（64-bit） |
 
 ---
 
-## 🤝 反馈问题
+## 反馈问题
 
-- [GitHub Issues](https://github.com/YeSuper-git/ChangLi/issues)
+[GitHub Issues](https://github.com/YeSuper-git/ChangLi/issues)
 
 ---
 
-## 📄 License
+## License
 
 [MIT License](LICENSE)
