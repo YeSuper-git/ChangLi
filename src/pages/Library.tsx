@@ -1405,7 +1405,7 @@ const Library: React.FC = () => {
                 type="text"
                 value={newSeriesTitle}
                 onChange={(e) => setNewSeriesTitle(e.target.value)}
-                placeholder="例如：令和的斑小姐"
+                placeholder="请输入视频集名称"
                 className="changli-input w-full"
                 autoFocus
                 onKeyDown={(e) => {

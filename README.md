@@ -40,13 +40,13 @@
 
 ## 📸 截图预览
 
-| 首页 | 视频库 | 播放器 |
-|------|--------|--------|
-| ![首页](docs/screenshots/home.png) | ![视频库](docs/screenshots/library.png) | ![播放器](docs/screenshots/player.png) |
+| 首页 | 视频库 |
+|------|--------|
+| ![首页](docs/screenshots/home.png) | ![视频库](docs/screenshots/library.png) |
 
-| 演员库 | 设置 | 订阅 |
-|--------|------|------|
-| ![演员库](docs/screenshots/actors.png) | ![设置](docs/screenshots/settings.png) | ![订阅](docs/screenshots/subscriptions.png) |
+| 标签管理 | 演员库 |
+|----------|--------|
+| ![标签](docs/screenshots/tags.png) | ![演员](docs/screenshots/actors.png) |
 
 ---
 

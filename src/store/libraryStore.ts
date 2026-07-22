@@ -126,6 +126,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       const tags = await getTags();
       set({ tags });
+      // 清除分类筛选缓存，防止标签编辑后视频页标签列表不更新
+      try {
+        const { clearLibraryFilterCaches } = await import('../pages/Library');
+        clearLibraryFilterCaches();
+      } catch {}
     } catch (error) {
       console.error('[LibraryStore] refreshTags failed:', error);
     }

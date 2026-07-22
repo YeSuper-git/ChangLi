@@ -814,7 +814,7 @@ pub async fn create_empty_video_series(
     display_type: Option<&str>,
 ) -> Result<VideoSeries> {
     sqlx::query(
-        "INSERT INTO video_series (title, folder_path, poster_orientation, status, display_type) VALUES (?, NULL, 'landscape', 'ongoing', COALESCE(?, ''))"
+        "INSERT INTO video_series (title, folder_path, poster_orientation, status, display_type, created_at, updated_at) VALUES (?, NULL, 'landscape', 'ongoing', COALESCE(?, ''), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
     )
     .bind(title)
     .bind(display_type)

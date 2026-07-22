@@ -386,6 +386,11 @@ const SeriesDetail: React.FC = () => {
     try {
       const savedSeries = await updateVideoSeries(series.id, title, editData.description, editData.poster, undefined, editData.status, editData.code || undefined);
       patchSeriesLocal(series.id, savedSeries);
+      // 立即更新 seriesDetailCache，防止刷新后读到旧数据
+      const cached = seriesDetailCache.get(series.id);
+      if (cached) {
+        seriesDetailCache.set(series.id, { ...cached, series: savedSeries });
+      }
       await syncSeriesRelations();
       loadSeries({ silent: true }).catch(() => {});
     } catch (error) {
