@@ -1,6 +1,6 @@
 [package]
 name = "changli"
-version = "1.9.34"
+version = "1.9.35"
 description = "长离 - 全功能视频管理播放平台"
 authors = ["YeSuper"]
 license = "MIT"
@@ -37,6 +37,7 @@ image = { version = "0.25", default-features = false, features = ["png", "bmp", 
 base64 = "0.22"
 tauri-plugin-mpv = "0.5.2"
 lru = "0.12"
+scopeguard = "1"
 raw-window-handle = "0.6"
 tauri-plugin-libmpv = { path = "vendor/tauri-plugin-libmpv-0.3.2" }
 

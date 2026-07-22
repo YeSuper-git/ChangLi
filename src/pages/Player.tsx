@@ -7,7 +7,7 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { MPV_OBSERVED_PROPERTIES, isMac, mpvCommand, mpvDestroy, mpvInit, mpvObserveProperties, mpvSetProperty, mpvSetVideoMarginRatio } from '../utils/mpv-bridge';
+import { MPV_OBSERVED_PROPERTIES, isMac, mpvCommand, mpvInit, mpvObserveProperties, mpvSetProperty, mpvSetVideoMarginRatio } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
@@ -418,28 +418,13 @@ const Player: React.FC = () => {
     };
   }, [id, runMpvCommand, handleObservedVideoSize]);
 
-  // 组件卸载时清理 mpv — 延迟 destroy，等 mpv 完全退出后再销毁窗口
+  // 组件卸载时清理 — 不再操作 mpv，所有销毁由 Rust 层 request_close_player 统一控制
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
       cleanupPlayerMemory('unmount');
-      mpvOperationLock.current = mpvOperationLock.current.then(async () => {
-        if (mpvInitialized.current) {
-          try {
-            // Send quit to let mpv flush and stop cleanly.
-            await runMpvCommand(() => mpvCommand('quit')).catch(() => {});
-            // Wait for mpv to process quit; the Rust is_alive guard prevents
-            // use-after-free even if destroy() is called before mpv fully stops.
-            await new Promise(resolve => setTimeout(resolve, 500));
-            // Destroy the plugin instance. Safe even if already destroyed by
-            // the lib.rs CloseRequested handler — destroy() is idempotent.
-            await mpvDestroy().catch(() => {});
-          } catch { /* ignore */ }
-          mpvInitialized.current = false;
-        }
-      }).catch(() => {});
     };
-  }, [runMpvCommand, cleanupPlayerMemory]);
+  }, [cleanupPlayerMemory]);
 
   // 保存音量到本地
   useEffect(() => {
@@ -733,10 +718,13 @@ const Player: React.FC = () => {
           await mainWindow.setAlwaysOnTop(false).catch(() => undefined);
         }
       } catch { /* 主窗口操作失败不影响关闭 */ }
-      // This triggers CloseRequested → plugin destroys mpv → window.close()
-      await playerWindow.close();
+      // 通知 Rust 统一执行：销毁 mpv → 关闭窗口，前端不再直接操作
+      await invoke('request_close_player').catch(() => {
+        // 兜底：如果 Rust 命令失败，直接关闭窗口
+        playerWindow.close().catch(() => {});
+      });
     }, '关闭');
-  }, [playerWindow, runPlayerWindowAction, currentVideo, currentTime, duration, markSeriesDirty]);
+  }, [runPlayerWindowAction, currentVideo, currentTime, duration, markSeriesDirty]);
 
   // 切换画中画
   const togglePiP = useCallback(async () => {

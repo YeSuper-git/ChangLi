@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::thread;
@@ -9,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow,
+    AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
@@ -20,6 +21,8 @@ const PLAYER_HEIGHT: f64 = 420.0;
 
 static MPV_SESSION: Mutex<Option<MpvSession>> = Mutex::new(None);
 static ALWAYS_ON_TOP: Mutex<bool> = Mutex::new(false);
+/// 防止重复进入播放器关闭流程的原子标记
+static PLAYER_CLOSING: AtomicBool = AtomicBool::new(false);
 
 struct MpvSession {
     child: Child,
@@ -100,20 +103,23 @@ pub fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-    eprintln!("[player] close_player_window called");
-    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        eprintln!("[player] close_player_window: found player window, visible={}", window.is_visible().unwrap_or(false));
-        // 窗口已隐藏则跳过，避免重复操作
-        if !window.is_visible().unwrap_or(false) {
+        eprintln!("[player] close_player_window called");
+        if PLAYER_CLOSING.load(Ordering::SeqCst) {
+            eprintln!("[player] close_player_window: skip (already closing)");
             return;
         }
-        let _ = window.hide();
-    } else {
-        eprintln!("[player] close_player_window: no player window found");
+        if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+            if !window.is_visible().unwrap_or(false) {
+                eprintln!("[player] close_player_window: player window not visible, skip");
+                return;
+            }
+        }
+        // 统一走 request_close_player 完整销毁链路
+        let app_handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = request_close_player(app_handle).await;
+        });
     }
-    // 不再在这里 destroy——由前端 useEffect cleanup 负责 destroy
-    // 避免双重销毁导致堆损坏
-}
 
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
 #[tauri::command]
@@ -305,12 +311,107 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
         WindowEvent::Destroyed => {
             eprintln!("[player] handle_main_window_event: Destroyed");
         }
-        WindowEvent::CloseRequested { .. } => {
+        WindowEvent::CloseRequested { api, .. } => {
             eprintln!("[player] handle_main_window_event: CloseRequested for main");
-            close_player_window(app);
+            // 阻止主窗口立即关闭，先等播放器资源释放完
+            api.prevent_close();
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                // 超时 2 秒兜底，防止销毁卡死导致主窗口关不掉
+                let result = tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    request_close_player(app_handle.clone()),
+                ).await;
+                // 超时或异常：强制 kill mpv 子进程，降低后台残留概率
+                if result.is_err() {
+                    eprintln!("[player] handle_main_window_event: request_close_player timed out, force killing mpv");
+                    #[cfg(target_os = "windows")]
+                    {
+                        use tauri_plugin_mpv::MpvExt;
+                        let _ = app_handle.mpv().destroy(PLAYER_WINDOW_LABEL);
+                    }
+                    stop_mpv_session();
+                }
+                // 关闭主窗口
+                if let Some(main) = app_handle.get_webview_window("main") {
+                    eprintln!("[player] handle_main_window_event: closing main window");
+                    let _ = main.close();
+                }
+            });
         }
         _ => {}
     }
+}
+
+/// 播放器窗口事件处理：拦截关闭事件，统一转发到 request_close_player
+pub fn handle_player_window_event(app: &AppHandle, event: &WindowEvent) {
+    match event {
+        WindowEvent::CloseRequested { .. } => {
+            // 统一转发到 request_close_player，禁止另起隐藏逻辑
+            if PLAYER_CLOSING.load(Ordering::SeqCst) {
+                eprintln!("[player] handle_player_window_event: CloseRequested — skip (already closing)");
+                return;
+            }
+            eprintln!("[player] handle_player_window_event: CloseRequested → request_close_player");
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = request_close_player(app_handle).await;
+            });
+        }
+        WindowEvent::Destroyed => {
+            eprintln!("[player] handle_player_window_event: Destroyed");
+            stop_mpv_session();
+        }
+        _ => {}
+    }
+}
+
+/// 统一的播放器关闭入口：前端和 CloseRequested 兜底都走这里
+/// 1. 原子标记防重入  2. 销毁 mpv  3. 关闭窗口
+#[tauri::command]
+pub async fn request_close_player(app: tauri::AppHandle) -> Result<(), String> {
+    if PLAYER_CLOSING.swap(true, Ordering::SeqCst) {
+        eprintln!("[player] request_close_player: already closing, skip");
+        return Ok(());
+    }
+    eprintln!("[player] request_close_player: start");
+
+    // 保证无论正常/异常，最终都重置标记
+    let _guard = scopeguard::guard((), |_| {
+        PLAYER_CLOSING.store(false, Ordering::SeqCst);
+        eprintln!("[player] request_close_player: PLAYER_CLOSING reset");
+    });
+
+    // 1. 销毁 mpv 实例（kill 子进程 + wait）
+    #[cfg(target_os = "windows")]
+    {
+        use tauri_plugin_mpv::MpvExt;
+        if let Err(e) = app.mpv().destroy(PLAYER_WINDOW_LABEL) {
+            eprintln!("[player] request_close_player: mpv plugin destroy error: {e}");
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_plugin_libmpv::MpvExt;
+        if let Err(e) = app.mpv().destroy(PLAYER_WINDOW_LABEL) {
+            eprintln!("[player] request_close_player: libmpv destroy error: {e}");
+        }
+    }
+
+    // 2. 兜底：也停掉我们自己 MPV_SESSION 里的进程（如有）
+    stop_mpv_session();
+
+    // 3. 给 Windows 窗口渲染管线异步任务收尾留缓冲
+    #[cfg(target_os = "windows")]
+    tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+
+    // 4. 关闭播放器窗口
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        eprintln!("[player] request_close_player: closing player window");
+        let _ = window.close();
+    }
+
+    Ok(())
 }
 
 /// Game DVR 注册表键路径
@@ -649,8 +750,14 @@ fn send_loadfile(ipc_path: &str, video_path: &PathBuf) -> Result<()> {
 
 #[tauri::command]
 pub fn kill_mpv() {
+    stop_mpv_session();
+}
+
+/// 停止 mpv 子进程（内部使用，非 Tauri command）
+pub fn stop_mpv_session() {
     if let Ok(mut session) = MPV_SESSION.lock() {
         if let Some(existing) = session.take() {
+            eprintln!("[player] stop_mpv_session: killing mpv pid={}", existing.child.id());
             cleanup_mpv_session(existing);
         }
     }

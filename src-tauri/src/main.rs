@@ -4344,6 +4344,8 @@ fn main() {
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 player::handle_main_window_event(&window.app_handle(), event);
+            } else if window.label() == "player" {
+                player::handle_player_window_event(&window.app_handle(), event);
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -4352,6 +4354,7 @@ fn main() {
             download_update,
             cancel_update_download,
             install_update,
+            player::request_close_player,
             get_downloaded_update,
             get_updates_dir,
             detect_rss_url,
