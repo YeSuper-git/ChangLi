@@ -12,41 +12,25 @@
 
 ## ✨ 核心功能
 
-### 🎬 智能识别
-自动扫描本地视频文件，智能识别视频集、季、选集层级，无需手动整理文件夹结构。
-
-### 📂 分类管理
-自定义分类体系，支持标签管理、文件夹自动识别、一体化筛选搜索。
-
-### 🎭 演员系统
-演员信息管理，参演作品自动关联，支持演员详情页和作品列表。
-
-### 🖼️ 海报匹配
-自动匹配视频集和分集海报，支持手动修复和批量更新。
-
-### ▶️ 内置播放器
-基于 mpv 引擎，支持原片画质播放、倍速播放、画中画模式、播放进度记录。
-
-### 📺 RSS 订阅
-支持 RSS 订阅源管理，自动检查更新，磁力链接一键复制。
-
-### 🔔 智能通知
-订阅更新检查、版本更新提醒，支持后台静默检查。
-
-### 📝 影评记录
-看完后记录评分、时间和短评，个人观影笔记。
+- **智能识别** — 自动识别视频集、季、选集层级
+- **分类管理** — 自定义分类、标签文件夹自动识别、一体化筛选
+- **演员系统** — 演员信息管理、参演作品自动关联
+- **海报匹配** — 自动匹配视频集和分集海报
+- **内置播放器** — mpv 引擎，原片画质，倍速播放，画中画
+- **RSS 订阅** — 自动检查更新，磁力链接一键复制
+- **影评记录** — 看完后记录评分、时间和短评
 
 ---
 
 ## 📸 截图预览
 
-| 首页 | 视频库 |
-|------|--------|
-| ![首页](docs/screenshots/home.png) | ![视频库](docs/screenshots/library.png) |
+<img src="docs/screenshots/home.png" width="800">
 
-| 标签管理 | 演员库 |
-|----------|--------|
-| ![标签](docs/screenshots/tags.png) | ![演员](docs/screenshots/actors.png) |
+<img src="docs/screenshots/library.png" width="800">
+
+<img src="docs/screenshots/tags.png" width="800">
+
+<img src="docs/screenshots/actors.png" width="800">
 
 ---
 
@@ -75,11 +59,7 @@
 
 ## 🛠️ 技术栈
 
-- **前端**：React + TypeScript + Tailwind CSS
-- **后端**：Tauri 2.0 + Rust
-- **播放器**：mpv（内置）/ 系统播放器
-- **数据库**：SQLite
-- **构建**：Vite + Cargo
+React + TypeScript + Tailwind CSS + Tauri 2.0 + Rust + mpv + SQLite
 
 ---
 
@@ -87,7 +67,7 @@
 
 | 平台 | 最低要求 |
 |------|----------|
-| macOS | macOS 11.0+ (Big Sur) |
+| macOS | macOS 11.0+ |
 | Windows | Windows 10 1903+ (64-bit) |
 
 ---
@@ -95,16 +75,9 @@
 ## 🤝 反馈问题
 
 - [GitHub Issues](https://github.com/YeSuper-git/ChangLi/issues)
-- 抖音联系二维码见应用内「关于」页面
 
 ---
 
 ## 📄 License
 
 [MIT License](LICENSE)
-
----
-
-<p align="center">
-  <sub>Made with ❤️ by <a href="https://github.com/YeSuper-git">YeSuper</a></sub>
-</p>
