@@ -48,6 +48,20 @@ function saveSubUpdates(updates: Map<number, any[]>) {
   localStorage.setItem('changli_sub_updates', JSON.stringify(obj));
 }
 
+/// 读取已查看的订阅 ID 集合
+function loadSeenUpdates(): Set<number> {
+  try {
+    const raw = localStorage.getItem('changli_sub_seen_updates');
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch { return new Set(); }
+}
+
+/// 保存已查看的订阅 ID 集合
+function saveSeenUpdates(seen: Set<number>) {
+  localStorage.setItem('changli_sub_seen_updates', JSON.stringify([...seen]));
+}
+
 function updateFingerprint(items: any[]): string {
   return items
     .map(item => String(item.guid || item.magnet_link || item.torrent_url || item.title || ''))
@@ -120,6 +134,8 @@ const Subscriptions: React.FC = () => {
   const [expandedSubs, setExpandedSubs] = useState<Set<number>>(() => loadExpandedSubs());
   // 每个订阅的更新结果：subId -> episodes
   const [subUpdates, setSubUpdates] = useState<Map<number, any[]>>(() => loadSubUpdates());
+  // 已查看的更新订阅 ID（用于显示 new 标识）
+  const [seenUpdates, setSeenUpdates] = useState<Set<number>>(() => loadSeenUpdates());
 
   // Per-subscription checking state
   const [checkingId, setCheckingId] = useState<number | null>(null);
@@ -171,6 +187,15 @@ const Subscriptions: React.FC = () => {
       saveExpandedSubs(next);
       return next;
     });
+    // 展开时标记为已查看，移除 new 标识
+    if (!expandedSubs.has(subId)) {
+      setSeenUpdates(prev => {
+        const next = new Set(prev);
+        next.add(subId);
+        saveSeenUpdates(next);
+        return next;
+      });
+    }
   };
 
   const handleCheckUpdates = async (sub: BangumiSubscription) => {
@@ -213,17 +238,26 @@ const Subscriptions: React.FC = () => {
       const nextUpdates = new Map(subUpdates);
       const nextExpanded = new Set(expandedSubs);
 
-      for (const sub of subscriptions) {
-        setCheckingId(sub.id);
-        const items = await checkSubscriptionUpdates(sub.id);
-        const previousItems = nextUpdates.get(sub.id);
-        if (items.length > 0 && !isSameUpdateResult(previousItems, items)) {
-          changedSubscriptions += 1;
-        }
-        nextUpdates.set(sub.id, items);
-        if (items.length > 0) {
-          totalPending += items.length;
-          nextExpanded.add(sub.id);
+      // 并行检查所有订阅
+      const results = await Promise.allSettled(
+        subscriptions.map(async (sub) => {
+          const items = await checkSubscriptionUpdates(sub.id);
+          return { subId: sub.id, items };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          const { subId, items } = result.value;
+          const previousItems = nextUpdates.get(subId);
+          if (items.length > 0 && !isSameUpdateResult(previousItems, items)) {
+            changedSubscriptions += 1;
+          }
+          nextUpdates.set(subId, items);
+          if (items.length > 0) {
+            totalPending += items.length;
+            nextExpanded.add(subId);
+          }
         }
       }
 
@@ -287,12 +321,20 @@ const Subscriptions: React.FC = () => {
 
   // 不显示全屏 loading，直接显示内容
 
-  // 按网站分组
+  // 按网站分组，并将有更新的订阅排到上方
   const siteGroups: Record<string, BangumiSubscription[]> = {};
   for (const sub of subscriptions) {
     const site = extractSiteName(sub.title || sub.rss_url);
     if (!siteGroups[site]) siteGroups[site] = [];
     siteGroups[site].push(sub);
+  }
+  // 每个分组内：有更新的排前面
+  for (const site of Object.keys(siteGroups)) {
+    siteGroups[site].sort((a, b) => {
+      const aHasUpdates = (subUpdates.get(a.id) || []).length > 0 ? 1 : 0;
+      const bHasUpdates = (subUpdates.get(b.id) || []).length > 0 ? 1 : 0;
+      return bHasUpdates - aHasUpdates;
+    });
   }
 
   return (
@@ -381,6 +423,9 @@ const Subscriptions: React.FC = () => {
                                 <span className="subscription-title-text">
                                   {displayName}
                                 </span>
+                                {(subUpdates.get(sub.id) || []).length > 0 && !seenUpdates.has(sub.id) && (
+                                  <span className="subscription-new-badge">new</span>
+                                )}
                               </button>
                               <div className="subscription-meta-list">
                                 {sub.series_id && sub.series_title && (
