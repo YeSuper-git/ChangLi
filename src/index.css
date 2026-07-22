@@ -3602,9 +3602,10 @@ html.changli-player-html .changli-speed-options {
 .completion-gallery-hero h1 {
   margin: 0;
   color: var(--changli-ink);
-  font-size: clamp(36px, 5vw, 56px);
+  font-size: clamp(32px, 4vw, 52px);
   line-height: 1;
-  letter-spacing: -0.052em;
+  font-weight: 850;
+  letter-spacing: -0.055em;
 }
 
 .completion-gallery-hero p:not(.completion-gallery-kicker) {

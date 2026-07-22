@@ -313,29 +313,24 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
         }
         WindowEvent::CloseRequested { api, .. } => {
             eprintln!("[player] handle_main_window_event: CloseRequested for main");
-            // 阻止主窗口立即关闭，先等播放器资源释放完
+            // 阻止主窗口立即关闭，先清理播放器资源
             api.prevent_close();
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
-                // 超时 2 秒兜底，防止销毁卡死导致主窗口关不掉
-                let result = tokio::time::timeout(
-                    std::time::Duration::from_secs(2),
-                    request_close_player(app_handle.clone()),
-                ).await;
-                // 超时或异常：强制 kill mpv 子进程，降低后台残留概率
-                if result.is_err() {
-                    eprintln!("[player] handle_main_window_event: request_close_player timed out, force killing mpv");
-                    #[cfg(target_os = "windows")]
-                    {
-                        use tauri_plugin_mpv::MpvExt;
-                        let _ = app_handle.mpv().destroy(PLAYER_WINDOW_LABEL);
+                // 如果播放器窗口存在，先销毁播放器资源
+                if let Some(pw) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
+                    if pw.is_visible().unwrap_or(false) {
+                        eprintln!("[player] handle_main_window_event: player window visible, destroying player first");
+                        let _ = tokio::time::timeout(
+                            std::time::Duration::from_secs(2),
+                            request_close_player(app_handle.clone()),
+                        ).await;
                     }
-                    stop_mpv_session();
                 }
-                // 关闭主窗口
+                // 销毁主窗口（用 destroy 避免再次触发 CloseRequested）
                 if let Some(main) = app_handle.get_webview_window("main") {
-                    eprintln!("[player] handle_main_window_event: closing main window");
-                    let _ = main.close();
+                    eprintln!("[player] handle_main_window_event: destroying main window");
+                    let _ = main.destroy();
                 }
             });
         }

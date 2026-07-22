@@ -141,7 +141,7 @@ const CompletionGallery: React.FC = () => {
       <section className="completion-gallery-hero">
         <div>
           <p className="completion-gallery-kicker">看完记录</p>
-          <h1>在故事落幕后，留下你的片刻心声。</h1>
+          <h1>故事落幕，留下你的不同见解</h1>
           <p>记录每部作品看完后的评分、时间和短评。</p>
         </div>
         <div className="completion-gallery-stats" aria-label="影评统计">

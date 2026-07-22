@@ -719,10 +719,16 @@ const Player: React.FC = () => {
         }
       } catch { /* 主窗口操作失败不影响关闭 */ }
       // 通知 Rust 统一执行：销毁 mpv → 关闭窗口，前端不再直接操作
-      await invoke('request_close_player').catch(() => {
-        // 兜底：如果 Rust 命令失败，直接关闭窗口
-        playerWindow.close().catch(() => {});
-      });
+      // 加 3 秒超时，防止 mpv.destroy() 卡住导致按钮无响应
+      const closeResult = await Promise.race([
+        invoke('request_close_player').then(() => 'ok' as const).catch(() => 'error' as const),
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3000)),
+      ]);
+      if (closeResult !== 'ok') {
+        // 超时或失败：直接关闭窗口兜底
+        console.warn('[Player] request_close_player', closeResult, '— falling back to window.close()');
+        await playerWindow.close().catch(() => {});
+      }
     }, '关闭');
   }, [runPlayerWindowAction, currentVideo, currentTime, duration, markSeriesDirty]);
 
