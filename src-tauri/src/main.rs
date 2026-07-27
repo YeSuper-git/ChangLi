@@ -12,6 +12,7 @@ mod rss_parser;
 mod scanner;
 mod site_config;
 mod storage;
+mod web_server;
 
 use futures_util::StreamExt;
 use image::ImageReader;
@@ -55,6 +56,7 @@ struct InstalledPlayer {
 // 应用状态
 struct AppState {
     db: Mutex<Option<sqlx::SqlitePool>>,
+    web_db: Arc<Mutex<Option<sqlx::SqlitePool>>>,
     poster_repair_status: Arc<Mutex<PosterRepairStatus>>,
     update_download_cancel: Arc<AtomicBool>,
 }
@@ -738,7 +740,13 @@ async fn init_db(state: State<'_, AppState>) -> Result<(), String> {
     eprintln!("[ChangLi] init_db: 初始化成功");
     let mut guard = state.db.lock().await;
     if guard.is_none() {
-        *guard = Some(db);
+        *guard = Some(db.clone());
+    }
+    drop(guard);
+    // Also share pool with web server
+    let mut web_guard = state.web_db.lock().await;
+    if web_guard.is_none() {
+        *web_guard = Some(db);
     }
     Ok(())
 }
@@ -4281,6 +4289,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             db: Mutex::new(None),
+            web_db: Arc::new(Mutex::new(None)),
             poster_repair_status: Arc::new(Mutex::new(PosterRepairStatus::default())),
             update_download_cancel: Arc::new(AtomicBool::new(false)),
         })
@@ -4337,6 +4346,19 @@ fn main() {
                 window.set_always_on_top(false)?;
             }
             player::disable_game_dvr();
+
+            // Start web server if enabled
+            let app_state = app.state::<AppState>();
+            let web_db = app_state.web_db.clone();
+            let web_enabled = std::fs::read_to_string(
+                dirs::config_dir().unwrap_or_default().join("changli").join("web_server_enabled")
+            ).ok().and_then(|s| s.trim().parse::<bool>().ok()).unwrap_or(false);
+            if web_enabled {
+                tauri::async_runtime::spawn(async move {
+                    web_server::start_web_server(web_db).await;
+                });
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -4528,6 +4550,8 @@ fn main() {
             preview::thumbnail_service::get_thumb_cache_dir,
             preview::thumbnail_service::abort_prebuild_cmd,
             preview::thumbnail_service::clear_preview_cache,
+            web_server::get_web_server_info,
+            web_server::save_web_server_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

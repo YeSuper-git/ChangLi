@@ -1429,3 +1429,19 @@ const TAG_COLORS = [
 export function getTagColor(tagId: number): { bg: string; text: string } {
   return TAG_COLORS[Math.abs(tagId) % TAG_COLORS.length];
 }
+
+
+// Web Server
+export interface WebServerInfo {
+  ip: string;
+  port: number;
+  url: string;
+}
+
+export async function getWebServerInfo(): Promise<WebServerInfo> {
+  return invoke<WebServerInfo>('get_web_server_info');
+}
+
+export async function saveWebServerSettings(enabled: boolean, port: number): Promise<void> {
+  return invoke('save_web_server_settings', { enabled, port });
+}
