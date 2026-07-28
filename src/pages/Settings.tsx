@@ -82,6 +82,7 @@ const Settings: React.FC = () => {
     getPosterRepairStatus().then(setPosterRepairStatus).catch(() => {});
     // Load web server info
     getWebServerInfo().then((info: any) => {
+      setWebServerEnabled(info.enabled || false);
       setWebServerUrl(info.url);
       setWebServerPort(info.port);
     }).catch(() => {});
@@ -679,6 +680,70 @@ const Settings: React.FC = () => {
               </label>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 局域网 Web 播放器 */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">局域网 Web 播放器</h2>
+            <p className="text-sm text-gray-500 mt-1">在局域网内通过浏览器访问和播放视频</p>
+          </div>
+        </div>
+        <div className="changli-panel p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">启用 Web 服务器</p>
+              <p className="text-sm text-gray-500 mt-1">开启后，可在局域网内通过浏览器访问</p>
+            </div>
+            <Switch
+              checked={webServerEnabled}
+              onChange={async (checked: boolean) => {
+                setWebServerEnabled(checked);
+                try {
+                  await saveWebServerSettings(checked, webServerPort);
+                  notify({ message: checked ? 'Web 服务器已启用，重启应用后生效' : 'Web 服务器已禁用，重启应用后生效', type: 'info' });
+                } catch (error) {
+                  setWebServerEnabled(!checked);
+                  notify({ message: '保存失败', type: 'error' });
+                }
+              }}
+            />
+          </div>
+          {webServerEnabled && (
+            <>
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">访问地址</label>
+                <div className="flex items-center flex-1">
+                  <span className="text-sm font-mono text-gray-500 bg-gray-100 px-3 py-2 rounded-l-xl border border-r-0 border-gray-200 select-none">http://{webServerUrl ? new URL(webServerUrl).hostname : '0.0.0.0'}:</span>
+                  <input
+                    type="text"
+                    value={webServerPort}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                      setWebServerPort(Number(v) || 9527);
+                    }}
+                    onBlur={async () => {
+                      const port = Math.min(65535, Math.max(1024, webServerPort || 9527));
+                      setWebServerPort(port);
+                      try {
+                        await saveWebServerSettings(true, port);
+                      } catch {}
+                    }}
+                    className="w-16 text-sm font-mono text-center px-1 py-2 border border-gray-200 rounded-r-xl focus:outline-none focus:border-rose-300"
+                  />
+                </div>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(webServerUrl || `http://0.0.0.0:${webServerPort}`); notify({ message: '已复制', type: 'success' }); }}
+                  className="action-btn text-sm"
+                >
+                  复制
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">确保手机/电脑与本机在同一局域网，修改端口后需重启应用生效</p>
+            </>
+          )}
         </div>
       </section>
 
@@ -1352,69 +1417,6 @@ const Settings: React.FC = () => {
 
 
       {/* Web Server Settings */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold">局域网 Web 播放器</h2>
-            <p className="text-sm text-gray-500 mt-1">在局域网内通过浏览器访问和播放视频</p>
-          </div>
-        </div>
-        <div className="changli-panel p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">启用 Web 服务器</p>
-              <p className="text-sm text-gray-500 mt-1">开启后，可在局域网内通过浏览器访问</p>
-            </div>
-            <Switch
-              checked={webServerEnabled}
-              onChange={async (checked: boolean) => {
-                setWebServerEnabled(checked);
-                try {
-                  await saveWebServerSettings(checked, webServerPort);
-                  notify({ message: checked ? 'Web 服务器已启用，重启应用后生效' : 'Web 服务器已禁用，重启应用后生效', type: 'info' });
-                } catch (error) {
-                  setWebServerEnabled(!checked);
-                  notify({ message: '保存失败', type: 'error' });
-                }
-              }}
-            />
-          </div>
-          {webServerEnabled && (
-            <>
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">访问地址</label>
-                <div className="flex items-center flex-1">
-                  <span className="text-sm font-mono text-gray-500 bg-gray-100 px-3 py-2 rounded-l-xl border border-r-0 border-gray-200 select-none">http://{webServerUrl ? new URL(webServerUrl).hostname : '0.0.0.0'}:</span>
-                  <input
-                    type="text"
-                    value={webServerPort}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
-                      setWebServerPort(Number(v) || 9527);
-                    }}
-                    onBlur={async () => {
-                      const port = Math.min(65535, Math.max(1024, webServerPort || 9527));
-                      setWebServerPort(port);
-                      try {
-                        await saveWebServerSettings(true, port);
-                      } catch {}
-                    }}
-                    className="w-16 text-sm font-mono text-center px-1 py-2 border border-gray-200 rounded-r-xl focus:outline-none focus:border-rose-300"
-                  />
-                </div>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(webServerUrl || `http://0.0.0.0:${webServerPort}`); notify({ message: '已复制', type: 'success' }); }}
-                  className="action-btn text-sm"
-                >
-                  复制
-                </button>
-              </div>
-              <p className="text-xs text-gray-400">确保手机/电脑与本机在同一局域网，修改端口后需重启应用生效</p>
-            </>
-          )}
-        </div>
-      </section>
-
       {/* 检查更新 & 版本信息 */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">

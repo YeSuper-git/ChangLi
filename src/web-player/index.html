@@ -438,7 +438,8 @@ function selectCat(key) {
   searchQ = ''; $('searchInput').value = ''; $('searchClear').classList.remove('visible');
   if (actorMode) exitActor();
   if (currentId) { currentId = null; showView('list'); }
-  renderGrid(allSeries);
+  var filtered = key === 'all' ? allSeries : allSeries.filter(function(s) { return s.display_type === key; });
+  renderGrid(filtered);
 }
 
 // === Search ===
@@ -494,7 +495,6 @@ async function loadActors() {
 
 async function openActor(id) {
   actorMode = true;
-  $('navTabs').style.display = 'none';
   $('actorsSection').style.display = 'none';
   $('backRow').style.display = '';
   searchQ = ''; $('searchInput').value = ''; $('searchClear').classList.remove('visible');
@@ -525,7 +525,10 @@ function renderGrid(list) {
   var html = '<div class="series-grid">';
   for (var i = 0; i < list.length; i++) {
     var s = list[i];
-    html += '<div class="series-card" onclick="openDetail(' + s.id + ')">' +
+    var cat = categories.find(function(c) { return c.key === s.display_type; });
+    var isLandscape = cat && cat.card_layout === 'landscape';
+    var cardClass = isLandscape ? 'series-card landscape' : 'series-card';
+    html += '<div class="' + cardClass + '" onclick="openDetail(' + s.id + ')">' +
       '<img class="poster" src="/api/poster/' + s.id + '" alt="' + esc(s.title) + '" loading="lazy" onerror="this.src=\'' + DEFAULT_POSTER + '\'">' +
       '<div class="info">' +
       '<div class="title">' + esc(s.title) + '</div>' +

@@ -659,7 +659,8 @@ const Library: React.FC = () => {
 
   const filteredSeries = seriesList.filter((series) => {
     const matchesText = series.title.toLowerCase().includes(normalizedSearch)
-      || (series.description || '').toLowerCase().includes(normalizedSearch);
+      || (series.description || '').toLowerCase().includes(normalizedSearch)
+      || (series.code || '').toLowerCase().includes(normalizedSearch);
     const matchesCategory = scopeAll
       || series.display_type === mainCategory
       || (!series.display_type && mainCategory === 'anime');

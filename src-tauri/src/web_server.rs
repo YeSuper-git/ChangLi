@@ -364,7 +364,7 @@ async fn api_categories(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or(StatusCode::SERVICE_UNAVAILABLE)?.clone()
     };
-    let rows = sqlx::query("SELECT id, key, name FROM categories ORDER BY sort_order, id")
+    let rows = sqlx::query("SELECT id, key, name, card_layout FROM categories ORDER BY sort_order, id")
         .fetch_all(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -373,6 +373,7 @@ async fn api_categories(
             "id": row.get::<i64, _>("id"),
             "key": row.get::<String, _>("key"),
             "name": row.get::<String, _>("name"),
+            "card_layout": row.get::<Option<String>, _>("card_layout").unwrap_or_else(|| "poster".to_string()),
         })
     }).collect();
     Ok(axum::Json(serde_json::json!({ "categories": cats })))
@@ -564,7 +565,11 @@ pub fn get_web_server_info() -> Result<serde_json::Value, String> {
     let port = std::fs::read_to_string(
         dirs::config_dir().unwrap_or_default().join("changli").join("web_port.txt")
     ).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(9527u16);
+    let enabled = std::fs::read_to_string(
+        dirs::config_dir().unwrap_or_default().join("changli").join("web_server_enabled")
+    ).ok().and_then(|s| s.trim().parse::<bool>().ok()).unwrap_or(false);
     Ok(serde_json::json!({
+        "enabled": enabled,
         "ip": local_ip,
         "port": port,
         "url": format!("http://{}:{}", local_ip, port),

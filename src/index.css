@@ -158,9 +158,10 @@ html.is-macos .changli-topbar {
 
 .changli-auto-grid-video {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 270px);
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 20px;
   justify-content: center;
+  max-width: calc(6 * 270px + 5 * 20px); /* 6 cards + 5 gaps */
 }
 
 .changli-auto-grid-mixed {
@@ -179,9 +180,10 @@ html.is-macos .changli-topbar {
 
 .changli-auto-grid-work {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 210px);
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
   justify-content: center;
+  max-width: calc(6 * 210px + 5 * 20px); /* 6 cards + 5 gaps */
 }
 
 .changli-auto-grid-episode {

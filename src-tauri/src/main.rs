@@ -4274,6 +4274,21 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
 }
 
 fn main() {
+    // 初始化日志：写入 %LOCALAPPDATA%/ChangLi/changli.log
+    let log_path = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("ChangLi");
+    let _ = std::fs::create_dir_all(&log_path);
+    let log_file = log_path.join("changli.log");
+    let log_target = Box::new(std::fs::OpenOptions::new()
+        .create(true).append(true).open(&log_file).unwrap());
+    env_logger::Builder::new()
+        .target(env_logger::Target::Pipe(log_target))
+        .filter_level(log::LevelFilter::Info)
+        .format_timestamp_millis()
+        .init();
+    log::info!("ChangLi 启动, 版本: {}", env!("CARGO_PKG_VERSION"));
+
     let builder = tauri::Builder::default();
     // macOS must never register the external-process mpv plugin: even accidental
     // plugin:mpv|init calls must fail instead of opening an external player.

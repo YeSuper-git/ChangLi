@@ -1,0 +1,1039 @@
+[   0.001][v][cplayer] mpv v0.41.0-744-g304426c39 Copyright © 2000-2026 mpv/MPlayer/mplayer2 projects
+[   0.001][v][cplayer]  built on Jun 10 2026 00:25:12
+[   0.001][v][cplayer] libplacebo version: v7.365.0 (v7.360.0-80-gd4624cb-dirty)
+[   0.001][v][cplayer] FFmpeg version: N-124930-g2576e0943
+[   0.001][v][cplayer] FFmpeg library versions:
+[   0.001][v][cplayer]    libavcodec      62.36.101
+[   0.001][v][cplayer]    libavdevice     62.4.100
+[   0.001][v][cplayer]    libavfilter     11.17.100
+[   0.001][v][cplayer]    libavformat     62.19.101
+[   0.001][v][cplayer]    libavutil       60.33.100
+[   0.001][v][cplayer]    libswresample   6.4.100
+[   0.001][v][cplayer]    libswscale      9.8.100
+[   0.001][v][cplayer] Configuration: -Dprefix=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/x86_64-w64-mingw32 -Dlibdir=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/x86_64-w64-mingw32/lib -Ddefault_library=shared -Dprefer_static=true -Ddebug=true -Db_ndebug=true -Doptimization=3 -Db_lto=true -Db_lto_mode=thin -Dlibmpv=true -Dpdf-build=enabled -Dlua=enabled -Djavascript=enabled -Dsdl2-gamepad=enabled -Dlibarchive=enabled -Dlibbluray=enabled -Ddvdnav=enabled -Duchardet=enabled -Drubberband=enabled -Dlcms2=enabled -Dopenal=enabled -Dspirv-cross=enabled -Dvulkan=enabled -Dvapoursynth=enabled -Dsubrandr=enabled -Dsixel=enabled -Dgl=enabled -Degl-angle=enabled -Dc_args=-Wno-error=int-conversion --cross-file=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/meson_cross.txt
+[   0.001][v][cplayer] List of enabled features: amf build-date cplugins cuda-hwaccel cuda-interop d3d-hwaccel d3d11 d3d9-hwaccel debug direct3d dos-paths dvdnav dxgi-debug-d3d11 egl-angle egl-angle-win32 ffmpeg ffnvcodec gl gl-dxinterop gl-dxinterop-d3d9 gl-win32 glob glob-win32 gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libplacebo luajit openal rubberband rubberband-3 sdl2-gamepad shaderc sixel spirv-cross subrandr uchardet vaapi vaapi-win32 vapoursynth vector vulkan wasapi win32 win32-desktop win32-executable win32-smtc win32-threads zimg zimg-st428 zlib
+[   0.001][v][cplayer] Built with NDEBUG.
+[   0.001][v][cplayer] Command line options: '--input-ipc-server=\\.\pipe\tauri_plugin_mpv_socket_51468_player' '--profile=libmpv' '--vo=gpu' '--hwdec=no' '--gpu-api=d3d11' '--gpu-context=d3d11' '--keep-open=yes' '--force-window=no' '--osc=no' '--osd-level=0' '--video-sync=audio' '--log-file=mpv.log' '--wid=1904228'
+[   0.001][v][cplayer] mpv v0.41.0-744-g304426c39 Copyright © 2000-2026 mpv/MPlayer/mplayer2 projects
+[   0.001][v][cplayer]  built on Jun 10 2026 00:25:12
+[   0.001][v][cplayer] libplacebo version: v7.365.0 (v7.360.0-80-gd4624cb-dirty)
+[   0.001][v][cplayer] FFmpeg version: N-124930-g2576e0943
+[   0.001][v][cplayer] FFmpeg library versions:
+[   0.001][v][cplayer]    libavcodec      62.36.101
+[   0.001][v][cplayer]    libavdevice     62.4.100
+[   0.001][v][cplayer]    libavfilter     11.17.100
+[   0.001][v][cplayer]    libavformat     62.19.101
+[   0.001][v][cplayer]    libavutil       60.33.100
+[   0.001][v][cplayer]    libswresample   6.4.100
+[   0.001][v][cplayer]    libswscale      9.8.100
+[   0.001][v][cplayer] Configuration: -Dprefix=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/x86_64-w64-mingw32 -Dlibdir=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/x86_64-w64-mingw32/lib -Ddefault_library=shared -Dprefer_static=true -Ddebug=true -Db_ndebug=true -Doptimization=3 -Db_lto=true -Db_lto_mode=thin -Dlibmpv=true -Dpdf-build=enabled -Dlua=enabled -Djavascript=enabled -Dsdl2-gamepad=enabled -Dlibarchive=enabled -Dlibbluray=enabled -Ddvdnav=enabled -Duchardet=enabled -Drubberband=enabled -Dlcms2=enabled -Dopenal=enabled -Dspirv-cross=enabled -Dvulkan=enabled -Dvapoursynth=enabled -Dsubrandr=enabled -Dsixel=enabled -Dgl=enabled -Degl-angle=enabled -Dc_args=-Wno-error=int-conversion --cross-file=/__w/mpv-winbuild-cmake/mpv-winbuild-cmake/build_x86_64/meson_cross.txt
+[   0.001][v][cplayer] List of enabled features: amf build-date cplugins cuda-hwaccel cuda-interop d3d-hwaccel d3d11 d3d9-hwaccel debug direct3d dos-paths dvdnav dxgi-debug-d3d11 egl-angle egl-angle-win32 ffmpeg ffnvcodec gl gl-dxinterop gl-dxinterop-d3d9 gl-win32 glob glob-win32 gpl iconv javascript jpeg lcms2 libarchive libass libavdevice libbluray libplacebo luajit openal rubberband rubberband-3 sdl2-gamepad shaderc sixel spirv-cross subrandr uchardet vaapi vaapi-win32 vapoursynth vector vulkan wasapi win32 win32-desktop win32-executable win32-smtc win32-threads zimg zimg-st428 zlib
+[   0.001][v][cplayer] Built with NDEBUG.
+[   0.003][d][global] home path: '' -> 'C:\Users\LONG\AppData\Roaming/mpv'
+[   0.003][d][global] user path: '~~home/' -> 'C:\Users\LONG\AppData\Roaming/mpv'
+[   0.003][d][global] user path: '~~old_home/' -> ''
+[   0.003][d][global] config path: 'encoding-profiles.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/encoding-profiles.conf'
+[   0.003][d][global] config path: 'encoding-profiles.conf' -/-> 'C:/Drivers/CL/resources/mpv/encoding-profiles.conf'
+[   0.003][d][global] config path: 'encoding-profiles.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/encoding-profiles.conf'
+[   0.003][d][global] config path: 'mpv.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/mpv.conf'
+[   0.003][d][global] config path: 'config' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/config'
+[   0.003][d][global] config path: 'mpv.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv.conf'
+[   0.003][d][global] config path: 'config' -/-> 'C:/Drivers/CL/resources/mpv/config'
+[   0.003][d][global] config path: 'mpv.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/mpv.conf'
+[   0.003][d][global] config path: 'config' -/-> 'C:/Drivers/CL/resources/mpv/mpv/config'
+[   0.003][v][cplayer] Setting option 'input-ipc-server' = '\\.\pipe\tauri_plugin_mpv_socket_51468_player' (flags = 8)
+[   0.003][v][cplayer] Setting option 'profile' = 'libmpv' (flags = 8)
+[   0.003][v][cplayer] Applying profile 'libmpv'...
+[   0.003][v][cplayer] Setting option 'config' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'idle' = 'yes' (flags = 12)
+[   0.003][v][cplayer] Setting option 'terminal' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'input-terminal' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'osc' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'input-default-bindings' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'input-vo-keyboard' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'input-media-keys' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'media-controls' = 'no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'script-opts-append' = 'select-populate_menu_data=no' (flags = 12)
+[   0.003][v][cplayer] Setting option 'vo' = 'gpu' (flags = 8)
+[   0.003][v][cplayer] Setting option 'hwdec' = 'no' (flags = 8)
+[   0.003][v][cplayer] Setting option 'gpu-api' = 'd3d11' (flags = 8)
+[   0.003][v][cplayer] Setting option 'gpu-context' = 'd3d11' (flags = 8)
+[   0.003][v][cplayer] Setting option 'keep-open' = 'yes' (flags = 8)
+[   0.003][v][cplayer] Setting option 'force-window' = 'no' (flags = 8)
+[   0.003][v][cplayer] Setting option 'osc' = 'no' (flags = 8)
+[   0.003][v][cplayer] Setting option 'osd-level' = '0' (flags = 8)
+[   0.003][v][cplayer] Setting option 'video-sync' = 'audio' (flags = 8)
+[   0.003][v][cplayer] Setting option 'log-file' = 'mpv.log' (flags = 8)
+[   0.003][v][cplayer] Setting option 'wid' = '1904228' (flags = 8)
+[   0.004][d][global] config path: 'input.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/input.conf'
+[   0.004][d][global] config path: 'input.conf' -/-> 'C:/Drivers/CL/resources/mpv/input.conf'
+[   0.004][d][global] config path: 'input.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/input.conf'
+[   0.004][d][ytdl_hook] Loading lua script @ytdl_hook.lua...
+[   0.004][d][stats] Loading lua script @stats.lua...
+[   0.004][d][console] Loading lua script @console.lua...
+[   0.004][d][auto_profiles] Loading lua script @auto_profiles.lua...
+[   0.004][d][select] Loading lua script @select.lua...
+[   0.004][d][positioning] Loading lua script @positioning.lua...
+[   0.004][d][commands] Loading lua script @commands.lua...
+[   0.004][v][clipboard] Initialized win32 clipboard backend.
+[   0.005][d][console] loading mp.defaults
+[   0.005][d][select] loading mp.defaults
+[   0.005][d][auto_profiles] loading mp.defaults
+[   0.005][d][positioning] loading mp.defaults
+[   0.005][v][ipc] Starting IPC master
+[   0.005][d][global] config path: 'scripts' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/scripts'
+[   0.005][d][commands] loading mp.defaults
+[   0.005][d][stats] loading mp.defaults
+[   0.005][d][global] config path: 'scripts' -/-> 'C:/Drivers/CL/resources/mpv/scripts'
+[   0.005][d][global] config path: 'scripts' -/-> 'C:/Drivers/CL/resources/mpv/mpv/scripts'
+[   0.005][d][ytdl_hook] loading mp.defaults
+[   0.005][v][cplayer] Waiting for scripts...
+[   0.005][d][positioning] loading @positioning.lua
+[   0.005][d][select] loading @select.lua
+[   0.005][d][auto_profiles] loading @auto_profiles.lua
+[   0.005][d][stats] loading @stats.lua
+[   0.005][d][commands] loading @commands.lua
+[   0.005][d][console] loading @console.lua
+[   0.005][d][ytdl_hook] loading @ytdl_hook.lua
+[   0.005][d][positioning] reading options for positioning
+[   0.005][v][ipc] Listening to IPC pipe.
+[   0.005][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/positioning.conf'
+[   0.005][d][commands] reading options for commands
+[   0.005][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/positioning.conf'
+[   0.005][d][global] config path: 'script-opts/positioning.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/positioning.conf'
+[   0.005][d][positioning] script-opts/positioning.conf not found.
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_positioning", contents="", flags="default"]
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][global] config path: 'script-opts/commands.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/commands.conf'
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_positioning", contents="", flags="force"]
+[   0.006][d][global] config path: 'script-opts/commands.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/commands.conf'
+[   0.006][d][global] config path: 'script-opts/commands.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/commands.conf'
+[   0.006][d][ytdl_hook] reading options for ytdl_hook
+[   0.006][d][commands] script-opts/commands.conf not found.
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_positioning", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_commands", contents="", flags="default"]
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_commands", contents="", flags="force"]
+[   0.006][d][select] reading options for select
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_commands", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][auto_profiles] Destroying client handle...
+[   0.006][d][global] config path: 'script-opts/select.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/select.conf'
+[   0.006][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/ytdl_hook.conf'
+[   0.006][d][stats] reading options for stats
+[   0.006][d][global] config path: 'script-opts/select.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/select.conf'
+[   0.006][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/ytdl_hook.conf'
+[   0.006][d][global] config path: 'script-opts/select.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/select.conf'
+[   0.006][d][select] script-opts/select.conf not found.
+[   0.006][d][global] config path: 'script-opts/ytdl_hook.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/ytdl_hook.conf'
+[   0.006][d][ytdl_hook] script-opts/ytdl_hook.conf not found.
+[   0.006][d][console] reading options for console
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_select", contents="", flags="default"]
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_select", contents="", flags="force"]
+[   0.006][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_select", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.006][d][global] config path: 'script-opts/stats.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/stats.conf'
+[   0.006][d][global] config path: 'script-opts/stats.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/stats.conf'
+[   0.006][d][global] config path: 'script-opts/stats.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/stats.conf'
+[   0.006][d][stats] script-opts/stats.conf not found.
+[   0.006][d][global] config path: 'script-opts/console.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/script-opts/console.conf'
+[   0.006][d][global] config path: 'script-opts/console.conf' -/-> 'C:/Drivers/CL/resources/mpv/script-opts/console.conf'
+[   0.006][d][global] config path: 'script-opts/console.conf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/script-opts/console.conf'
+[   0.006][d][console] script-opts/console.conf not found.
+[   0.006][v][cplayer] Done loading scripts.
+[   0.006][d][cplayer] Run command: define-section, flags=64, args=[name="input_stats", contents="", flags="default"]
+[   0.007][d][cplayer] Run command: define-section, flags=64, args=[name="input_console", contents="", flags="default"]
+[   0.007][d][cplayer] Run command: enable-section, flags=64, args=[name="input_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.007][d][cplayer] Run command: enable-section, flags=64, args=[name="input_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.007][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_stats", contents="", flags="force"]
+[   0.007][d][cplayer] Run command: define-section, flags=64, args=[name="input_forced_console", contents="", flags="force"]
+[   0.007][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_stats", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.007][d][cplayer] Run command: enable-section, flags=64, args=[name="input_forced_console", flags="allow-hide-cursor+allow-vo-dragging"]
+[   0.041][v][ipc_0] Client connected
+[   0.041][v][ipc_0] Client disconnected
+[   0.041][d][ipc_0] Destroying client handle...
+[   0.041][v][ipc_1] Client connected
+[   0.041][v][ipc_2] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-left=0.000000 -> 1
+[   0.041][v][ipc_2] Client disconnected
+[   0.041][d][ipc_2] Destroying client handle...
+[   0.041][v][ipc_3] Client connected
+[   0.041][v][cplayer] Set property: video-margin-ratio-right=0.000000 -> 1
+[   0.042][v][ipc_3] Client disconnected
+[   0.042][d][ipc_3] Destroying client handle...
+[   0.042][v][ipc_4] Client connected
+[   0.042][v][cplayer] Set property: video-margin-ratio-top=0.000000 -> 1
+[   0.042][v][ipc_4] Client disconnected
+[   0.042][d][ipc_4] Destroying client handle...
+[   0.042][v][ipc_5] Client connected
+[   0.042][v][cplayer] Set property: video-margin-ratio-bottom=0.000000 -> 1
+[   0.042][v][ipc_5] Client disconnected
+[   0.042][d][ipc_5] Destroying client handle...
+[   0.543][v][ipc_6] Client connected
+[   0.543][d][cplayer] Run command: loadfile, flags=64, args=[url="D:\\影视\\安斋拉拉\\RION\\OAE-134[beach RION]\\OAE-134.mp4", flags="replace", index="-1", options=""]
+[   0.543][v][cplayer] Running hook: auto_profiles/on_before_start_file
+[   0.543][v][cplayer] Failed sending hook command auto_profiles/on_before_start_file. Removing hook.
+[   0.543][v][ipc_6] Client disconnected
+[   0.543][d][ipc_6] Destroying client handle...
+[   0.543][d][global] state path: 'watch_later' -> 'C:\Users\LONG\AppData\Local/mpv/watch_later'
+[   0.543][v][cplayer] Running hook: auto_profiles/on_load
+[   0.543][v][cplayer] Failed sending hook command auto_profiles/on_load. Removing hook.
+[   0.543][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.544][v][cplayer] Running hook: ytdl_hook/on_load
+[   0.544][v][ipc_7] Client connected
+[   0.544][v][ytdl_hook] playlist hook
+[   0.544][v][cplayer] Set property: pause=false -> 1
+[   0.544][v][ipc_7] Client disconnected
+[   0.544][d][ipc_7] Destroying client handle...
+[   0.544][v][ifo_dvdnav] Opening D:\影视\安斋拉拉\RION\OAE-134[beach RION]\OAE-134.mp4
+[   0.544][v][bdmv/bluray] Opening D:\影视\安斋拉拉\RION\OAE-134[beach RION]\OAE-134.mp4
+[   0.544][v][file] Opening D:\影视\安斋拉拉\RION\OAE-134[beach RION]\OAE-134.mp4
+[   0.544][d][file] resize stream to 131072 bytes, drop 0 bytes
+[   0.544][d][file] Stream opened successfully.
+[   0.544][v][demux] Trying demuxers for level=normal.
+[   0.544][d][demux] Trying demuxer: directory (force-level: normal)
+[   0.562][d][demux] Trying demuxer: disc (force-level: normal)
+[   0.562][d][demux] Trying demuxer: edl (force-level: normal)
+[   0.562][d][demux] Trying demuxer: cue (force-level: normal)
+[   0.562][d][demux] Trying demuxer: rawaudio (force-level: normal)
+[   0.562][d][demux] Trying demuxer: rawvideo (force-level: normal)
+[   0.562][d][demux] Trying demuxer: mkv (force-level: normal)
+[   0.562][d][demux] Trying demuxer: libarchive (force-level: normal)
+[   0.562][d][demux] Trying demuxer: subrandr (force-level: normal)
+[   0.562][d][demux] Trying demuxer: lavf (force-level: normal)
+[   0.563][v][lavf] Found 'mov,mp4,m4a,3gp,3g2,mj2' at score=100 size=2048.
+[   0.564][v][file] stream level seek from 131072 to 1367761371
+[   0.617][v][demux] Detected file format: mov,mp4,m4a,3gp,3g2,mj2 (libavformat)
+[   0.617][v][cplayer] Opening done: D:\影视\安斋拉拉\RION\OAE-134[beach RION]\OAE-134.mp4
+[   0.618][v][find_files] Loading external files in D:\影视\安斋拉拉\RION\OAE-134[beach RION]\
+[   0.618][d][global] config path: 'sub' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/sub'
+[   0.618][d][global] config path: 'sub' -/-> 'C:/Drivers/CL/resources/mpv/sub'
+[   0.618][d][global] config path: 'sub' -/-> 'C:/Drivers/CL/resources/mpv/mpv/sub'
+[   0.618][v][cplayer] Running hook: auto_profiles/on_preloaded
+[   0.618][v][cplayer] Failed sending hook command auto_profiles/on_preloaded. Removing hook.
+[   0.618][v][cplayer] Running hook: ytdl_hook/on_preloaded
+[   0.618][v][cplayer] Running hook: auto_profiles/on_loaded
+[   0.618][v][cplayer] Failed sending hook command auto_profiles/on_loaded. Removing hook.
+[   0.618][v][lavf] select track 0
+[   0.618][v][lavf] select track 1
+[   0.618][i][cplayer] ● Video  --vid=1  --vlang=eng  (h264 720x404 29.97 fps 1599 kbps) [default]
+[   0.618][i][cplayer] ● Audio  --aid=1  --alang=eng  (aac 2ch 48000 Hz 96 kbps) [default]
+[   0.618][v][vo/gpu/d3d11] Initializing GPU context 'd3d11'
+[   0.709][v][vo/gpu/d3d11] Using Direct3D 11 feature level 12_1
+[   0.709][v][vo/gpu/d3d11] Device Name: NVIDIA GeForce RTX 4080 SUPER
+[   0.709][v][vo/gpu/d3d11] Device ID: 10de:2702 (rev a1)
+[   0.709][v][vo/gpu/d3d11] Subsystem ID: 1b4c:a078
+[   0.709][v][vo/gpu/d3d11] LUID: 0000000000011c0e
+[   0.709][v][vo/gpu/d3d11] Initializing SPIR-V compiler 'shaderc'
+[   0.709][v][vo/gpu/d3d11] Using Direct3D 11.1 runtime
+[   0.709][v][vo/gpu/d3d11] Maximum Texture2D size: 16384x16384
+[   0.710][v][vo/gpu/d3d11] D3DCompiler version: 10.0.26100.8894
+[   0.714][v][vo/gpu/win32] DPI detected from the new API: 96
+[   0.714][v][vo/gpu/win32] display-fps: 239.972000
+[   0.716][v][vo/gpu/win32] color-profile: C:\WINDOWS\system32\spool\drivers\color\sRGB Color Space Profile.icm
+[   0.723][v][vo/gpu/d3d11] Using DXGI 1.2+
+[   0.723][v][vo/gpu/d3d11] Queried output: \\.\DISPLAY1, 2560x1440 @ 8 bits, colorspace: RGB_FULL_G22_NONE_P709 (0)
+[   0.723][v][vo/gpu/d3d11] Selected swapchain format R8G8B8A8_UNORM (28), attempting to utilize it.
+[   0.724][v][vo/gpu/d3d11] Selected swapchain color space RGB_FULL_G22_NONE_P709 (0), attempting to utilize it.
+[   0.724][v][vo/gpu/d3d11] Swapchain capabilities for color space RGB_FULL_G22_NONE_P709 (0): normal: yes, overlay: yes
+[   0.724][v][vo/gpu/d3d11] Swapchain successfully configured to color space RGB_FULL_G22_NONE_P709 (0)!
+[   0.724][v][vo/gpu/d3d11] Using flip-model presentation
+[   0.724][d][vo/gpu/d3d11] Texture formats:
+[   0.724][d][vo/gpu/d3d11]   NAME       COMP*TYPE SIZE           DEPTH PER COMP.
+[   0.724][d][vo/gpu/d3d11]   r8         1*unorm   1B    LF CR ST {8}
+[   0.724][d][vo/gpu/d3d11]   rg8        2*unorm   2B    LF CR ST {8 8}
+[   0.724][d][vo/gpu/d3d11]   rgba8      4*unorm   4B    LF CR ST {8 8 8 8}
+[   0.724][d][vo/gpu/d3d11]   r16        1*unorm   2B    LF CR ST {16}
+[   0.724][d][vo/gpu/d3d11]   rg16       2*unorm   4B    LF CR ST {16 16}
+[   0.724][d][vo/gpu/d3d11]   rgba16     4*unorm   8B    LF CR ST {16 16 16 16}
+[   0.724][d][vo/gpu/d3d11]   r32ui      1*uint    4B          ST {32}
+[   0.724][d][vo/gpu/d3d11]   rg32ui     2*uint    8B          ST {32 32}
+[   0.724][d][vo/gpu/d3d11]   rgb32ui    3*uint   12B             {32 32 32}
+[   0.724][d][vo/gpu/d3d11]   rgba32ui   4*uint   16B          ST {32 32 32 32}
+[   0.724][d][vo/gpu/d3d11]   r16hf      1*float   2B    LF CR ST {16}
+[   0.724][d][vo/gpu/d3d11]   rg16hf     2*float   4B    LF CR ST {16 16}
+[   0.724][d][vo/gpu/d3d11]   rgba16hf   4*float   8B    LF CR ST {16 16 16 16}
+[   0.724][d][vo/gpu/d3d11]   r32f       1*float   4B    LF CR ST {32}
+[   0.724][d][vo/gpu/d3d11]   rg32f      2*float   8B    LF CR ST {32 32}
+[   0.724][d][vo/gpu/d3d11]   rgb32f     3*float  12B             {32 32 32}
+[   0.724][d][vo/gpu/d3d11]   rgba32f    4*float  16B    LF CR ST {32 32 32 32}
+[   0.724][d][vo/gpu/d3d11]   rgb10_a2   4*unorm   4B    LF CR ST {10 10 10 2}
+[   0.724][d][vo/gpu/d3d11]   bgra8      4*unorm   4B    LF CR ST {8 8 8 8}
+[   0.724][d][vo/gpu/d3d11]   bgrx8      3*unorm   4B    LF CR    {8 8 8}
+[   0.724][d][vo/gpu/d3d11]  LA = LUMINANCE_ALPHA hack format
+[   0.724][d][vo/gpu/d3d11]  LF = linear filterable
+[   0.724][d][vo/gpu/d3d11]  CR = can be used for render targets
+[   0.724][d][vo/gpu/d3d11]  ST = can be used for storable images
+[   0.724][d][vo/gpu/d3d11] Image formats:
+[   0.724][d][vo/gpu/d3d11]   yuv444p => 3 planes 1x1 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv420p => 3 planes 2x2 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gray => 1 planes 1x1 8/0 [r8] (r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gray16 => 1 planes 1x1 16/0 [r16] (r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   uyvy422
+[   0.724][d][vo/gpu/d3d11]   nv12 => 2 planes 2x2 8/0 [r8/rg8] (r/gb) [unorm]
+[   0.724][d][vo/gpu/d3d11]   p010 => 2 planes 2x2 16/6 [r16/rg16] (r/gb) [unorm]
+[   0.724][d][vo/gpu/d3d11]   argb => 1 planes 1x1 8/0 [rgba8] (argb) [unorm]
+[   0.724][d][vo/gpu/d3d11]   bgra => 1 planes 1x1 8/0 [rgba8] (bgra) [unorm]
+[   0.724][d][vo/gpu/d3d11]   abgr => 1 planes 1x1 8/0 [rgba8] (abgr) [unorm]
+[   0.724][d][vo/gpu/d3d11]   rgba => 1 planes 1x1 8/0 [rgba8] (rgba) [unorm]
+[   0.724][d][vo/gpu/d3d11]   bgr24
+[   0.724][d][vo/gpu/d3d11]   rgb24
+[   0.724][d][vo/gpu/d3d11]   x2rgb10
+[   0.724][d][vo/gpu/d3d11]   x2bgr10 => 1 planes 1x1 10/0 [rgb10_a2] (rgb) [unknown]
+[   0.724][d][vo/gpu/d3d11]   rgbaf16 => 1 planes 1x1 16/0 [rgba16hf] (rgba) [float]
+[   0.724][d][vo/gpu/d3d11]   0rgb => 1 planes 1x1 8/0 [rgba8] (_rgb) [unorm]
+[   0.724][d][vo/gpu/d3d11]   bgr0 => 1 planes 1x1 8/0 [rgba8] (bgr) [unorm]
+[   0.724][d][vo/gpu/d3d11]   0bgr => 1 planes 1x1 8/0 [rgba8] (_bgr) [unorm]
+[   0.724][d][vo/gpu/d3d11]   rgb0 => 1 planes 1x1 8/0 [rgba8] (rgb) [unorm]
+[   0.724][d][vo/gpu/d3d11]   rgba64 => 1 planes 1x1 16/0 [rgba16] (rgba) [unorm]
+[   0.724][d][vo/gpu/d3d11]   rgb565
+[   0.724][d][vo/gpu/d3d11]   pal8
+[   0.724][d][vo/gpu/d3d11]   vdpau
+[   0.724][d][vo/gpu/d3d11]   d3d11
+[   0.724][d][vo/gpu/d3d11]   dxva2_vld
+[   0.724][d][vo/gpu/d3d11]   mmal
+[   0.724][d][vo/gpu/d3d11]   mediacodec
+[   0.724][d][vo/gpu/d3d11]   cuda
+[   0.724][d][vo/gpu/d3d11]   yap8 => 2 planes 1x1 8/0 [r8/r8] (r/a) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yap16 => 2 planes 1x1 16/0 [r16/r16] (r/a) [unorm]
+[   0.724][d][vo/gpu/d3d11]   grayaf32 => 2 planes 1x1 32/0 [r32f/r32f] (r/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv444pf => 3 planes 1x1 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva444pf => 4 planes 1x1 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv420pf => 3 planes 2x2 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva420pf => 4 planes 2x2 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv422pf => 3 planes 2x1 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva422pf => 4 planes 2x1 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv440pf => 3 planes 1x2 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva440pf => 4 planes 1x2 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv410pf => 3 planes 4x4 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva410pf => 4 planes 4x4 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   yuv411pf => 3 planes 4x1 32/0 [r32f/r32f/r32f] (r/g/b) [float]
+[   0.724][d][vo/gpu/d3d11]   yuva411pf => 4 planes 4x1 32/0 [r32f/r32f/r32f/r32f] (r/g/b/a) [float]
+[   0.724][d][vo/gpu/d3d11]   y1 => 1 planes 1x1 8/-7 [r8] (r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp1 => 3 planes 1x1 8/-7 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp2 => 3 planes 1x1 8/-6 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp3 => 3 planes 1x1 8/-5 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp4 => 3 planes 1x1 8/-4 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp5 => 3 planes 1x1 8/-3 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gbrp6 => 3 planes 1x1 8/-2 [r8/r8/r8] (g/b/r) [unorm]
+[   0.724][d][vo/gpu/d3d11]   vdpau_output
+[   0.724][d][vo/gpu/d3d11]   vaapi
+[   0.724][d][vo/gpu/d3d11]   videotoolbox
+[   0.724][d][vo/gpu/d3d11]   vulkan
+[   0.724][d][vo/gpu/d3d11]   drm_prime
+[   0.724][d][vo/gpu/d3d11]   yuyv422
+[   0.724][d][vo/gpu/d3d11]   yuv422p => 3 planes 2x1 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv410p => 3 planes 4x4 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv411p => 3 planes 4x1 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   monow
+[   0.724][d][vo/gpu/d3d11]   monob
+[   0.724][d][vo/gpu/d3d11]   yuvj422p => 3 planes 2x1 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   uyyvyy411
+[   0.724][d][vo/gpu/d3d11]   bgr8
+[   0.724][d][vo/gpu/d3d11]   bgr4
+[   0.724][d][vo/gpu/d3d11]   bgr4_byte
+[   0.724][d][vo/gpu/d3d11]   rgb8
+[   0.724][d][vo/gpu/d3d11]   rgb4
+[   0.724][d][vo/gpu/d3d11]   rgb4_byte
+[   0.724][d][vo/gpu/d3d11]   nv21 => 2 planes 2x2 8/0 [r8/rg8] (r/bg) [unorm]
+[   0.724][d][vo/gpu/d3d11]   gray16be
+[   0.724][d][vo/gpu/d3d11]   yuv440p => 3 planes 1x2 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuvj440p => 3 planes 1x2 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuva420p => 4 planes 2x2 8/0 [r8/r8/r8/r8] (r/g/b/a) [unorm]
+[   0.724][d][vo/gpu/d3d11]   rgb48be
+[   0.724][d][vo/gpu/d3d11]   rgb48
+[   0.724][d][vo/gpu/d3d11]   rgb565be
+[   0.724][d][vo/gpu/d3d11]   rgb555be
+[   0.724][d][vo/gpu/d3d11]   rgb555
+[   0.724][d][vo/gpu/d3d11]   bgr565be
+[   0.724][d][vo/gpu/d3d11]   bgr565
+[   0.724][d][vo/gpu/d3d11]   bgr555be
+[   0.724][d][vo/gpu/d3d11]   bgr555
+[   0.724][d][vo/gpu/d3d11]   yuv420p16 => 3 planes 2x2 16/0 [r16/r16/r16] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv420p16be
+[   0.724][d][vo/gpu/d3d11]   yuv422p16 => 3 planes 2x1 16/0 [r16/r16/r16] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv422p16be
+[   0.724][d][vo/gpu/d3d11]   yuv444p16 => 3 planes 1x1 16/0 [r16/r16/r16] (r/g/b) [unorm]
+[   0.724][d][vo/gpu/d3d11]   yuv444p16be
+[   0.724][d][vo/gpu/d3d11]   rgb444
+[   0.725][d][vo/gpu/d3d11]   rgb444be
+[   0.725][d][vo/gpu/d3d11]   bgr444
+[   0.725][d][vo/gpu/d3d11]   bgr444be
+[   0.725][d][vo/gpu/d3d11]   ya8 => 1 planes 1x1 8/0 [rg8] (ra) [unorm]
+[   0.725][d][vo/gpu/d3d11]   bgr48be
+[   0.725][d][vo/gpu/d3d11]   bgr48
+[   0.725][d][vo/gpu/d3d11]   yuv420p9be
+[   0.725][d][vo/gpu/d3d11]   yuv420p9 => 3 planes 2x2 16/-7 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv420p10be
+[   0.725][d][vo/gpu/d3d11]   yuv420p10 => 3 planes 2x2 16/-6 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv422p10be
+[   0.725][d][vo/gpu/d3d11]   yuv422p10 => 3 planes 2x1 16/-6 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv444p9be
+[   0.725][d][vo/gpu/d3d11]   yuv444p9 => 3 planes 1x1 16/-7 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv444p10be
+[   0.725][d][vo/gpu/d3d11]   yuv444p10 => 3 planes 1x1 16/-6 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv422p9be
+[   0.725][d][vo/gpu/d3d11]   yuv422p9 => 3 planes 2x1 16/-7 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp => 3 planes 1x1 8/0 [r8/r8/r8] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp9be
+[   0.725][d][vo/gpu/d3d11]   gbrp9 => 3 planes 1x1 16/-7 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp10be
+[   0.725][d][vo/gpu/d3d11]   gbrp10 => 3 planes 1x1 16/-6 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp16be
+[   0.725][d][vo/gpu/d3d11]   gbrp16 => 3 planes 1x1 16/0 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva422p => 4 planes 2x1 8/0 [r8/r8/r8/r8] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva444p => 4 planes 1x1 8/0 [r8/r8/r8/r8] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva420p9be
+[   0.725][d][vo/gpu/d3d11]   yuva420p9 => 4 planes 2x2 16/-7 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva422p9be
+[   0.725][d][vo/gpu/d3d11]   yuva422p9 => 4 planes 2x1 16/-7 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva444p9be
+[   0.725][d][vo/gpu/d3d11]   yuva444p9 => 4 planes 1x1 16/-7 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva420p10be
+[   0.725][d][vo/gpu/d3d11]   yuva420p10 => 4 planes 2x2 16/-6 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva422p10be
+[   0.725][d][vo/gpu/d3d11]   yuva422p10 => 4 planes 2x1 16/-6 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva444p10be
+[   0.725][d][vo/gpu/d3d11]   yuva444p10 => 4 planes 1x1 16/-6 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva420p16be
+[   0.725][d][vo/gpu/d3d11]   yuva420p16 => 4 planes 2x2 16/0 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva422p16be
+[   0.725][d][vo/gpu/d3d11]   yuva422p16 => 4 planes 2x1 16/0 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva444p16be
+[   0.725][d][vo/gpu/d3d11]   yuva444p16 => 4 planes 1x1 16/0 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   xyz12
+[   0.725][d][vo/gpu/d3d11]   xyz12be
+[   0.725][d][vo/gpu/d3d11]   nv16 => 2 planes 2x1 8/0 [r8/rg8] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   nv20 => 2 planes 2x1 16/-6 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   nv20be
+[   0.725][d][vo/gpu/d3d11]   rgba64be
+[   0.725][d][vo/gpu/d3d11]   bgra64be
+[   0.725][d][vo/gpu/d3d11]   bgra64 => 1 planes 1x1 16/0 [rgba16] (bgra) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yvyu422
+[   0.725][d][vo/gpu/d3d11]   ya16be
+[   0.725][d][vo/gpu/d3d11]   ya16 => 1 planes 1x1 16/0 [rg16] (ra) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrap => 4 planes 1x1 8/0 [r8/r8/r8/r8] (g/b/r/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrap16be
+[   0.725][d][vo/gpu/d3d11]   gbrap16 => 4 planes 1x1 16/0 [r16/r16/r16/r16] (g/b/r/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   qsv
+[   0.725][d][vo/gpu/d3d11]   d3d11va_vld
+[   0.725][d][vo/gpu/d3d11]   yuv420p12be
+[   0.725][d][vo/gpu/d3d11]   yuv420p12 => 3 planes 2x2 16/-4 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv420p14be
+[   0.725][d][vo/gpu/d3d11]   yuv420p14 => 3 planes 2x2 16/-2 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv422p12be
+[   0.725][d][vo/gpu/d3d11]   yuv422p12 => 3 planes 2x1 16/-4 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv422p14be
+[   0.725][d][vo/gpu/d3d11]   yuv422p14 => 3 planes 2x1 16/-2 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv444p12be
+[   0.725][d][vo/gpu/d3d11]   yuv444p12 => 3 planes 1x1 16/-4 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv444p14be
+[   0.725][d][vo/gpu/d3d11]   yuv444p14 => 3 planes 1x1 16/-2 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp12be
+[   0.725][d][vo/gpu/d3d11]   gbrp12 => 3 planes 1x1 16/-4 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp14be
+[   0.725][d][vo/gpu/d3d11]   gbrp14 => 3 planes 1x1 16/-2 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuvj411p => 3 planes 4x1 8/0 [r8/r8/r8] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   bayer_bggr8
+[   0.725][d][vo/gpu/d3d11]   bayer_rggb8
+[   0.725][d][vo/gpu/d3d11]   bayer_gbrg8
+[   0.725][d][vo/gpu/d3d11]   bayer_grbg8
+[   0.725][d][vo/gpu/d3d11]   bayer_bggr16
+[   0.725][d][vo/gpu/d3d11]   bayer_bggr16be
+[   0.725][d][vo/gpu/d3d11]   bayer_rggb16
+[   0.725][d][vo/gpu/d3d11]   bayer_rggb16be
+[   0.725][d][vo/gpu/d3d11]   bayer_gbrg16
+[   0.725][d][vo/gpu/d3d11]   bayer_gbrg16be
+[   0.725][d][vo/gpu/d3d11]   bayer_grbg16
+[   0.725][d][vo/gpu/d3d11]   bayer_grbg16be
+[   0.725][d][vo/gpu/d3d11]   yuv440p10 => 3 planes 1x2 16/-6 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv440p10be
+[   0.725][d][vo/gpu/d3d11]   yuv440p12 => 3 planes 1x2 16/-4 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv440p12be
+[   0.725][d][vo/gpu/d3d11]   ayuv64 => 1 planes 1x1 16/0 [rgba16] (argb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   ayuv64be
+[   0.725][d][vo/gpu/d3d11]   p010be
+[   0.725][d][vo/gpu/d3d11]   gbrap12be
+[   0.725][d][vo/gpu/d3d11]   gbrap12 => 4 planes 1x1 16/-4 [r16/r16/r16/r16] (g/b/r/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrap10be
+[   0.725][d][vo/gpu/d3d11]   gbrap10 => 4 planes 1x1 16/-6 [r16/r16/r16/r16] (g/b/r/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gray12be
+[   0.725][d][vo/gpu/d3d11]   gray12 => 1 planes 1x1 16/-4 [r16] (r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gray10be
+[   0.725][d][vo/gpu/d3d11]   gray10 => 1 planes 1x1 16/-6 [r16] (r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p016 => 2 planes 2x2 16/0 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p016be
+[   0.725][d][vo/gpu/d3d11]   gray9be
+[   0.725][d][vo/gpu/d3d11]   gray9 => 1 planes 1x1 16/-7 [r16] (r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrpf32be
+[   0.725][d][vo/gpu/d3d11]   gbrpf32 => 3 planes 1x1 32/0 [r32f/r32f/r32f] (g/b/r) [float]
+[   0.725][d][vo/gpu/d3d11]   gbrapf32be
+[   0.725][d][vo/gpu/d3d11]   gbrapf32 => 4 planes 1x1 32/0 [r32f/r32f/r32f/r32f] (g/b/r/a) [float]
+[   0.725][d][vo/gpu/d3d11]   opencl
+[   0.725][d][vo/gpu/d3d11]   gray14be
+[   0.725][d][vo/gpu/d3d11]   gray14 => 1 planes 1x1 16/-2 [r16] (r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   grayf32be
+[   0.725][d][vo/gpu/d3d11]   grayf32 => 1 planes 1x1 32/0 [r32f] (r) [float]
+[   0.725][d][vo/gpu/d3d11]   yuva422p12be
+[   0.725][d][vo/gpu/d3d11]   yuva422p12 => 4 planes 2x1 16/-4 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuva444p12be
+[   0.725][d][vo/gpu/d3d11]   yuva444p12 => 4 planes 1x1 16/-4 [r16/r16/r16/r16] (r/g/b/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   nv24 => 2 planes 1x1 8/0 [r8/rg8] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   nv42 => 2 planes 1x1 8/0 [r8/rg8] (r/bg) [unorm]
+[   0.725][d][vo/gpu/d3d11]   y210be
+[   0.725][d][vo/gpu/d3d11]   y210
+[   0.725][d][vo/gpu/d3d11]   x2rgb10be
+[   0.725][d][vo/gpu/d3d11]   x2bgr10be
+[   0.725][d][vo/gpu/d3d11]   p210be
+[   0.725][d][vo/gpu/d3d11]   p210 => 2 planes 2x1 16/6 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p410be
+[   0.725][d][vo/gpu/d3d11]   p410 => 2 planes 1x1 16/6 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p216be
+[   0.725][d][vo/gpu/d3d11]   p216 => 2 planes 2x1 16/0 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p416be
+[   0.725][d][vo/gpu/d3d11]   p416 => 2 planes 1x1 16/0 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   vuya => 1 planes 1x1 8/0 [rgba8] (bgra) [unorm]
+[   0.725][d][vo/gpu/d3d11]   rgbaf16be
+[   0.725][d][vo/gpu/d3d11]   vuyx => 1 planes 1x1 8/0 [rgba8] (bgr) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p012 => 2 planes 2x2 16/4 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p012be
+[   0.725][d][vo/gpu/d3d11]   y212be
+[   0.725][d][vo/gpu/d3d11]   y212
+[   0.725][d][vo/gpu/d3d11]   xv30be
+[   0.725][d][vo/gpu/d3d11]   xv30
+[   0.725][d][vo/gpu/d3d11]   xv36be
+[   0.725][d][vo/gpu/d3d11]   xv36 => 1 planes 1x1 16/4 [rgba16] (grb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   rgbf32be
+[   0.725][d][vo/gpu/d3d11]   rgbf32
+[   0.725][d][vo/gpu/d3d11]   rgbaf32be
+[   0.725][d][vo/gpu/d3d11]   rgbaf32
+[   0.725][d][vo/gpu/d3d11]   p212be
+[   0.725][d][vo/gpu/d3d11]   p212 => 2 planes 2x1 16/4 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   p412be
+[   0.725][d][vo/gpu/d3d11]   p412 => 2 planes 1x1 16/4 [r16/rg16] (r/gb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrap14be
+[   0.725][d][vo/gpu/d3d11]   gbrap14 => 4 planes 1x1 16/-2 [r16/r16/r16/r16] (g/b/r/a) [unorm]
+[   0.725][d][vo/gpu/d3d11]   d3d12
+[   0.725][d][vo/gpu/d3d11]   ayuv => 1 planes 1x1 8/0 [rgba8] (argb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   uyva => 1 planes 1x1 8/0 [rgba8] (grba) [unorm]
+[   0.725][d][vo/gpu/d3d11]   vyu444
+[   0.725][d][vo/gpu/d3d11]   v30xbe
+[   0.725][d][vo/gpu/d3d11]   v30x
+[   0.725][d][vo/gpu/d3d11]   rgbf16be
+[   0.725][d][vo/gpu/d3d11]   rgbf16
+[   0.725][d][vo/gpu/d3d11]   rgba128be
+[   0.725][d][vo/gpu/d3d11]   rgba128
+[   0.725][d][vo/gpu/d3d11]   rgb96be
+[   0.725][d][vo/gpu/d3d11]   rgb96
+[   0.725][d][vo/gpu/d3d11]   y216be
+[   0.725][d][vo/gpu/d3d11]   y216
+[   0.725][d][vo/gpu/d3d11]   xv48be
+[   0.725][d][vo/gpu/d3d11]   xv48 => 1 planes 1x1 16/0 [rgba16] (grb) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrpf16be
+[   0.725][d][vo/gpu/d3d11]   gbrpf16 => 3 planes 1x1 16/0 [r16hf/r16hf/r16hf] (g/b/r) [float]
+[   0.725][d][vo/gpu/d3d11]   gbrapf16be
+[   0.725][d][vo/gpu/d3d11]   gbrapf16 => 4 planes 1x1 16/0 [r16hf/r16hf/r16hf/r16hf] (g/b/r/a) [float]
+[   0.725][d][vo/gpu/d3d11]   grayf16be
+[   0.725][d][vo/gpu/d3d11]   grayf16 => 1 planes 1x1 16/0 [r16hf] (r) [float]
+[   0.725][d][vo/gpu/d3d11]   amf
+[   0.725][d][vo/gpu/d3d11]   gray32be
+[   0.725][d][vo/gpu/d3d11]   gray32 => 1 planes 1x1 32/0 [r32ui] (r) [uint ]
+[   0.725][d][vo/gpu/d3d11]   yaf32be
+[   0.725][d][vo/gpu/d3d11]   yaf32 => 1 planes 1x1 32/0 [rg32f] (ra) [float]
+[   0.725][d][vo/gpu/d3d11]   yaf16be
+[   0.725][d][vo/gpu/d3d11]   yaf16 => 1 planes 1x1 16/0 [rg16hf] (ra) [float]
+[   0.725][d][vo/gpu/d3d11]   gbrap32be
+[   0.725][d][vo/gpu/d3d11]   gbrap32 => 4 planes 1x1 32/0 [r32ui/r32ui/r32ui/r32ui] (g/b/r/a) [uint ]
+[   0.725][d][vo/gpu/d3d11]   yuv444p10msbbe
+[   0.725][d][vo/gpu/d3d11]   yuv444p10msb => 3 planes 1x1 16/6 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   yuv444p12msbbe
+[   0.725][d][vo/gpu/d3d11]   yuv444p12msb => 3 planes 1x1 16/4 [r16/r16/r16] (r/g/b) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp10msbbe
+[   0.725][d][vo/gpu/d3d11]   gbrp10msb => 3 planes 1x1 16/6 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   gbrp12msbbe
+[   0.725][d][vo/gpu/d3d11]   gbrp12msb => 3 planes 1x1 16/4 [r16/r16/r16] (g/b/r) [unorm]
+[   0.725][d][vo/gpu/d3d11]   ohcodec
+[   0.725][v][vo/gpu] Testing FBO format rgba16hf
+[   0.725][d][vo/gpu] Resizing texture: 16x16
+[   0.725][v][vo/gpu] Using FBO format rgba16hf.
+[   0.725][d][global] cache path: '' -> 'C:\Users\LONG\AppData\Local/mpv/cache'
+[   0.726][v][vo/gpu] Resize: 1166x656
+[   0.727][v][vo/gpu] Reported display depth: 8
+[   0.727][v][vo/gpu] Assuming 239.972000 FPS for display sync.
+[   0.727][v][vd] Container reported FPS: 29.970030
+[   0.727][v][vd] Codec list:
+[   0.727][v][vd]     h264 - H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+[   0.727][v][vd]     h264_qsv (h264) - H264 video (Intel Quick Sync Video acceleration)
+[   0.727][v][vd]     h264_amf (h264) - H264 AMD AMF video decoder
+[   0.727][v][vd]     h264_cuvid (h264) - Nvidia CUVID H264 decoder
+[   0.727][v][vd] Opening decoder h264
+[   0.727][v][vd] No hardware decoding requested.
+[   0.727][v][vd] Using software decoding.
+[   0.727][v][vd] Detected 16 logical cores.
+[   0.727][v][vd] Requesting 16 threads for decoding.
+[   0.728][v][vd] Selected decoder: h264 - H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+[   0.728][v][vf] User filter list:
+[   0.728][v][vf]   (empty)
+[   0.728][v][ad] Codec list:
+[   0.728][v][ad]     aac - AAC (Advanced Audio Coding)
+[   0.728][v][ad]     aac_fixed (aac) - AAC (Advanced Audio Coding)
+[   0.728][v][ad] Opening decoder aac
+[   0.728][v][ad] Requesting 1 threads for decoding.
+[   0.728][v][ad] Selected decoder: aac - AAC (Advanced Audio Coding)
+[   0.728][v][af] User filter list:
+[   0.728][v][af]   (empty)
+[   0.728][v][cplayer] Starting playback...
+[   0.729][v][file] stream level seek from 1373382538 to 48
+[   0.729][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   0.729][d][vd] DR parameter change to 720x418 yuv420p align=64
+[   0.729][d][vd] Allocating new (host-cached) DR image...
+[   0.729][d][vd] ...failed..
+[   0.729][v][vd] DR failed - disabling.
+[   0.732][v][vd] Using software decoding.
+[   0.732][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vd] Using container aspect ratio.
+[   0.732][v][vf] [in] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vf] [userdeint] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vf] [userdeint] (disabled)
+[   0.732][v][vf] [autovflip] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vf] [autovflip] (disabled)
+[   0.732][v][vf] [autorotate] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vf] [autorotate] (disabled)
+[   0.732][v][vf] [convert] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][vf] [convert] (disabled)
+[   0.732][v][vf] [out] 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.732][v][af] [in] 48000Hz stereo 2ch floatp
+[   0.732][v][af] [userspeed] 48000Hz stereo 2ch floatp
+[   0.732][v][af] [userspeed] (disabled)
+[   0.732][v][af] [convert] 48000Hz stereo 2ch floatp
+[   0.732][v][ao] Trying audio driver 'wasapi'
+[   0.732][v][ao/wasapi] requested format: 48000 Hz, stereo channels, floatp
+[   0.732][d][ao/wasapi] Init wasapi
+[   0.732][d][ao/wasapi] Find device ''
+[   0.734][v][ao/wasapi] No device specified. Selecting default.
+[   0.735][v][ao/wasapi] Selecting device '{eca88538-dd1f-45b5-bb54-c8a9bad73bf2}' (耳机 (ROG DELTA II (2.4GHz)))
+[   0.735][v][ao/wasapi] Monitoring changes in device {0.0.0.00000000}.{eca88538-dd1f-45b5-bb54-c8a9bad73bf2}
+[   0.736][d][ao/wasapi] Init wasapi thread
+[   0.736][d][ao/wasapi] Activating pAudioClient interface
+[   0.736][d][ao/wasapi] Probing formats
+[   0.739][v][ao/wasapi] Trying stereo float (32/32 bits) @ 48000hz (shared) -> ok
+[   0.739][v][ao/wasapi] Accepted as stereo float @ 48000hz -> stereo float (32/32 bits) @ 48000hz (shared)
+[   0.739][d][ao/wasapi] Fixing format
+[   0.739][d][ao/wasapi] IAudioClient::GetDevicePeriod
+[   0.740][v][ao/wasapi] Device period: default 10000 us, minimum 3000 us
+[   0.740][d][ao/wasapi] IAudioClient::Initialize
+[   0.760][d][ao/wasapi] IAudioClient::Initialize pRenderClient
+[   0.760][d][ao/wasapi] IAudioClient::Initialize IAudioClient_SetEventHandle
+[   0.760][d][ao/wasapi] IAudioClient::Initialize IAudioClient_GetBufferSize
+[   0.760][v][ao/wasapi] Buffer frame count: 1056 (22000 us)
+[   0.760][v][ao/wasapi] IAudioClock::GetFrequency gave a frequency of 384000.
+[   0.761][d][ao/wasapi] IAudioClient::Initialize pAudioVolume
+[   0.761][d][ao/wasapi] Entering dispatch loop
+[   0.761][d][ao/wasapi] Init wasapi done
+[   0.761][v][ao/wasapi] device buffer: 1056 samples.
+[   0.761][v][ao/wasapi] using soft-buffer of 9600 samples.
+[   0.761][i][cplayer] AO: [wasapi] 48000Hz stereo 2ch float
+[   0.761][v][cplayer] AO: Description: Windows WASAPI audio output (event mode)
+[   0.761][v][autoconvert] inserting resampler
+[   0.761][v][swresample] format change, reinitializing resampler
+[   0.761][v][swresample] 48000Hz stereo floatp -> 48000Hz stereo float
+[   0.761][v][af] [out] 48000Hz stereo 2ch float
+[   0.761][i][cplayer] VO: [gpu] 720x404 => 720x407 yuv420p
+[   0.761][v][cplayer] VO: Description: Shader-based GPU Renderer
+[   0.761][v][vo/gpu] reconfig to 720x404 [114:115] yuv420p bt.601/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   0.761][d][vo/gpu] max content size: 2560x1392
+[   0.761][d][vo/gpu] monitor size: 2560x1440
+[   0.762][v][vo/gpu] Resize: 1166x656
+[   0.762][v][vo/gpu] Window size: 1166x656 (Borders: l=0 t=0 r=0 b=0)
+[   0.762][v][vo/gpu] Video source: 720x404 (114:115)
+[   0.763][v][vo/gpu] Video display: (0, 0) 720x404 -> (3, 0) 1160x656
+[   0.763][v][vo/gpu] Video scale: 1.611111/1.623762
+[   0.763][v][vo/gpu] OSD borders: l=3 t=0 r=3 b=0
+[   0.763][v][vo/gpu] Video borders: l=3 t=0 r=3 b=0
+[   0.763][v][vo/gpu] Reported display depth: 8
+[   0.763][v][vo/gpu] Texture for plane 0: 720x404
+[   0.763][v][vo/gpu] Texture for plane 1: 360x202
+[   0.763][v][vo/gpu] Texture for plane 2: 360x202
+[   0.763][v][vo/gpu] Testing FBO format rgba16hf
+[   0.763][d][vo/gpu] Resizing texture: 16x16
+[   0.763][v][vo/gpu] Using FBO format rgba16hf.
+[   0.764][v][vo/gpu] Resize: 1166x656
+[   0.764][v][vo/gpu] Window size: 1166x656 (Borders: l=0 t=0 r=0 b=0)
+[   0.764][v][vo/gpu] Video source: 720x404 (114:115)
+[   0.764][v][vo/gpu] Video display: (0, 0) 720x404 -> (3, 0) 1160x656
+[   0.764][v][vo/gpu] Video scale: 1.611111/1.623762
+[   0.764][v][vo/gpu] OSD borders: l=3 t=0 r=3 b=0
+[   0.764][v][vo/gpu] Video borders: l=3 t=0 r=3 b=0
+[   0.764][v][vo/gpu] Reported display depth: 8
+[   0.764][d][vo/gpu] Resizing texture: 360x202
+[   0.765][d][vo/gpu] Trying to load shader from disk...
+[   0.765][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.765][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.765][d][vo/gpu] Resizing texture: 360x404
+[   0.765][d][vo/gpu] Trying to load shader from disk...
+[   0.765][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.765][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.766][d][vo/gpu] Resizing texture: 720x404
+[   0.766][d][vo/gpu] Trying to load shader from disk...
+[   0.766][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.766][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.766][d][vo/gpu] Resizing texture: 720x404
+[   0.766][d][vo/gpu] Trying to load shader from disk...
+[   0.766][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.766][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.767][d][vo/gpu] Resizing texture: 720x656
+[   0.767][d][vo/gpu] Trying to load shader from disk...
+[   0.767][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.767][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.767][v][vo/gpu] Dither to 8.
+[   0.776][d][vo/gpu] Trying to load shader from disk...
+[   0.776][v][vo/gpu/d3d11] Using cached vertex shader
+[   0.776][v][vo/gpu/d3d11] Using cached fragment shader
+[   0.777][v][cplayer] first video frame after restart shown
+[   0.777][d][vo/gpu] Resizing texture: 1166x656
+[   0.777][d][global] config path: 'fonts' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/fonts'
+[   0.777][d][global] config path: 'fonts' -/-> 'C:/Drivers/CL/resources/mpv/fonts'
+[   0.777][d][global] config path: 'fonts' -/-> 'C:/Drivers/CL/resources/mpv/mpv/fonts'
+[   0.777][d][osd/libass] ASS library version: 0x1704000 (runtime 0x1704000)
+[   0.777][v][osd/libass] libass API version: 0x1704000
+[   0.777][v][osd/libass] libass source: meson, commit: 0.17.4-29-gc425f6d7ec9ca7e5dfa3f8bbed29a6ddbf39a596
+[   0.777][v][osd/libass] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.2.1 (COMPLEX)
+[   0.778][d][global] config path: 'subfont.ttf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/subfont.ttf'
+[   0.778][d][global] config path: 'subfont.ttf' -/-> 'C:/Drivers/CL/resources/mpv/subfont.ttf'
+[   0.778][d][global] config path: 'subfont.ttf' -/-> 'C:/Drivers/CL/resources/mpv/mpv/subfont.ttf'
+[   0.778][d][global] config path: 'fonts.conf' -/-> 'C:\Users\LONG\AppData\Roaming/mpv/fonts.conf'
+[   0.778][d][global] config path: 'fonts.conf' -/-> 'C:/Drivers/CL/resources/mpv/fonts.conf'
+[   0.778][d][global] config path: 'fonts.conf' -> 'C:/Drivers/CL/resources/mpv/mpv/fonts.conf'
+[   0.778][v][osd/libass] Setting up fonts...
+[   0.778][v][osd/libass] Using font provider directwrite (with GDI)
+[   0.778][v][osd/libass] Done.
+[   0.779][v][cplayer] audio ready
+[   0.779][d][cplayer] starting video playback
+[   0.779][v][cplayer] delaying audio start 0.000000 vs. 0.000000, diff=0.000000
+[   0.779][v][cplayer] playback restart complete @ 0.000000, audio=ready, video=playing
+[   0.779][v][cplayer] starting audio playback
+[   0.779][d][ao/wasapi] Thread Resume
+[   0.779][d][ao/wasapi] Thread Reset
+[   0.779][d][ao/wasapi] Thread Pause
+[   0.779][d][ao/wasapi] Thread Unpause
+[   3.629][v][ipc_8] Client connected
+[   3.629][d][cplayer] Run command: seek, flags=64, args=[target="84.744424", flags="absolute", legacy="unused"]
+[   3.629][v][lavf] queuing seek to 84.744424
+[   3.629][v][ipc_8] Client disconnected
+[   3.629][v][lavf] execute seek (to 84.744424 flags 32)
+[   3.629][d][ao/wasapi] Thread Reset
+[   3.629][d][ao/wasapi] Thread Pause
+[   3.629][d][ipc_8] Destroying client handle...
+[   3.629][v][lavf] seek done
+[   3.630][v][cplayer] hr-seek, skipping to 84.744424
+[   3.630][v][file] stream level seek from 983088 to 19022037
+[   3.642][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   3.643][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   3.643][v][vd] Using container aspect ratio.
+[   3.663][v][cplayer] first video frame after restart shown
+[   3.663][v][cplayer] audio ready
+[   3.663][d][cplayer] starting video playback
+[   3.663][v][cplayer] starting audio playback
+[   3.663][d][ao/wasapi] Thread Resume
+[   3.663][d][ao/wasapi] Thread Reset
+[   3.663][d][ao/wasapi] Thread Pause
+[   3.663][d][ao/wasapi] Thread Unpause
+[   3.663][v][cplayer] playback restart complete @ 84.751333, audio=playing, video=playing
+[   3.693][v][ipc_9] Client connected
+[   3.693][d][cplayer] Run command: seek, flags=64, args=[target="84.744424", flags="absolute", legacy="unused"]
+[   3.694][v][lavf] queuing seek to 84.744424
+[   3.694][v][ipc_9] Client disconnected
+[   3.694][d][ao/wasapi] Thread Reset
+[   3.694][d][ao/wasapi] Thread Pause
+[   3.694][d][ipc_9] Destroying client handle...
+[   3.694][v][lavf] execute seek (to 84.744424 flags 32)
+[   3.694][v][lavf] seek done
+[   3.694][v][cplayer] hr-seek, skipping to 84.744424
+[   3.694][v][file] stream level seek from 19349717 to 19022037
+[   3.694][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   3.695][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   3.695][v][vd] Using container aspect ratio.
+[   3.696][v][cplayer] first video frame after restart shown
+[   3.697][v][cplayer] audio ready
+[   3.697][d][cplayer] starting video playback
+[   3.697][v][cplayer] starting audio playback
+[   3.697][d][ao/wasapi] Thread Resume
+[   3.697][d][ao/wasapi] Thread Reset
+[   3.697][d][ao/wasapi] Thread Pause
+[   3.697][v][cplayer] playback restart complete @ 84.751333, audio=playing, video=playing
+[   3.697][d][ao/wasapi] Thread Unpause
+[   5.156][v][ipc_10] Client connected
+[   5.156][d][cplayer] Run command: seek, flags=64, args=[target="860.481844", flags="absolute", legacy="unused"]
+[   5.156][v][lavf] queuing seek to 860.481844
+[   5.156][v][ipc_10] Client disconnected
+[   5.156][v][lavf] execute seek (to 860.481844 flags 32)
+[   5.156][d][ao/wasapi] Thread Reset
+[   5.156][d][ao/wasapi] Thread Pause
+[   5.156][d][ipc_10] Destroying client handle...
+[   5.156][v][lavf] seek done
+[   5.156][v][cplayer] hr-seek, skipping to 860.481844
+[   5.156][v][file] stream level seek from 19415253 to 180539102
+[   5.162][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   5.162][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   5.162][v][vd] Using container aspect ratio.
+[   5.181][v][cplayer] first video frame after restart shown
+[   5.181][v][cplayer] audio ready
+[   5.181][d][cplayer] starting video playback
+[   5.181][v][cplayer] starting audio playback
+[   5.181][d][ao/wasapi] Thread Resume
+[   5.181][d][ao/wasapi] Thread Reset
+[   5.181][d][ao/wasapi] Thread Pause
+[   5.181][d][ao/wasapi] Thread Unpause
+[   5.181][v][cplayer] playback restart complete @ 860.492967, audio=playing, video=playing
+[   5.241][v][ipc_11] Client connected
+[   5.242][d][cplayer] Run command: seek, flags=64, args=[target="860.481844", flags="absolute", legacy="unused"]
+[   5.242][v][lavf] queuing seek to 860.481844
+[   5.242][v][lavf] execute seek (to 860.481844 flags 32)
+[   5.242][v][ipc_11] Client disconnected
+[   5.242][d][ao/wasapi] Thread Reset
+[   5.242][d][ao/wasapi] Thread Pause
+[   5.242][d][ipc_11] Destroying client handle...
+[   5.242][v][lavf] seek done
+[   5.242][v][cplayer] hr-seek, skipping to 860.481844
+[   5.242][v][file] stream level seek from 180997854 to 180539102
+[   5.242][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   5.243][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   5.243][v][vd] Using container aspect ratio.
+[   5.260][v][cplayer] first video frame after restart shown
+[   5.261][v][cplayer] audio ready
+[   5.261][d][cplayer] starting video playback
+[   5.261][v][cplayer] starting audio playback
+[   5.261][d][ao/wasapi] Thread Resume
+[   5.261][d][ao/wasapi] Thread Reset
+[   5.261][d][ao/wasapi] Thread Pause
+[   5.261][d][ao/wasapi] Thread Unpause
+[   5.261][v][cplayer] playback restart complete @ 860.492967, audio=playing, video=playing
+[   5.586][v][ipc_12] Client connected
+[   5.586][d][cplayer] Run command: seek, flags=64, args=[target="1564.512444", flags="absolute", legacy="unused"]
+[   5.586][v][lavf] queuing seek to 1564.512444
+[   5.586][v][lavf] execute seek (to 1564.512444 flags 32)
+[   5.586][v][ipc_12] Client disconnected
+[   5.586][d][ao/wasapi] Thread Reset
+[   5.586][d][ao/wasapi] Thread Pause
+[   5.586][d][ipc_12] Destroying client handle...
+[   5.586][v][lavf] seek done
+[   5.586][v][cplayer] hr-seek, skipping to 1564.512444
+[   5.586][v][file] stream level seek from 181063390 to 334337178
+[   5.598][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   5.599][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   5.599][v][vd] Using container aspect ratio.
+[   5.607][v][cplayer] first video frame after restart shown
+[   5.607][v][cplayer] audio ready
+[   5.607][d][cplayer] starting video playback
+[   5.607][v][cplayer] starting audio playback
+[   5.607][d][ao/wasapi] Thread Resume
+[   5.607][d][ao/wasapi] Thread Reset
+[   5.607][d][ao/wasapi] Thread Pause
+[   5.607][v][cplayer] playback restart complete @ 1564.529633, audio=playing, video=playing
+[   5.607][d][ao/wasapi] Thread Unpause
+[   5.676][v][ipc_13] Client connected
+[   5.677][d][cplayer] Run command: seek, flags=64, args=[target="1564.512444", flags="absolute", legacy="unused"]
+[   5.677][v][ipc_13] Client disconnected
+[   5.677][v][lavf] queuing seek to 1564.512444
+[   5.677][v][lavf] execute seek (to 1564.512444 flags 32)
+[   5.677][d][ao/wasapi] Thread Reset
+[   5.677][d][ao/wasapi] Thread Pause
+[   5.677][d][ipc_13] Destroying client handle...
+[   5.677][v][lavf] seek done
+[   5.677][v][cplayer] hr-seek, skipping to 1564.512444
+[   5.677][v][file] stream level seek from 334795930 to 334337178
+[   5.677][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   5.679][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   5.679][v][vd] Using container aspect ratio.
+[   5.690][v][cplayer] first video frame after restart shown
+[   5.690][v][cplayer] audio ready
+[   5.690][d][cplayer] starting video playback
+[   5.690][v][cplayer] starting audio playback
+[   5.690][d][ao/wasapi] Thread Resume
+[   5.690][d][ao/wasapi] Thread Reset
+[   5.690][d][ao/wasapi] Thread Pause
+[   5.690][v][cplayer] playback restart complete @ 1564.529633, audio=playing, video=playing
+[   5.690][d][ao/wasapi] Thread Unpause
+[   6.027][v][ipc_14] Client connected
+[   6.027][d][cplayer] Run command: seek, flags=64, args=[target="2190.317422", flags="absolute", legacy="unused"]
+[   6.027][v][ipc_14] Client disconnected
+[   6.027][v][lavf] queuing seek to 2190.317422
+[   6.027][d][ipc_14] Destroying client handle...
+[   6.027][v][lavf] execute seek (to 2190.317422 flags 32)
+[   6.027][d][ao/wasapi] Thread Reset
+[   6.027][d][ao/wasapi] Thread Pause
+[   6.027][v][lavf] seek done
+[   6.027][v][cplayer] hr-seek, skipping to 2190.317422
+[   6.027][v][file] stream level seek from 334861466 to 467339767
+[   6.041][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   6.042][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   6.042][v][vd] Using container aspect ratio.
+[   6.043][v][cplayer] first video frame after restart shown
+[   6.044][v][cplayer] audio ready
+[   6.044][d][cplayer] starting video playback
+[   6.044][v][cplayer] starting audio playback
+[   6.044][d][ao/wasapi] Thread Resume
+[   6.044][d][ao/wasapi] Thread Reset
+[   6.044][d][ao/wasapi] Thread Pause
+[   6.044][d][ao/wasapi] Thread Unpause
+[   6.044][v][cplayer] playback restart complete @ 2190.321467, audio=playing, video=playing
+[   6.113][v][ipc_15] Client connected
+[   6.113][d][cplayer] Run command: seek, flags=64, args=[target="2190.317422", flags="absolute", legacy="unused"]
+[   6.113][v][lavf] queuing seek to 2190.317422
+[   6.113][v][ipc_15] Client disconnected
+[   6.113][v][lavf] execute seek (to 2190.317422 flags 32)
+[   6.113][d][ao/wasapi] Thread Reset
+[   6.113][d][ao/wasapi] Thread Pause
+[   6.113][d][ipc_15] Destroying client handle...
+[   6.113][v][cplayer] hr-seek, skipping to 2190.317422
+[   6.113][v][lavf] seek done
+[   6.113][v][file] stream level seek from 467864055 to 467339767
+[   6.114][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   6.115][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   6.115][v][vd] Using container aspect ratio.
+[   6.130][v][cplayer] first video frame after restart shown
+[   6.130][v][cplayer] audio ready
+[   6.130][d][cplayer] starting video playback
+[   6.130][v][cplayer] starting audio playback
+[   6.130][d][ao/wasapi] Thread Resume
+[   6.130][d][ao/wasapi] Thread Reset
+[   6.130][d][ao/wasapi] Thread Pause
+[   6.130][d][ao/wasapi] Thread Unpause
+[   6.130][v][cplayer] playback restart complete @ 2190.321467, audio=playing, video=playing
+[   7.014][v][ipc_16] Client connected
+[   7.014][d][cplayer] Run command: seek, flags=64, args=[target="2750.934381", flags="absolute", legacy="unused"]
+[   7.014][v][lavf] queuing seek to 2750.934381
+[   7.014][v][ipc_16] Client disconnected
+[   7.014][v][lavf] execute seek (to 2750.934381 flags 32)
+[   7.014][d][ao/wasapi] Thread Reset
+[   7.014][d][ao/wasapi] Thread Pause
+[   7.014][d][ipc_16] Destroying client handle...
+[   7.014][v][lavf] seek done
+[   7.014][v][cplayer] hr-seek, skipping to 2750.934381
+[   7.014][v][file] stream level seek from 467995127 to 584619175
+[   7.026][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   7.027][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   7.027][v][vd] Using container aspect ratio.
+[   7.044][v][cplayer] first video frame after restart shown
+[   7.045][v][cplayer] audio ready
+[   7.045][d][cplayer] starting video playback
+[   7.045][v][cplayer] starting audio playback
+[   7.045][d][ao/wasapi] Thread Resume
+[   7.045][d][ao/wasapi] Thread Reset
+[   7.045][d][ao/wasapi] Thread Pause
+[   7.045][d][ao/wasapi] Thread Unpause
+[   7.045][v][cplayer] playback restart complete @ 2750.948200, audio=playing, video=playing
+[   7.095][v][ipc_17] Client connected
+[   7.095][d][cplayer] Run command: seek, flags=64, args=[target="2750.934381", flags="absolute", legacy="unused"]
+[   7.095][v][lavf] queuing seek to 2750.934381
+[   7.095][v][ipc_17] Client disconnected
+[   7.095][d][ao/wasapi] Thread Reset
+[   7.095][d][ao/wasapi] Thread Pause
+[   7.095][v][lavf] execute seek (to 2750.934381 flags 32)
+[   7.095][d][ipc_17] Destroying client handle...
+[   7.096][v][lavf] seek done
+[   7.096][v][cplayer] hr-seek, skipping to 2750.934381
+[   7.096][v][file] stream level seek from 585208999 to 584619175
+[   7.096][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   7.097][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   7.097][v][vd] Using container aspect ratio.
+[   7.130][v][cplayer] first video frame after restart shown
+[   7.130][v][cplayer] audio ready
+[   7.130][d][cplayer] starting video playback
+[   7.130][v][cplayer] starting audio playback
+[   7.130][d][ao/wasapi] Thread Resume
+[   7.130][d][ao/wasapi] Thread Reset
+[   7.130][d][ao/wasapi] Thread Pause
+[   7.130][v][cplayer] playback restart complete @ 2750.948200, audio=playing, video=playing
+[   7.130][d][ao/wasapi] Thread Unpause
+[   7.441][v][ipc_18] Client connected
+[   7.441][d][cplayer] Run command: seek, flags=64, args=[target="3389.776963", flags="absolute", legacy="unused"]
+[   7.441][v][ipc_18] Client disconnected
+[   7.441][v][lavf] queuing seek to 3389.776963
+[   7.441][d][ipc_18] Destroying client handle...
+[   7.441][v][lavf] execute seek (to 3389.776963 flags 32)
+[   7.441][d][ao/wasapi] Thread Reset
+[   7.441][d][ao/wasapi] Thread Pause
+[   7.441][v][lavf] seek done
+[   7.442][v][cplayer] hr-seek, skipping to 3389.776963
+[   7.442][v][file] stream level seek from 585274535 to 722566048
+[   7.456][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   7.457][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   7.457][v][vd] Using container aspect ratio.
+[   7.458][v][cplayer] first video frame after restart shown
+[   7.458][v][cplayer] audio ready
+[   7.458][d][cplayer] starting video playback
+[   7.458][v][cplayer] starting audio playback
+[   7.458][d][ao/wasapi] Thread Resume
+[   7.458][d][ao/wasapi] Thread Reset
+[   7.458][d][ao/wasapi] Thread Pause
+[   7.458][d][ao/wasapi] Thread Unpause
+[   7.458][v][cplayer] playback restart complete @ 3389.786400, audio=playing, video=playing
+[   7.528][v][ipc_19] Client connected
+[   7.528][d][cplayer] Run command: seek, flags=64, args=[target="3389.776963", flags="absolute", legacy="unused"]
+[   7.528][v][ipc_19] Client disconnected
+[   7.528][d][ipc_19] Destroying client handle...
+[   7.529][v][lavf] queuing seek to 3389.776963
+[   7.529][v][lavf] execute seek (to 3389.776963 flags 32)
+[   7.529][d][ao/wasapi] Thread Reset
+[   7.529][d][ao/wasapi] Thread Pause
+[   7.529][v][lavf] seek done
+[   7.529][v][cplayer] hr-seek, skipping to 3389.776963
+[   7.529][v][file] stream level seek from 723024800 to 722566048
+[   7.529][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   7.530][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   7.530][v][vd] Using container aspect ratio.
+[   7.539][v][cplayer] first video frame after restart shown
+[   7.540][v][cplayer] audio ready
+[   7.540][d][cplayer] starting video playback
+[   7.540][v][cplayer] starting audio playback
+[   7.540][d][ao/wasapi] Thread Resume
+[   7.540][d][ao/wasapi] Thread Reset
+[   7.540][d][ao/wasapi] Thread Pause
+[   7.540][v][cplayer] playback restart complete @ 3389.786400, audio=playing, video=playing
+[   7.540][d][ao/wasapi] Thread Unpause
+[   8.436][v][ipc_20] Client connected
+[   8.436][d][cplayer] Run command: seek, flags=64, args=[target="4745.687748", flags="absolute", legacy="unused"]
+[   8.436][v][lavf] queuing seek to 4745.687748
+[   8.436][v][lavf] execute seek (to 4745.687748 flags 32)
+[   8.436][v][ipc_20] Client disconnected
+[   8.436][d][ao/wasapi] Thread Reset
+[   8.436][d][ao/wasapi] Thread Pause
+[   8.436][d][ipc_20] Destroying client handle...
+[   8.436][v][cplayer] hr-seek, skipping to 4745.687748
+[   8.436][v][lavf] seek done
+[   8.436][v][file] stream level seek from 723221408 to 1017706461
+[   8.447][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   8.448][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   8.448][v][vd] Using container aspect ratio.
+[   8.454][v][cplayer] first video frame after restart shown
+[   8.454][v][cplayer] audio ready
+[   8.454][d][cplayer] starting video playback
+[   8.454][v][cplayer] starting audio playback
+[   8.454][d][ao/wasapi] Thread Resume
+[   8.454][d][ao/wasapi] Thread Reset
+[   8.454][d][ao/wasapi] Thread Pause
+[   8.454][v][cplayer] playback restart complete @ 4745.707633, audio=playing, video=playing
+[   8.454][d][ao/wasapi] Thread Unpause
+[   8.519][v][ipc_21] Client connected
+[   8.519][d][cplayer] Run command: seek, flags=64, args=[target="4745.687748", flags="absolute", legacy="unused"]
+[   8.519][v][lavf] queuing seek to 4745.687748
+[   8.519][v][ipc_21] Client disconnected
+[   8.519][v][lavf] execute seek (to 4745.687748 flags 32)
+[   8.519][d][ao/wasapi] Thread Reset
+[   8.519][d][ao/wasapi] Thread Pause
+[   8.519][d][ipc_21] Destroying client handle...
+[   8.520][v][cplayer] hr-seek, skipping to 4745.687748
+[   8.520][v][lavf] seek done
+[   8.520][v][file] stream level seek from 1018034141 to 1017706461
+[   8.520][d][ffmpeg/video] h264: Reinit context to 720x416, pix_fmt: yuv420p
+[   8.521][v][vd] Decoder format: 720x404 [114:115] yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=720x404+0+0 A=none
+[   8.521][v][vd] Using container aspect ratio.
+[   8.540][v][cplayer] first video frame after restart shown
+[   8.540][v][cplayer] audio ready
+[   8.540][d][cplayer] starting video playback
+[   8.540][v][cplayer] starting audio playback
+[   8.540][d][ao/wasapi] Thread Resume
+[   8.540][d][ao/wasapi] Thread Reset
+[   8.540][d][ao/wasapi] Thread Pause
+[   8.540][v][cplayer] playback restart complete @ 4745.707633, audio=playing, video=playing
+[   8.540][d][ao/wasapi] Thread Unpause

@@ -1,6 +1,6 @@
 [package]
 name = "changli"
-version = "1.9.41"
+version = "1.9.43"
 description = "长离 - 全功能视频管理播放平台"
 authors = ["YeSuper"]
 license = "MIT"
@@ -11,6 +11,8 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+log = "0.4"
+env_logger = "0.11"
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-shell = "2"
 tauri-plugin-fs = "2"

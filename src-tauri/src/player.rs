@@ -79,22 +79,30 @@ pub fn play(app: &AppHandle, path: &str) -> Result<()> {
     play_platform(app, &video_path)
 }
 
+#[cfg(target_os = "macos")]
+fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
+    // macOS: 通过前端播放器播放
+    let path_str = video_path.to_string_lossy().to_string();
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.eval(&format!("window.dispatchEvent(new CustomEvent('play-video', {{ detail: {{ path: '{}' }} }}))", path_str));
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // mpv 由前端通过 tauri-plugin-mpv 的 init() 管理
     // Rust 端只负责创建/显示播放器窗口和定位
     let player_window = get_or_create_player_window(app)?;
-    position_player_window_next_to_main(app, &player_window)?;
+    let player_window = get_or_create_player_window(app)?;
     sync_player_minimize_state(app, &player_window)?;
     player_window.show()?;
     player_window.set_focus()?;
-    Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
-pub fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
+/// 在主窗口右侧打开播放器（独立窗口）
+pub fn open_player_window(app: &AppHandle) -> Result<()> {
     let player_window = get_or_create_player_window(app)?;
-    position_player_window_next_to_main(app, &player_window)?;
     sync_player_minimize_state(app, &player_window)?;
     player_window.show()?;
     player_window.set_focus()?;
@@ -298,15 +306,7 @@ pub fn mpv_send_command(_cmd: String, _args: Vec<String>) -> Result<String, Stri
 pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_) => {
-            if let Some(player) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-                let _ = position_player_window_next_to_main(app, &player);
-            }
-        }
-        WindowEvent::Resized(_) => {
-            if let Some(player) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-                let _ = sync_player_minimize_state(app, &player);
-                let _ = position_player_window_next_to_main(app, &player);
-            }
+            // 播放器独立拖动，不跟随主窗口
         }
         WindowEvent::Destroyed => {
             eprintln!("[player] handle_main_window_event: Destroyed");
@@ -472,7 +472,6 @@ pub fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     // 禁用系统级自由缩放，前端右下角手柄负责等比实时缩放，避免 resize 回调递归导致 mpv/WebView 闪退。
     .resizable(false)
     .decorations(false)
-    .skip_taskbar(true)
     .visible(false);
 
     // libmpv 在 WebView 窗口下方渲染视频层；如果 WebView 不透明，
