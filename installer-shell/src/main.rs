@@ -291,13 +291,13 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   a {{ text-decoration: none; }}
-  html, body {{ width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }}
+  html, body {{ width: 100%; height: 100%; margin: 0; overflow: hidden; background: #f0f2f7; }}
   body {{ user-select: none; -webkit-user-select: none; }}
 
   /* ── Shell ─────────────────────────────────────── */
   .shell {{
     position: relative;
-    width: 1000px; height: 660px;
+    width: 100%; height: 100%;
     display: grid; grid-template-columns: 340px 1fr;
     overflow: hidden;
     border-radius: 18px;
@@ -755,7 +755,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   choose.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = 'changli://choose-dir'; }});
 
   /* Install button */
-  install.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = 'changli://install'; }});
+  install.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = install.classList.contains('launch') ? 'changli://launch-close' : 'changli://install'; }});
 
   /* Dragging on main area */
   document.addEventListener('mousedown', (e) => {{
@@ -843,34 +843,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn apply_true_transparent_window(window: &tao::window::Window) {
-    use windows::Win32::{
-        Foundation::{COLORREF, HWND},
-        Graphics::Dwm::DwmExtendFrameIntoClientArea,
-        UI::{
-            Controls::MARGINS,
-            WindowsAndMessaging::{
-                GetWindowLongW, SetLayeredWindowAttributes, SetWindowLongW, GWL_EXSTYLE, LWA_ALPHA,
-                WS_EX_LAYERED,
-            },
-        },
-    };
-
-    let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
-    unsafe {
-        let margins = MARGINS {
-            cxLeftWidth: -1,
-            cxRightWidth: -1,
-            cyTopHeight: -1,
-            cyBottomHeight: -1,
-        };
-        let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
-        let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
-        let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
-        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
-
-        // 圆角由 CSS border-radius + WebView 透明背景实现
-    }
+fn apply_true_transparent_window(_window: &tao::window::Window) {
+    // 透明窗口方案不可靠，改用 CSS border-radius 实现圆角
+    // 窗口背景色与 .shell 一致，圆角纯 CSS 实现
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -899,7 +874,6 @@ fn main() -> wry::Result<()> {
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
-        .with_transparent(true)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
     if let Some(pos) = pos {
@@ -915,8 +889,7 @@ fn main() -> wry::Result<()> {
             position: WebLogicalPosition::new(0, 0).into(),
             size: WebLogicalSize::new(W, H).into(),
         })
-        .with_transparent(true)
-        .with_background_color((0, 0, 0, 0))
+        .with_background_color((240, 242, 247, 255))
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {
