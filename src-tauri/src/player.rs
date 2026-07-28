@@ -94,10 +94,10 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // mpv 由前端通过 tauri-plugin-mpv 的 init() 管理
     // Rust 端只负责创建/显示播放器窗口和定位
     let player_window = get_or_create_player_window(app)?;
-    let player_window = get_or_create_player_window(app)?;
     sync_player_minimize_state(app, &player_window)?;
     player_window.show()?;
     player_window.set_focus()?;
+    Ok(())
 }
 
 /// 在主窗口右侧打开播放器（独立窗口）
