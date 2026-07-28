@@ -4566,8 +4566,29 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 eprintln!("[check_updates] 跳过(名称已存在): {} existing_base_names包含={}", name, existing_base_names.contains(&name));
                                 continue;
                             }
-                            if all_actor_period_names.contains(&name)
-                                || parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) { continue; }
+                            if parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) { continue; }
+                            // 时期文件夹：进入内部扫描视频集，而不是跳过
+                            if all_actor_period_names.contains(&name) {
+                                if let Ok(period_entries) = std::fs::read_dir(&p) {
+                                    for pe in period_entries.filter_map(|e| e.ok()) {
+                                        let pp = pe.path();
+                                        if !pp.is_dir() { continue; }
+                                        let p_name = pp.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                                        let p_fps = pp.to_string_lossy().to_string();
+                                        if normalized_db_paths.contains(&normalize(&p_fps)) { continue; }
+                                        if existing_base_names.contains(&p_name) { continue; }
+                                        let p_base = crate::scanner::strip_episode_suffix(&p_name);
+                                        if existing_base_names.contains(&p_base) { continue; }
+                                        let p_count = std::fs::read_dir(&pp)
+                                            .map(|entries| entries.filter_map(|e| e.ok())
+                                                .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
+                                                .count())
+                                            .unwrap_or(0);
+                                        result.push((p_name, p_count, p_fps));
+                                    }
+                                }
+                                continue;
+                            }
                             // 3) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if existing_base_names.contains(&base) {

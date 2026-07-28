@@ -158,8 +158,7 @@ fn start_install(install_dir: PathBuf, proxy: EventLoopProxy<InstallerEvent>) {
     thread::spawn(move || {
         write_installer_log(&format!("start install: {}", install_dir.display()));
         let result = (|| -> Result<(bool, Option<i32>, String), String> {
-            fs::create_dir_all(&install_dir)
-                .map_err(|err| format!("创建安装目录失败：{}", err))?;
+            fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败：{}", err))?;
             let setup = write_embedded("ChangLi-inner-setup.exe", SETUP_BYTES)?;
             write_installer_log(&format!("inner setup: {}", setup.display()));
             let status = Command::new(&setup)
@@ -207,7 +206,7 @@ fn launch_installed_app(install_dir: &Path) {
 }
 
 fn js_call(name: &str, value: &str) -> String {
-    format!("window.{}({});", name, serde_json::to_string(value).unwrap())
+    format!("window.{name}({});", serde_json::to_string(value).unwrap())
 }
 
 fn html(default_dir: &Path, is_update: bool) -> String {
@@ -223,469 +222,142 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ChangLi Installer</title>
 <style>
-  @keyframes fadeSlideIn {{
-    0%   {{ opacity: 0; transform: translateY(12px); }}
-    100% {{ opacity: 1; transform: translateY(0); }}
-  }}
-  @keyframes shimmer {{
-    0%   {{ background-position: -200% center; }}
-    100% {{ background-position: 200% center; }}
-  }}
-  @keyframes progressGlow {{
-    0%, 100% {{ box-shadow: 0 0 14px rgba(232,64,100,.28), 0 0 4px rgba(232,64,100,.18); }}
-    50%      {{ box-shadow: 0 0 22px rgba(232,64,100,.38), 0 0 8px rgba(232,64,100,.22); }}
-  }}
-  @keyframes spinnerRotate {{
-    100% {{ transform: rotate(360deg); }}
-  }}
-  @keyframes pulseRing {{
-    0%   {{ transform: scale(.88); opacity: .6; }}
-    50%  {{ transform: scale(1.04); opacity: 1; }}
-    100% {{ transform: scale(.88); opacity: .6; }}
-  }}
-  @keyframes dotBounce {{
-    0%, 80%, 100% {{ transform: translateY(0); opacity: .35; }}
-    40%           {{ transform: translateY(-8px); opacity: 1; }}
-  }}
-  @keyframes titlePulse {{
-    0%   {{ opacity: .4; transform: translateY(8px); }}
-    100% {{ opacity: 1; transform: translateY(0); }}
-  }}
-  @keyframes titleDrop {{
-    0%   {{ opacity: 0; transform: translateY(-80px) scale(1.05); }}
-    60%  {{ opacity: 1; transform: translateY(10px) scale(.99); }}
-    80%  {{ transform: translateY(-4px) scale(1.004); }}
-    100% {{ opacity: 1; transform: translateY(0) scale(1); }}
-  }}
-  @keyframes successBounce {{
-    0%   {{ transform: scale(0); opacity: 0; }}
-    50%  {{ transform: scale(1.15); opacity: 1; }}
-    70%  {{ transform: scale(.96); }}
-    100% {{ transform: scale(1); opacity: 1; }}
-  }}
-  @keyframes checkDraw {{
-    0%   {{ stroke-dashoffset: 24; }}
-    100% {{ stroke-dashoffset: 0; }}
-  }}
-  @keyframes fadeOut {{
-    0%   {{ opacity: 1; }}
-    100% {{ opacity: 0; }}
-  }}
-  @keyframes cardFlyIn {{
-    0%   {{ opacity: 0; transform: translateX(40px) scale(.97); }}
-    100% {{ opacity: 1; transform: translateX(0) scale(1); }}
-  }}
   :root {{
-    --ink:#12151e;
-    --ink2:#394050;
-    --muted:#6b7280;
-    --soft-bg:#f8f9fc;
-    --line:#e5e8ef;
-    --rose:#e84064;
-    --rose-dim:#e8406418;
-    --rose-mid:#e8406430;
-    --orange:#ef6c32;
-    --green:#10b981;
-    --green-dim:#10b98118;
-    --font: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, -apple-system, sans-serif;
+    --rose:#f44975; --rose2:#ff6f8d; --orange:#ff8356; --ink:#111421;
+    --muted:#667084; --soft:#f4f6fb; --line:#e7eaf2;
+    font-family:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;
   }}
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  a {{ text-decoration: none; }}
-  html, body {{ width: 100%; height: 100%; margin: 0; overflow: hidden; background: #f0f2f7; }}
-  body {{ user-select: none; -webkit-user-select: none; }}
-
-  /* ── Shell ─────────────────────────────────────── */
-  .shell {{
-    position: relative;
-    width: 100%; height: 100%;
-    display: grid; grid-template-columns: 340px 1fr;
-    overflow: hidden;
-    border-radius: 18px;
-    background: #f0f2f7;
-    box-shadow:
-      0 1px 0 rgba(255,255,255,.6) inset,
-      0 2px 0 rgba(0,0,0,.018),
-      0 8px 24px rgba(16,18,28,.07),
-      0 24px 68px rgba(16,18,28,.12);
-    animation: fadeSlideIn .5s cubic-bezier(.16,1,.3,1) both;
-  }}
-  .shell::before {{
-    content: ""; position: absolute; inset: 0; z-index: 6; pointer-events: none;
-    border-radius: 18px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.55);
-  }}
-
-  /* ── Drag region ───────────────────────────────── */
-  .drag {{ -webkit-app-region: drag; cursor: default; }}
-  .no-drag {{ -webkit-app-region: no-drag; }}
-  a, button, input, label, .no-drag {{ -webkit-app-region: no-drag; }}
-
-  /* ── Side panel ────────────────────────────────── */
-  .side {{
-    position: relative; overflow: hidden;
-    padding: 36px 32px 32px; color: #fff;
+  * {{ box-sizing:border-box; }}
+  a {{ text-decoration:none; }}
+  html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
+  body {{ user-select:none; }}
+  .shell {{ position:relative; width:1000px; height:660px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell::before {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.72), inset 0 0 26px rgba(255,255,255,.34), inset 0 -18px 34px rgba(31,35,49,.045); }}
+  .shell::after {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; background:linear-gradient(135deg,rgba(255,255,255,.38),transparent 16%,transparent 84%,rgba(31,35,49,.07)); }}
+  .drag {{ cursor:default; }}
+  .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:
-      radial-gradient(ellipse 90% 60% at 15% 8%, rgba(255,255,255,.30), transparent 50%),
-      radial-gradient(ellipse 80% 50% at 90% 100%, rgba(239,108,50,.35), transparent 45%),
-      linear-gradient(160deg, #dc2f52 0%, #e84064 38%, #ef6c32 100%);
+      radial-gradient(circle at 25% 12%, rgba(255,255,255,.38), transparent 25%),
+      radial-gradient(circle at -18% 74%, rgba(255,164,92,.70) 0 24%, transparent 25%),
+      radial-gradient(circle at 74% 86%, rgba(255,187,123,.42), transparent 30%),
+      radial-gradient(circle at 82% -9%, rgba(255,152,103,.82) 0 25%, transparent 26%),
+      linear-gradient(154deg,#f14170 0%,#fb566a 47%,#ff8050 100%);
   }}
-  .side::before {{
-    content: ""; position: absolute; inset: 0; z-index: 0; opacity: .06;
+  .side::before {{ content:""; position:absolute; inset:0; opacity:.34;
     background-image:
-      repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 40px),
-      repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 40px);
-    mask-image: linear-gradient(180deg, #000 0, transparent 60%);
-    -webkit-mask-image: linear-gradient(180deg, #000 0, transparent 60%);
+      repeating-linear-gradient(90deg, rgba(255,255,255,.24) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.15) 0 1px, transparent 1px 34px);
+    mask-image:linear-gradient(180deg,#000 0, rgba(0,0,0,.72) 45%, transparent 82%);
   }}
-  .side::after {{
-    content: ""; position: absolute; inset: 0; z-index: 0;
-    background: linear-gradient(170deg, rgba(255,255,255,.10), transparent 50%, rgba(0,0,0,.12));
-    pointer-events: none;
+  .side::after {{ content:""; position:absolute; inset:0; background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 28%,transparent 72%,rgba(255,255,255,.18)); pointer-events:none; }}
+  .orb {{ position:absolute; border-radius:999px; background:rgba(255,102,99,.36); filter:blur(.2px); }}
+  .orb.a {{ left:38px; bottom:154px; width:154px; height:90px; border-radius:32px; }}
+  .orb.b {{ left:-50px; bottom:20px; width:150px; height:150px; background:rgba(255,180,91,.38); }}
+  .brand,.hero,.glass-pills,.stack {{ position:relative; z-index:1; }}
+  .brand {{ display:flex; gap:14px; align-items:center; }}
+  .brand img {{ width:58px; height:58px; border-radius:18px; display:block; object-fit:cover; background:rgba(255,255,255,.20); border:1px solid rgba(255,255,255,.34); box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 14px 30px rgba(112,24,44,.22); }}
+  .wordmark {{ font-size:26px; font-weight:900; letter-spacing:-.04em; line-height:1; }}
+  .tag {{ margin-top:3px; font-size:13px; font-weight:500; letter-spacing:0; color:rgba(255,255,255,.78); }}
+  .hero {{ margin-top:74px; }}
+  .kicker {{ font-size:13px; font-weight:800; opacity:.78; letter-spacing:.18em; margin-bottom:14px; }}
+  .hero h1 {{ margin:0 0 12px; font-size:42px; line-height:1.05; font-weight:950; letter-spacing:-.07em; }}
+  .hero p {{ display:block; width:210px; margin:0; line-height:1.8; font-size:14px; color:rgba(255,255,255,.84); }}
+  .glass-pills {{ margin-top:36px; display:flex; flex-wrap:wrap; gap:10px; }}
+  .pill {{ padding:9px 12px; border-radius:999px; color:#fff; font-size:12px; font-weight:750;
+    background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.24);
+    box-shadow:none; backdrop-filter:none;
   }}
-  .side > * {{ position: relative; z-index: 1; }}
-
-  /* ── Brand ─────────────────────────────────────── */
-  .brand {{ display: flex; gap: 14px; align-items: center; }}
-  .brand img {{
-    width: 52px; height: 52px; border-radius: 14px; display: block;
-    object-fit: cover; background: rgba(255,255,255,.15);
-    border: 1px solid rgba(255,255,255,.28);
-    box-shadow: 0 4px 12px rgba(0,0,0,.18);
+  .stack {{ position:absolute; z-index:1; left:48px; bottom:-74px; width:230px; height:210px; opacity:.74; }}
+  .glass-card {{ position:absolute; width:92px; height:132px; border-radius:16px;
+    background:linear-gradient(150deg,rgba(255,255,255,.42),rgba(255,255,255,.20)); border:1px solid rgba(255,255,255,.58); box-shadow:0 18px 50px rgba(94,22,31,.22), inset 0 1px 0 rgba(255,255,255,.42); backdrop-filter:blur(10px) saturate(150%);
   }}
-  .wordmark {{
-    font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
-    text-shadow: 0 1px 2px rgba(0,0,0,.12);
-  }}
-  .tag {{
-    margin-top: 3px; font-size: 12px; font-weight: 500; letter-spacing: .02em;
-    color: rgba(255,255,255,.70);
-  }}
-
-  /* ── Hero ──────────────────────────────────────── */
-  .hero {{ margin-top: 56px; }}
-  .kicker {{
-    font-size: 11px; font-weight: 700; letter-spacing: .22em;
-    color: rgba(255,255,255,.55); margin-bottom: 16px;
-    text-transform: uppercase;
-  }}
-  .hero h1 {{
-    margin: 0 0 14px; font-size: 36px; line-height: 1.12;
-    font-weight: 800; letter-spacing: -.05em;
-    text-shadow: 0 1px 3px rgba(0,0,0,.10);
-  }}
-  .hero p {{
-    display: block; width: 240px; margin: 0;
-    line-height: 1.75; font-size: 13px; color: rgba(255,255,255,.72);
-  }}
-
-  /* ── Pills ─────────────────────────────────────── */
-  .glass-pills {{ margin-top: 32px; display: flex; flex-wrap: wrap; gap: 8px; }}
-  .pill {{
-    padding: 7px 13px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 600;
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16);
-    letter-spacing: .01em;
-  }}
-
-  /* ── Decorative orbs ──────────────────────────── */
-  .orb {{ position: absolute; border-radius: 50%; filter: blur(1px); }}
-  .orb.a {{ left: -30px; bottom: 120px; width: 140px; height: 90px; border-radius: 44px; background: rgba(239,108,50,.20); }}
-  .orb.b {{ left: -50px; bottom: -20px; width: 120px; height: 120px; background: rgba(255,200,150,.18); }}
-
-  /* ── Glass card stack (decorative) ─────────────── */
-  .stack {{ position: absolute; z-index: 1; left: 44px; bottom: -60px; width: 220px; height: 190px; opacity: .55; }}
-  .glass-card {{
-    position: absolute; width: 84px; height: 120px; border-radius: 14px;
-    background: linear-gradient(150deg, rgba(255,255,255,.30), rgba(255,255,255,.12));
-    border: 1px solid rgba(255,255,255,.35);
-    box-shadow: 0 12px 32px rgba(0,0,0,.10);
-    backdrop-filter: blur(8px) saturate(130%);
-  }}
-  .glass-card.one  {{ left: 0;   top: 20px; transform: rotate(-10deg); }}
-  .glass-card.two  {{ left: 64px; top: 0;   transform: rotate(4deg); background: linear-gradient(150deg, rgba(255,255,255,.38), rgba(255,255,255,.16)); }}
-  .glass-card.three {{ left: 128px; top: 28px; transform: rotate(12deg); }}
-
-  /* ── Main panel ────────────────────────────────── */
-  .main {{
-    position: relative; overflow: hidden;
-    padding: 44px 36px 28px 40px;
-    background: linear-gradient(180deg, #fafbff 0%, #f3f5fa 100%);
-  }}
-  .main::before {{
-    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
-    background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.02), rgba(0,0,0,.04));
-    pointer-events: none;
-  }}
-  .main > * {{ position: relative; z-index: 1; }}
-
-  /* ── Close button ──────────────────────────────── */
-  .close-btn {{
-    position: absolute; right: 16px; top: 16px;
-    width: 32px; height: 32px; border: 0; border-radius: 8px;
-    background: transparent; color: #9ca3af;
-    font-size: 20px; cursor: pointer;
-    display: grid; place-items: center; line-height: 1;
-    transition: background .15s, color .15s;
-  }}
-  .close-btn:hover {{ background: #f0f1f4; color: #374151; }}
-  .close-btn.disabled {{ opacity: .35; pointer-events: none; cursor: not-allowed; }}
-
-  /* ── Top bar ───────────────────────────────────── */
-  .topline {{ display: flex; align-items: center; justify-content: space-between; margin-right: 48px; }}
-  .ver {{ color: #9ca3af; font-size: 12px; font-weight: 600; letter-spacing: .02em; }}
-
-  /* ── Step indicator ────────────────────────────── */
-  .steps {{ display: flex; gap: 8px; align-items: center; }}
-  .stepbar {{
-    width: 28px; height: 6px; border-radius: 99px;
-    background: linear-gradient(90deg, var(--rose), var(--orange));
-    transition: width .35s cubic-bezier(.16,1,.3,1), background .35s, box-shadow .35s;
-  }}
-  .stepdot {{
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #d9dde6;
-    transition: width .35s cubic-bezier(.16,1,.3,1), background .35s, box-shadow .35s, border-radius .35s;
-  }}
-  .steps.install .stepbar {{ width: 6px; background: #d9dde6; box-shadow: none; }}
-  .steps.install .stepdot.one {{ width: 28px; border-radius: 99px; background: linear-gradient(90deg, var(--rose), var(--orange)); box-shadow: 0 4px 12px rgba(232,64,100,.18); }}
-  .steps.done .stepbar, .steps.done .stepdot.one {{ width: 6px; background: #bbf0d2; box-shadow: none; }}
-  .steps.done .stepdot.two {{
-    width: 28px; border-radius: 99px;
-    background: linear-gradient(90deg, #34d399, var(--green));
-    box-shadow: 0 4px 12px rgba(16,185,129,.18);
-  }}
-  .steps.fail .stepbar {{ background: #ef4444; box-shadow: 0 4px 12px rgba(239,68,68,.18); }}
-
-  /* ── Title block ───────────────────────────────── */
-  .title-block {{
-    margin-top: 36px;
-    transition: transform .5s cubic-bezier(.22,1,.36,1), opacity .22s ease;
-  }}
-  .title-block.installing {{ transform: translateY(100px); }}
-  .title-block.done {{ transform: translateY(110px); }}
-  .title-block h2 {{
-    margin: 0; color: var(--ink); font-size: 34px; line-height: 1.1;
-    letter-spacing: -.05em; font-weight: 800;
-    transition: transform .28s cubic-bezier(.16,1,.3,1), opacity .18s, font-size .28s, text-align .28s;
-  }}
-  .title-block.installing h2, .title-block.done h2 {{ text-align: center; font-size: 40px; letter-spacing: -.055em; }}
-  .title-block h2.pulse {{ animation: titlePulse .4s cubic-bezier(.16,1,.3,1); }}
-  .title-block h2.drop {{ animation: titleDrop .55s cubic-bezier(.2,1.18,.26,1) both; }}
-  .title-block p {{ display: none; margin-top: 6px; color: var(--muted); font-size: 13px; font-weight: 500; }}
-
-  /* ── Animated dots (installing) ────────────────── */
-  .dots {{ display: inline-flex; width: 30px; justify-content: space-between; margin-left: 6px; vertical-align: baseline; }}
-  .dots i {{ width: 5px; height: 5px; border-radius: 50%; background: var(--rose); animation: dotBounce .85s ease-in-out infinite; }}
-  .dots i:nth-child(2) {{ animation-delay: .12s; }}
-  .dots i:nth-child(3) {{ animation-delay: .24s; }}
-
-  /* ── Success checkmark ─────────────────────────── */
-  .success-icon {{
-    display: none; width: 56px; height: 56px; margin: 0 auto 16px;
-    border-radius: 50%; background: linear-gradient(135deg, #34d399, #10b981);
-    box-shadow: 0 8px 24px rgba(16,185,129,.22);
-    animation: successBounce .5s cubic-bezier(.16,1,.3,1) both;
-    place-items: center;
-  }}
-  .success-icon svg {{ width: 28px; height: 28px; }}
-  .success-icon path {{ stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: checkDraw .35s .25s ease forwards; }}
-  .title-block.done .success-icon {{ display: grid; }}
-
-  /* ── Install card ──────────────────────────────── */
-  .card {{
-    margin-top: 24px; width: 100%;
-    border-radius: 14px;
-    background: rgba(255,255,255,.88);
-    border: 1px solid rgba(229,232,239,.90);
-    box-shadow: 0 2px 8px rgba(16,18,28,.03), 0 8px 24px rgba(16,18,28,.04);
-    padding: 18px;
-    transition: border-color .22s, box-shadow .22s, transform .5s cubic-bezier(.22,1,.36,1), opacity .3s, filter .3s;
-    animation: cardFlyIn .4s cubic-bezier(.16,1,.3,1) both;
-  }}
-  .card.flyout {{ transform: translateX(500px) rotate(1.5deg) scale(.97); opacity: 0; filter: blur(3px); pointer-events: none; }}
-  .card.is-working {{ border-color: rgba(232,64,100,.15); box-shadow: 0 2px 8px rgba(16,18,28,.03), 0 12px 36px rgba(232,64,100,.08); }}
-  .card.is-done {{ border-color: rgba(16,185,129,.15); box-shadow: 0 2px 8px rgba(16,18,28,.03), 0 12px 36px rgba(16,185,129,.08); }}
-
-  /* ── Path row ──────────────────────────────────── */
-  .path-row {{
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 14px 16px; border-radius: 12px;
-    background: #f6f7fa; border: 1px solid var(--line);
-    transition: border-color .22s;
-  }}
-  .path-copy {{ flex: 1; min-width: 0; }}
-  .path-copy small {{ display: block; color: #9ca3af; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }}
-  .path-copy strong {{ display: block; margin-top: 4px; color: var(--ink); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }}
-  .change-btn {{
-    border: 0; border-radius: 999px; padding: 9px 14px;
-    background: #fff; color: var(--rose); font-size: 12px; font-weight: 700;
-    cursor: pointer; display: inline-flex; align-items: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,.06);
-    transition: background .15s, box-shadow .15s;
-  }}
-  .change-btn:hover {{ background: #fdf2f5; box-shadow: 0 2px 8px rgba(232,64,100,.10); }}
-  .change-btn.disabled {{ opacity: .35; pointer-events: none; cursor: not-allowed; }}
-
-  /* ── Flow steps ────────────────────────────────── */
-  .flow {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }}
-  .flow-item {{
-    min-height: 96px; border-radius: 12px; padding: 14px;
-    background: #fff; border: 1px solid var(--line);
-    transition: border-color .22s, background .22s, box-shadow .22s, transform .22s;
-  }}
-  .flow-item.active {{ border-color: var(--line); background: #fff; }}
-  .card.is-working .flow-item.active {{
-    border-color: rgba(232,64,100,.18); background: #fdf6f8;
-    box-shadow: 0 4px 12px rgba(232,64,100,.06);
-  }}
-  .flow-item.done {{ border-color: var(--line); background: #fff; }}
-  .card.is-done .flow-item.done {{
-    border-color: rgba(16,185,129,.18); background: #f0fdf6;
-  }}
-  .flow-item.fail {{ background: #fef2f2; border-color: #fecaca; }}
-  .num {{
-    width: 26px; height: 26px; border-radius: 8px;
-    display: grid; place-items: center; margin-bottom: 10px;
-    color: var(--rose); font-size: 12px; font-weight: 800;
-    background: var(--rose-dim);
-  }}
-  .flow-item b {{ display: block; color: var(--ink); font-size: 13px; line-height: 1.3; font-weight: 700; }}
-  .flow-item span {{ display: block; margin-top: 4px; color: #9ca3af; font-size: 11px; line-height: 1.4; }}
-
-  /* ── Bottom bar ────────────────────────────────── */
-  .bottom {{
-    position: absolute; left: 40px; right: 36px; bottom: 60px;
-    display: flex; align-items: center; justify-content: space-between;
-  }}
-  .status-wrap {{ min-width: 260px; }}
-  .state {{ display: none; color: #6b7280; font-size: 12px; font-weight: 600; }}
-  .state.active {{ display: block; }}
-
-  /* ── Progress bar ──────────────────────────────── */
-  .progress {{
-    display: none; margin-top: 8px; width: 260px; height: 6px;
-    border-radius: 999px; overflow: hidden;
-    background: #eaedf3;
-  }}
-  .progress.active {{ display: block; }}
-  .bar {{
-    width: 1%; height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, var(--rose), var(--orange));
-    transition: width .22s ease;
-    animation: progressGlow 2s ease-in-out infinite;
-    position: relative;
-  }}
-  .bar::after {{
-    content: ""; position: absolute; inset: 0;
-    border-radius: 999px;
-    background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%);
-    background-size: 200% 100%;
-    animation: shimmer 2.2s ease-in-out infinite;
-  }}
-
-  /* ── Buttons ───────────────────────────────────── */
-  .actions {{ display: flex; gap: 10px; }}
-  .btn {{
-    height: 42px; border-radius: 10px; border: 1px solid var(--line);
-    background: #fff; color: var(--ink2); font-size: 13px; font-weight: 700;
-    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 22px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.04);
-    transition: background .15s, border-color .15s, box-shadow .15s, color .15s, transform .1s;
-  }}
-  .btn:hover {{ background: #f7f8fa; border-color: #d1d5de; }}
-  .btn:active {{ transform: scale(.98); }}
-  .btn.disabled {{ opacity: .35; pointer-events: none; cursor: not-allowed; }}
-  .primary {{
-    min-width: 110px; border: 0; color: #fff;
-    background: linear-gradient(180deg, #f05276, var(--rose) 50%, #d63456);
-    box-shadow: 0 2px 8px rgba(232,64,100,.22), inset 0 1px 0 rgba(255,255,255,.20);
-  }}
-  .primary:hover {{ background: linear-gradient(180deg, #f46080, #e84064 50%, #d93a5a); box-shadow: 0 4px 14px rgba(232,64,100,.28); }}
-  .primary:active {{ transform: scale(.97); }}
-  .primary.launch {{ min-width: 160px; background: linear-gradient(180deg, #34d399, #10b981 50%, #059669); box-shadow: 0 2px 8px rgba(16,185,129,.22), inset 0 1px 0 rgba(255,255,255,.20); }}
-  .primary.launch:hover {{ box-shadow: 0 4px 14px rgba(16,185,129,.28); }}
+  .glass-card.one {{ left:0; top:24px; transform:rotate(-12deg); }} .glass-card.two {{ left:70px; top:0; transform:rotate(5deg); background:linear-gradient(150deg,rgba(255,255,255,.50),rgba(255,255,255,.24)); }} .glass-card.three {{ left:138px; top:32px; transform:rotate(13deg); }}
+  .main {{ position:relative; overflow:hidden; padding:48px 34px 26px 38px; background:linear-gradient(180deg,#f8faff,#f4f7fc); }}
+  .main::before {{ content:""; position:absolute; inset:1px; border-radius:0 33px 33px 0; background:linear-gradient(115deg,rgba(255,255,255,.38),transparent 26%,transparent 78%,rgba(255,255,255,.24)); pointer-events:none; }}
+  .main > * {{ position:relative; z-index:1; }}
+  .close {{ position:absolute; right:18px; top:17px; width:34px; height:34px; border:0; border-radius:12px; background:transparent; color:#858c9b; font-size:24px; cursor:pointer; display:grid; place-items:center; line-height:1; }}
+  .close:hover {{ background:#e9edf5; color:#111421; }}
+  .topline {{ display:flex; align-items:center; justify-content:space-between; margin-right:54px; }}
+  .steps {{ display:flex; gap:10px; align-items:center; }}
+  .stepbar {{ width:28px; height:8px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .stepdot {{ width:8px; height:8px; border-radius:50%; background:#d9dee8; }}
+  .steps.install .stepbar {{ width:8px; background:#d9dee8; box-shadow:none; }}
+  .steps.install .stepdot.one {{ width:28px; border-radius:99px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 8px 18px rgba(244,73,117,.24); }}
+  .steps.done .stepbar,.steps.done .stepdot.one {{ width:8px; background:#b9f0d2; box-shadow:none; }}
+  .steps.done .stepdot.two {{ width:28px; border-radius:99px; background:linear-gradient(90deg,#34d399,#10b981); box-shadow:0 8px 18px rgba(16,185,129,.22); }}
+  .steps.fail .stepbar {{ background:#ef4444; }}
+  .ver {{ color:#717784; font-size:13px; font-weight:700; pointer-events:none; }}
+  .title {{ margin-top:42px; transition:transform .52s cubic-bezier(.2,.9,.18,1), opacity .24s ease; }}
+  .title.installing {{ transform:translateY(116px); }}
+  .title.done {{ transform:translateY(128px); }}
+  .title h2 {{ margin:0; color:var(--ink); font-size:38px; line-height:1.08; letter-spacing:-.07em; font-weight:950; transition:transform .28s cubic-bezier(.16,1,.3,1), opacity .18s ease, font-size .28s ease, text-align .28s ease; }}
+  .title.installing h2,.title.done h2 {{ text-align:center; font-size:46px; letter-spacing:-.075em; }}
+  .title h2.pulse {{ animation:titlePulse .42s cubic-bezier(.16,1,.3,1); }}
+  .title h2.drop {{ animation:titleDrop .62s cubic-bezier(.2,1.18,.26,1) both; }}
+  @keyframes titlePulse {{ 0%{{ opacity:.48; transform:translateY(10px); }} 100%{{ opacity:1; transform:translateY(0); }} }}
+  @keyframes titleDrop {{ 0%{{ opacity:0; transform:translateY(-92px) scale(1.06); }} 62%{{ opacity:1; transform:translateY(14px) scale(.985); }} 82%{{ transform:translateY(-5px) scale(1.006); }} 100%{{ opacity:1; transform:translateY(0) scale(1); }} }}
+  .dots {{ display:inline-flex; width:34px; justify-content:space-between; margin-left:6px; vertical-align:baseline; }}
+  .dots i {{ width:6px; height:6px; border-radius:50%; background:var(--rose); animation:dotBounce .9s ease-in-out infinite; }}
+  .dots i:nth-child(2){{ animation-delay:.15s; }} .dots i:nth-child(3){{ animation-delay:.3s; }}
+  @keyframes dotBounce {{ 0%,80%,100%{{ transform:translateY(0); opacity:.45; }} 38%{{ transform:translateY(-7px); opacity:1; }} }}
+  .title p {{ display:none; }}
+  .card {{ margin-top:28px; width:532px; border-radius:24px; background:rgba(255,255,255,.82); border:1px solid rgba(228,231,238,.92); box-shadow:0 16px 40px rgba(35,40,50,.07); padding:18px; transition:border-color .24s ease, box-shadow .24s ease, transform .58s cubic-bezier(.22,1,.36,1), opacity .38s ease, filter .38s ease; }}
+  .card.flyout {{ transform:translateX(610px) rotate(2.5deg) scale(.96); opacity:0; filter:blur(4px); pointer-events:none; }}
+  .card.is-working {{ border-color:rgba(251,91,123,.24); box-shadow:0 24px 64px rgba(244,73,117,.12); }}
+  .card.is-done {{ border-color:rgba(52,211,153,.24); box-shadow:0 24px 64px rgba(16,185,129,.10); }}
+  .path-row {{ display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:0; padding:15px 16px; border-radius:18px; background:#f7f8fb; border:1px solid rgba(230,233,240,.92); transition:border-color .24s ease; }}
+  .card.is-working .path-row {{ border-bottom-color:#ffd4dd; }}
+  .card.is-done .path-row {{ border-bottom-color:#bbf7d0; }}
+  .home {{ display:none; }}
+  .path-copy {{ flex:1; min-width:0; }}
+  .path-copy small {{ display:block; color:#8b919c; font-size:12px; font-weight:800; }}
+  .path-copy strong {{ display:block; margin-top:4px; color:var(--ink); font-size:14px; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .change {{ border:0; border-radius:999px; padding:10px 14px; background:white; color:#c72e55; font-size:13px; font-weight:850; cursor:pointer; display:inline-flex; align-items:center; box-shadow:0 8px 20px rgba(34,39,48,.08); }}
+  .flow {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding-top:0; margin-top:14px; }}
+  .flow-item {{ min-height:104px; border-radius:18px; padding:14px; background:#fff; border:1px solid rgba(230,233,240,.86); transition:.2s ease; }}
+  .flow-item.active {{ background:#fff; border-color:rgba(230,233,240,.86); box-shadow:none; }}
+  .card.is-working .flow-item.active {{ border-color:#ffc3d0; background:#fff7fa; box-shadow:0 10px 24px rgba(244,73,117,.08); }}
+  .flow-item.done {{ background:#fff; border-color:rgba(230,233,240,.86); }}
+  .card.is-done .flow-item.done {{ border-color:#bbf7d0; background:#f0fdf6; }}
+  .flow-item.fail {{ background:#fff1f2; border-color:#fecdd3; }}
+  .num {{ width:28px; height:28px; border-radius:10px; display:grid; place-items:center; margin-bottom:12px; color:#c72e55; font-size:14px; font-weight:900; background:linear-gradient(135deg,rgba(251,91,123,.13),rgba(255,138,76,.15)); }}
+  .flow-item b {{ display:block; margin-top:0; color:var(--ink); font-size:14px; line-height:1.25; }}
+  .flow-item span {{ display:block; margin-top:5px; color:#6b7382; font-size:12px; line-height:1.35; }}
+  .options {{ display:flex; gap:18px; margin-top:18px; padding-top:16px; border-top:1px solid #edf0f6; }}
+  .check {{ display:flex; align-items:center; gap:8px; color:#384050; font-size:13px; font-weight:800; }}
+  .check input {{ accent-color:#f44975; }}
+  .bottom {{ position:absolute; left:38px; right:34px; bottom:76px; display:flex; align-items:center; justify-content:space-between; }}
+  .status-wrap {{ min-width:288px; }}
+  .state {{ display:none; color:#687184; font-size:13px; font-weight:800; }}
+  .state.active {{ display:block; }}
+  .progress {{ display:none; margin-top:10px; width:288px; height:8px; border-radius:999px; overflow:hidden; background:#e8ecf3; }}
+  .progress.active {{ display:block; }}
+  .bar {{ width:1%; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--rose),var(--orange)); box-shadow:0 0 18px rgba(251,91,123,.38); transition:width .24s ease; }}
+  .actions {{ display:flex; gap:12px; }}
+  .btn {{ height:46px; border-radius:16px; border:1px solid #d9dee8; background:linear-gradient(180deg,#fff,#f8f9fd); padding:0 24px; color:#3f4654; font-size:15px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; box-shadow:inset 0 1px 0 rgba(255,255,255,.92); }}
+  .btn.disabled,.change.disabled,.close.disabled {{ opacity:.55; pointer-events:none; cursor:not-allowed; }}
+  .primary {{ min-width:118px; border:0; color:white; background:linear-gradient(180deg,#ff7d99,#f44975 58%,#e83266); box-shadow:0 14px 28px rgba(244,73,117,.30), inset 0 1px 0 rgba(255,255,255,.34); }}
+  .primary.launch {{ min-width:178px; background:linear-gradient(180deg,#ff8ca3,#f44975 54%,#ff8356); }}
 </style>
 </head>
 <body>
   <div class="shell" data-drag="true">
     <aside class="side drag" data-drag="true">
       <div class="orb a"></div><div class="orb b"></div>
-      <div class="brand">
-        <img src="data:image/png;base64,{icon}" alt="ChangLi">
-        <div>
-          <div class="wordmark">ChangLi</div>
-          <div class="tag">私人影音资料库</div>
-        </div>
-      </div>
-      <div class="hero">
-        <div class="kicker">Installer</div>
-        <h1>装好后<br>直接进入收藏宇宙</h1>
-        <p>本地优先，离线可用，海报、演员、标签和追番状态一起带进桌面。</p>
-      </div>
-      <div class="glass-pills">
-        <span class="pill">本地数据库</span>
-        <span class="pill">内置播放器</span>
-        <span class="pill">自动建库</span>
-      </div>
-      <div class="stack">
-        <div class="glass-card three"></div>
-        <div class="glass-card two"></div>
-        <div class="glass-card one"></div>
-      </div>
+      <div class="brand"><img src="data:image/png;base64,{icon}" alt="ChangLi"><div><div class="wordmark">ChangLi</div><div class="tag">私人影音资料库</div></div></div>
+      <div class="hero"><div class="kicker">INSTALLER</div><h1>装好后<br>直接进入收藏宇宙</h1><p>本地优先，离线可用，海报、演员、标签和追番状态一起带进桌面。</p></div>
+      <div class="glass-pills"><span class="pill">本地数据库</span><span class="pill">内置播放器</span><span class="pill">自动建库</span></div>
+      <div class="stack"><div class="glass-card three"></div><div class="glass-card two"></div><div class="glass-card one"></div></div>
     </aside>
     <main class="main">
-      <button class="close-btn" id="close" aria-label="关闭">×</button>
-      <div class="topline drag" data-drag="true">
-        <div class="steps" id="steps">
-          <i class="stepbar"></i>
-          <i class="stepdot one"></i>
-          <i class="stepdot two"></i>
-        </div>
-        <div class="ver">ChangLi {version}</div>
-      </div>
-      <section class="title-block drag" id="title-block" data-drag="true">
-        <div class="success-icon">
-          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <h2 id="headline">准备安装长离</h2>
-        <p id="subtitle"></p>
-      </section>
+      <a class="close" id="close" href="changli://close" data-close="true">×</a>
+      <div class="topline drag" data-drag="true"><div class="steps" id="steps"><i class="stepbar"></i><i class="stepdot one"></i><i class="stepdot two"></i></div><div class="ver">ChangLi {version}</div></div>
+      <section class="title drag" id="title-block" data-drag="true"><h2 id="headline">准备安装长离</h2><p id="subtitle"></p></section>
       <section class="card" id="install-card">
-        <div class="path-row" id="path-row">
-          <div class="path-copy">
-            <small id="path-label">安装位置</small>
-            <strong id="install-dir" title="{default_label}">{default_label}</strong>
-          </div>
-          <button class="change-btn" id="choose">更改</button>
-        </div>
-        <div class="flow">
-          <div class="flow-item" id="flow-1">
-            <div class="num">1</div>
-            <b id="flow-1-title">检测位置</b>
-            <span id="flow-1-desc">优先沿用旧版安装目录</span>
-          </div>
-          <div class="flow-item" id="flow-2">
-            <div class="num">2</div>
-            <b id="flow-2-title">写入组件</b>
-            <span id="flow-2-desc">静默执行安装后端</span>
-          </div>
-          <div class="flow-item" id="flow-3">
-            <div class="num">3</div>
-            <b id="flow-3-title">创建入口</b>
-            <span id="flow-3-desc">安装器创建桌面入口</span>
-          </div>
-        </div>
+        <div class="path-row" id="path-row"><div class="home">⌂</div><div class="path-copy"><small id="path-label">安装位置</small><strong id="install-dir" title="{default_label}">{default_label}</strong></div><a class="change" id="choose" href="changli://choose-dir">更改</a></div>
+        <div class="flow"><div class="flow-item" id="flow-1"><div class="num">1</div><b id="flow-1-title">检测位置</b><span id="flow-1-desc">优先沿用旧版安装目录</span></div><div class="flow-item" id="flow-2"><div class="num">2</div><b id="flow-2-title">写入组件</b><span id="flow-2-desc">静默执行安装后端</span></div><div class="flow-item" id="flow-3"><div class="num">3</div><b id="flow-3-title">创建入口</b><span id="flow-3-desc">安装器创建桌面入口</span></div></div>
       </section>
-      <div class="bottom">
-        <div class="status-wrap">
-          <div class="state" id="state"></div>
-          <div class="progress" id="progress"><div class="bar" id="progress-bar"></div></div>
-        </div>
-        <div class="actions">
-          <button class="btn" id="cancel">取消</button>
-          <button class="btn primary" id="install">开始安装</button>
-        </div>
-      </div>
+      <div class="bottom"><div class="status-wrap"><div class="state" id="state"></div><div class="progress" id="progress"><div class="bar" id="progress-bar"></div></div></div><div class="actions"><a class="btn" id="cancel" href="changli://close" data-close="true">取消</a><a class="btn primary" id="install" href="changli://install">开始安装</a></div></div>
     </main>
   </div>
 <script>
@@ -705,25 +377,19 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   const installMode = '{install_mode}';
   let progressValue = 1;
   let progressTimer = null;
-
-  const processCopy = () => installMode === 'update'
-    ? '检测到已有版本，正在覆盖更新安装中'
-    : '检测到首次安装，请稍后';
-
+  const processCopy = () => installMode === 'update' ? '检测到已有版本，正在覆盖更新安装中' : '检测到首次安装，请稍后';
   const setHeadline = (text) => {{
     headline.innerHTML = text;
     headline.classList.remove('pulse', 'drop');
     void headline.offsetWidth;
     headline.classList.add('pulse');
   }};
-
   const setProgress = (value) => {{
     progressValue = Math.max(1, Math.min(100, value));
     progressBar.style.width = progressValue + '%';
     state.textContent = progressValue >= 100 ? '安装完成 100%' : processCopy() + '，' + progressValue + '%';
     state.classList.add('active');
   }};
-
   const install = document.getElementById('install');
   const cancel = document.getElementById('cancel');
   const closeBtn = document.getElementById('close');
@@ -733,7 +399,6 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   const flow1 = document.getElementById('flow-1');
   const flow2 = document.getElementById('flow-2');
   const flow3 = document.getElementById('flow-3');
-
   const setPhase = (phase) => {{
     steps.className = 'steps ' + (phase === 'ready' ? '' : phase);
     [flow1, flow2, flow3].forEach(el => el.classList.remove('active', 'done', 'fail'));
@@ -742,95 +407,54 @@ fn html(default_dir: &Path, is_update: bool) -> String {
     if (phase === 'done') {{ flow1.classList.add('done'); flow2.classList.add('done'); flow3.classList.add('done'); }}
     if (phase === 'fail') flow2.classList.add('fail');
   }};
-
   setPhase('ready');
-
-  /* Close via button */
-  closeBtn.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = 'changli://close'; }});
-
-  /* Cancel button */
-  cancel.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = 'changli://close'; }});
-
-  /* Choose directory */
-  choose.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = 'changli://choose-dir'; }});
-
-  /* Install button */
-  install.addEventListener('click', (e) => {{ e.preventDefault(); window.location.href = install.classList.contains('launch') ? 'changli://launch-close' : 'changli://install'; }});
-
-  /* Dragging on main area */
-  document.addEventListener('mousedown', (e) => {{
-    if (e.button !== 0) return;
-    if (e.target.closest('button, input, label, .change-btn, .close-btn')) return;
+  document.addEventListener('mousedown', e => {{
+    if (e.button !== 0 || e.target.closest('a,button,input,label')) return;
     window.location.href = 'changli://drag';
   }});
-
+  document.addEventListener('click', e => {{
+    const el = e.target.closest('a');
+    if (!el) return;
+    const href = el.getAttribute('href') || '';
+    if (el.dataset.close === 'true' || href === 'changli://launch-close') {{
+      e.preventDefault();
+      window.location.href = href;
+    }}
+  }});
   window.setInstalling = () => {{
     setPhase('install');
-    titleBlock.className = 'title-block installing drag';
+    installCard.classList.add('flyout');
+    titleBlock.className = 'title installing drag';
     headline.innerHTML = '正在安装长离中<span class="dots"><i></i><i></i><i></i></span>';
     headline.classList.remove('pulse', 'drop');
     void headline.offsetWidth;
     headline.classList.add('drop');
     subtitle.textContent = '';
     installCard.className = 'card is-working flyout';
-
     flow1Title.textContent = installMode === 'update' ? '检测旧版' : '首次安装';
     flow1Desc.textContent = installMode === 'update' ? '已找到原安装目录' : '准备创建应用目录';
     flow2Title.textContent = installMode === 'update' ? '覆盖更新' : '写入组件';
     flow2Desc.textContent = installMode === 'update' ? '保留资料并写入新版' : '静默执行安装后端';
     flow3Title.textContent = '创建入口';
     flow3Desc.textContent = '完成后可直接打开应用';
-
     if (progressTimer) clearInterval(progressTimer);
-    install.classList.add('disabled');
-    cancel.classList.add('disabled');
-    closeBtn.classList.add('disabled');
-    choose.classList.add('disabled');
-    install.textContent = '安装中…';
-    progress.classList.add('active');
-    setProgress(1);
-
+    install.classList.add('disabled'); cancel.classList.add('disabled'); closeBtn.classList.add('disabled'); choose.classList.add('disabled');
+    install.textContent = '安装中'; progress.classList.add('active'); setProgress(1);
     progressTimer = setInterval(() => {{
       if (progressValue < 92) setProgress(progressValue + 1);
       else if (progressValue < 99 && Math.random() > .55) setProgress(progressValue + 1);
     }}, 90);
   }};
-
   window.setInstallDir = (value) => {{ dir.textContent = value; dir.title = value; }};
-
   window.installDone = (ok, code, message) => {{
     if (progressTimer) {{ clearInterval(progressTimer); progressTimer = null; }}
     if (ok) {{
-      setPhase('done');
-      installCard.className = 'card is-done flyout';
-      titleBlock.className = 'title-block done drag';
-      headline.innerHTML = '安装成功';
-      subtitle.textContent = '';
-      setProgress(100);
-      install.textContent = '完成并启动';
-      install.classList.add('launch');
-      install.classList.remove('disabled');
-      cancel.textContent = '完成';
-      cancel.classList.remove('disabled');
-      closeBtn.classList.remove('disabled');
+      setPhase('done'); installCard.className = 'card is-done flyout'; titleBlock.className = 'title done drag'; setHeadline('安装成功'); subtitle.textContent = ''; setProgress(100); install.textContent = '完成并启动'; install.href = 'changli://launch-close'; install.classList.add('launch'); install.classList.remove('disabled'); cancel.textContent = '完成'; cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled');
     }} else {{
       progress.classList.remove('active');
-      setPhase('fail');
-      installCard.className = 'card';
-      titleBlock.className = 'title-block drag';
-      headline.innerHTML = '安装失败';
-      subtitle.textContent = '';
-      state.classList.add('active');
-      state.textContent = message || ('安装失败' + (code == null ? '' : '，退出码 ' + code));
-      progressBar.style.width = '1%';
-      install.textContent = '重试';
-      install.classList.remove('disabled');
-      cancel.classList.remove('disabled');
-      closeBtn.classList.remove('disabled');
-      choose.classList.remove('disabled');
+      setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = message || ('安装失败' + (code == null ? '' : '，退出码 ' + code)); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
   }};
-
   requestAnimationFrame(() => requestAnimationFrame(() => {{ window.location.href = 'changli://ready'; }}));
 </script>
 </body>
@@ -843,9 +467,41 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn apply_true_transparent_window(_window: &tao::window::Window) {
-    // 透明窗口方案不可靠，改用 CSS border-radius 实现圆角
-    // 窗口背景色与 .shell 一致，圆角纯 CSS 实现
+fn apply_true_transparent_window(window: &tao::window::Window) {
+    use windows::Win32::{
+        Foundation::{COLORREF, HWND},
+        Graphics::Dwm::DwmExtendFrameIntoClientArea,
+        UI::{
+            Controls::MARGINS,
+            WindowsAndMessaging::{
+                GetWindowLongW, SetLayeredWindowAttributes, SetWindowLongW, GWL_EXSTYLE, LWA_ALPHA,
+                WS_EX_LAYERED,
+            },
+        },
+    };
+
+    let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
+    unsafe {
+        // 现实 Windows artifact 已多次证明纯透明链路在部分环境会回退成白底。
+        // 这里明确采用“圆角 region 裁剪 + 内侧柔光/渐变/阴影淡化边缘”的稳定路线，
+        // 不再在纯透明白底和硬裁之间来回切换。
+        let margins = MARGINS {
+            cxLeftWidth: -1,
+            cxRightWidth: -1,
+            cyTopHeight: -1,
+            cyBottomHeight: -1,
+        };
+        let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+        let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
+        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+
+        use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, 68, 68);
+        if !region.is_invalid() {
+            let _ = SetWindowRgn(hwnd, region, true);
+        }
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -874,6 +530,7 @@ fn main() -> wry::Result<()> {
         .with_title("ChangLi Installer")
         .with_decorations(false)
         .with_resizable(false)
+        .with_transparent(true)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
     if let Some(pos) = pos {
@@ -889,7 +546,8 @@ fn main() -> wry::Result<()> {
             position: WebLogicalPosition::new(0, 0).into(),
             size: WebLogicalSize::new(W, H).into(),
         })
-        .with_background_color((240, 242, 247, 255))
+        .with_transparent(true)
+        .with_background_color((0, 0, 0, 0))
         .with_html(html(&default_dir, is_update))
         .with_navigation_handler(move |url| {
             if let Some(cmd) = url.strip_prefix("changli://") {
