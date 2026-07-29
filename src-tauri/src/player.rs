@@ -487,9 +487,10 @@ pub fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     )
     .title("ChangLi Player")
     .inner_size(PLAYER_WIDTH, PLAYER_HEIGHT)
-    .min_inner_size(480.0, 270.0)
-    // 禁用系统级自由缩放，前端右下角手柄负责等比实时缩放，避免 resize 回调递归导致 mpv/WebView 闪退。
-    .resizable(false)
+    .min_inner_size(360.0, 203.0)
+    // 保留系统级窗口缩放。Windows 会在播放中的 mpv 子窗口覆盖 WebView
+    // 命中区域时继续提供非客户区缩放，小窗和普通窗口也保持一致。
+    .resizable(true)
     .decorations(false)
     .visible(false);
 
@@ -523,7 +524,9 @@ fn apply_player_window_style(window: &WebviewWindow) -> Result<()> {
         .lock()
         .map_err(|_| anyhow!("always-on-top lock poisoned"))?;
     window.set_decorations(false)?;
-    window.set_skip_taskbar(true)?;
+    // 播放器是独立顶层窗口，应在任务栏和 Alt+Tab 中与主窗口分别出现。
+    window.set_skip_taskbar(false)?;
+    window.set_resizable(true)?;
     window.set_always_on_top(always_on_top)?;
     set_windows_11_rounded_corners(window);
     Ok(())

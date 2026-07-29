@@ -261,7 +261,7 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ position:relative; width:1000px; height:660px; display:grid; grid-template-columns:318px 1fr; overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
+  .shell {{ position:relative; width:100vw; height:100vh; display:grid; grid-template-columns:318px minmax(0,1fr); overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
   .shell::before {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.72), inset 0 0 26px rgba(255,255,255,.34), inset 0 -18px 34px rgba(31,35,49,.045); }}
   .shell::after {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; background:linear-gradient(135deg,rgba(255,255,255,.38),transparent 16%,transparent 84%,rgba(31,35,49,.07)); }}
   .drag {{ cursor:default; }}
@@ -501,19 +501,45 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 #[cfg(target_os = "windows")]
 fn apply_true_transparent_window(window: &tao::window::Window) {
     use windows::Win32::{
-        Foundation::HWND, Graphics::Dwm::DwmExtendFrameIntoClientArea, UI::Controls::MARGINS,
+        Foundation::HWND,
+        Graphics::Dwm::DwmExtendFrameIntoClientArea,
+        UI::{
+            Controls::MARGINS,
+            WindowsAndMessaging::{
+                GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, HWND_TOP,
+                SET_WINDOW_POS_FLAGS, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+                WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+            },
+        },
     };
 
     let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
     unsafe {
+        // Tao's transparent undecorated window can retain the size calculated
+        // for WS_OVERLAPPEDWINDOW on some Windows 11/WebView2 combinations.
+        // That leaves the old 16x39 non-client area at the right and bottom.
+        // Force a true popup before DirectComposition attaches its visual.
+        let old_style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+        let frame_bits =
+            WS_CAPTION.0 | WS_THICKFRAME.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0;
+        let popup_style = (old_style & !frame_bits) | WS_POPUP.0;
+        let _ = SetWindowLongW(hwnd, GWL_STYLE, popup_style as i32);
+
+        let scale = window.scale_factor();
+        let width = (W as f64 * scale).round() as i32;
+        let height = (H as f64 * scale).round() as i32;
+        let flags: SET_WINDOW_POS_FLAGS =
+            SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER;
+        let _ = SetWindowPos(hwnd, HWND_TOP, 0, 0, width, height, flags);
+
         // DirectComposition supplies the antialiased shape. Do not combine it
         // with SetWindowRgn: HRGN clipping is binary and reintroduces the
         // jagged edge this compositor path is designed to remove.
         let margins = MARGINS {
-            cxLeftWidth: -1,
-            cxRightWidth: -1,
-            cyTopHeight: -1,
-            cyBottomHeight: -1,
+            cxLeftWidth: 0,
+            cxRightWidth: 0,
+            cyTopHeight: 0,
+            cyBottomHeight: 0,
         };
         let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
     }

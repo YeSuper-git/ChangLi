@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.45] - 2026-07-29
+
+### Changed
+- **代码格式化与重构**：player.rs/db.rs/main.rs/scanner.rs/migrations.rs 等文件代码风格统一
+- **安装器依赖更新**：installer-shell Cargo.toml/Cargo.lock 更新
+
+
 ## [1.9.44] - 2026-07-29
 
 ### Changed
