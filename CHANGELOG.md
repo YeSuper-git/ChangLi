@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.44] - 2026-07-29
+
+### Changed
+- **网页播放器横版海报**：分类配置为横版海报的视频集展示为 16:9 比例
+- **安装器 DirectComposition**：Windows 安装器使用 DirectComposition 实现透明圆角
+- **代码格式化**：player.rs/db.rs/main.rs/scanner.rs 等文件代码风格统一
+
+
 ## [1.9.43] - 2026-07-29
 
 ### Changed
