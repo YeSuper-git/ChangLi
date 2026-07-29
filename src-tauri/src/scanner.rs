@@ -8,7 +8,13 @@ use walkdir::WalkDir;
 use crate::db::Video;
 
 fn image_mime_from_extension(path: &Path) -> &'static str {
-    match path.extension().and_then(|ext| ext.to_str()).unwrap_or_default().to_lowercase().as_str() {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
         "png" => "image/png",
         "webp" => "image/webp",
         "bmp" => "image/bmp",
@@ -23,7 +29,11 @@ fn raw_image_data_url(poster_path: &Path) -> Option<String> {
         return None;
     }
     let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-    Some(format!("data:{};base64,{}", image_mime_from_extension(poster_path), encoded))
+    Some(format!(
+        "data:{};base64,{}",
+        image_mime_from_extension(poster_path),
+        encoded
+    ))
 }
 
 /// 生成海报缓存 Base64（最大 600px 宽）。如果图片解码失败，回退为原图 data URL，避免本地海报路径存在但缓存为空。
@@ -161,7 +171,7 @@ pub fn strip_episode_suffix(name: &str) -> String {
             end -= 1;
         }
         // 往前读数字和横杠
- let mut start = end;
+        let mut start = end;
         while start > 0 && (chars[start - 1].is_ascii_digit() || chars[start - 1] == '-') {
             start -= 1;
         }
@@ -263,7 +273,11 @@ fn parse_season_number(value: &str) -> Option<i32> {
         }
     }
     let result = total + current;
-    if result > 0 { Some(result) } else { None }
+    if result > 0 {
+        Some(result)
+    } else {
+        None
+    }
 }
 
 // 扫描目录（支持子文件夹，最小文件夹为一部作品）
@@ -327,13 +341,8 @@ pub async fn scan_directory(path: &str) -> Result<ScanResult> {
                     (season_counter, None)
                 }
             };
-            process_directory_videos(
-                subdir,
-                Some(season),
-                subtitle.as_deref(),
-                &mut videos,
-            )
-            .await?;
+            process_directory_videos(subdir, Some(season), subtitle.as_deref(), &mut videos)
+                .await?;
         }
     }
 
@@ -362,8 +371,16 @@ pub async fn scan_directory_video_index(path: &str) -> Result<Vec<Video>> {
         process_directory_video_index(path, None, None, &mut videos).await?;
     } else {
         subdirs.sort_by(|a, b| {
-            let a_name = a.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
-            let b_name = b.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+            let a_name = a
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            let b_name = b
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
             a_name.cmp(&b_name)
         });
 
@@ -374,7 +391,11 @@ pub async fn scan_directory_video_index(path: &str) -> Result<Vec<Video>> {
                 continue;
             }
 
-            let folder_name = subdir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let folder_name = subdir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let (season, subtitle) = match classify_series_subfolder(&folder_name) {
                 SeriesSubfolderKind::Movie => (999, Some(folder_name)),
                 SeriesSubfolderKind::Season(season) => (season, None),
@@ -384,7 +405,8 @@ pub async fn scan_directory_video_index(path: &str) -> Result<Vec<Video>> {
                     (season_counter, None)
                 }
             };
-            process_directory_video_index(subdir, Some(season), subtitle.as_deref(), &mut videos).await?;
+            process_directory_video_index(subdir, Some(season), subtitle.as_deref(), &mut videos)
+                .await?;
         }
     }
 
@@ -413,7 +435,10 @@ async fn process_directory_video_index(
     let mut folder_videos: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
     for video_path in &video_files {
         if let Some(parent) = video_path.parent() {
-            folder_videos.entry(parent.to_path_buf()).or_insert_with(Vec::new).push(video_path.clone());
+            folder_videos
+                .entry(parent.to_path_buf())
+                .or_insert_with(Vec::new)
+                .push(video_path.clone());
         }
     }
 
@@ -442,7 +467,11 @@ async fn process_directory_video_index(
 }
 
 fn scan_video_file_index(path: &Path) -> Result<Video> {
-    let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     let file_size = std::fs::metadata(path)?.len() as i64;
     let adult_info = parse_adult_filename(&file_name);
 
@@ -451,7 +480,8 @@ fn scan_video_file_index(path: &Path) -> Result<Video> {
         file_path: path.to_string_lossy().to_string(),
         file_name: file_name.clone(),
         series_id: None,
-        episode_number: fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name)),
+        episode_number: fixed_episode_from_path(path)
+            .or_else(|| extract_episode_from_filename(&file_name)),
         file_size: Some(file_size),
         season: None,
         subtitle: adult_info.as_ref().and_then(|info| info.title.clone()),
@@ -572,7 +602,10 @@ fn file_stem_lower(path: &Path) -> String {
 
 fn same_dir(a: &Path, b: &Path) -> bool {
     let normalize = |p: &Path| -> String {
-        p.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_string()
+        p.to_string_lossy()
+            .replace('\\', "/")
+            .trim_end_matches('/')
+            .to_string()
     };
     normalize(a) == normalize(b)
 }
@@ -832,8 +865,8 @@ pub fn extract_episode_from_filename(filename: &str) -> Option<i32> {
 
     // 常见的集数格式
     let patterns = [
-        r"(?i)s\d+e(\d+)",        // S01E01, S1E01（标准季集格式，优先匹配）
-        r"(?i)ep?\s*(\d+)",       // EP01, E01, ep01
+        r"(?i)s\d+e(\d+)",          // S01E01, S1E01（标准季集格式，优先匹配）
+        r"(?i)ep?\s*(\d+)",         // EP01, E01, ep01
         r"(?i)第\s*(\d+)\s*[集话]", // 第01集, 第01话
         r"(?i)\[(\d+)\]",           // [01]
         r"(?i)_(\d+)_",             // _01_
@@ -922,7 +955,9 @@ pub fn find_folder_poster(folder: &Path) -> Option<String> {
                 .to_string_lossy()
                 .to_string();
             let (child_images, child_videos) = collect_direct_media_files(&child);
-            if let Some(poster) = find_poster_for_folder(&child, &child_name, &child_images, &child_videos) {
+            if let Some(poster) =
+                find_poster_for_folder(&child, &child_name, &child_images, &child_videos)
+            {
                 return Some(poster);
             }
         }
@@ -1009,11 +1044,7 @@ pub fn parse_adult_filename(filename: &str) -> Option<AdultFileInfo> {
 /// JUR-472[标题] / JUR-472-C[标题] / JUR-472-AI-C[标题] 识别为同一个视频。
 pub fn adult_rename_identity(filename: &str) -> Option<String> {
     let info = parse_adult_filename(filename)?;
-    let title = info
-        .title
-        .unwrap_or_default()
-        .trim()
-        .to_lowercase();
+    let title = info.title.unwrap_or_default().trim().to_lowercase();
     Some(format!("{}|{}", info.code.to_uppercase(), title))
 }
 
@@ -1055,13 +1086,34 @@ mod tests {
 
     #[test]
     fn classifies_series_subfolder_names_before_legacy_count_rule() {
-        assert_eq!(classify_series_subfolder("S1"), SeriesSubfolderKind::Season(1));
-        assert_eq!(classify_series_subfolder("S02"), SeriesSubfolderKind::Season(2));
-        assert_eq!(classify_series_subfolder("第十二季"), SeriesSubfolderKind::Season(12));
-        assert_eq!(classify_series_subfolder("Season 3"), SeriesSubfolderKind::Season(3));
-        assert_eq!(classify_series_subfolder("完结篇"), SeriesSubfolderKind::Movie);
-        assert_eq!(classify_series_subfolder("S2 剧场版"), SeriesSubfolderKind::Movie);
-        assert_eq!(classify_series_subfolder("SSIS-123"), SeriesSubfolderKind::Unknown);
+        assert_eq!(
+            classify_series_subfolder("S1"),
+            SeriesSubfolderKind::Season(1)
+        );
+        assert_eq!(
+            classify_series_subfolder("S02"),
+            SeriesSubfolderKind::Season(2)
+        );
+        assert_eq!(
+            classify_series_subfolder("第十二季"),
+            SeriesSubfolderKind::Season(12)
+        );
+        assert_eq!(
+            classify_series_subfolder("Season 3"),
+            SeriesSubfolderKind::Season(3)
+        );
+        assert_eq!(
+            classify_series_subfolder("完结篇"),
+            SeriesSubfolderKind::Movie
+        );
+        assert_eq!(
+            classify_series_subfolder("S2 剧场版"),
+            SeriesSubfolderKind::Movie
+        );
+        assert_eq!(
+            classify_series_subfolder("SSIS-123"),
+            SeriesSubfolderKind::Unknown
+        );
     }
 
     #[tokio::test]
@@ -1105,8 +1157,14 @@ mod tests {
         assert!(!plain.has_chinese_sub);
         assert!(sub.has_chinese_sub);
         assert!(ai_sub.has_chinese_sub);
-        assert_eq!(adult_rename_identity("JUR-472[学校风波].mp4"), adult_rename_identity("JUR-472-C[学校风波].mp4"));
-        assert_eq!(adult_rename_identity("JUR-472-AI[学校风波].mp4"), adult_rename_identity("JUR-472-AI-C[学校风波].mp4"));
+        assert_eq!(
+            adult_rename_identity("JUR-472[学校风波].mp4"),
+            adult_rename_identity("JUR-472-C[学校风波].mp4")
+        );
+        assert_eq!(
+            adult_rename_identity("JUR-472-AI[学校风波].mp4"),
+            adult_rename_identity("JUR-472-AI-C[学校风波].mp4")
+        );
     }
 
     #[test]
@@ -1118,7 +1176,10 @@ mod tests {
         fs::write(&poster, b"poster")?;
         fs::write(season.join("01.mp4"), b"video")?;
 
-        assert_eq!(find_folder_poster(&dir).as_deref(), Some(poster.to_str().unwrap()));
+        assert_eq!(
+            find_folder_poster(&dir).as_deref(),
+            Some(poster.to_str().unwrap())
+        );
 
         fs::remove_dir_all(dir).ok();
         Ok(())
@@ -1186,12 +1247,18 @@ mod classify_test {
     #[test]
     fn s3_in_chinese_name_is_season_3() {
         let name = "超超超超超喜欢你的100个女朋友 S3[01-12]";
-        assert_eq!(classify_series_subfolder(name), SeriesSubfolderKind::Season(3));
+        assert_eq!(
+            classify_series_subfolder(name),
+            SeriesSubfolderKind::Season(3)
+        );
     }
 
     #[test]
     fn s3_with_no_brackets() {
         let name = "超超超超超喜欢你的100个女朋友 S3";
-        assert_eq!(classify_series_subfolder(name), SeriesSubfolderKind::Season(3));
+        assert_eq!(
+            classify_series_subfolder(name),
+            SeriesSubfolderKind::Season(3)
+        );
     }
 }

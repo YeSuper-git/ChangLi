@@ -1,3 +1,7 @@
+// This module keeps the external-process fallback alongside the active plugin
+// path so packaged builds can recover when the plugin is unavailable.
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Context, Result};
 use std::io::Write;
 use std::path::PathBuf;
@@ -10,7 +14,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Webview, WebviewUrl, WebviewWindow,
+    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
@@ -84,7 +88,10 @@ fn play_platform(app: &AppHandle, video_path: &PathBuf) -> Result<()> {
     // macOS: 通过前端播放器播放
     let path_str = video_path.to_string_lossy().to_string();
     if let Some(main) = app.get_webview_window("main") {
-        let _ = main.eval(&format!("window.dispatchEvent(new CustomEvent('play-video', {{ detail: {{ path: '{}' }} }}))", path_str));
+        let _ = main.eval(&format!(
+            "window.dispatchEvent(new CustomEvent('play-video', {{ detail: {{ path: '{}' }} }}))",
+            path_str
+        ));
     }
     Ok(())
 }
@@ -111,33 +118,29 @@ pub fn open_player_window(app: &AppHandle) -> Result<()> {
 }
 
 pub fn close_player_window(app: &AppHandle) {
-        eprintln!("[player] close_player_window called");
-        if PLAYER_CLOSING.load(Ordering::SeqCst) {
-            eprintln!("[player] close_player_window: skip (already closing)");
+    eprintln!("[player] close_player_window called");
+    if PLAYER_CLOSING.load(Ordering::SeqCst) {
+        eprintln!("[player] close_player_window: skip (already closing)");
+        return;
+    }
+    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+        if !window.is_visible().unwrap_or(false) {
+            eprintln!("[player] close_player_window: player window not visible, skip");
             return;
         }
-        if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-            if !window.is_visible().unwrap_or(false) {
-                eprintln!("[player] close_player_window: player window not visible, skip");
-                return;
-            }
-        }
-        // 统一走 request_close_player 完整销毁链路
-        let app_handle = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _ = request_close_player(app_handle).await;
-        });
     }
+    // 统一走 request_close_player 完整销毁链路
+    let app_handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = request_close_player(app_handle).await;
+    });
+}
 
 /// 在后端查找 mpv.exe，检查多种可能路径，返回第一个存在的
 #[tauri::command]
 pub fn find_mpv_path() -> Result<String, String> {
-    let exe_path = std::env::current_exe()
-        .map_err(|e| format!("获取 exe 路径失败: {}", e))?;
-    let mut exe_dir = exe_path
-        .parent()
-        .ok_or("无法获取 exe 目录")?
-        .to_path_buf();
+    let exe_path = std::env::current_exe().map_err(|e| format!("获取 exe 路径失败: {}", e))?;
+    let mut exe_dir = exe_path.parent().ok_or("无法获取 exe 目录")?.to_path_buf();
 
     // 去掉 Windows 长路径前缀 \\?\
     let exe_dir_str = exe_dir.to_string_lossy().to_string();
@@ -170,7 +173,11 @@ pub fn find_mpv_path() -> Result<String, String> {
     }
 
     for candidate in &candidates {
-        eprintln!("[player] find_mpv_path: checking {} → exists={}", candidate.display(), candidate.exists());
+        eprintln!(
+            "[player] find_mpv_path: checking {} → exists={}",
+            candidate.display(),
+            candidate.exists()
+        );
         if candidate.exists() {
             let path = candidate.to_string_lossy().to_string();
             eprintln!("[player] find_mpv_path: found {}", path);
@@ -178,8 +185,14 @@ pub fn find_mpv_path() -> Result<String, String> {
         }
     }
 
-    Err(format!("mpv.exe 未找到，已尝试: {}",
-        candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")))
+    Err(format!(
+        "mpv.exe 未找到，已尝试: {}",
+        candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
 }
 
 /// 返回播放器窗口的原生句柄（十进制），供前端 init mpv 时传 --wid=
@@ -250,8 +263,8 @@ mod mpv_ipc {
 
     pub fn send_command(cmd: &str, args: &[&str]) -> Result<String, String> {
         let path = socket_path().ok_or("mpv socket 未初始化")?;
-        let stream = UnixStream::connect(&path)
-            .map_err(|e| format!("连接 mpv socket 失败: {}", e))?;
+        let stream =
+            UnixStream::connect(&path).map_err(|e| format!("连接 mpv socket 失败: {}", e))?;
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .map_err(|e| format!("设置 mpv socket 超时失败: {}", e))?;
@@ -318,14 +331,13 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
                 // 如果播放器窗口存在，先销毁播放器资源
-                if let Some(pw) = app_handle.get_webview_window(PLAYER_WINDOW_LABEL) {
-                    if pw.is_visible().unwrap_or(false) {
-                        eprintln!("[player] handle_main_window_event: player window visible, destroying player first");
-                        let _ = tokio::time::timeout(
-                            std::time::Duration::from_secs(2),
-                            request_close_player(app_handle.clone()),
-                        ).await;
-                    }
+                if app_handle.get_webview_window(PLAYER_WINDOW_LABEL).is_some() {
+                    eprintln!("[player] handle_main_window_event: destroying player before main");
+                    // Hidden windows still own a WebView2 controller and may
+                    // still have an mpv child rendering into their HWND.
+                    // Never cancel teardown midway: cancellation can leave
+                    // WebView2 and mpv with contradictory ownership.
+                    let _ = request_close_player(app_handle.clone()).await;
                 }
                 // 销毁主窗口（用 destroy 避免再次触发 CloseRequested）
                 if let Some(main) = app_handle.get_webview_window("main") {
@@ -341,10 +353,17 @@ pub fn handle_main_window_event(app: &AppHandle, event: &WindowEvent) {
 /// 播放器窗口事件处理：拦截关闭事件，统一转发到 request_close_player
 pub fn handle_player_window_event(app: &AppHandle, event: &WindowEvent) {
     match event {
-        WindowEvent::CloseRequested { .. } => {
-            // 统一转发到 request_close_player，禁止另起隐藏逻辑
+        WindowEvent::CloseRequested { api, .. } => {
+            // The window must remain alive until mpv has released its HWND.
+            // Letting WebView2 destroy the HWND first leaves mpv rendering into
+            // a stale native handle and has caused 0xc0000005/0xc0000374 on
+            // Windows. `request_close_player` finishes with `destroy()`, which
+            // deliberately bypasses another CloseRequested round trip.
+            api.prevent_close();
             if PLAYER_CLOSING.load(Ordering::SeqCst) {
-                eprintln!("[player] handle_player_window_event: CloseRequested — skip (already closing)");
+                eprintln!(
+                    "[player] handle_player_window_event: CloseRequested — skip (already closing)"
+                );
                 return;
             }
             eprintln!("[player] handle_player_window_event: CloseRequested → request_close_player");
@@ -396,14 +415,14 @@ pub async fn request_close_player(app: tauri::AppHandle) -> Result<(), String> {
     // 2. 兜底：也停掉我们自己 MPV_SESSION 里的进程（如有）
     stop_mpv_session();
 
-    // 3. 给 Windows 窗口渲染管线异步任务收尾留缓冲
-    #[cfg(target_os = "windows")]
-    tokio::time::sleep(std::time::Duration::from_millis(30)).await;
-
-    // 4. 关闭播放器窗口
+    // 3. mpv has released the HWND, so WebView2 can now be destroyed. Use
+    // destroy rather than close: close emits CloseRequested again and races
+    // with tauri-plugin-mpv's own close hook.
     if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
-        eprintln!("[player] request_close_player: closing player window");
-        let _ = window.close();
+        eprintln!("[player] request_close_player: destroying player window");
+        window
+            .destroy()
+            .map_err(|e| format!("销毁播放器窗口失败: {e}"))?;
     }
 
     Ok(())
@@ -483,11 +502,12 @@ pub fn get_or_create_player_window(app: &AppHandle) -> Result<WebviewWindow> {
     // 禁用输入法注入：防止微信输入法等第三方 IME 的全局钩子注入到播放器窗口
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, IACE_IGNORENOCONTEXT, HIMC};
+        use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, HIMC, IACE_IGNORENOCONTEXT};
         if let Ok(handle) = window.hwnd() {
             let hwnd = windows::Win32::Foundation::HWND(handle.0);
             unsafe {
-                let _ = ImmAssociateContextEx(hwnd, HIMC(std::ptr::null_mut()), IACE_IGNORENOCONTEXT);
+                let _ =
+                    ImmAssociateContextEx(hwnd, HIMC(std::ptr::null_mut()), IACE_IGNORENOCONTEXT);
             }
         }
     }
@@ -751,7 +771,10 @@ pub fn kill_mpv() {
 pub fn stop_mpv_session() {
     if let Ok(mut session) = MPV_SESSION.lock() {
         if let Some(existing) = session.take() {
-            eprintln!("[player] stop_mpv_session: killing mpv pid={}", existing.child.id());
+            eprintln!(
+                "[player] stop_mpv_session: killing mpv pid={}",
+                existing.child.id()
+            );
             cleanup_mpv_session(existing);
         }
     }

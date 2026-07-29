@@ -76,32 +76,45 @@ struct DetectRssResult {
 #[tauri::command]
 async fn detect_rss_url(url: String) -> Result<DetectRssResult, String> {
     let url = url.trim();
-    
+
     // Mikanani: /Home/Bangumi/{id} → /RSS/Bangumi?bangumiId={id}
     // 同时获取页面标题提取季号
     if url.contains("mikanani") && url.contains("/Home/Bangumi/") {
         if let Some(id_pos) = url.rfind('/') {
             let bangumi_id = &url[id_pos + 1..];
             let bangumi_id = bangumi_id.split('?').next().unwrap_or(bangumi_id);
-            let rss_url = format!("https://mikanani.kas.pub/RSS/Bangumi?bangumiId={}", bangumi_id);
-            
+            let rss_url = format!(
+                "https://mikanani.kas.pub/RSS/Bangumi?bangumiId={}",
+                bangumi_id
+            );
+
             // 获取页面标题提取季号
             let feed_season = if let Ok(resp) = reqwest::get(url).await {
                 if let Ok(html) = resp.text().await {
                     // 从 <title> 或 <h1> 提取季号
                     extract_season_from_html(&html)
-                } else { None }
-            } else { None };
-            
-            return Ok(DetectRssResult { rss_url, feed_season });
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            return Ok(DetectRssResult {
+                rss_url,
+                feed_season,
+            });
         }
     }
-    
+
     // 已经是 RSS URL
     if url.contains("/RSS/") || url.contains("rss") {
-        return Ok(DetectRssResult { rss_url: url.to_string(), feed_season: None });
+        return Ok(DetectRssResult {
+            rss_url: url.to_string(),
+            feed_season: None,
+        });
     }
-    
+
     // 尝试从页面提取 RSS 链接
     Err("无法识别 RSS 地址，请输入番组页面 URL 或 RSS URL".to_string())
 }
@@ -133,33 +146,38 @@ async fn fetch_rss(url: String) -> Result<rss_parser::RssFeed, String> {
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
-    
+
     let response = client
         .get(&url)
         .header(reqwest::header::USER_AGENT, "ChangLi/1.0")
         .send()
         .await
         .map_err(|e| format!("请求失败: {e}"))?;
-    
-    let xml = response.text().await.map_err(|e| format!("读取响应失败: {e}"))?;
-    
+
+    let xml = response
+        .text()
+        .await
+        .map_err(|e| format!("读取响应失败: {e}"))?;
+
     rss_parser::parse_mikanani_rss(&xml).map_err(|e| format!("解析 RSS 失败: {e}"))
 }
 
 /// 从 RSS 条目标题中提取关键词
 #[tauri::command]
-async fn extract_keywords_from_rss(url: String) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+async fn extract_keywords_from_rss(
+    url: String,
+) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
     let feed = fetch_rss(url).await?;
     let titles: Vec<String> = feed.items.iter().map(|i| i.title.clone()).collect();
-    
+
     let keywords = keyword_extractor::extract_keywords(&titles);
-    
+
     // 转换为 String key
     let result: std::collections::HashMap<String, Vec<String>> = keywords
         .into_iter()
         .map(|(cat, vals)| (cat.display_name().to_string(), vals))
         .collect();
-    
+
     Ok(result)
 }
 
@@ -179,10 +197,10 @@ async fn create_subscription(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     let prefs = preferences.unwrap_or_else(|| "{}".to_string());
     let mode = download_mode.unwrap_or_else(|| "clipboard".to_string());
-    
+
     sqlx::query(
         r#"INSERT INTO bangumi_subscriptions (series_id, site_id, bangumi_url, rss_url, title, preferences, download_mode)
            VALUES (?, ?, ?, ?, ?, ?, ?)"#
@@ -197,7 +215,7 @@ async fn create_subscription(
     .execute(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     // 查询刚插入的记录
     let sub = sqlx::query_as::<_, db::BangumiSubscription>(
         "SELECT * FROM bangumi_subscriptions WHERE series_id = ? AND bangumi_url = ? ORDER BY id DESC LIMIT 1"
@@ -207,7 +225,7 @@ async fn create_subscription(
     .fetch_one(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     Ok(sub)
 }
 
@@ -221,15 +239,15 @@ async fn get_subscription_by_series(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     let sub = sqlx::query_as::<_, db::BangumiSubscription>(
-        "SELECT * FROM bangumi_subscriptions WHERE series_id = ? AND enabled = 1 LIMIT 1"
+        "SELECT * FROM bangumi_subscriptions WHERE series_id = ? AND enabled = 1 LIMIT 1",
     )
     .bind(series_id)
     .fetch_optional(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     Ok(sub)
 }
 
@@ -242,23 +260,20 @@ async fn get_all_subscriptions(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     let subs = sqlx::query_as::<_, db::BangumiSubscription>(
         "SELECT s.*, vs.title as series_title FROM bangumi_subscriptions s LEFT JOIN video_series vs ON s.series_id = vs.id ORDER BY s.created_at DESC"
     )
     .fetch_all(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     Ok(subs)
 }
 
 /// 删除订阅
 #[tauri::command]
-async fn delete_subscription(
-    state: State<'_, AppState>,
-    id: i64,
-) -> Result<(), String> {
+async fn delete_subscription(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -292,23 +307,33 @@ async fn update_subscription_cmd(
 /// 检查 selectedPrefixes 的一个 part 是否匹配标题中的对应关键词
 /// 支持简中/繁中/简繁等语言变体、画质变体、来源变体、容器变体
 fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
-    if title_lower.contains(part) { return true; }
+    if title_lower.contains(part) {
+        return true;
+    }
     // 语言变体
     if part.contains("简中") {
-        return title_lower.contains("简日内嵌") || title_lower.contains("简日内封")
-            || title_lower.contains("简体内嵌") || title_lower.contains("简体内封")
-            || title_lower.contains("简体") || title_lower.contains("chs")
+        return title_lower.contains("简日内嵌")
+            || title_lower.contains("简日内封")
+            || title_lower.contains("简体内嵌")
+            || title_lower.contains("简体内封")
+            || title_lower.contains("简体")
+            || title_lower.contains("chs")
             || title_lower.contains("[gb]");
     }
     if part.contains("繁中") {
-        return title_lower.contains("繁日内嵌") || title_lower.contains("繁日内封")
-            || title_lower.contains("繁体内嵌") || title_lower.contains("繁体内封")
-            || title_lower.contains("繁体") || title_lower.contains("cht")
+        return title_lower.contains("繁日内嵌")
+            || title_lower.contains("繁日内封")
+            || title_lower.contains("繁体内嵌")
+            || title_lower.contains("繁体内封")
+            || title_lower.contains("繁体")
+            || title_lower.contains("cht")
             || title_lower.contains("[big5]");
     }
     if part.contains("简繁") {
-        return title_lower.contains("简繁") || title_lower.contains("简／繁")
-            || title_lower.contains("简/繁") || title_lower.contains("简繁内封")
+        return title_lower.contains("简繁")
+            || title_lower.contains("简／繁")
+            || title_lower.contains("简/繁")
+            || title_lower.contains("简繁内封")
             || title_lower.contains("简繁内嵌");
     }
     // 画质变体
@@ -316,18 +341,31 @@ fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
         return title_lower.contains("1080p") || title_lower.contains("1920x1080");
     }
     if part.contains("4k") || part.contains("2160p") || part.contains("3840x2160") {
-        return title_lower.contains("4k") || title_lower.contains("2160p") || title_lower.contains("3840x2160");
+        return title_lower.contains("4k")
+            || title_lower.contains("2160p")
+            || title_lower.contains("3840x2160");
     }
     // 来源变体
     if part.contains("cr") {
-        return title_lower.contains("cr ") || title_lower.contains("[cr]")
-            || title_lower.contains("crwebrip") || title_lower.contains("cr webrip") || title_lower.contains("cr web");
+        return title_lower.contains("cr ")
+            || title_lower.contains("[cr]")
+            || title_lower.contains("crwebrip")
+            || title_lower.contains("cr webrip")
+            || title_lower.contains("cr web");
     }
-    if part.contains("abema") { return title_lower.contains("abema"); }
-    if part.contains("baha") { return title_lower.contains("baha"); }
+    if part.contains("abema") {
+        return title_lower.contains("abema");
+    }
+    if part.contains("baha") {
+        return title_lower.contains("baha");
+    }
     // 容器变体
-    if part.contains("mp4") { return title_lower.contains("[mp4]") || title_lower.contains(".mp4"); }
-    if part.contains("mkv") { return title_lower.contains("[mkv]") || title_lower.contains(".mkv"); }
+    if part.contains("mp4") {
+        return title_lower.contains("[mp4]") || title_lower.contains(".mp4");
+    }
+    if part.contains("mkv") {
+        return title_lower.contains("[mkv]") || title_lower.contains(".mkv");
+    }
     false
 }
 
@@ -344,7 +382,9 @@ fn infer_previous_seasons_episode_offset(
         let season_max = existing_season_episode
             .iter()
             .filter_map(|(s, ep)| match (s, ep) {
-                (Some(existing_season), Some(existing_episode)) if *existing_season == season => Some(*existing_episode),
+                (Some(existing_season), Some(existing_episode)) if *existing_season == season => {
+                    Some(*existing_episode)
+                }
                 _ => None,
             })
             .max();
@@ -380,7 +420,8 @@ fn subscription_item_already_exists(
 
         // 有些源用全局集数：例如已有第一季 12 集、第二季 12 集，第三季第 1 集写成 25。
         // 不固定每季 12 集，而是根据本地已有前序季的最大集数动态推断 offset。
-        if let Some(offset) = infer_previous_seasons_episode_offset(existing_season_episode, season) {
+        if let Some(offset) = infer_previous_seasons_episode_offset(existing_season_episode, season)
+        {
             if item_episode > offset {
                 let normalized_episode = item_episode - offset;
                 if existing_season_episode.contains(&(Some(season), Some(normalized_episode))) {
@@ -405,38 +446,43 @@ async fn check_subscription_updates(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     // 获取订阅信息
     let sub = sqlx::query_as::<_, db::BangumiSubscription>(
-        "SELECT * FROM bangumi_subscriptions WHERE id = ?"
+        "SELECT * FROM bangumi_subscriptions WHERE id = ?",
     )
     .bind(subscription_id)
     .fetch_one(&pool)
     .await
     .map_err(|e| format!("获取订阅失败: {e}"))?;
-    
+
     // 获取 RSS
     let feed = fetch_rss(sub.rss_url.clone()).await?;
-    
+
     // 解析用户选择的版本前缀
-    let selected_prefixes: Vec<String> = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
-        if let Some(arr) = parsed.get("selectedPrefixes").and_then(|v| v.as_array()) {
-            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+    let selected_prefixes: Vec<String> =
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&sub.preferences) {
+            if let Some(arr) = parsed.get("selectedPrefixes").and_then(|v| v.as_array()) {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-    
+        };
+
     // 查询视频集已有的最大集数；如果历史视频没有 episode_number，用视频数量兜底
     let max_episode: Option<i32> = if let Some(series_id) = sub.series_id {
-        sqlx::query_scalar::<_, Option<i32>>("SELECT MAX(episode_number) FROM videos WHERE series_id = ?")
-            .bind(series_id)
-            .fetch_one(&pool)
-            .await
-            .ok()
-            .flatten()
+        sqlx::query_scalar::<_, Option<i32>>(
+            "SELECT MAX(episode_number) FROM videos WHERE series_id = ?",
+        )
+        .bind(series_id)
+        .fetch_one(&pool)
+        .await
+        .ok()
+        .flatten()
     } else {
         None
     };
@@ -450,19 +496,23 @@ async fn check_subscription_updates(
         0
     };
     let existing_episode_progress = std::cmp::max(max_episode.unwrap_or(0), existing_video_count);
-    
+
     // 查询视频集中已有的 (season, episode_number) 组合
-    let existing_season_episode: Vec<(Option<i32>, Option<i32>)> = if let Some(series_id) = sub.series_id {
-        sqlx::query_as::<_, (Option<i32>, Option<i32>)>("SELECT season, episode_number FROM videos WHERE series_id = ?")
+    let existing_season_episode: Vec<(Option<i32>, Option<i32>)> =
+        if let Some(series_id) = sub.series_id {
+            sqlx::query_as::<_, (Option<i32>, Option<i32>)>(
+                "SELECT season, episode_number FROM videos WHERE series_id = ?",
+            )
             .bind(series_id)
             .fetch_all(&pool)
             .await
             .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
+        } else {
+            Vec::new()
+        };
     // 也保留纯集数列表用于无季号时的匹配
-    let existing_episodes: Vec<Option<i32>> = existing_season_episode.iter().map(|(_, ep)| *ep).collect();
+    let existing_episodes: Vec<Option<i32>> =
+        existing_season_episode.iter().map(|(_, ep)| *ep).collect();
 
     // 从订阅 preferences 中读取 feedSeason；旧订阅缺失时，从 RSS 源标题实时提取
     let feed_season: Option<i32> = serde_json::from_str::<serde_json::Value>(&sub.preferences)
@@ -472,7 +522,7 @@ async fn check_subscription_updates(
         .or_else(|| extract_season_number(&feed.title));
 
     let mut new_items = Vec::new();
-    
+
     for item in &feed.items {
         // 如果用户选择了版本，用 selectedPrefixes 关键词匹配
         if !selected_prefixes.is_empty() {
@@ -480,11 +530,15 @@ async fn check_subscription_updates(
             let matched = selected_prefixes.iter().any(|prefix| {
                 let prefix_lower = prefix.to_lowercase();
                 let parts: Vec<&str> = prefix_lower.split(' ').collect();
-                parts.iter().all(|part| prefix_part_matches_title(part, &title_lower))
+                parts
+                    .iter()
+                    .all(|part| prefix_part_matches_title(part, &title_lower))
             });
-            if !matched { continue; }
+            if !matched {
+                continue;
+            }
         }
-        
+
         let item_season = extract_season_number(&item.title).or(feed_season);
         let item_episode = extract_episode_number(&item.title);
         if let Some(ep) = item_episode {
@@ -498,7 +552,7 @@ async fn check_subscription_updates(
                 continue;
             }
         }
-        
+
         // 提取磁力链接
         let mut magnet = item.magnet_link.clone();
         if magnet.is_none() {
@@ -511,19 +565,19 @@ async fn check_subscription_updates(
         }
         if magnet.is_none() && !item.link.is_empty() {
             if let Ok(resp) = reqwest::get(&item.link).await {
-              if let Ok(html) = resp.text().await {
-                let lower = html.to_lowercase();
-                if let Some(start) = lower.find("magnet:?xt=") {
-                    let slice = &html[start..];
-                    if let Some(end) = slice.find('"') {
-                        let raw = &slice[..end];
-                        magnet = Some(raw.replace("&amp;", "&").to_string());
+                if let Ok(html) = resp.text().await {
+                    let lower = html.to_lowercase();
+                    if let Some(start) = lower.find("magnet:?xt=") {
+                        let slice = &html[start..];
+                        if let Some(end) = slice.find('"') {
+                            let raw = &slice[..end];
+                            magnet = Some(raw.replace("&amp;", "&").to_string());
+                        }
                     }
                 }
-              }
             }
         }
-        
+
         new_items.push(db::SubscriptionDownload {
             id: 0,
             subscription_id,
@@ -541,82 +595,95 @@ async fn check_subscription_updates(
             updated_at: String::new(),
         });
     }
-    
+
     // 更新最后检查时间
     sqlx::query("UPDATE bangumi_subscriptions SET last_check_at = datetime('now', 'localtime') WHERE id = ?")
         .bind(subscription_id)
         .execute(&pool)
         .await
         .ok();
-    
+
     Ok(new_items)
 }
 
-
 /// 从标题中提取集数
 fn extract_season_number(title: &str) -> Option<i32> {
-        use regex::Regex;
-    
-        // 中文数字映射
-        let chinese_num = |s: &str| -> Option<i32> {
-            match s {
-                "一" => Some(1), "二" | "两" => Some(2), "三" => Some(3),
-                "四" => Some(4), "五" => Some(5), "六" => Some(6),
-                "七" => Some(7), "八" => Some(8), "九" => Some(9),
-                "十" => Some(10), "十一" => Some(11), "十二" => Some(12),
-                "十三" => Some(13), "十四" => Some(14), "十五" => Some(15),
-                "十六" => Some(16), "十七" => Some(17), "十八" => Some(18),
-                "十九" => Some(19), "二十" => Some(20),
-                _ => s.parse::<i32>().ok(),
-            }
-        };
-    
-        // 1. 中文格式：第X季（支持中文数字和阿拉伯数字）
-        if let Ok(re) = Regex::new(r"第\s*([^\d\s季]{1,4})\s*季") {
-            if let Some(caps) = re.captures(title) {
-                if let Some(s) = caps.get(1) {
-                    if let Some(season) = chinese_num(s.as_str()) {
-                        if season >= 1 && season <= 99 { return Some(season); }
+    use regex::Regex;
+
+    // 中文数字映射
+    let chinese_num = |s: &str| -> Option<i32> {
+        match s {
+            "一" => Some(1),
+            "二" | "两" => Some(2),
+            "三" => Some(3),
+            "四" => Some(4),
+            "五" => Some(5),
+            "六" => Some(6),
+            "七" => Some(7),
+            "八" => Some(8),
+            "九" => Some(9),
+            "十" => Some(10),
+            "十一" => Some(11),
+            "十二" => Some(12),
+            "十三" => Some(13),
+            "十四" => Some(14),
+            "十五" => Some(15),
+            "十六" => Some(16),
+            "十七" => Some(17),
+            "十八" => Some(18),
+            "十九" => Some(19),
+            "二十" => Some(20),
+            _ => s.parse::<i32>().ok(),
+        }
+    };
+
+    // 1. 中文格式：第X季（支持中文数字和阿拉伯数字）
+    if let Ok(re) = Regex::new(r"第\s*([^\d\s季]{1,4})\s*季") {
+        if let Some(caps) = re.captures(title) {
+            if let Some(s) = caps.get(1) {
+                if let Some(season) = chinese_num(s.as_str()) {
+                    if season >= 1 && season <= 99 {
+                        return Some(season);
                     }
                 }
             }
         }
-    
-        // 2. 英文格式：3rd Season、Season 1
-        let patterns = [
-            r"(?i)(\d+)(?:st|nd|rd|th)\s+Season",
-            r"(?i)Season\s*(\d+)",
-        ];
-        for pattern in &patterns {
-            if let Ok(re) = Regex::new(pattern) {
-                if let Some(caps) = re.captures(title) {
-                    if let Some(s) = caps.get(1) {
-                        if let Ok(season) = s.as_str().parse::<i32>() {
-                            if season >= 1 && season <= 99 { return Some(season); }
+    }
+
+    // 2. 英文格式：3rd Season、Season 1
+    let patterns = [r"(?i)(\d+)(?:st|nd|rd|th)\s+Season", r"(?i)Season\s*(\d+)"];
+    for pattern in &patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            if let Some(caps) = re.captures(title) {
+                if let Some(s) = caps.get(1) {
+                    if let Ok(season) = s.as_str().parse::<i32>() {
+                        if season >= 1 && season <= 99 {
+                            return Some(season);
                         }
                     }
                 }
             }
         }
-        None
     }
+    None
+}
 
 fn extract_episode_number(title: &str) -> Option<i32> {
     use regex::Regex;
-    
+
     // 按优先级尝试多种集数格式
     let patterns = [
-        (r"EP\.?\s*(\d+)", true),                    // "EP02", "EP.02" (高优先)
-        (r"(?:-|–|—)\s*(\d+)\s*(?:\[|$)", true),   // "- 02 [" 或 "- 02" 在末尾
+        (r"EP\.?\s*(\d+)", true),                     // "EP02", "EP.02" (高优先)
+        (r"(?:-|–|—)\s*(\d+)\s*(?:\[|$)", true),      // "- 02 [" 或 "- 02" 在末尾
         (r"\[(\d{1,3})(?:v\d+)?\]\s*(?:\[|$)", true), // "[01][1080P]"、"[01v2][1080P]"
-        (r"#(\d+)", true),                              // "#02"
+        (r"#(\d+)", true),                            // "#02"
         (r"第\s*(\d+)\s*集", true),                   // "第02集"
-        (r"(\d+)\s*话", true),                         // "02话"
-        (r"(\d+)\s*話", true),                         // "02話"
-        (r"S\d+E(\d+)", true),                         // "S01E02"
+        (r"(\d+)\s*话", true),                        // "02话"
+        (r"(\d+)\s*話", true),                        // "02話"
+        (r"S\d+E(\d+)", true),                        // "S01E02"
         (r"(?:-|–|—)\s*(\d+)", false),                // "- 02" (低优先，可能误匹配)
     ];
-    
+
     for (pattern, _) in &patterns {
         if let Ok(re) = Regex::new(pattern) {
             if let Some(caps) = re.captures(title) {
@@ -662,14 +729,14 @@ async fn update_subscription_keywords(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     // 清除旧关键词
     sqlx::query("DELETE FROM subscription_keywords WHERE subscription_id = ?")
         .bind(subscription_id)
         .execute(&pool)
         .await
         .ok();
-    
+
     // 插入新关键词
     for (category, value, is_selected) in keywords {
         sqlx::query(
@@ -683,7 +750,7 @@ async fn update_subscription_keywords(
         .await
         .ok();
     }
-    
+
     Ok(())
 }
 
@@ -697,7 +764,7 @@ async fn get_subscription_keywords(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    
+
     let keywords = sqlx::query_as::<_, db::SubscriptionKeyword>(
         "SELECT * FROM subscription_keywords WHERE subscription_id = ? ORDER BY keyword_category, keyword_value"
     )
@@ -705,7 +772,7 @@ async fn get_subscription_keywords(
     .fetch_all(&pool)
     .await
     .map_err(|e| e.to_string())?;
-    
+
     Ok(keywords)
 }
 
@@ -1104,7 +1171,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         sub_poster_base64.as_deref(),
-                                None,
+                        None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -1156,7 +1223,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         thumb.as_deref(),
-                                None,
+                        None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -1227,7 +1294,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         sub_poster_base64.as_deref(),
-                                None,
+                        None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -1295,7 +1362,7 @@ async fn scan_videos(state: State<'_, AppState>, path: String) -> Result<ScanRes
                         Some("landscape"),
                         Some("ongoing"),
                         thumb.as_deref(),
-                                None,
+                        None,
                     )
                     .await
                     .map_err(|e| e.to_string())?;
@@ -1486,13 +1553,10 @@ async fn scan_videos_for_actor(
     };
 
     // 如果名称不匹配，检查是否是番号格式的文件夹
-    let is_video_folder = !name_matches
-        && scanner::parse_adult_filename(folder_trimmed).is_some();
+    let is_video_folder = !name_matches && scanner::parse_adult_filename(folder_trimmed).is_some();
 
     if !name_matches && !is_video_folder {
-        let expected = period_name
-            .as_deref()
-            .unwrap_or(&actor.name);
+        let expected = period_name.as_deref().unwrap_or(&actor.name);
         return Err(format!(
             "文件夹名 '{}' 不匹配 '{}' 或番号格式",
             folder_name, expected
@@ -1797,10 +1861,7 @@ async fn delete_video_series_batch(
 }
 
 #[tauri::command]
-async fn delete_videos_batch(
-    state: State<'_, AppState>,
-    ids: Vec<i64>,
-) -> Result<(), String> {
+async fn delete_videos_batch(state: State<'_, AppState>, ids: Vec<i64>) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -1827,7 +1888,11 @@ async fn switch_series_type(state: State<'_, AppState>, series_id: i64) -> Resul
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
-async fn switch_series_type_to(state: State<'_, AppState>, series_id: i64, category_key: String) -> Result<(), String> {
+async fn switch_series_type_to(
+    state: State<'_, AppState>,
+    series_id: i64,
+    category_key: String,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -1837,19 +1902,26 @@ async fn switch_series_type_to(state: State<'_, AppState>, series_id: i64, categ
         .map_err(|e| e.to_string())
 }
 
-
-
 fn find_season_folder_poster_for_video(video_path: &Path) -> Option<String> {
     let parent = video_path.parent()?;
     if let Some(parent_name) = parent.file_name().map(|n| n.to_string_lossy().to_string()) {
-        if matches!(scanner::classify_series_subfolder(&parent_name), scanner::SeriesSubfolderKind::Season(_)) {
+        if matches!(
+            scanner::classify_series_subfolder(&parent_name),
+            scanner::SeriesSubfolderKind::Season(_)
+        ) {
             return scanner::find_folder_poster(parent);
         }
     }
 
     let grandparent = parent.parent()?;
-    if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
-        if matches!(scanner::classify_series_subfolder(&gp_name), scanner::SeriesSubfolderKind::Season(_)) {
+    if let Some(gp_name) = grandparent
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    {
+        if matches!(
+            scanner::classify_series_subfolder(&gp_name),
+            scanner::SeriesSubfolderKind::Season(_)
+        ) {
             return scanner::find_folder_poster(grandparent);
         }
     }
@@ -1887,8 +1959,13 @@ async fn add_video_to_series(
                 _ => {
                     // 父目录不是季节文件夹，尝试祖父目录（视频在子子文件夹中）
                     if let Some(grandparent) = parent.parent() {
-                        if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
-                            if let scanner::SeriesSubfolderKind::Season(season) = scanner::classify_series_subfolder(&gp_name) {
+                        if let Some(gp_name) = grandparent
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                        {
+                            if let scanner::SeriesSubfolderKind::Season(season) =
+                                scanner::classify_series_subfolder(&gp_name)
+                            {
                                 video.season = Some(season);
                             }
                         }
@@ -1947,11 +2024,18 @@ async fn add_videos_to_series(
         if let Some(parent) = video_path.parent() {
             if let Some(parent_name) = parent.file_name().map(|n| n.to_string_lossy().to_string()) {
                 match scanner::classify_series_subfolder(&parent_name) {
-                    scanner::SeriesSubfolderKind::Season(season) => { video.season = Some(season); }
+                    scanner::SeriesSubfolderKind::Season(season) => {
+                        video.season = Some(season);
+                    }
                     _ => {
                         if let Some(grandparent) = parent.parent() {
-                            if let Some(gp_name) = grandparent.file_name().map(|n| n.to_string_lossy().to_string()) {
-                                if let scanner::SeriesSubfolderKind::Season(season) = scanner::classify_series_subfolder(&gp_name) {
+                            if let Some(gp_name) = grandparent
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                            {
+                                if let scanner::SeriesSubfolderKind::Season(season) =
+                                    scanner::classify_series_subfolder(&gp_name)
+                                {
                                     video.season = Some(season);
                                 }
                             }
@@ -2066,12 +2150,14 @@ async fn add_category_series_by_paths(
             .await
             .map_err(|e| e.to_string())?;
             if let Some(c) = code {
-                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                    .bind(&c)
-                    .bind(has_chinese_sub)
-                    .bind(series.id)
-                    .execute(&pool)
-                    .await;
+                let _ = sqlx::query(
+                    "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?",
+                )
+                .bind(&c)
+                .bind(has_chinese_sub)
+                .bind(series.id)
+                .execute(&pool)
+                .await;
             }
             series
         };
@@ -2086,14 +2172,27 @@ async fn add_category_series_by_paths(
                 if let Ok(Some(tag)) = db::get_tag_by_name(&pool, parent_name.trim()).await {
                     let _ = db::add_series_tag(&pool, series.id, tag.id).await;
                 }
-                if let Ok(Some(actor)) = db::get_actor_by_name_or_jp(&pool, parent_name.trim()).await {
+                if let Ok(Some(actor)) =
+                    db::get_actor_by_name_or_jp(&pool, parent_name.trim()).await
+                {
                     let _ = db::add_series_actor(&pool, series.id, actor.id, None, None).await;
                 } else if let Some(grand) = parent.parent() {
-                    if let Some(actor_name) = grand.file_name().map(|s| s.to_string_lossy().to_string()) {
-                        if let Ok(Some(actor)) = db::get_actor_by_name_or_jp(&pool, actor_name.trim()).await {
-                            let periods = db::get_actor_periods(&pool, actor.id).await.unwrap_or_default();
-                            let period_id = periods.into_iter().find(|p| p.name == parent_name).map(|p| p.id);
-                            let _ = db::add_series_actor(&pool, series.id, actor.id, None, period_id).await;
+                    if let Some(actor_name) =
+                        grand.file_name().map(|s| s.to_string_lossy().to_string())
+                    {
+                        if let Ok(Some(actor)) =
+                            db::get_actor_by_name_or_jp(&pool, actor_name.trim()).await
+                        {
+                            let periods = db::get_actor_periods(&pool, actor.id)
+                                .await
+                                .unwrap_or_default();
+                            let period_id = periods
+                                .into_iter()
+                                .find(|p| p.name == parent_name)
+                                .map(|p| p.id);
+                            let _ =
+                                db::add_series_actor(&pool, series.id, actor.id, None, period_id)
+                                    .await;
                         }
                     }
                 }
@@ -2128,12 +2227,17 @@ async fn get_actors(state: State<'_, AppState>) -> Result<Vec<db::Actor>, String
 }
 
 #[tauri::command]
-async fn get_actors_by_category(state: State<'_, AppState>, category_key: String) -> Result<Vec<db::Actor>, String> {
+async fn get_actors_by_category(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<Vec<db::Actor>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_actors_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
+    db::get_actors_by_category(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2142,7 +2246,9 @@ async fn increment_actor_view(state: State<'_, AppState>, actor_id: i64) -> Resu
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::increment_actor_view_count(&pool, actor_id).await.map_err(|e| e.to_string())
+    db::increment_actor_view_count(&pool, actor_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2364,7 +2470,11 @@ fn discover_installed_players() -> Vec<InstalledPlayer> {
             if !path.exists() {
                 continue;
             }
-            for entry in walkdir::WalkDir::new(path).max_depth(2).into_iter().filter_map(Result::ok) {
+            for entry in walkdir::WalkDir::new(path)
+                .max_depth(2)
+                .into_iter()
+                .filter_map(Result::ok)
+            {
                 let app_path = entry.path();
                 if app_path.extension().and_then(|ext| ext.to_str()) == Some("app") {
                     push_player_candidate(app_path, &mut players, &mut seen);
@@ -2517,7 +2627,19 @@ fn discover_windows_players(
         push_windows_player_path(Path::new(&path), players, seen);
     }
 
-    for exe in ["vlc.exe", "mpv.exe", "mpvnet.exe", "PotPlayerMini64.exe", "PotPlayerMini.exe", "mpc-hc64.exe", "mpc-hc.exe", "mpc-be64.exe", "mpc-be.exe", "KMPlayer.exe", "wmplayer.exe"] {
+    for exe in [
+        "vlc.exe",
+        "mpv.exe",
+        "mpvnet.exe",
+        "PotPlayerMini64.exe",
+        "PotPlayerMini.exe",
+        "mpc-hc64.exe",
+        "mpc-hc.exe",
+        "mpc-be64.exe",
+        "mpc-be.exe",
+        "KMPlayer.exe",
+        "wmplayer.exe",
+    ] {
         if let Ok(output) = std::process::Command::new("where").arg(exe).output() {
             if output.status.success() {
                 let text = String::from_utf8_lossy(&output.stdout);
@@ -2542,11 +2664,23 @@ fn discover_windows_players(
         if !root.exists() {
             continue;
         }
-        for entry in walkdir::WalkDir::new(root).max_depth(4).into_iter().filter_map(Result::ok) {
+        for entry in walkdir::WalkDir::new(root)
+            .max_depth(4)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
             let path = entry.path();
             if path.is_file()
-                && path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.eq_ignore_ascii_case("exe")).unwrap_or(false)
-                && path.file_name().and_then(|name| name.to_str()).map(looks_like_video_player).unwrap_or(false)
+                && path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("exe"))
+                    .unwrap_or(false)
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(looks_like_video_player)
+                    .unwrap_or(false)
             {
                 push_windows_player_path(path, players, seen);
             }
@@ -2575,21 +2709,25 @@ fn push_windows_player_path(
     players.push(InstalledPlayer { name, path });
 }
 
-
 #[tauri::command]
-async fn open_series_in_file_manager(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
+async fn open_series_in_file_manager(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
 
-    let folder_path = sqlx::query_scalar::<_, Option<String>>("SELECT folder_path FROM video_series WHERE id = ?")
-        .bind(series_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| e.to_string())?
-        .flatten()
-        .ok_or_else(|| "该视频集没有源文件路径".to_string())?;
+    let folder_path = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT folder_path FROM video_series WHERE id = ?",
+    )
+    .bind(series_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .flatten()
+    .ok_or_else(|| "该视频集没有源文件路径".to_string())?;
 
     let source = std::path::PathBuf::from(&folder_path);
     let target = if source.is_file() {
@@ -2642,7 +2780,9 @@ async fn repair_missing_posters_silent(state: State<'_, AppState>) -> Result<(),
                     current.skipped = result.skipped;
                 }
             });
-        }).await {
+        })
+        .await
+        {
             Ok(result) => {
                 eprintln!(
                     "[ChangLi] 批量修复海报完成: scanned_series={}, updated_series={}, scanned_videos={}, updated_videos={}, skipped={}",
@@ -2712,7 +2852,8 @@ async fn start_poster_update_silent(state: State<'_, AppState>) -> Result<(), St
                     current.skipped = result.skipped;
                 }
             });
-        }).await;
+        })
+        .await;
 
         let repair_result = match repair_result {
             Ok(result) => result,
@@ -2763,7 +2904,9 @@ async fn start_poster_update_silent(state: State<'_, AppState>) -> Result<(), St
 }
 
 #[tauri::command]
-async fn get_poster_repair_status(state: State<'_, AppState>) -> Result<PosterRepairStatus, String> {
+async fn get_poster_repair_status(
+    state: State<'_, AppState>,
+) -> Result<PosterRepairStatus, String> {
     Ok(state.poster_repair_status.lock().await.clone())
 }
 
@@ -2913,22 +3056,33 @@ async fn get_tags(state: State<'_, AppState>) -> Result<Vec<db::Tag>, String> {
 }
 
 #[tauri::command]
-async fn get_tags_by_category(state: State<'_, AppState>, category_key: String) -> Result<Vec<db::Tag>, String> {
+async fn get_tags_by_category(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<Vec<db::Tag>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_tags_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
+    db::get_tags_by_category(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn add_tag(state: State<'_, AppState>, name: String, scope: Option<String>) -> Result<db::Tag, String> {
+async fn add_tag(
+    state: State<'_, AppState>,
+    name: String,
+    scope: Option<String>,
+) -> Result<db::Tag, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let scope_str = scope.as_deref().unwrap_or("global");
-    db::add_tag(&pool, &name, scope_str).await.map_err(|e| e.to_string())
+    db::add_tag(&pool, &name, scope_str)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2941,13 +3095,20 @@ async fn delete_tag(state: State<'_, AppState>, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn update_tag(state: State<'_, AppState>, id: i64, name: String, scope: Option<String>) -> Result<(), String> {
+async fn update_tag(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+    scope: Option<String>,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let scope_str = scope.as_deref().unwrap_or("global");
-    db::update_tag(&pool, id, &name, scope_str).await.map_err(|e| e.to_string())
+    db::update_tag(&pool, id, &name, scope_str)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -2958,7 +3119,9 @@ struct TagWithCategories {
 }
 
 #[tauri::command]
-async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<TagWithCategories>, String> {
+async fn get_tags_with_categories(
+    state: State<'_, AppState>,
+) -> Result<Vec<TagWithCategories>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -2966,19 +3129,30 @@ async fn get_tags_with_categories(state: State<'_, AppState>) -> Result<Vec<TagW
     let tags = db::get_tags(&pool).await.map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     for tag in tags {
-        let categories = db::get_tag_categories(&pool, tag.id).await.map_err(|e| e.to_string())?;
-        result.push(TagWithCategories { tag, category_keys: categories });
+        let categories = db::get_tag_categories(&pool, tag.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        result.push(TagWithCategories {
+            tag,
+            category_keys: categories,
+        });
     }
     Ok(result)
 }
 
 #[tauri::command]
-async fn update_tag_categories(state: State<'_, AppState>, tag_id: i64, category_keys: Vec<String>) -> Result<(), String> {
+async fn update_tag_categories(
+    state: State<'_, AppState>,
+    tag_id: i64,
+    category_keys: Vec<String>,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_tag_categories(&pool, tag_id, &category_keys).await.map_err(|e| e.to_string())
+    db::update_tag_categories(&pool, tag_id, &category_keys)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3202,7 +3376,6 @@ async fn play_video(
     Ok(())
 }
 
-
 #[tauri::command]
 async fn open_player_window(
     app: tauri::AppHandle,
@@ -3269,15 +3442,21 @@ async fn open_player_window(
 
     // Use the same window creation path as player.rs to ensure consistent
     // window properties (transparent, decorations, skip_taskbar, etc.).
-    let window = player::get_or_create_player_window(&app)
-        .map_err(|e| e.to_string())?;
+    let window = player::get_or_create_player_window(&app).map_err(|e| e.to_string())?;
 
-    window.set_title(&format!("ChangLi Player - {}", video.file_name)).map_err(|e| e.to_string())?;
-    window.set_size(tauri::LogicalSize::new(player_w, player_h)).map_err(|e| e.to_string())?;
+    window
+        .set_title(&format!("ChangLi Player - {}", video.file_name))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(tauri::LogicalSize::new(player_w, player_h))
+        .map_err(|e| e.to_string())?;
 
     // Navigate to the video — if the window already existed, replace the URL;
     // if newly created, the URL was set to a default by get_or_create_player_window.
-    let js = format!("window.location.replace('index.html?window=player&videoId={}');", video.id);
+    let js = format!(
+        "window.location.replace('index.html?window=player&videoId={}');",
+        video.id
+    );
     window.eval(&js).map_err(|e| e.to_string())?;
 
     if let Some(main) = app.get_webview_window("main") {
@@ -3409,7 +3588,9 @@ async fn get_video_series_map(state: State<'_, AppState>) -> Result<Vec<(i64, i6
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::get_video_series_map(&pool).await.map_err(|e| e.to_string())
+    db::get_video_series_map(&pool)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3519,7 +3700,6 @@ async fn create_season(
         .map_err(|e| e.to_string())
 }
 
-
 #[tauri::command]
 async fn update_season_group(
     state: State<'_, AppState>,
@@ -3533,9 +3713,16 @@ async fn update_season_group(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_season_group(&pool, series_id, from_season, from_subtitle, to_season, to_subtitle)
-        .await
-        .map_err(|e| e.to_string())
+    db::update_season_group(
+        &pool,
+        series_id,
+        from_season,
+        from_subtitle,
+        to_season,
+        to_subtitle,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3733,7 +3920,6 @@ async fn reorder_actor_photos_cmd(
         .map_err(|e| e.to_string())
 }
 
-
 #[derive(serde::Serialize)]
 struct ReleaseAssetInfo {
     name: String,
@@ -3786,7 +3972,7 @@ async fn download_update(
         .parent()
         .ok_or("获取应用目录失败")?
         .join("updates");
-    
+
     // 清理旧的下载文件
     if update_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&update_dir) {
@@ -3800,7 +3986,7 @@ async fn download_update(
             }
         }
     }
-    
+
     std::fs::create_dir_all(&update_dir).map_err(|e| format!("创建更新目录失败: {e}"))?;
     let file_path = update_dir.join(&file_name);
 
@@ -3848,7 +4034,8 @@ async fn download_update(
         downloaded += chunk.len() as u64;
 
         // 每 200ms 发送一次进度事件，避免过多事件
-        if last_emit.elapsed() >= std::time::Duration::from_millis(200) || downloaded >= total_size {
+        if last_emit.elapsed() >= std::time::Duration::from_millis(200) || downloaded >= total_size
+        {
             let percentage = if total_size > 0 {
                 (downloaded as f64 / total_size as f64) * 100.0
             } else {
@@ -3894,7 +4081,9 @@ async fn install_update(app: tauri::AppHandle, file_path: String) -> Result<(), 
 #[cfg(target_os = "windows")]
 fn install_webview2_silent(app: &tauri::AppHandle) {
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let installer = resource_dir.join("webview2").join("MicrosoftEdgeWebview2Setup.exe");
+        let installer = resource_dir
+            .join("webview2")
+            .join("MicrosoftEdgeWebview2Setup.exe");
         if installer.exists() {
             eprintln!("[webview2] 执行静默安装: {}", installer.display());
             let _ = std::process::Command::new(&installer)
@@ -3906,12 +4095,9 @@ fn install_webview2_silent(app: &tauri::AppHandle) {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-fn install_webview2_silent(_app: &tauri::AppHandle) {}
-
 /// 获取更新缓存目录路径
 #[tauri::command]
-async fn get_updates_dir(app: tauri::AppHandle) -> Result<String, String> {
+async fn get_updates_dir(_app: tauri::AppHandle) -> Result<String, String> {
     let update_dir = std::env::current_exe()
         .map_err(|e| format!("获取应用路径失败: {e}"))?
         .parent()
@@ -3922,7 +4108,9 @@ async fn get_updates_dir(app: tauri::AppHandle) -> Result<String, String> {
 
 /// 获取已下载的更新文件信息
 #[tauri::command]
-async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, String, u64)>, String> {
+async fn get_downloaded_update(
+    _app: tauri::AppHandle,
+) -> Result<Option<(String, String, u64)>, String> {
     let update_dir = std::env::current_exe()
         .map_err(|e| format!("获取应用路径失败: {e}"))?
         .parent()
@@ -3931,7 +4119,7 @@ async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, 
     if !update_dir.exists() {
         return Ok(None);
     }
-    
+
     // 找最新的安装包
     let mut candidates: Vec<(std::time::SystemTime, std::path::PathBuf)> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&update_dir) {
@@ -3948,9 +4136,9 @@ async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, 
             }
         }
     }
-    
+
     candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    
+
     if let Some((_, path)) = candidates.first() {
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
@@ -3961,22 +4149,34 @@ async fn get_downloaded_update(app: tauri::AppHandle) -> Result<Option<(String, 
 }
 
 #[tauri::command]
-async fn check_env_dependencies(app: tauri::AppHandle) -> Result<Vec<(String, bool, String)>, String> {
+async fn check_env_dependencies(
+    app: tauri::AppHandle,
+) -> Result<Vec<(String, bool, String)>, String> {
+    #[cfg(not(target_os = "windows"))]
+    let _ = &app;
     let mut results = Vec::new();
 
     // 检查 WebView2 (Windows)
     #[cfg(target_os = "windows")]
     {
         let webview2_installed = {
-            let path1 = std::path::PathBuf::from(r"C:\Program Files (x86)\Microsoft\EdgeWebView\Application");
-            let path2 = std::path::PathBuf::from(r"C:\Program Files\Microsoft\EdgeWebView\Application");
-            let path3 = std::path::PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application");
+            let path1 = std::path::PathBuf::from(
+                r"C:\Program Files (x86)\Microsoft\EdgeWebView\Application",
+            );
+            let path2 =
+                std::path::PathBuf::from(r"C:\Program Files\Microsoft\EdgeWebView\Application");
+            let path3 =
+                std::path::PathBuf::from(r"C:\Program Files (x86)\Microsoft\Edge\Application");
             path1.exists() || path2.exists() || path3.exists()
         };
         results.push((
             "WebView2 运行时".to_string(),
             webview2_installed,
-            if webview2_installed { "已安装".to_string() } else { "未安装，播放器和界面依赖此组件".to_string() },
+            if webview2_installed {
+                "已安装".to_string()
+            } else {
+                "未安装，播放器和界面依赖此组件".to_string()
+            },
         ));
     }
 
@@ -3987,30 +4187,46 @@ async fn check_env_dependencies(app: tauri::AppHandle) -> Result<Vec<(String, bo
             {
                 std::path::Path::new("/opt/homebrew/bin/mpv").exists()
                     || std::path::Path::new("/usr/local/bin/mpv").exists()
-                    || std::process::Command::new("which").arg("mpv").output().map(|o| o.status.success()).unwrap_or(false)
+                    || std::process::Command::new("which")
+                        .arg("mpv")
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false)
             }
             #[cfg(target_os = "windows")]
             {
                 // 检查 PATH
-                let in_path = std::process::Command::new("where").arg("mpv.exe").output().map(|o| o.status.success()).unwrap_or(false);
+                let in_path = std::process::Command::new("where")
+                    .arg("mpv.exe")
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
                 // 检查应用内置
-                let bundled = app.path().resource_dir()
+                let bundled = app
+                    .path()
+                    .resource_dir()
                     .map(|rd| {
                         rd.join("mpv").join("mpv.exe").exists()
-                        || rd.join("mpv.exe").exists()
-                        || rd.join("resources").join("mpv").join("mpv.exe").exists()
-                        || rd.join("resources").join("mpv.exe").exists()
+                            || rd.join("mpv.exe").exists()
+                            || rd.join("resources").join("mpv").join("mpv.exe").exists()
+                            || rd.join("resources").join("mpv.exe").exists()
                     })
                     .unwrap_or(false);
                 in_path || bundled
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            { false }
+            {
+                false
+            }
         };
         results.push((
             "mpv 播放器".to_string(),
             mpv_found,
-            if mpv_found { "已安装".to_string() } else { "未安装，视频播放依赖此组件".to_string() },
+            if mpv_found {
+                "已安装".to_string()
+            } else {
+                "未安装，视频播放依赖此组件".to_string()
+            },
         ));
     }
 
@@ -4021,28 +4237,48 @@ async fn check_env_dependencies(app: tauri::AppHandle) -> Result<Vec<(String, bo
             {
                 std::path::Path::new("/opt/homebrew/bin/ffmpeg").exists()
                     || std::path::Path::new("/usr/local/bin/ffmpeg").exists()
-                    || std::process::Command::new("which").arg("ffmpeg").output().map(|o| o.status.success()).unwrap_or(false)
+                    || std::process::Command::new("which")
+                        .arg("ffmpeg")
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false)
             }
             #[cfg(target_os = "windows")]
             {
-                let in_path = std::process::Command::new("where").arg("ffmpeg.exe").output().map(|o| o.status.success()).unwrap_or(false);
-                let bundled = app.path().resource_dir()
+                let in_path = std::process::Command::new("where")
+                    .arg("ffmpeg.exe")
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
+                let bundled = app
+                    .path()
+                    .resource_dir()
                     .map(|rd| {
                         rd.join("ffmpeg").join("ffmpeg.exe").exists()
-                        || rd.join("ffmpeg.exe").exists()
-                        || rd.join("resources").join("ffmpeg").join("ffmpeg.exe").exists()
-                        || rd.join("resources").join("ffmpeg.exe").exists()
+                            || rd.join("ffmpeg.exe").exists()
+                            || rd
+                                .join("resources")
+                                .join("ffmpeg")
+                                .join("ffmpeg.exe")
+                                .exists()
+                            || rd.join("resources").join("ffmpeg.exe").exists()
                     })
                     .unwrap_or(false);
                 in_path || bundled
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            { false }
+            {
+                false
+            }
         };
         results.push((
             "ffmpeg".to_string(),
             ffmpeg_found,
-            if ffmpeg_found { "已安装".to_string() } else { "未安装，缩略图生成依赖此组件".to_string() },
+            if ffmpeg_found {
+                "已安装".to_string()
+            } else {
+                "未安装，缩略图生成依赖此组件".to_string()
+            },
         ));
     }
 
@@ -4055,7 +4291,9 @@ async fn install_dependency(name: String) -> Result<String, String> {
         "WebView2 运行时" => {
             // 下载 WebView2 bootstrapper 并静默安装
             let url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
-            let resp = reqwest::get(url).await.map_err(|e| format!("下载失败: {e}"))?;
+            let resp = reqwest::get(url)
+                .await
+                .map_err(|e| format!("下载失败: {e}"))?;
             let bytes = resp.bytes().await.map_err(|e| format!("读取失败: {e}"))?;
             let installer_path = std::env::temp_dir().join("MicrosoftEdgeWebview2Setup.exe");
             std::fs::write(&installer_path, &bytes).map_err(|e| format!("写入失败: {e}"))?;
@@ -4082,18 +4320,27 @@ async fn install_dependency(name: String) -> Result<String, String> {
             {
                 // 尝试 winget 安装
                 let status = std::process::Command::new("winget")
-                    .args(["install", "--id", "sharkdp.mpv", "--accept-package-agreements", "--accept-source-agreements"])
+                    .args([
+                        "install",
+                        "--id",
+                        "sharkdp.mpv",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ])
                     .status();
                 if status.map(|s| s.success()).unwrap_or(false) {
                     Ok("mpv 安装完成".to_string())
                 } else {
                     // 打开浏览器下载
-                    let _ = open::that("https://sourceforge.net/projects/mpv-player-windows/files/");
+                    let _ =
+                        open::that("https://sourceforge.net/projects/mpv-player-windows/files/");
                     Ok("winget 不可用，已在浏览器中打开 mpv 下载页面，请手动安装".to_string())
                 }
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            { Err("不支持自动安装".to_string()) }
+            {
+                Err("不支持自动安装".to_string())
+            }
         }
         "ffmpeg" => {
             #[cfg(target_os = "macos")]
@@ -4112,7 +4359,13 @@ async fn install_dependency(name: String) -> Result<String, String> {
             {
                 // 尝试 winget 安装
                 let status = std::process::Command::new("winget")
-                    .args(["install", "--id", "Gyan.FFmpeg", "--accept-package-agreements", "--accept-source-agreements"])
+                    .args([
+                        "install",
+                        "--id",
+                        "Gyan.FFmpeg",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ])
                     .status();
                 if status.map(|s| s.success()).unwrap_or(false) {
                     Ok("ffmpeg 安装完成".to_string())
@@ -4122,7 +4375,9 @@ async fn install_dependency(name: String) -> Result<String, String> {
                 }
             }
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            { Err("不支持自动安装".to_string()) }
+            {
+                Err("不支持自动安装".to_string())
+            }
         }
         _ => Err(format!("未知依赖: {}", name)),
     }
@@ -4137,7 +4392,10 @@ async fn cleanup_old_installers() -> Result<u32, String> {
                 for entry in entries.filter_map(|e| e.ok()) {
                     let path = entry.path();
                     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        if name.ends_with(".dmg") || name.ends_with(".exe") || name.ends_with(".msi") {
+                        if name.ends_with(".dmg")
+                            || name.ends_with(".exe")
+                            || name.ends_with(".msi")
+                        {
                             if std::fs::remove_file(&path).is_ok() {
                                 count += 1;
                             }
@@ -4192,10 +4450,15 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
             });
         }
         Ok(response) => {
-            eprintln!("[ChangLi] GitHub Release API 返回 {}，尝试 releases/latest fallback", response.status());
+            eprintln!(
+                "[ChangLi] GitHub Release API 返回 {}，尝试 releases/latest fallback",
+                response.status()
+            );
         }
         Err(error) => {
-            eprintln!("[ChangLi] GitHub Release API 请求失败: {error}，尝试 releases/latest fallback");
+            eprintln!(
+                "[ChangLi] GitHub Release API 请求失败: {error}，尝试 releases/latest fallback"
+            );
         }
     }
 
@@ -4242,17 +4505,19 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
 
     let body = {
         let release_api = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
-        match client.get(&release_api)
+        match client
+            .get(&release_api)
             .header(reqwest::header::ACCEPT, "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
-            .send().await
+            .send()
+            .await
         {
-            Ok(resp) if resp.status().is_success() => {
-                resp.json::<serde_json::Value>().await
-                    .ok()
-                    .and_then(|v| v["body"].as_str().map(|s| s.to_string()))
-            }
-            _ => None
+            Ok(resp) if resp.status().is_success() => resp
+                .json::<serde_json::Value>()
+                .await
+                .ok()
+                .and_then(|v| v["body"].as_str().map(|s| s.to_string())),
+            _ => None,
         }
     };
 
@@ -4262,7 +4527,11 @@ async fn check_latest_release() -> Result<LatestReleaseInfo, String> {
         body,
         assets: vec![
             ReleaseAssetInfo {
-                name: exe_url.split('/').last().unwrap_or(&"ChangLi.exe").to_string(),
+                name: exe_url
+                    .split('/')
+                    .last()
+                    .unwrap_or(&"ChangLi.exe")
+                    .to_string(),
                 browser_download_url: exe_url,
             },
             ReleaseAssetInfo {
@@ -4280,8 +4549,13 @@ fn main() {
         .join("ChangLi");
     let _ = std::fs::create_dir_all(&log_path);
     let log_file = log_path.join("changli.log");
-    let log_target = Box::new(std::fs::OpenOptions::new()
-        .create(true).append(true).open(&log_file).unwrap());
+    let log_target = Box::new(
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)
+            .unwrap(),
+    );
     env_logger::Builder::new()
         .target(env_logger::Target::Pipe(log_target))
         .filter_level(log::LevelFilter::Info)
@@ -4323,36 +4597,38 @@ fn main() {
             {
                 use tauri::WebviewUrl;
                 use tauri::WebviewWindowBuilder;
-                let _window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                    .title("长离")
-                    .inner_size(1280.0, 800.0)
-                    .min_inner_size(800.0, 600.0)
-                    .resizable(true)
-                    .fullscreen(false)
-                    .decorations(true)
-                    .transparent(true)
-                    .hidden_title(true)
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .traffic_light_position(tauri::LogicalPosition::new(14, 32))
-                    .center()
-                    .build()
-                    .expect("failed to create main window");
+                let _window =
+                    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                        .title("长离")
+                        .inner_size(1280.0, 800.0)
+                        .min_inner_size(800.0, 600.0)
+                        .resizable(true)
+                        .fullscreen(false)
+                        .decorations(true)
+                        .transparent(true)
+                        .hidden_title(true)
+                        .title_bar_style(tauri::TitleBarStyle::Overlay)
+                        .traffic_light_position(tauri::LogicalPosition::new(14, 32))
+                        .center()
+                        .build()
+                        .expect("failed to create main window");
             }
             #[cfg(not(target_os = "macos"))]
             {
                 use tauri::WebviewUrl;
                 use tauri::WebviewWindowBuilder;
-                let _window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                    .title("长离")
-                    .inner_size(1280.0, 800.0)
-                    .min_inner_size(800.0, 600.0)
-                    .resizable(true)
-                    .fullscreen(false)
-                    .transparent(true)
-                    .decorations(false)
-                    .center()
-                    .build()
-                    .expect("failed to create main window");
+                let _window =
+                    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                        .title("长离")
+                        .inner_size(1280.0, 800.0)
+                        .min_inner_size(800.0, 600.0)
+                        .resizable(true)
+                        .fullscreen(false)
+                        .transparent(true)
+                        .decorations(false)
+                        .center()
+                        .build()
+                        .expect("failed to create main window");
             }
 
             if let Some(window) = app.get_webview_window("main") {
@@ -4366,8 +4642,14 @@ fn main() {
             let app_state = app.state::<AppState>();
             let web_db = app_state.web_db.clone();
             let web_enabled = std::fs::read_to_string(
-                dirs::config_dir().unwrap_or_default().join("changli").join("web_server_enabled")
-            ).ok().and_then(|s| s.trim().parse::<bool>().ok()).unwrap_or(false);
+                dirs::config_dir()
+                    .unwrap_or_default()
+                    .join("changli")
+                    .join("web_server_enabled"),
+            )
+            .ok()
+            .and_then(|s| s.trim().parse::<bool>().ok())
+            .unwrap_or(false);
             if web_enabled {
                 tauri::async_runtime::spawn(async move {
                     web_server::start_web_server(web_db).await;
@@ -4699,7 +4981,10 @@ async fn save_completion_record(
 }
 
 #[tauri::command]
-async fn delete_completion_record(state: State<'_, AppState>, series_id: i64) -> Result<(), String> {
+async fn delete_completion_record(
+    state: State<'_, AppState>,
+    series_id: i64,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -4761,21 +5046,31 @@ async fn delete_all_adult(state: State<'_, AppState>) -> Result<(i64, i64), Stri
     db::delete_all_adult(&pool).await.map_err(|e| e.to_string())
 }
 #[tauri::command]
-async fn delete_videos_by_category(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64), String> {
+async fn delete_videos_by_category(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<(i64, i64), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::delete_videos_by_category(&pool, &category_key).await.map_err(|e| e.to_string())
+    db::delete_videos_by_category(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn rescan_category_metadata(state: State<'_, AppState>, category_key: String) -> Result<(i64, i64, i64, i64), String> {
+async fn rescan_category_metadata(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<(i64, i64, i64, i64), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::rescan_category_metadata(&pool, &category_key).await.map_err(|e| e.to_string())
+    db::rescan_category_metadata(&pool, &category_key)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ==================== 大类配置 Commands ====================
@@ -4804,9 +5099,16 @@ async fn create_category_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::create_category(&pool, &key, &name, &card_layout, &features, scan_path.as_deref())
-        .await
-        .map_err(|e| e.to_string())
+    db::create_category(
+        &pool,
+        &key,
+        &name,
+        &card_layout,
+        &features,
+        scan_path.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4822,9 +5124,16 @@ async fn update_category_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_category(&pool, &key, &name, &card_layout, &features, scan_path.as_deref())
-        .await
-        .map_err(|e| e.to_string())
+    db::update_category(
+        &pool,
+        &key,
+        &name,
+        &card_layout,
+        &features,
+        scan_path.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -4839,7 +5148,10 @@ async fn delete_category_cmd(state: State<'_, AppState>, key: String) -> Result<
 }
 
 #[tauri::command]
-async fn reorder_categories_cmd(state: State<'_, AppState>, category_keys: Vec<String>) -> Result<(), String> {
+async fn reorder_categories_cmd(
+    state: State<'_, AppState>,
+    category_keys: Vec<String>,
+) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -4850,7 +5162,10 @@ async fn reorder_categories_cmd(state: State<'_, AppState>, category_keys: Vec<S
 }
 
 #[tauri::command]
-async fn scan_category(state: State<'_, AppState>, category_key: String) -> Result<ScanResult, String> {
+async fn scan_category(
+    state: State<'_, AppState>,
+    category_key: String,
+) -> Result<ScanResult, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -4862,9 +5177,9 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("大类 '{}' 不存在", category_key))?;
 
-    let scan_path = category.scan_path.ok_or_else(|| {
-        format!("大类 '{}' 未设置扫描路径", category.name)
-    })?;
+    let scan_path = category
+        .scan_path
+        .ok_or_else(|| format!("大类 '{}' 未设置扫描路径", category.name))?;
 
     let path = Path::new(&scan_path);
     if !path.exists() {
@@ -4873,8 +5188,14 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
 
     // 解析 features
     let features: serde_json::Value = serde_json::from_str(&category.features).unwrap_or_default();
-    let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
-    let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
+    let actors_enabled = features
+        .get("actors")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let tags_enabled = features
+        .get("tags")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let mut added: i64 = 0;
     let mut updated: i64 = 0;
@@ -4884,8 +5205,12 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
     let mut has_videos = false;
     if let Ok(check_entries) = std::fs::read_dir(&scan_path) {
         for e in check_entries.filter_map(|e| e.ok()) {
-            if e.path().is_dir() { has_subdirs = true; }
-            if e.path().is_file() && scanner::is_video_file(&e.path()) { has_videos = true; }
+            if e.path().is_dir() {
+                has_subdirs = true;
+            }
+            if e.path().is_file() && scanner::is_video_file(&e.path()) {
+                has_videos = true;
+            }
         }
     }
     let root_poster = crate::scanner::find_folder_poster(std::path::Path::new(&scan_path));
@@ -4893,21 +5218,52 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
     // 如果没有子文件夹，把 scan_path 本身当一个视频集；动漫暂无资源视频集可能只有海报、没有视频文件。
     if !has_subdirs && (has_videos || root_poster.is_some()) {
         let folder_name = std::path::Path::new(&scan_path)
-            .file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
         let (series_title, code, has_chinese_sub) = extract_adult_metadata(&folder_name);
-        let scan_result = scanner::scan_directory(&scan_path).await.map_err(|e| e.to_string())?;
+        let scan_result = scanner::scan_directory(&scan_path)
+            .await
+            .map_err(|e| e.to_string())?;
         let poster = root_poster;
-        let poster_base64 = poster.as_deref().and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
-        if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path).await.map_err(|e| e.to_string())? {
+        let poster_base64 = poster
+            .as_deref()
+            .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+        if let Some(existing) = db::get_video_series_by_folder_path(&pool, &scan_path)
+            .await
+            .map_err(|e| e.to_string())?
+        {
             // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
-            db::add_videos_batch(&pool, scan_result.videos, Some(existing.id)).await.map_err(|e| e.to_string())?;
+            db::add_videos_batch(&pool, scan_result.videos, Some(existing.id))
+                .await
+                .map_err(|e| e.to_string())?;
             updated += 1;
         } else {
-            let series = db::add_video_series(&pool, &series_title, Some(&scan_path), poster.as_deref(), Some("landscape"), Some("ongoing"), poster_base64.as_deref(), Some(&category_key)).await.map_err(|e| e.to_string())?;
+            let series = db::add_video_series(
+                &pool,
+                &series_title,
+                Some(&scan_path),
+                poster.as_deref(),
+                Some("landscape"),
+                Some("ongoing"),
+                poster_base64.as_deref(),
+                Some(&category_key),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
             if let Some(c) = code {
-                let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?").bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                let _ = sqlx::query(
+                    "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?",
+                )
+                .bind(&c)
+                .bind(has_chinese_sub)
+                .bind(series.id)
+                .execute(&pool)
+                .await;
             }
-            db::add_videos_batch(&pool, scan_result.videos, Some(series.id)).await.map_err(|e| e.to_string())?;
+            db::add_videos_batch(&pool, scan_result.videos, Some(series.id))
+                .await
+                .map_err(|e| e.to_string())?;
             let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
             added += 1;
         }
@@ -4931,9 +5287,9 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 .await
                 .map_err(|e| e.to_string())?;
             let poster = crate::scanner::find_folder_poster(&entry_path);
-            let poster_base64 = poster.as_deref().and_then(|p| {
-                scanner::generate_thumbnail_base64(std::path::Path::new(p))
-            });
+            let poster_base64 = poster
+                .as_deref()
+                .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
             let folder_path_str = entry_path.to_string_lossy().to_string();
 
             if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str)
@@ -4942,8 +5298,10 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
             {
                 // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                 db::add_videos_batch(&pool, scan_result.videos, Some(existing.id))
-                    .await.map_err(|e| e.to_string())?;
-                let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let _ =
+                    db::update_video_series_display_type(&pool, existing.id, &category_key).await;
                 updated += 1;
             } else {
                 let (series_title, code, has_chinese_sub) = extract_adult_metadata(&entry_name);
@@ -4956,13 +5314,22 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                     Some("ongoing"),
                     poster_base64.as_deref(),
                     Some(&category_key),
-                ).await.map_err(|e| e.to_string())?;
+                )
+                .await
+                .map_err(|e| e.to_string())?;
                 if let Some(c) = code {
-                    let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                        .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                    let _ = sqlx::query(
+                        "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?",
+                    )
+                    .bind(&c)
+                    .bind(has_chinese_sub)
+                    .bind(series.id)
+                    .execute(&pool)
+                    .await;
                 }
                 db::add_videos_batch(&pool, scan_result.videos, Some(series.id))
-                    .await.map_err(|e| e.to_string())?;
+                    .await
+                    .map_err(|e| e.to_string())?;
                 let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
                 added += 1;
             }
@@ -4990,7 +5357,10 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
 
         // 都没匹配到但启用了标签/演员：跳过
         if (actors_enabled || tags_enabled) && matched_actor.is_none() && matched_tag.is_none() {
-            eprintln!("[ChangLi] scan_category: 子文件夹 '{}' 未匹配到演员或标签，跳过", entry_name);
+            eprintln!(
+                "[ChangLi] scan_category: 子文件夹 '{}' 未匹配到演员或标签，跳过",
+                entry_name
+            );
             continue;
         }
 
@@ -5021,46 +5391,81 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 for period_entry in period_entries {
                     let period_entry = period_entry.map_err(|e| e.to_string())?;
                     let pe_path = period_entry.path();
-                    if !pe_path.is_dir() { continue; }
+                    if !pe_path.is_dir() {
+                        continue;
+                    }
                     let pe_name = period_entry.file_name().to_string_lossy().to_string();
                     let pe_result = scanner::scan_directory(&pe_path.to_string_lossy())
-                        .await.map_err(|e| e.to_string())?;
+                        .await
+                        .map_err(|e| e.to_string())?;
                     // 时期文件夹下每个视频集必须只取自己的海报，不能取时期父目录海报，
                     // 否则同一时期下的多个无季视频集会被批量替换成同一张图。
                     let pe_poster = crate::scanner::find_folder_poster(&pe_path);
-                    let pe_poster_base64 = pe_poster.as_deref().and_then(|p| {
-                        scanner::generate_thumbnail_base64(std::path::Path::new(p))
-                    });
+                    let pe_poster_base64 = pe_poster
+                        .as_deref()
+                        .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
                     let pe_folder = pe_path.to_string_lossy().to_string();
 
                     if let Some(existing) = db::get_video_series_by_folder_path(&pool, &pe_folder)
-                        .await.map_err(|e| e.to_string())?
+                        .await
+                        .map_err(|e| e.to_string())?
                     {
                         // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                         db::add_videos_batch(&pool, pe_result.videos, Some(existing.id))
-                            .await.map_err(|e| e.to_string())?;
+                            .await
+                            .map_err(|e| e.to_string())?;
                         if let Some(aid) = matched_actor {
-                            let _ = db::add_series_actor(&pool, existing.id, aid, None, matched_period_id).await;
-                            let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                            let _ = db::add_series_actor(
+                                &pool,
+                                existing.id,
+                                aid,
+                                None,
+                                matched_period_id,
+                            )
+                            .await;
+                            let _ = db::update_video_series_display_type(
+                                &pool,
+                                existing.id,
+                                &category_key,
+                            )
+                            .await;
                         }
                         updated += 1;
                     } else {
-                        let (series_title, code, has_chinese_sub) = extract_adult_metadata(&pe_name);
+                        let (series_title, code, has_chinese_sub) =
+                            extract_adult_metadata(&pe_name);
                         let series = db::add_video_series(
-                            &pool, &series_title, Some(&pe_folder),
-                            pe_poster.as_deref(), Some("landscape"), Some("ongoing"),
-                            pe_poster_base64.as_deref(), Some(&category_key),
-                        ).await.map_err(|e| e.to_string())?;
+                            &pool,
+                            &series_title,
+                            Some(&pe_folder),
+                            pe_poster.as_deref(),
+                            Some("landscape"),
+                            Some("ongoing"),
+                            pe_poster_base64.as_deref(),
+                            Some(&category_key),
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
                         if let Some(c) = code {
                             let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
                                 .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
                         }
                         db::add_videos_batch(&pool, pe_result.videos, Some(series.id))
-                            .await.map_err(|e| e.to_string())?;
+                            .await
+                            .map_err(|e| e.to_string())?;
                         if let Some(aid) = matched_actor {
-                            let _ = db::add_series_actor(&pool, series.id, aid, None, matched_period_id).await;
+                            let _ = db::add_series_actor(
+                                &pool,
+                                series.id,
+                                aid,
+                                None,
+                                matched_period_id,
+                            )
+                            .await;
                         }
-                        let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                        let _ =
+                            db::update_video_series_display_type(&pool, series.id, &category_key)
+                                .await;
                         added += 1;
                     }
                 }
@@ -5074,9 +5479,9 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 // 演员/标签目录下每个视频集必须只取自己的海报，不能取演员/标签父目录海报，
                 // 否则同一演员/标签下多个无季视频集会被批量替换成同一张图。
                 let sub_poster = crate::scanner::find_folder_poster(&sub_entry_path);
-                let sub_poster_base64 = sub_poster.as_deref().and_then(|p| {
-                    scanner::generate_thumbnail_base64(std::path::Path::new(p))
-                });
+                let sub_poster_base64 = sub_poster
+                    .as_deref()
+                    .and_then(|p| scanner::generate_thumbnail_base64(std::path::Path::new(p)));
                 let folder_path_str = sub_entry_path.to_string_lossy().to_string();
 
                 if let Some(existing) = db::get_video_series_by_folder_path(&pool, &folder_path_str)
@@ -5085,85 +5490,129 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
                 {
                     // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                     db::add_videos_batch(&pool, sub_result.videos, Some(existing.id))
-                        .await.map_err(|e| e.to_string())?;
+                        .await
+                        .map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
                         let _ = db::add_series_actor(&pool, existing.id, aid, None, None).await;
-                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                        let _ =
+                            db::update_video_series_display_type(&pool, existing.id, &category_key)
+                                .await;
                     }
                     if let Some(tid) = matched_tag {
                         let _ = db::add_series_tag(&pool, existing.id, tid).await;
-                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                        let _ =
+                            db::update_video_series_display_type(&pool, existing.id, &category_key)
+                                .await;
                     }
                     updated += 1;
                 } else {
-                    let (series_title, code, has_chinese_sub) = extract_adult_metadata(&sub_entry_name);
+                    let (series_title, code, has_chinese_sub) =
+                        extract_adult_metadata(&sub_entry_name);
                     let series = db::add_video_series(
-                        &pool, &series_title, Some(&folder_path_str),
-                        sub_poster.as_deref(), Some("landscape"), Some("ongoing"),
-                        sub_poster_base64.as_deref(), Some(&category_key),
-                    ).await.map_err(|e| e.to_string())?;
+                        &pool,
+                        &series_title,
+                        Some(&folder_path_str),
+                        sub_poster.as_deref(),
+                        Some("landscape"),
+                        Some("ongoing"),
+                        sub_poster_base64.as_deref(),
+                        Some(&category_key),
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
                     if let Some(c) = code {
-                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                        let _ = sqlx::query(
+                            "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?",
+                        )
+                        .bind(&c)
+                        .bind(has_chinese_sub)
+                        .bind(series.id)
+                        .execute(&pool)
+                        .await;
                     }
                     db::add_videos_batch(&pool, sub_result.videos, Some(series.id))
-                        .await.map_err(|e| e.to_string())?;
+                        .await
+                        .map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
                         let _ = db::add_series_actor(&pool, series.id, aid, None, None).await;
                     }
                     if let Some(tid) = matched_tag {
                         let _ = db::add_series_tag(&pool, series.id, tid).await;
                     }
-                    let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                    let _ =
+                        db::update_video_series_display_type(&pool, series.id, &category_key).await;
                     added += 1;
                 }
             } else if sub_entry_path.is_file() && scanner::is_video_file(&sub_entry_path) {
                 let video = scanner::scan_video_file(&sub_entry_path, None)
-                    .await.map_err(|e| e.to_string())?;
-                let file_stem = sub_entry_path.file_stem()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let file_stem = sub_entry_path
+                    .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_else(|| sub_entry_name.clone());
-                let thumb = video.thumbnail.as_deref().and_then(|t| {
-                    scanner::generate_thumbnail_base64(std::path::Path::new(t))
-                });
+                let thumb = video
+                    .thumbnail
+                    .as_deref()
+                    .and_then(|t| scanner::generate_thumbnail_base64(std::path::Path::new(t)));
                 let file_path_str = sub_entry_path.to_string_lossy().to_string();
 
                 if let Some(existing) = db::get_video_series_by_folder_path(&pool, &file_path_str)
-                    .await.map_err(|e| e.to_string())?
+                    .await
+                    .map_err(|e| e.to_string())?
                 {
                     // 全量检查更新只同步视频增删与分类关联，不改已有视频集海报。
                     db::add_videos_batch(&pool, vec![video], Some(existing.id))
-                        .await.map_err(|e| e.to_string())?;
+                        .await
+                        .map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
                         let _ = db::add_series_actor(&pool, existing.id, aid, None, None).await;
-                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                        let _ =
+                            db::update_video_series_display_type(&pool, existing.id, &category_key)
+                                .await;
                     }
                     if let Some(tid) = matched_tag {
                         let _ = db::add_series_tag(&pool, existing.id, tid).await;
-                        let _ = db::update_video_series_display_type(&pool, existing.id, &category_key).await;
+                        let _ =
+                            db::update_video_series_display_type(&pool, existing.id, &category_key)
+                                .await;
                     }
                     updated += 1;
                 } else {
                     let (series_title, code, has_chinese_sub) = extract_adult_metadata(&file_stem);
                     let series = db::add_video_series(
-                        &pool, &series_title, Some(&file_path_str),
-                        video.thumbnail.as_deref(), Some("landscape"), Some("ongoing"),
+                        &pool,
+                        &series_title,
+                        Some(&file_path_str),
+                        video.thumbnail.as_deref(),
+                        Some("landscape"),
+                        Some("ongoing"),
                         thumb.as_deref(),
-                                None,
-                    ).await.map_err(|e| e.to_string())?;
+                        None,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
                     if let Some(c) = code {
-                        let _ = sqlx::query("UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?")
-                            .bind(&c).bind(has_chinese_sub).bind(series.id).execute(&pool).await;
+                        let _ = sqlx::query(
+                            "UPDATE video_series SET code = ?, has_chinese_sub = ? WHERE id = ?",
+                        )
+                        .bind(&c)
+                        .bind(has_chinese_sub)
+                        .bind(series.id)
+                        .execute(&pool)
+                        .await;
                     }
                     db::add_videos_batch(&pool, vec![video], Some(series.id))
-                        .await.map_err(|e| e.to_string())?;
+                        .await
+                        .map_err(|e| e.to_string())?;
                     if let Some(aid) = matched_actor {
                         let _ = db::add_series_actor(&pool, series.id, aid, None, None).await;
                     }
                     if let Some(tid) = matched_tag {
                         let _ = db::add_series_tag(&pool, series.id, tid).await;
                     }
-                    let _ = db::update_video_series_display_type(&pool, series.id, &category_key).await;
+                    let _ =
+                        db::update_video_series_display_type(&pool, series.id, &category_key).await;
                     added += 1;
                 }
             }
@@ -5176,9 +5625,7 @@ async fn scan_category(state: State<'_, AppState>, category_key: String) -> Resu
 // ==================== 演员字段配置 Commands ====================
 
 #[tauri::command]
-async fn get_all_actor_fields(
-    state: State<'_, AppState>,
-) -> Result<Vec<db::ActorField>, String> {
+async fn get_all_actor_fields(state: State<'_, AppState>) -> Result<Vec<db::ActorField>, String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -5202,9 +5649,17 @@ async fn update_actor_field_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::update_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), format.as_deref(), enabled)
-        .await
-        .map_err(|e| e.to_string())
+    db::update_actor_field(
+        &pool,
+        &field_key,
+        &field_label,
+        &field_type,
+        options.as_deref(),
+        format.as_deref(),
+        enabled,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -5220,9 +5675,16 @@ async fn create_actor_field_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::create_actor_field(&pool, &field_key, &field_label, &field_type, options.as_deref(), format.as_deref())
-        .await
-        .map_err(|e| e.to_string())
+    db::create_actor_field(
+        &pool,
+        &field_key,
+        &field_label,
+        &field_type,
+        options.as_deref(),
+        format.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -5296,10 +5758,7 @@ async fn is_preset_template_enabled_cmd(
 }
 
 #[tauri::command]
-async fn enable_preset_template_cmd(
-    state: State<'_, AppState>,
-    key: String,
-) -> Result<(), String> {
+async fn enable_preset_template_cmd(state: State<'_, AppState>, key: String) -> Result<(), String> {
     let pool = {
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
@@ -5318,7 +5777,9 @@ async fn disable_preset_template_cmd(
         let guard = state.db.lock().await;
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
-    db::disable_preset_template(&pool, &key).await.map_err(|e| e.to_string())
+    db::disable_preset_template(&pool, &key)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 async fn regenerate_all_poster_base64_internal(
@@ -5326,7 +5787,7 @@ async fn regenerate_all_poster_base64_internal(
     status: Option<Arc<Mutex<PosterRepairStatus>>>,
 ) -> Result<i32, String> {
     let rows: Vec<(i64, Option<String>)> = sqlx::query_as(
-        "SELECT id, poster FROM video_series WHERE poster IS NOT NULL AND poster != ''"
+        "SELECT id, poster FROM video_series WHERE poster IS NOT NULL AND poster != ''",
     )
     .fetch_all(pool)
     .await

@@ -229,15 +229,6 @@ pub struct Tag {
     pub created_at: String,
 }
 
-// 标签-分类关联
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TagCategory {
-    pub id: i64,
-    pub tag_id: i64,
-    pub category_key: String,
-}
-
-
 // 演员时期
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActorPeriod {
@@ -829,17 +820,16 @@ pub async fn create_empty_video_series(
 }
 
 /// Batch update episode numbers for videos (used for drag-and-drop reorder).
-pub async fn update_video_episode_numbers(
-    pool: &SqlitePool,
-    updates: &[(i64, i32)],
-) -> Result<()> {
+pub async fn update_video_episode_numbers(pool: &SqlitePool, updates: &[(i64, i32)]) -> Result<()> {
     let mut tx = pool.begin().await?;
     for (video_id, episode_number) in updates {
-        sqlx::query("UPDATE videos SET episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-            .bind(episode_number)
-            .bind(video_id)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "UPDATE videos SET episode_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        )
+        .bind(episode_number)
+        .bind(video_id)
+        .execute(&mut *tx)
+        .await?;
     }
     tx.commit().await?;
     Ok(())
@@ -861,28 +851,39 @@ pub async fn get_video_series_list_lite(
     pool: &SqlitePool,
 ) -> Result<Vec<(i64, String, Option<String>)>> {
     let rows = sqlx::query_as::<_, (i64, String, Option<String>)>(
-        "SELECT id, title, display_type FROM video_series ORDER BY created_at DESC, id DESC"
+        "SELECT id, title, display_type FROM video_series ORDER BY created_at DESC, id DESC",
     )
     .fetch_all(pool)
     .await?;
     Ok(rows)
 }
 
-pub async fn get_video_series_poster_data_url(pool: &SqlitePool, id: i64) -> Result<Option<String>> {
+pub async fn get_video_series_poster_data_url(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<String>> {
     let row = sqlx::query("SELECT poster, poster_base64 FROM video_series WHERE id = ?")
         .bind(id)
         .fetch_optional(pool)
         .await?;
-    let Some(row) = row else { return Ok(None); };
+    let Some(row) = row else {
+        return Ok(None);
+    };
 
-    if let Some(data_url) = row.try_get::<Option<String>, _>("poster_base64").ok().flatten() {
+    if let Some(data_url) = row
+        .try_get::<Option<String>, _>("poster_base64")
+        .ok()
+        .flatten()
+    {
         if !data_url.trim().is_empty() {
             return Ok(Some(data_url));
         }
     }
 
     let poster = row.try_get::<Option<String>, _>("poster").ok().flatten();
-    let Some(poster) = poster else { return Ok(None); };
+    let Some(poster) = poster else {
+        return Ok(None);
+    };
     let resolved = storage::resolve_data_path(&poster);
     let data_url = image_data_url(Path::new(&resolved));
     if let Some(ref value) = data_url {
@@ -911,12 +912,21 @@ pub async fn get_video_series_list(
     let sql = format!("SELECT s.id, s.title, s.description, s.poster, s.poster_base64 AS poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id GROUP BY s.id {}", order_clause);
     let rows = sqlx::query(&sql).fetch_all(pool).await?;
     // 直接构造结构体，不调用 series_from_row（避免 poster_base64 为空时读文件转 base64）。
-    let result = rows.iter().map(|row| {
-        VideoSeries {
+    let result = rows
+        .iter()
+        .map(|row| VideoSeries {
             id: row.get("id"),
             title: row.get("title"),
             description: row.get("description"),
-            poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
+            poster: row
+                .try_get::<Option<String>, _>("poster")
+                .ok()
+                .flatten()
+                .map(|path| {
+                    storage::resolve_data_path(&path)
+                        .to_string_lossy()
+                        .to_string()
+                }),
             poster_data_url: None,
             poster_base64: None,
             folder_path: row.get("folder_path"),
@@ -929,12 +939,17 @@ pub async fn get_video_series_list(
             is_watched: row.try_get("is_watched").ok().flatten(),
             last_watched_episode: None,
             last_watched_season: None,
-            has_actor: row.try_get::<Option<i64>, _>("has_actor").ok().flatten().map(|v| v > 0).unwrap_or(false),
+            has_actor: row
+                .try_get::<Option<i64>, _>("has_actor")
+                .ok()
+                .flatten()
+                .map(|v| v > 0)
+                .unwrap_or(false),
             has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
             display_type: row.try_get("display_type").ok().flatten(),
             code: None,
-        }
-    }).collect();
+        })
+        .collect();
     Ok(result)
 }
 
@@ -1603,28 +1618,13 @@ pub async fn delete_tag(pool: &SqlitePool, id: i64) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_tags_by_scope(pool: &SqlitePool, scope: &str) -> Result<Vec<Tag>> {
-    let rows = sqlx::query("SELECT * FROM tags WHERE scope = ? ORDER BY name")
-        .bind(scope)
-        .fetch_all(pool)
-        .await?;
-    let tags = rows
-        .iter()
-        .map(|row| Tag {
-            id: row.get("id"),
-            name: row.get("name"),
-            scope: row.get("scope"),
-            created_at: row.get("created_at"),
-        })
-        .collect();
-    Ok(tags)
-}
-
 pub async fn get_tag_categories(pool: &SqlitePool, tag_id: i64) -> Result<Vec<String>> {
-    let rows = sqlx::query("SELECT category_key FROM tag_categories WHERE tag_id = ? ORDER BY category_key")
-        .bind(tag_id)
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT category_key FROM tag_categories WHERE tag_id = ? ORDER BY category_key",
+    )
+    .bind(tag_id)
+    .fetch_all(pool)
+    .await?;
     Ok(rows.iter().map(|r| r.get("category_key")).collect())
 }
 
@@ -1638,7 +1638,11 @@ pub async fn update_tag(pool: &SqlitePool, id: i64, name: &str, scope: &str) -> 
     Ok(())
 }
 
-pub async fn update_tag_categories(pool: &SqlitePool, tag_id: i64, category_keys: &[String]) -> Result<()> {
+pub async fn update_tag_categories(
+    pool: &SqlitePool,
+    tag_id: i64,
+    category_keys: &[String],
+) -> Result<()> {
     // 先删后插
     sqlx::query("DELETE FROM tag_categories WHERE tag_id = ?")
         .bind(tag_id)
@@ -1762,19 +1766,26 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
 
     // 补充：确保所有有 series_id 的作品都有 series_poster_data_url
     // 和视频页用相同的数据路径：直接从 video_series.poster_base64 读取
-    let series_ids: Vec<i64> = results.iter()
+    let series_ids: Vec<i64> = results
+        .iter()
         .filter_map(|v| v.series_id)
-        .filter(|sid| results.iter().any(|r| r.series_id == Some(*sid) && r.series_poster_data_url.is_none()))
+        .filter(|sid| {
+            results
+                .iter()
+                .any(|r| r.series_id == Some(*sid) && r.series_poster_data_url.is_none())
+        })
         .collect();
     if !series_ids.is_empty() {
         let placeholders = series_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!("SELECT id, poster_base64 FROM video_series WHERE id IN ({placeholders})");
+        let sql =
+            format!("SELECT id, poster_base64 FROM video_series WHERE id IN ({placeholders})");
         let mut query = sqlx::query(&sql);
         for sid in &series_ids {
             query = query.bind(sid);
         }
         if let Ok(series_rows) = query.fetch_all(pool).await {
-            let poster_map: std::collections::HashMap<i64, Option<String>> = series_rows.iter()
+            let poster_map: std::collections::HashMap<i64, Option<String>> = series_rows
+                .iter()
                 .filter_map(|row| {
                     let id: i64 = row.get("id");
                     let poster: Option<String> = row.try_get("poster_base64").ok().flatten();
@@ -1796,9 +1807,8 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
     }
 
     // 2. 查空视频集（关联了演员但没有视频的视频集）
-    let existing_series_ids: std::collections::HashSet<i64> = results.iter()
-        .filter_map(|v| v.series_id)
-        .collect();
+    let existing_series_ids: std::collections::HashSet<i64> =
+        results.iter().filter_map(|v| v.series_id).collect();
 
     let empty_series = sqlx::query(
         "SELECT s.id, s.title, s.poster, s.poster_base64 AS series_poster_base64, s.display_type, s.created_at
@@ -1812,7 +1822,9 @@ pub async fn get_actor_resources(pool: &SqlitePool, actor_id: i64) -> Result<Vec
 
     for row in empty_series {
         let series_id: i64 = row.get("id");
-        if existing_series_ids.contains(&series_id) { continue; }
+        if existing_series_ids.contains(&series_id) {
+            continue;
+        }
         let title: String = row.get("title");
         let poster: Option<String> = row.get("poster");
         let created_at: String = row.get("created_at");
@@ -2325,10 +2337,14 @@ pub async fn get_completion_records(pool: &SqlitePool) -> Result<Vec<SeriesCompl
                 video_count: row.get("video_count"),
                 display_type: row.try_get("display_type").ok(),
                 status: row.try_get("status").ok(),
-                rating: row.try_get::<Option<f64>, _>("rating").ok().flatten().map(|value| {
-                    let normalized = if value > 5.0 { value / 2.0 } else { value };
-                    (normalized.clamp(0.1, 5.0) * 10.0).round() / 10.0
-                }),
+                rating: row
+                    .try_get::<Option<f64>, _>("rating")
+                    .ok()
+                    .flatten()
+                    .map(|value| {
+                        let normalized = if value > 5.0 { value / 2.0 } else { value };
+                        (normalized.clamp(0.1, 5.0) * 10.0).round() / 10.0
+                    }),
                 review: row.try_get("review").ok().flatten(),
                 completed_at: row.try_get("completed_at").ok().flatten(),
                 last_played: row.try_get("last_played").ok().flatten(),
@@ -2343,8 +2359,13 @@ pub async fn upsert_completion_record(
     pool: &SqlitePool,
     input: CompletionRecordInput,
 ) -> Result<SeriesCompletionRecord> {
-    let completed_at = input.completed_at.unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
-    let review = input.review.map(|text| text.trim().to_string()).filter(|text| !text.is_empty());
+    let completed_at = input
+        .completed_at
+        .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    let review = input
+        .review
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty());
     let rating = input.rating.map(|value| {
         let normalized = if value > 5.0 { value / 2.0 } else { value };
         (normalized.clamp(0.1, 5.0) * 10.0).round() / 10.0
@@ -2368,10 +2389,12 @@ pub async fn upsert_completion_record(
     .execute(pool)
     .await?;
 
-    sqlx::query("UPDATE video_series SET is_watched = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .bind(input.series_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE video_series SET is_watched = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    )
+    .bind(input.series_id)
+    .execute(pool)
+    .await?;
 
     let records = get_completion_records(pool).await?;
     records
@@ -2793,28 +2816,44 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
     let rows = sqlx::query("SELECT s.id, s.title, s.description, s.poster, s.poster_base64 AS poster_base64, s.folder_path, s.poster_orientation, s.status, s.created_at, s.updated_at, s.is_favorite, s.is_watched, s.has_chinese_sub, s.display_type, COUNT(v.id) AS video_count, NULL AS last_watched_episode, NULL AS last_watched_season, MAX(CASE WHEN sa.actor_id IS NOT NULL THEN 1 ELSE 0 END) AS has_actor FROM video_series s LEFT JOIN videos v ON v.series_id = s.id LEFT JOIN series_actors sa ON sa.series_id = s.id WHERE s.is_favorite = 1 GROUP BY s.id ORDER BY s.created_at DESC")
         .fetch_all(pool)
         .await?;
-    Ok(rows.iter().map(|row| VideoSeries {
-        id: row.get("id"),
-        title: row.get("title"),
-        description: row.get("description"),
-        poster: row.try_get::<Option<String>, _>("poster").ok().flatten().map(|path| storage::resolve_data_path(&path).to_string_lossy().to_string()),
-        poster_data_url: None,
-        poster_base64: None,
-        folder_path: row.get("folder_path"),
-        video_count: row.try_get("video_count").unwrap_or(0),
-        poster_orientation: row.try_get("poster_orientation").ok().flatten(),
-        status: row.try_get("status").ok().flatten(),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
-        is_favorite: row.try_get("is_favorite").ok().flatten(),
-        is_watched: row.try_get("is_watched").ok().flatten(),
-        last_watched_episode: None,
-        last_watched_season: None,
-        has_actor: row.try_get::<Option<i64>, _>("has_actor").ok().flatten().map(|v| v > 0).unwrap_or(false),
-        code: None,
-        has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
-        display_type: row.try_get("display_type").ok().flatten(),
-    }).collect())
+    Ok(rows
+        .iter()
+        .map(|row| VideoSeries {
+            id: row.get("id"),
+            title: row.get("title"),
+            description: row.get("description"),
+            poster: row
+                .try_get::<Option<String>, _>("poster")
+                .ok()
+                .flatten()
+                .map(|path| {
+                    storage::resolve_data_path(&path)
+                        .to_string_lossy()
+                        .to_string()
+                }),
+            poster_data_url: None,
+            poster_base64: None,
+            folder_path: row.get("folder_path"),
+            video_count: row.try_get("video_count").unwrap_or(0),
+            poster_orientation: row.try_get("poster_orientation").ok().flatten(),
+            status: row.try_get("status").ok().flatten(),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+            is_favorite: row.try_get("is_favorite").ok().flatten(),
+            is_watched: row.try_get("is_watched").ok().flatten(),
+            last_watched_episode: None,
+            last_watched_season: None,
+            has_actor: row
+                .try_get::<Option<i64>, _>("has_actor")
+                .ok()
+                .flatten()
+                .map(|v| v > 0)
+                .unwrap_or(false),
+            code: None,
+            has_chinese_sub: row.try_get("has_chinese_sub").ok().flatten(),
+            display_type: row.try_get("display_type").ok().flatten(),
+        })
+        .collect())
 }
 
 /// 删除所有视频数据（不删除本地源文件，保留 actors 和 tags）
@@ -3005,9 +3044,7 @@ fn find_child_folder_by_identity(
                 || crate::scanner::strip_episode_suffix(&name).to_lowercase() == title_lower);
         let code_matches = code_upper
             .as_deref()
-            .map(|code| {
-                name_code.as_deref() == Some(code) || name.to_uppercase().contains(code)
-            })
+            .map(|code| name_code.as_deref() == Some(code) || name.to_uppercase().contains(code))
             .unwrap_or(false);
 
         if title_matches || code_matches {
@@ -3085,7 +3122,14 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         None => return Ok(false),
     };
 
-    let source = resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref(), code.as_deref()).await?;
+    let source = resolve_series_folder(
+        pool,
+        folder_path.as_deref(),
+        &title,
+        display_type.as_deref(),
+        code.as_deref(),
+    )
+    .await?;
     let folder_name = source
         .as_deref()
         .and_then(std::path::Path::file_name)
@@ -3098,7 +3142,7 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
         let resolved = storage::resolve_data_path(p);
         crate::scanner::generate_thumbnail_base64(std::path::Path::new(&resolved))
     });
-    let poster_updated = if let Some(ref poster_path) = poster {
+    if let Some(ref poster_path) = poster {
         update_video_series_poster(
             pool,
             id,
@@ -3107,16 +3151,11 @@ pub async fn rescan_single_series_metadata(pool: &SqlitePool, series_id: i64) ->
             Some("landscape"),
         )
         .await?;
-        true
-    } else {
-        false
-    };
+    }
 
-    let mut found_video_files = false;
     if let Some(source) = source.as_deref() {
         let result = crate::scanner::scan_directory(&source.to_string_lossy()).await?;
-        found_video_files = !result.videos.is_empty();
-        if found_video_files {
+        if !result.videos.is_empty() {
             add_videos_batch(pool, result.videos, Some(id)).await?;
         }
     }
@@ -3302,7 +3341,13 @@ pub struct SeasonInfo {
 }
 
 fn normalize_season(season: i32) -> i32 {
-    if season == 999 { 999 } else if season > 0 { season } else { 1 }
+    if season == 999 {
+        999
+    } else if season > 0 {
+        season
+    } else {
+        1
+    }
 }
 
 fn normalize_subtitle(subtitle: Option<&str>) -> String {
@@ -3310,16 +3355,21 @@ fn normalize_subtitle(subtitle: Option<&str>) -> String {
 }
 
 pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec<SeasonInfo>> {
-    let mut groups: std::collections::BTreeMap<(i32, String), i64> = std::collections::BTreeMap::new();
+    let mut groups: std::collections::BTreeMap<(i32, String), i64> =
+        std::collections::BTreeMap::new();
 
-    let meta_rows = sqlx::query("SELECT season, COALESCE(subtitle, '') AS subtitle FROM series_seasons WHERE series_id = ?")
-        .bind(series_id)
-        .fetch_all(pool)
-        .await?;
+    let meta_rows = sqlx::query(
+        "SELECT season, COALESCE(subtitle, '') AS subtitle FROM series_seasons WHERE series_id = ?",
+    )
+    .bind(series_id)
+    .fetch_all(pool)
+    .await?;
     for row in meta_rows {
         let season: i32 = row.get("season");
         let subtitle: String = row.get("subtitle");
-        groups.entry((normalize_season(season), subtitle)).or_insert(0);
+        groups
+            .entry((normalize_season(season), subtitle))
+            .or_insert(0);
     }
 
     let video_rows = sqlx::query(
@@ -3332,7 +3382,9 @@ pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec
         let season: i32 = row.try_get("season").unwrap_or(0);
         let subtitle: String = row.try_get("subtitle").unwrap_or_default();
         let count: i64 = row.get("video_count");
-        *groups.entry((normalize_season(season), subtitle)).or_insert(0) += count;
+        *groups
+            .entry((normalize_season(season), subtitle))
+            .or_insert(0) += count;
     }
 
     groups.entry((1, String::new())).or_insert(0);
@@ -3341,7 +3393,11 @@ pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec
         .into_iter()
         .map(|((season, subtitle), video_count)| SeasonInfo {
             season,
-            subtitle: if subtitle.trim().is_empty() { None } else { Some(subtitle) },
+            subtitle: if subtitle.trim().is_empty() {
+                None
+            } else {
+                Some(subtitle)
+            },
             video_count,
         })
         .collect();
@@ -3353,7 +3409,12 @@ pub async fn get_series_seasons(pool: &SqlitePool, series_id: i64) -> Result<Vec
     Ok(seasons)
 }
 
-pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32, subtitle: Option<String>) -> Result<()> {
+pub async fn delete_season(
+    pool: &SqlitePool,
+    series_id: i64,
+    season: i32,
+    subtitle: Option<String>,
+) -> Result<()> {
     let target_season = normalize_season(season);
     let target_subtitle = normalize_subtitle(subtitle.as_deref());
 
@@ -3371,12 +3432,14 @@ pub async fn delete_season(pool: &SqlitePool, series_id: i64, season: i32, subti
             .execute(pool)
             .await?;
     } else {
-        sqlx::query("DELETE FROM videos WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?")
-            .bind(series_id)
-            .bind(target_season)
-            .bind(&target_subtitle)
-            .execute(pool)
-            .await?;
+        sqlx::query(
+            "DELETE FROM videos WHERE series_id = ? AND season = ? AND COALESCE(subtitle, '') = ?",
+        )
+        .bind(series_id)
+        .bind(target_season)
+        .bind(&target_subtitle)
+        .execute(pool)
+        .await?;
     }
     Ok(())
 }
@@ -3406,7 +3469,7 @@ pub async fn create_season(
     };
     let subtitle_text = normalize_subtitle(subtitle);
     sqlx::query(
-        "INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)"
+        "INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)",
     )
     .bind(series_id)
     .bind(target_season)
@@ -3429,12 +3492,14 @@ pub async fn update_season_group(
     let target_season = normalize_season(to_season);
     let target_subtitle = normalize_subtitle(to_subtitle.as_deref());
 
-    sqlx::query("INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)")
-        .bind(series_id)
-        .bind(target_season)
-        .bind(&target_subtitle)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)",
+    )
+    .bind(series_id)
+    .bind(target_season)
+    .bind(&target_subtitle)
+    .execute(pool)
+    .await?;
 
     if source_season == 1 {
         sqlx::query("UPDATE videos SET season = ?, subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE series_id = ? AND (season IS NULL OR season = 0 OR season = 1) AND COALESCE(subtitle, '') = ?")
@@ -3478,12 +3543,14 @@ pub async fn move_videos_to_season(
     let target_season = normalize_season(season);
     let target_subtitle = normalize_subtitle(subtitle.as_deref());
 
-    sqlx::query("INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)")
-        .bind(series_id)
-        .bind(target_season)
-        .bind(&target_subtitle)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO series_seasons (series_id, season, subtitle) VALUES (?, ?, ?)",
+    )
+    .bind(series_id)
+    .bind(target_season)
+    .bind(&target_subtitle)
+    .execute(pool)
+    .await?;
 
     for video_id in video_ids {
         sqlx::query("UPDATE videos SET season = ?, subtitle = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND series_id = ?")
@@ -3685,7 +3752,10 @@ pub async fn delete_videos_by_category(
 /// 语义对齐“单视频集右键检查更新”的海报修复部分：
 /// 只在视频集海报路径或缓存缺失时从本地文件夹重新匹配海报；找不到不覆盖旧值；不新增/删除视频，不改标题/车牌/中字。
 /// 返回 (updated, skipped, missing_series_count, missing_videos_count)，missing_videos_count 保持 0 以兼容旧接口。
-pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> Result<(i64, i64, i64, i64)> {
+pub async fn rescan_category_metadata(
+    pool: &SqlitePool,
+    category_key: &str,
+) -> Result<(i64, i64, i64, i64)> {
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>, Option<String>)>(&format!(
         "SELECT id, title, folder_path, code, poster, poster_base64 FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
         category_key, category_key
@@ -3698,7 +3768,15 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
     let mut missing_series_count: i64 = 0;
 
     for (id, title, folder_path, code, poster, poster_base64) in series_list {
-        let folder_path_std = match resolve_series_folder(pool, folder_path.as_deref(), &title, Some(category_key), code.as_deref()).await? {
+        let folder_path_std = match resolve_series_folder(
+            pool,
+            folder_path.as_deref(),
+            &title,
+            Some(category_key),
+            code.as_deref(),
+        )
+        .await?
+        {
             Some(path) => path,
             None => {
                 missing_series_count += 1;
@@ -3707,7 +3785,11 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
             }
         };
         let candidate = crate::scanner::find_folder_poster(&folder_path_std);
-        let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
+        let base64_missing = poster_base64
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .is_empty();
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
         let candidate_changed = candidate
             .as_deref()
@@ -3719,7 +3801,8 @@ pub async fn rescan_category_metadata(pool: &SqlitePool, category_key: &str) -> 
                 let resolved = storage::resolve_data_path(&series_poster);
                 let series_poster_base64 =
                     crate::scanner::generate_thumbnail_base64(std::path::Path::new(&resolved));
-                let orientation = crate::scanner::get_image_orientation(std::path::Path::new(&resolved));
+                let orientation =
+                    crate::scanner::get_image_orientation(std::path::Path::new(&resolved));
                 sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                     .bind(series_poster.as_str())
                     .bind(series_poster_base64.as_deref())
@@ -4023,7 +4106,14 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
     let (_id, title, folder_path, display_type, code) = match row {
         Some(r) => r,
-        None => return Ok(SeriesUpdateResult { new_videos: vec![], missing_videos: vec![], renamed_videos_count: 0, poster_updated: false }),
+        None => {
+            return Ok(SeriesUpdateResult {
+                new_videos: vec![],
+                missing_videos: vec![],
+                renamed_videos_count: 0,
+                poster_updated: false,
+            })
+        }
     };
 
     let folder_path_buf = resolve_series_folder(
@@ -4050,7 +4140,11 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
     .await
     .map(|(poster, poster_base64)| {
         poster.as_deref().unwrap_or_default().trim().is_empty()
-            || poster_base64.as_deref().unwrap_or_default().trim().is_empty()
+            || poster_base64
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .is_empty()
     })
     .unwrap_or(false);
 
@@ -4096,7 +4190,9 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
 
         let mut missing_by_identity: std::collections::HashMap<String, Video> = missing_videos
             .iter()
-            .filter_map(|v| crate::scanner::adult_rename_identity(&v.file_name).map(|key| (key, v.clone())))
+            .filter_map(|v| {
+                crate::scanner::adult_rename_identity(&v.file_name).map(|key| (key, v.clone()))
+            })
             .collect();
 
         let mut remaining_new = Vec::new();
@@ -4105,10 +4201,9 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
         for scanned in scanned_new.drain(..) {
             let identity = crate::scanner::adult_rename_identity(&scanned.file_name);
             if let Some(existing) = identity.and_then(|key| missing_by_identity.remove(&key)) {
-                let thumbnail_base64 = scanned
-                    .thumbnail
-                    .as_deref()
-                    .and_then(|p| crate::scanner::generate_thumbnail_base64(std::path::Path::new(p)));
+                let thumbnail_base64 = scanned.thumbnail.as_deref().and_then(|p| {
+                    crate::scanner::generate_thumbnail_base64(std::path::Path::new(p))
+                });
                 let poster_orientation = scanned
                     .thumbnail
                     .as_deref()
@@ -4159,7 +4254,12 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
         (vec![], 0)
     };
 
-    Ok(SeriesUpdateResult { new_videos, missing_videos, renamed_videos_count, poster_updated })
+    Ok(SeriesUpdateResult {
+        new_videos,
+        missing_videos,
+        renamed_videos_count,
+        poster_updated,
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4180,10 +4280,10 @@ pub struct SeriesInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryUpdateResult {
-    pub new_series: Vec<SeriesInfo>,               // 新发现的文件夹名+视频数
-    pub missing_series: Vec<SeriesInfo>,           // 数据库中已丢失的视频集标题+分集数
-    pub series_updates: Vec<SeriesUpdateSummary>,  // 每个视频集的新增/丢失分集
-    pub renamed_series: Vec<(i64, String, String, String)>,  // (id, old_title, new_title, new_path)
+    pub new_series: Vec<SeriesInfo>,     // 新发现的文件夹名+视频数
+    pub missing_series: Vec<SeriesInfo>, // 数据库中已丢失的视频集标题+分集数
+    pub series_updates: Vec<SeriesUpdateSummary>, // 每个视频集的新增/丢失分集
+    pub renamed_series: Vec<(i64, String, String, String)>, // (id, old_title, new_title, new_path)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4225,9 +4325,21 @@ where
         let poster: Option<String> = row.try_get("poster").ok().flatten();
         let poster_base64: Option<String> = row.try_get("poster_base64").ok().flatten();
         let poster_missing = poster.as_deref().unwrap_or_default().trim().is_empty();
-        let base64_missing = poster_base64.as_deref().unwrap_or_default().trim().is_empty();
+        let base64_missing = poster_base64
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .is_empty();
 
-        let folder = match resolve_series_folder(pool, folder_path.as_deref(), &title, display_type.as_deref(), code.as_deref()).await? {
+        let folder = match resolve_series_folder(
+            pool,
+            folder_path.as_deref(),
+            &title,
+            display_type.as_deref(),
+            code.as_deref(),
+        )
+        .await?
+        {
             Some(path) => path,
             None => {
                 result.skipped += 1;
@@ -4260,11 +4372,12 @@ where
 
         if let Some(poster_path) = candidate.or_else(|| poster.clone()) {
             let resolved = storage::resolve_data_path(&poster_path);
-            let base64 = if poster_missing || base64_missing || wrong_parent_poster || candidate_changed {
-                crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
-            } else {
-                poster_base64.clone()
-            };
+            let base64 =
+                if poster_missing || base64_missing || wrong_parent_poster || candidate_changed {
+                    crate::scanner::generate_thumbnail_base64(Path::new(&resolved))
+                } else {
+                    poster_base64.clone()
+                };
             let orientation = crate::scanner::get_image_orientation(Path::new(&resolved));
             sqlx::query("UPDATE video_series SET poster = ?, poster_base64 = COALESCE(?, poster_base64), poster_orientation = COALESCE(?, poster_orientation), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
                 .bind(poster_path.as_str())
@@ -4288,9 +4401,10 @@ where
         }
     }
 
-    let video_rows = sqlx::query("SELECT id, file_path, thumbnail, thumbnail_base64 FROM videos ORDER BY id")
-        .fetch_all(pool)
-        .await?;
+    let video_rows =
+        sqlx::query("SELECT id, file_path, thumbnail, thumbnail_base64 FROM videos ORDER BY id")
+            .fetch_all(pool)
+            .await?;
 
     for row in video_rows {
         result.scanned_videos += 1;
@@ -4300,7 +4414,11 @@ where
         let thumbnail: Option<String> = row.try_get("thumbnail").ok().flatten();
         let thumbnail_base64: Option<String> = row.try_get("thumbnail_base64").ok().flatten();
         let thumbnail_missing = thumbnail.as_deref().unwrap_or_default().trim().is_empty();
-        let base64_missing = thumbnail_base64.as_deref().unwrap_or_default().trim().is_empty();
+        let base64_missing = thumbnail_base64
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .is_empty();
 
         if !thumbnail_missing && !base64_missing {
             continue;
@@ -4324,7 +4442,10 @@ where
                     .filter(|path| {
                         path.extension()
                             .and_then(|ext| ext.to_str())
-                            .map(|ext| crate::scanner::IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+                            .map(|ext| {
+                                crate::scanner::IMAGE_EXTENSIONS
+                                    .contains(&ext.to_lowercase().as_str())
+                            })
                             .unwrap_or(false)
                     })
                     .collect()
@@ -4365,7 +4486,10 @@ where
 }
 
 /// 检测整个分类的更新：新增视频集 + 丢失视频集 + 每个视频集的新增/丢失分集
-pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Result<CategoryUpdateResult> {
+pub async fn check_category_updates(
+    pool: &SqlitePool,
+    category_key: &str,
+) -> Result<CategoryUpdateResult> {
     // 获取分类下的所有视频集（空字符串 display_type 归入默认分类）
     let series_list = sqlx::query_as::<_, (i64, String, Option<String>, Option<String>, Option<String>)>(&format!(
         "SELECT id, title, folder_path, display_type, code FROM video_series WHERE display_type = '{}' OR display_type = '' OR (display_type IS NULL AND '{}' = 'anime')",
@@ -4379,28 +4503,38 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
 
     // 建立 folder_path 到 series 的映射，用于后续匹配新文件夹
     // 同时建立基础名称集合，用于匹配 "xxxx 1-3" → "xxxx" 这种改名场景
-    let mut existing_folder_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut existing_base_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut existing_folder_paths: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
+    let mut existing_base_names: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
     let mut existing_codes: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // 全库去重集合：只排除当前分类下的视频集，其他分类的视频集应该可以被归入当前分类
     // 建立名称到 display_type 的映射，用于判断是否属于当前分类
-    let all_series_with_type = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>)>(
-        "SELECT title, folder_path, code, display_type FROM video_series"
-    )
-    .fetch_all(pool)
-    .await?;
+    let all_series_with_type =
+        sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>)>(
+            "SELECT title, folder_path, code, display_type FROM video_series",
+        )
+        .fetch_all(pool)
+        .await?;
     // 只有当前分类的视频集才加入 existing_base_names 做去重
     // 其他分类的视频集不加入，这样 collect_new 就能把它们识别为"新视频集"并归入当前分类
-    let mut current_category_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut current_category_names: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
     for (title, folder_path, code, display_type) in &all_series_with_type {
         let is_current = display_type.as_deref() == Some(category_key)
-            || display_type.as_deref().map(|d| d.is_empty()).unwrap_or(false)
+            || display_type
+                .as_deref()
+                .map(|d| d.is_empty())
+                .unwrap_or(false)
             || (display_type.is_none() && category_key == "anime");
         if is_current {
             existing_base_names.insert(title.clone());
             current_category_names.insert(title.clone());
-            if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
+            if let Some(path) = folder_path
+                .as_deref()
+                .filter(|path| !path.trim().is_empty())
+            {
                 existing_folder_paths.insert(path.to_string());
                 let folder_name = std::path::Path::new(path)
                     .file_name()
@@ -4413,7 +4547,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
             }
         } else {
             // 其他分类的视频集：路径加入 existing_folder_paths 防止重复扫描，但名称不加入 existing_base_names
-            if let Some(path) = folder_path.as_deref().filter(|path| !path.trim().is_empty()) {
+            if let Some(path) = folder_path
+                .as_deref()
+                .filter(|path| !path.trim().is_empty())
+            {
                 existing_folder_paths.insert(path.to_string());
             }
         }
@@ -4422,20 +4559,28 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
         }
     }
     // 构建 base_name → (id, title, folder_path) 映射，用于检测文件夹改名
-    let mut base_to_series: std::collections::HashMap<String, (i64, String, String)> = std::collections::HashMap::new();
+    let mut base_to_series: std::collections::HashMap<String, (i64, String, String)> =
+        std::collections::HashMap::new();
     for (id, title, folder_path, _display_type, _code) in &series_list {
         let base = crate::scanner::strip_episode_suffix(title);
-        base_to_series.entry(base).or_insert((*id, title.clone(), folder_path.clone().unwrap_or_default()));
+        base_to_series.entry(base).or_insert((
+            *id,
+            title.clone(),
+            folder_path.clone().unwrap_or_default(),
+        ));
         if let Some(ref fp) = folder_path {
             let folder_name = std::path::Path::new(fp)
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| title.clone());
             let folder_base = crate::scanner::strip_episode_suffix(&folder_name);
-            base_to_series.entry(folder_base).or_insert((*id, title.clone(), fp.clone()));
+            base_to_series
+                .entry(folder_base)
+                .or_insert((*id, title.clone(), fp.clone()));
         }
     }
-    let renamed_series: std::sync::Mutex<Vec<(i64, String, String, String)>> = std::sync::Mutex::new(Vec::new());
+    let renamed_series: std::sync::Mutex<Vec<(i64, String, String, String)>> =
+        std::sync::Mutex::new(Vec::new());
 
     eprintln!("[check_updates] category={} existing_base_names={:?} current_category_names={:?} existing_folder_paths_count={} base_to_series_count={}",
         category_key, existing_base_names, current_category_names, existing_folder_paths.len(), base_to_series.len());
@@ -4473,9 +4618,12 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
 
         if series_missing {
             // 查询该视频集的分集数
-            let video_count: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM videos WHERE series_id = ?")
-                .bind(id).fetch_one(pool).await.unwrap_or(0);
+            let video_count: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM videos WHERE series_id = ?")
+                    .bind(id)
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(0);
             missing_series.push(SeriesInfo {
                 id: Some(*id),
                 name: title.clone(),
@@ -4515,35 +4663,64 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 //   actors=true  → 匹配演员目录，演员目录下继续识别时期
                 //   tags=true    → 匹配标签目录
                 //   两者都关闭 → 分类目录下一层直接作为视频集候选
-                let features: serde_json::Value = serde_json::from_str(&category.features).unwrap_or_default();
-                let actors_enabled = features.get("actors").and_then(|v| v.as_bool()).unwrap_or(false);
-                let tags_enabled = features.get("tags").and_then(|v| v.as_bool()).unwrap_or(false);
+                let features: serde_json::Value =
+                    serde_json::from_str(&category.features).unwrap_or_default();
+                let actors_enabled = features
+                    .get("actors")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let tags_enabled = features
+                    .get("tags")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
                 // 预加载所有标签名、演员名、分类名用于匹配
                 let tag_names: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT name FROM tags")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
                 let actor_names: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT name FROM actors")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
                 let actor_labels: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT COALESCE(label, name) FROM actors")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
                 let cat_names: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT name FROM categories")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
                 let cat_keys: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT key FROM categories")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
                 let all_actor_period_names: std::collections::HashSet<String> =
                     sqlx::query_scalar::<_, String>("SELECT name FROM actor_periods")
-                        .fetch_all(pool).await.unwrap_or_default().into_iter().collect();
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect();
 
                 // 收集目录下不在 existing_base_names 中的子文件夹名
                 // 路径规范化：统一斜杠方向和大小写
-                let normalize = |s: &str| -> String {
-                    s.replace("\\", "/").to_lowercase()
-                };
+                let normalize = |s: &str| -> String { s.replace("\\", "/").to_lowercase() };
                 let normalized_db_paths: std::collections::HashSet<String> =
                     existing_folder_paths.iter().map(|p| normalize(p)).collect();
 
@@ -4552,37 +4729,68 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     if let Ok(entries) = std::fs::read_dir(parent) {
                         for entry in entries.filter_map(|e| e.ok()) {
                             let p = entry.path();
-                            if !p.is_dir() { continue; }
+                            if !p.is_dir() {
+                                continue;
+                            }
                             let fps = p.to_string_lossy().to_string();
                             // 1) 规范化路径比较
                             if normalized_db_paths.contains(&normalize(&fps)) {
                                 eprintln!("[check_updates] 跳过(路径已存在): {}", fps);
                                 continue;
                             }
-                            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            let name = p
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default();
                             // 2) 文件夹名/车牌直接匹配；时期文件夹本身不是视频集
-                            let parsed_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
+                            let parsed_code =
+                                crate::scanner::parse_adult_filename(&name).map(|info| info.code);
                             if existing_base_names.contains(&name) {
                                 eprintln!("[check_updates] 跳过(名称已存在): {} existing_base_names包含={}", name, existing_base_names.contains(&name));
                                 continue;
                             }
-                            if parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) { continue; }
+                            if parsed_code
+                                .as_deref()
+                                .map(|code| existing_codes.contains(code))
+                                .unwrap_or(false)
+                            {
+                                continue;
+                            }
                             // 时期文件夹：进入内部扫描视频集，而不是跳过
                             if all_actor_period_names.contains(&name) {
                                 if let Ok(period_entries) = std::fs::read_dir(&p) {
                                     for pe in period_entries.filter_map(|e| e.ok()) {
                                         let pp = pe.path();
-                                        if !pp.is_dir() { continue; }
-                                        let p_name = pp.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                                        if !pp.is_dir() {
+                                            continue;
+                                        }
+                                        let p_name = pp
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().to_string())
+                                            .unwrap_or_default();
                                         let p_fps = pp.to_string_lossy().to_string();
-                                        if normalized_db_paths.contains(&normalize(&p_fps)) { continue; }
-                                        if existing_base_names.contains(&p_name) { continue; }
+                                        if normalized_db_paths.contains(&normalize(&p_fps)) {
+                                            continue;
+                                        }
+                                        if existing_base_names.contains(&p_name) {
+                                            continue;
+                                        }
                                         let p_base = crate::scanner::strip_episode_suffix(&p_name);
-                                        if existing_base_names.contains(&p_base) { continue; }
+                                        if existing_base_names.contains(&p_base) {
+                                            continue;
+                                        }
                                         let p_count = std::fs::read_dir(&pp)
-                                            .map(|entries| entries.filter_map(|e| e.ok())
-                                                .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
-                                                .count())
+                                            .map(|entries| {
+                                                entries
+                                                    .filter_map(|e| e.ok())
+                                                    .filter(|e| {
+                                                        e.path().is_file()
+                                                            && crate::scanner::is_video_file(
+                                                                &e.path(),
+                                                            )
+                                                    })
+                                                    .count()
+                                            })
                                             .unwrap_or(0);
                                         result.push((p_name, p_count, p_fps));
                                     }
@@ -4593,22 +4801,40 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if existing_base_names.contains(&base) {
                                 // 基名匹配但名称不同 → 检测为改名
-                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
+                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base)
+                                {
                                     if *old_title != name {
-                                        eprintln!("[check_updates] 检测到改名: {} -> {}", old_title, name);
-                                        renamed_series.lock().unwrap().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                        eprintln!(
+                                            "[check_updates] 检测到改名: {} -> {}",
+                                            old_title, name
+                                        );
+                                        renamed_series.lock().unwrap().push((
+                                            *sid,
+                                            old_title.clone(),
+                                            name.clone(),
+                                            fps.clone(),
+                                        ));
                                     }
                                 }
-                                eprintln!("[check_updates] 跳过(base名称已存在): name={} base={}", name, base);
+                                eprintln!(
+                                    "[check_updates] 跳过(base名称已存在): name={} base={}",
+                                    name, base
+                                );
                                 continue;
                             }
                             // 原来的 if !existing_base_names.contains(&base) 分支继续
                             {
                                 // 统计视频文件数；空视频集文件夹也保留为 0
                                 let count = std::fs::read_dir(&p)
-                                    .map(|entries| entries.filter_map(|e| e.ok())
-                                        .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
-                                        .count())
+                                    .map(|entries| {
+                                        entries
+                                            .filter_map(|e| e.ok())
+                                            .filter(|e| {
+                                                e.path().is_file()
+                                                    && crate::scanner::is_video_file(&e.path())
+                                            })
+                                            .count()
+                                    })
                                     .unwrap_or(0);
                                 result.push((name, count, fps));
                             }
@@ -4622,14 +4848,25 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     name: &str,
                 ) -> std::collections::HashSet<String> {
                     let aid = sqlx::query_scalar::<_, i64>(
-                        "SELECT id FROM actors WHERE name = ? OR COALESCE(label, name) = ?")
-                        .bind(name).bind(name).fetch_one(pool).await.unwrap_or(0);
+                        "SELECT id FROM actors WHERE name = ? OR COALESCE(label, name) = ?",
+                    )
+                    .bind(name)
+                    .bind(name)
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(0);
                     if aid == 0 {
                         return std::collections::HashSet::new();
                     }
                     sqlx::query_scalar::<_, String>(
-                        "SELECT name FROM actor_periods WHERE actor_id = ?")
-                        .bind(aid).fetch_all(pool).await.unwrap_or_default().into_iter().collect()
+                        "SELECT name FROM actor_periods WHERE actor_id = ?",
+                    )
+                    .bind(aid)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect()
                 }
 
                 async fn collect_from_actor_folder<F>(
@@ -4640,8 +4877,10 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 where
                     F: FnMut(&std::path::Path) -> Vec<(String, usize, String)> + ?Sized,
                 {
-                    let name = actor_path.file_name()
-                        .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    let name = actor_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
                     let actor_periods = actor_period_names_for(pool, &name).await;
                     if actor_periods.is_empty() {
                         return collect_new(actor_path);
@@ -4652,9 +4891,13 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     if let Ok(entries) = std::fs::read_dir(actor_path) {
                         for entry in entries.filter_map(|e| e.ok()) {
                             let p = entry.path();
-                            if !p.is_dir() { continue; }
-                            let sub_name = p.file_name()
-                                .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            if !p.is_dir() {
+                                continue;
+                            }
+                            let sub_name = p
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default();
                             if actor_periods.contains(&sub_name) {
                                 found_period = true;
                                 result.extend(collect_new(&p));
@@ -4690,12 +4933,19 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     if let Ok(entries) = std::fs::read_dir(parent) {
                         for entry in entries.filter_map(|e| e.ok()) {
                             let p = entry.path();
-                            if !p.is_dir() { continue; }
-                            let name = p.file_name()
-                                .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                            if !p.is_dir() {
+                                continue;
+                            }
+                            let name = p
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default();
 
-                            if actors_enabled && (actor_names.contains(&name) || actor_labels.contains(&name)) {
-                                result.extend(collect_from_actor_folder(pool, &p, collect_new).await);
+                            if actors_enabled
+                                && (actor_names.contains(&name) || actor_labels.contains(&name))
+                            {
+                                result
+                                    .extend(collect_from_actor_folder(pool, &p, collect_new).await);
                                 continue;
                             }
 
@@ -4716,19 +4966,38 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                     .unwrap_or(false);
                 if !scan_path_has_subdirs && !normalized_db_paths.contains(&normalize(scan_path)) {
                     let has_root_video = std::fs::read_dir(path)
-                        .map(|entries| entries.filter_map(|e| e.ok()).any(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path())))
+                        .map(|entries| {
+                            entries.filter_map(|e| e.ok()).any(|e| {
+                                e.path().is_file() && crate::scanner::is_video_file(&e.path())
+                            })
+                        })
                         .unwrap_or(false);
                     let has_root_poster = crate::scanner::find_folder_poster(path).is_some();
                     if has_root_video || has_root_poster {
-                        let root_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                        let root_name = path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default();
                         let root_base = crate::scanner::strip_episode_suffix(&root_name);
-                        if !existing_base_names.contains(&root_name) && !existing_base_names.contains(&root_base) {
+                        if !existing_base_names.contains(&root_name)
+                            && !existing_base_names.contains(&root_base)
+                        {
                             let count = std::fs::read_dir(path)
-                                .map(|entries| entries.filter_map(|e| e.ok())
-                                    .filter(|e| e.path().is_file() && crate::scanner::is_video_file(&e.path()))
-                                    .count())
+                                .map(|entries| {
+                                    entries
+                                        .filter_map(|e| e.ok())
+                                        .filter(|e| {
+                                            e.path().is_file()
+                                                && crate::scanner::is_video_file(&e.path())
+                                        })
+                                        .count()
+                                })
                                 .unwrap_or(0);
-                            new_folders.push((root_name, count, path.to_string_lossy().to_string()));
+                            new_folders.push((
+                                root_name,
+                                count,
+                                path.to_string_lossy().to_string(),
+                            ));
                         }
                     }
                 }
@@ -4736,29 +5005,40 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 if let Ok(top_entries) = std::fs::read_dir(path) {
                     for entry in top_entries.filter_map(|e| e.ok()) {
                         let sub_path = entry.path();
-                        if !sub_path.is_dir() { continue; }
-                        let name = sub_path.file_name()
-                            .map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                        if !sub_path.is_dir() {
+                            continue;
+                        }
+                        let name = sub_path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default();
 
                         if cat_names.contains(&name) || cat_keys.contains(&name) {
                             // scan_path 指向父级目录时，分类文件夹内继续按当前分类 features 识别
-                            new_folders.extend(collect_by_category_features(
-                                pool,
-                                &sub_path,
-                                actors_enabled,
-                                tags_enabled,
-                                &actor_names,
-                                &actor_labels,
-                                &tag_names,
-                                &mut collect_new,
-                            ).await);
+                            new_folders.extend(
+                                collect_by_category_features(
+                                    pool,
+                                    &sub_path,
+                                    actors_enabled,
+                                    tags_enabled,
+                                    &actor_names,
+                                    &actor_labels,
+                                    &tag_names,
+                                    &mut collect_new,
+                                )
+                                .await,
+                            );
                         } else if !actors_enabled && !tags_enabled {
                             // scan_path 本身就是分类目录，且分类未开演员/标签：顶层文件夹就是视频集
                             new_folders.extend(collect_new(path));
                             break;
-                        } else if actors_enabled && (actor_names.contains(&name) || actor_labels.contains(&name)) {
+                        } else if actors_enabled
+                            && (actor_names.contains(&name) || actor_labels.contains(&name))
+                        {
                             // 匹配演员 → 进入演员目录；如有时期，进入时期目录找视频集
-                            new_folders.extend(collect_from_actor_folder(pool, &sub_path, &mut collect_new).await);
+                            new_folders.extend(
+                                collect_from_actor_folder(pool, &sub_path, &mut collect_new).await,
+                            );
                         } else if tags_enabled && tag_names.contains(&name) {
                             // 匹配标签 → 进入标签目录找视频集
                             new_folders.extend(collect_new(&sub_path));
@@ -4775,18 +5055,32 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                                 continue;
                             }
                             // 3) 番号已存在 → 跳过
-                            let parsed_code = crate::scanner::parse_adult_filename(&name).map(|info| info.code);
-                            if parsed_code.as_deref().map(|code| existing_codes.contains(code)).unwrap_or(false) {
+                            let parsed_code =
+                                crate::scanner::parse_adult_filename(&name).map(|info| info.code);
+                            if parsed_code
+                                .as_deref()
+                                .map(|code| existing_codes.contains(code))
+                                .unwrap_or(false)
+                            {
                                 continue;
                             }
                             // 4) 去掉集数后缀再匹配
                             let base = crate::scanner::strip_episode_suffix(&name);
                             if existing_base_names.contains(&base) {
                                 // 基名匹配但名称不同 → 检测为改名
-                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base) {
+                                if let Some((sid, old_title, _old_path)) = base_to_series.get(&base)
+                                {
                                     if *old_title != name {
-                                        eprintln!("[check_updates] 检测到改名(非标签): {} -> {}", old_title, name);
-                                        renamed_series.lock().unwrap().push((*sid, old_title.clone(), name.clone(), fps.clone()));
+                                        eprintln!(
+                                            "[check_updates] 检测到改名(非标签): {} -> {}",
+                                            old_title, name
+                                        );
+                                        renamed_series.lock().unwrap().push((
+                                            *sid,
+                                            old_title.clone(),
+                                            name.clone(),
+                                            fps.clone(),
+                                        ));
                                     }
                                 }
                                 continue;
@@ -4813,7 +5107,15 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
                 }
                 new_folders.sort_by(|a, b| a.0.cmp(&b.0));
                 new_folders.dedup_by(|a, b| a.0 == b.0);
-                new_folders.into_iter().map(|(name, video_count, folder_path)| SeriesInfo { id: None, name, video_count, folder_path: Some(folder_path) }).collect()
+                new_folders
+                    .into_iter()
+                    .map(|(name, video_count, folder_path)| SeriesInfo {
+                        id: None,
+                        name,
+                        video_count,
+                        folder_path: Some(folder_path),
+                    })
+                    .collect()
             } else {
                 vec![]
             }
@@ -4826,22 +5128,30 @@ pub async fn check_category_updates(pool: &SqlitePool, category_key: &str) -> Re
 
     // 批量更新重命名的视频集，并从 missing_series 移除
     let renamed_series = renamed_series.into_inner().unwrap();
-    let renamed_ids: std::collections::HashSet<i64> = renamed_series.iter().map(|(sid, _, _, _)| *sid).collect();
+    let renamed_ids: std::collections::HashSet<i64> =
+        renamed_series.iter().map(|(sid, _, _, _)| *sid).collect();
     missing_series.retain(|s| !s.id.map_or(false, |id| renamed_ids.contains(&id)));
 
     for (sid, old_title, new_title, new_path) in &renamed_series {
-        eprintln!("[check_updates] 自动更新视频集: id={} {} → {}", sid, old_title, new_title);
+        eprintln!(
+            "[check_updates] 自动更新视频集: id={} {} → {}",
+            sid, old_title, new_title
+        );
         // 更新视频集名称和路径
         let _ = sqlx::query("UPDATE video_series SET title = ?, folder_path = ? WHERE id = ?")
             .bind(new_title)
             .bind(new_path)
             .bind(sid)
-            .execute(&*pool).await;
+            .execute(&*pool)
+            .await;
 
         // 同时更新该视频集下所有视频的 file_path
-        if let Ok(old_fp) = sqlx::query_scalar::<_, String>(
-            "SELECT folder_path FROM video_series WHERE id = ?"
-        ).bind(sid).fetch_one(&*pool).await {
+        if let Ok(old_fp) =
+            sqlx::query_scalar::<_, String>("SELECT folder_path FROM video_series WHERE id = ?")
+                .bind(sid)
+                .fetch_one(&*pool)
+                .await
+        {
             if let Some(old_dir_name) = std::path::Path::new(&old_fp).file_name() {
                 if let Some(new_dir_name) = std::path::Path::new(new_path).file_name() {
                     let old_dir_str = old_dir_name.to_string_lossy().to_string();

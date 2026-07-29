@@ -22,8 +22,7 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actors_if_empty(pool).await?;
     create_actor_photos_table(pool).await?;
     create_indexes(pool).await?;
-    add_column_if_not_exists(pool, "categories", "scan_path", "TEXT")
-        .await?;
+    add_column_if_not_exists(pool, "categories", "scan_path", "TEXT").await?;
     // 回填历史空 display_type：动漫类（scan_path 含 '动漫' 或 key='anime' 的分类下）
     execute(
         pool,
@@ -33,27 +32,35 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
     seed_default_actor_fields(pool).await?;
     seed_tutorial_data(pool).await?;
     // Remove stale 'name' field from actor_fields (task #1)
-    execute(pool, "DELETE FROM actor_fields WHERE field_key = 'name'", "delete name from actor_fields").await?;
+    execute(
+        pool,
+        "DELETE FROM actor_fields WHERE field_key = 'name'",
+        "delete name from actor_fields",
+    )
+    .await?;
     // 回填历史分类 features 中缺失的 status 字段
     {
         let rows = sqlx::query_scalar::<_, String>("SELECT features FROM categories")
-            .fetch_all(pool).await.unwrap_or_default();
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
         for features_str in rows {
             if let Ok(mut features) = serde_json::from_str::<serde_json::Value>(&features_str) {
                 if features.get("status").is_none() {
                     features["status"] = serde_json::Value::Bool(true);
-                    let new_features = serde_json::to_string(&features).unwrap_or(features_str.clone());
+                    let new_features =
+                        serde_json::to_string(&features).unwrap_or(features_str.clone());
                     sqlx::query("UPDATE categories SET features = ? WHERE features = ?")
-                        .bind(&new_features).bind(&features_str)
-                        .execute(pool).await?;
+                        .bind(&new_features)
+                        .bind(&features_str)
+                        .execute(pool)
+                        .await?;
                 }
             }
         }
     }
-    add_column_if_not_exists(pool, "actor_fields", "options", "TEXT")
-        .await?;
-    add_column_if_not_exists(pool, "actor_fields", "format", "TEXT")
-        .await?;
+    add_column_if_not_exists(pool, "actor_fields", "options", "TEXT").await?;
+    add_column_if_not_exists(pool, "actor_fields", "format", "TEXT").await?;
     create_preset_templates_table(pool).await?;
     seed_preset_templates(pool).await?;
     add_column_if_not_exists(pool, "actors", "view_count", "INTEGER NOT NULL DEFAULT 0").await?;
@@ -74,14 +81,13 @@ pub async fn run(pool: &SqlitePool) -> Result<()> {
         "create tag_categories table",
     )
     .await?;
-    
+
     // === 订阅相关表 ===
     create_subscription_tables(pool).await?;
     create_series_seasons_table(pool).await?;
 
     Ok(())
 }
-
 
 async fn create_series_seasons_table(pool: &SqlitePool) -> Result<()> {
     execute(
@@ -1056,6 +1062,7 @@ async fn create_indexes(pool: &SqlitePool) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 async fn seed_default_categories(pool: &SqlitePool) -> Result<()> {
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM categories")
         .fetch_one(pool)
@@ -1164,7 +1171,15 @@ async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
             1,
             4,
         ),
-        ("cup_size", "罩杯", "text", "[]", r#"{"maxLength":1,"uppercase":true}"#, 1, 5),
+        (
+            "cup_size",
+            "罩杯",
+            "text",
+            "[]",
+            r#"{"maxLength":1,"uppercase":true}"#,
+            1,
+            5,
+        ),
     ];
 
     for (key, name, field_type, sub_fields, rules, is_ext, order) in &presets {
@@ -1184,7 +1199,6 @@ async fn seed_preset_templates(pool: &SqlitePool) -> Result<()> {
 
     Ok(())
 }
-
 
 /// 首次安装时预置教程示例数据：一个分类、一个演员、两个标签、一个视频集
 async fn seed_tutorial_data(pool: &SqlitePool) -> Result<()> {
@@ -1252,7 +1266,7 @@ async fn seed_tutorial_data(pool: &SqlitePool) -> Result<()> {
 
     // 创建示例视频集
     sqlx::query(
-        "INSERT INTO video_series (title, display_type, created_at) VALUES (?, ?, datetime('now'))"
+        "INSERT INTO video_series (title, display_type, created_at) VALUES (?, ?, datetime('now'))",
     )
     .bind("示例视频集")
     .bind("example")
@@ -1261,9 +1275,10 @@ async fn seed_tutorial_data(pool: &SqlitePool) -> Result<()> {
     .context("seed tutorial video series")?;
 
     // 获取视频集 ID
-    let series_id: i64 = sqlx::query_scalar("SELECT id FROM video_series WHERE title = '示例视频集'")
-        .fetch_one(pool)
-        .await?;
+    let series_id: i64 =
+        sqlx::query_scalar("SELECT id FROM video_series WHERE title = '示例视频集'")
+            .fetch_one(pool)
+            .await?;
 
     // 关联演员
     sqlx::query("INSERT INTO series_actors (series_id, actor_id) VALUES (?, ?)")

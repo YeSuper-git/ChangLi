@@ -22,6 +22,9 @@ use wry::{
 };
 
 #[cfg(target_os = "windows")]
+mod composition_webview;
+
+#[cfg(target_os = "windows")]
 use tao::platform::windows::WindowExtWindows;
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
@@ -47,6 +50,33 @@ enum InstallerEvent {
         code: Option<i32>,
         message: String,
     },
+}
+
+enum InstallerWebView {
+    #[cfg(target_os = "windows")]
+    Composition(composition_webview::CompositionWebView),
+    Wry(wry::WebView),
+}
+
+impl InstallerWebView {
+    fn evaluate_script(&self, script: &str) -> Result<(), String> {
+        match self {
+            #[cfg(target_os = "windows")]
+            Self::Composition(webview) => webview.evaluate_script(script),
+            Self::Wry(webview) => webview
+                .evaluate_script(script)
+                .map_err(|error| error.to_string()),
+        }
+    }
+
+    fn handle_window_event(&self, window: &tao::window::Window, event: &WindowEvent<'_>) {
+        #[cfg(target_os = "windows")]
+        if let Self::Composition(webview) = self {
+            webview.handle_window_event(window, event);
+        }
+        #[cfg(not(target_os = "windows"))]
+        let _ = (window, event);
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -410,15 +440,15 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   setPhase('ready');
   document.addEventListener('mousedown', e => {{
     if (e.button !== 0 || e.target.closest('a,button,input,label')) return;
-    window.location.href = 'changli://drag';
+    (window.__changliHostCommand || (value => window.location.href = value))('changli://drag');
   }});
   document.addEventListener('click', e => {{
     const el = e.target.closest('a');
     if (!el) return;
     const href = el.getAttribute('href') || '';
-    if (el.dataset.close === 'true' || href === 'changli://launch-close') {{
+    if (href.startsWith('changli://')) {{
       e.preventDefault();
-      window.location.href = href;
+      (window.__changliHostCommand || (value => window.location.href = value))(href);
     }}
   }});
   window.setInstalling = () => {{
@@ -455,7 +485,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
       setPhase('fail'); installCard.className = 'card'; titleBlock.className = 'title drag'; setHeadline('安装失败'); subtitle.textContent = ''; state.classList.add('active'); state.textContent = message || ('安装失败' + (code == null ? '' : '，退出码 ' + code)); progressBar.style.width = '1%'; install.textContent = '重试'; install.href = 'changli://install'; install.classList.remove('disabled'); cancel.classList.remove('disabled'); closeBtn.classList.remove('disabled'); choose.classList.remove('disabled');
     }}
   }};
-  requestAnimationFrame(() => requestAnimationFrame(() => {{ window.location.href = 'changli://ready'; }}));
+  requestAnimationFrame(() => requestAnimationFrame(() => {{
+    (window.__changliHostCommand || (value => window.location.href = value))('changli://ready');
+  }}));
 </script>
 </body>
 </html>"#,
@@ -469,22 +501,14 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 #[cfg(target_os = "windows")]
 fn apply_true_transparent_window(window: &tao::window::Window) {
     use windows::Win32::{
-        Foundation::{COLORREF, HWND},
-        Graphics::Dwm::DwmExtendFrameIntoClientArea,
-        UI::{
-            Controls::MARGINS,
-            WindowsAndMessaging::{
-                GetWindowLongW, SetLayeredWindowAttributes, SetWindowLongW, GWL_EXSTYLE, LWA_ALPHA,
-                WS_EX_LAYERED,
-            },
-        },
+        Foundation::HWND, Graphics::Dwm::DwmExtendFrameIntoClientArea, UI::Controls::MARGINS,
     };
 
     let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
     unsafe {
-        // 现实 Windows artifact 已多次证明纯透明链路在部分环境会回退成白底。
-        // 这里明确采用“圆角 region 裁剪 + 内侧柔光/渐变/阴影淡化边缘”的稳定路线，
-        // 不再在纯透明白底和硬裁之间来回切换。
+        // DirectComposition supplies the antialiased shape. Do not combine it
+        // with SetWindowRgn: HRGN clipping is binary and reintroduces the
+        // jagged edge this compositor path is designed to remove.
         let margins = MARGINS {
             cxLeftWidth: -1,
             cxRightWidth: -1,
@@ -492,20 +516,49 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
             cyBottomHeight: -1,
         };
         let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
-        let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
-        let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
-        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
-
-        use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
-        let region = CreateRoundRectRgn(0, 0, W + 1, H + 1, 68, 68);
-        if !region.is_invalid() {
-            let _ = SetWindowRgn(hwnd, region, true);
-        }
     }
 }
 
 #[cfg(not(target_os = "windows"))]
 fn apply_true_transparent_window(_window: &tao::window::Window) {}
+
+fn build_wry_webview(
+    window: &tao::window::Window,
+    page: String,
+    proxy: EventLoopProxy<InstallerEvent>,
+) -> wry::Result<wry::WebView> {
+    let mut web_context = WebContext::new(Some(webview_data_dir()));
+    WebViewBuilder::with_web_context(&mut web_context)
+        .with_bounds(Rect {
+            position: WebLogicalPosition::new(0, 0).into(),
+            size: WebLogicalSize::new(W, H).into(),
+        })
+        .with_transparent(true)
+        .with_background_color((0, 0, 0, 0))
+        .with_html(page)
+        .with_navigation_handler(move |url| {
+            if let Some(cmd) = url.strip_prefix("changli://") {
+                if let Some(event) = installer_event(cmd) {
+                    let _ = proxy.send_event(event);
+                }
+                return false;
+            }
+            true
+        })
+        .build_as_child(window)
+}
+
+fn installer_event(command: &str) -> Option<InstallerEvent> {
+    match command.trim().trim_end_matches('/') {
+        "ready" => Some(InstallerEvent::Ready),
+        "drag" => Some(InstallerEvent::Drag),
+        "close" => Some(InstallerEvent::Close),
+        "choose-dir" => Some(InstallerEvent::ChooseDir),
+        "install" => Some(InstallerEvent::Install),
+        "launch-close" => Some(InstallerEvent::CloseAndLaunch),
+        _ => None,
+    }
+}
 
 fn main() -> wry::Result<()> {
     let event_loop = EventLoopBuilder::<InstallerEvent>::with_user_event().build();
@@ -539,39 +592,27 @@ fn main() -> wry::Result<()> {
     let window = builder.build(&event_loop).expect("create installer window");
     apply_true_transparent_window(&window);
 
-    let nav_proxy = proxy.clone();
-    let mut web_context = WebContext::new(Some(webview_data_dir()));
-    let webview = WebViewBuilder::with_web_context(&mut web_context)
-        .with_bounds(Rect {
-            position: WebLogicalPosition::new(0, 0).into(),
-            size: WebLogicalSize::new(W, H).into(),
-        })
-        .with_transparent(true)
-        .with_background_color((0, 0, 0, 0))
-        .with_html(html(&default_dir, is_update))
-        .with_navigation_handler(move |url| {
-            if let Some(cmd) = url.strip_prefix("changli://") {
-                let event = match cmd.trim_end_matches('/') {
-                    "ready" => Some(InstallerEvent::Ready),
-                    "drag" => Some(InstallerEvent::Drag),
-                    "close" => Some(InstallerEvent::Close),
-                    "choose-dir" => Some(InstallerEvent::ChooseDir),
-                    "install" => Some(InstallerEvent::Install),
-                    "launch-close" => Some(InstallerEvent::CloseAndLaunch),
-                    _ => None,
-                };
-                if let Some(event) = event {
-                    let _ = nav_proxy.send_event(event);
-                }
-                return false;
-            }
-            true
-        })
-        .build_as_child(&window)?;
+    let page = html(&default_dir, is_update);
+    #[cfg(target_os = "windows")]
+    let webview = match composition_webview::CompositionWebView::new(&window, &page, proxy.clone())
+    {
+        Ok(webview) => InstallerWebView::Composition(webview),
+        Err(error) => {
+            write_installer_log(&format!(
+                "DirectComposition WebView2 unavailable, using HWND fallback: {error}"
+            ));
+            InstallerWebView::Wry(build_wry_webview(&window, page, proxy.clone())?)
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let webview = InstallerWebView::Wry(build_wry_webview(&window, page, proxy.clone())?);
 
     let mut install_dir = default_dir;
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
+        if let Event::WindowEvent { event, .. } = &event {
+            webview.handle_window_event(&window, event);
+        }
         match event {
             Event::NewEvents(StartCause::Init) => {}
             Event::WindowEvent {
