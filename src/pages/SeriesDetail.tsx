@@ -53,6 +53,15 @@ import { useLibraryStore } from '../store/libraryStore';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { notify } from '../utils/notify';
 
+function playerOpenErrorMessage(error: unknown): string {
+  const detail = typeof error === 'string'
+    ? error
+    : error instanceof Error
+      ? error.message
+      : '';
+  return detail ? `打开播放失败：${detail}` : '打开播放失败';
+}
+
 interface SeriesDetailCacheEntry {
   series: VideoSeries | null;
   videos: Video[];
@@ -719,7 +728,7 @@ const SeriesDetail: React.FC = () => {
       if (target) await openPlayerWindow(target.id);
     } catch (error) {
       console.error('[SeriesDetail] 播放入口失败:', error);
-      notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' });
+      notify({ message: playerOpenErrorMessage(error), type: 'error' });
     }
   };
 
@@ -1689,7 +1698,7 @@ const VideoGrid: React.FC<VideoGridProps> = ({
           if (selectMode && onToggleSelect) {
             onToggleSelect(video.id);
           } else {
-            openPlayerWindow(video.id).catch(() => notify({ message: '打开播放失败，请确认视频文件仍然存在', type: 'error' }));
+            openPlayerWindow(video.id).catch((error) => notify({ message: playerOpenErrorMessage(error), type: 'error' }));
           }
         }}
       >

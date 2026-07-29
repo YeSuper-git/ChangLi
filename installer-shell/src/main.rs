@@ -553,10 +553,47 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
             std::mem::size_of_val(&corner_preference) as u32,
         );
     }
+    apply_rounded_window_region(window);
 }
 
 #[cfg(not(target_os = "windows"))]
 fn apply_true_transparent_window(_window: &tao::window::Window) {}
+
+#[cfg(target_os = "windows")]
+fn apply_rounded_window_region(window: &tao::window::Window) {
+    use windows::Win32::{
+        Foundation::HWND,
+        Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn},
+    };
+
+    let hwnd = HWND(window.hwnd() as *mut core::ffi::c_void);
+    let size = window.inner_size();
+    let radius = (34.0 * window.scale_factor()).round().max(1.0) as i32;
+    unsafe {
+        // The +1 follows the Win32 region API's exclusive lower/right edge.
+        // DComp still renders the antialiased edge inside this hard HWND
+        // boundary, while the region guarantees no host-surface corner can
+        // leak through on affected Windows 11/WebView2 combinations.
+        let region = CreateRoundRectRgn(
+            0,
+            0,
+            size.width as i32 + 1,
+            size.height as i32 + 1,
+            radius * 2,
+            radius * 2,
+        );
+        if region.0.is_null() {
+            return;
+        }
+        // On success Windows owns the region. Delete it only on failure.
+        if SetWindowRgn(hwnd, region, true) == 0 {
+            let _ = DeleteObject(region);
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_rounded_window_region(_window: &tao::window::Window) {}
 
 fn build_wry_webview(
     window: &tao::window::Window,
@@ -656,6 +693,9 @@ fn main() -> wry::Result<()> {
         *control_flow = ControlFlow::Wait;
         if let Event::WindowEvent { event, .. } = &event {
             webview.handle_window_event(&window, event);
+            if matches!(event, WindowEvent::ScaleFactorChanged { .. }) {
+                apply_rounded_window_region(&window);
+            }
         }
         match event {
             Event::NewEvents(StartCause::Init) => {}

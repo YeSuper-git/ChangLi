@@ -330,12 +330,13 @@ export interface VideoSeries {
 }
 
 export function formatSeriesWatchLabel(series: Pick<VideoSeries, 'is_watched' | 'last_watched_episode' | 'last_watched_season'>, epWord: string): string {
+  if (series.is_watched) return '已看完';
   const episode = series.last_watched_episode;
-  if (!episode) return series.is_watched ? '已看完' : '尚未观看';
+  if (!episode) return '尚未观看';
   const season = series.last_watched_season;
   if (season && season > 0 && season !== 999) return `看到第${season}季第${episode}${epWord}`;
   if (season === 999) return `看到剧场版第${episode}${epWord}`;
-  return series.is_watched ? `已看完（看到第${episode}${epWord}）` : `看到第${episode}${epWord}`;
+  return `看到第${episode}${epWord}`;
 }
 
 export function isSeriesCompleted(series: Pick<VideoSeries, 'status'>): boolean {

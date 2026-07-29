@@ -937,8 +937,14 @@ pub async fn get_video_series_list(
             updated_at: row.get("updated_at"),
             is_favorite: row.try_get("is_favorite").ok().flatten(),
             is_watched: row.try_get("is_watched").ok().flatten(),
-            last_watched_episode: None,
-            last_watched_season: None,
+            last_watched_episode: row
+                .try_get::<Option<i32>, _>("last_watched_episode")
+                .ok()
+                .flatten(),
+            last_watched_season: row
+                .try_get::<Option<i32>, _>("last_watched_season")
+                .ok()
+                .flatten(),
             has_actor: row
                 .try_get::<Option<i64>, _>("has_actor")
                 .ok()
@@ -2841,8 +2847,14 @@ pub async fn get_favorite_series(pool: &SqlitePool) -> Result<Vec<VideoSeries>> 
             updated_at: row.get("updated_at"),
             is_favorite: row.try_get("is_favorite").ok().flatten(),
             is_watched: row.try_get("is_watched").ok().flatten(),
-            last_watched_episode: None,
-            last_watched_season: None,
+            last_watched_episode: row
+                .try_get::<Option<i32>, _>("last_watched_episode")
+                .ok()
+                .flatten(),
+            last_watched_season: row
+                .try_get::<Option<i32>, _>("last_watched_season")
+                .ok()
+                .flatten(),
             has_actor: row
                 .try_get::<Option<i64>, _>("has_actor")
                 .ok()

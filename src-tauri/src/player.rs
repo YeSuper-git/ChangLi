@@ -135,23 +135,32 @@ unsafe extern "system" fn player_sizing_subclass(
 
 #[cfg(target_os = "windows")]
 fn install_player_aspect_ratio_subclass(window: &WebviewWindow) -> Result<()> {
-    use windows::Win32::UI::Shell::SetWindowSubclass;
-
     const PLAYER_ASPECT_SUBCLASS_ID: usize = 0x434C_4152;
     let handle = window.hwnd().context("get player HWND for aspect resize")?;
-    let hwnd = windows::Win32::Foundation::HWND(handle.0);
-    let installed = unsafe {
-        SetWindowSubclass(
-            hwnd,
-            Some(player_sizing_subclass),
-            PLAYER_ASPECT_SUBCLASS_ID,
-            0,
-        )
-    };
-    if !installed.as_bool() {
-        return Err(anyhow!("install player aspect-ratio window subclass"));
-    }
-    Ok(())
+    let raw_hwnd = handle.0 as isize;
+
+    // SetWindowSubclass must run on the thread that owns the HWND. Tauri
+    // commands execute on an async worker, so calling it directly here makes
+    // Windows reject the subclass and used to abort the entire player-open
+    // path with a misleading "file no longer exists" notification.
+    window
+        .run_on_main_thread(move || {
+            use windows::Win32::UI::Shell::SetWindowSubclass;
+
+            let hwnd = windows::Win32::Foundation::HWND(raw_hwnd as *mut core::ffi::c_void);
+            let installed = unsafe {
+                SetWindowSubclass(
+                    hwnd,
+                    Some(player_sizing_subclass),
+                    PLAYER_ASPECT_SUBCLASS_ID,
+                    0,
+                )
+            };
+            if !installed.as_bool() {
+                eprintln!("[player] aspect-ratio subclass unavailable; player remains usable");
+            }
+        })
+        .context("schedule player aspect-ratio subclass on UI thread")
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -665,7 +674,12 @@ fn apply_player_window_style(window: &WebviewWindow) -> Result<()> {
     // 播放器是独立顶层窗口，应在任务栏和 Alt+Tab 中与主窗口分别出现。
     window.set_skip_taskbar(false)?;
     window.set_resizable(true)?;
-    install_player_aspect_ratio_subclass(window)?;
+    if let Err(error) = install_player_aspect_ratio_subclass(window) {
+        // Aspect locking is an enhancement, never a prerequisite for opening
+        // a valid video. Keep playback available if the platform hook cannot
+        // be scheduled or installed.
+        eprintln!("[player] aspect-ratio subclass skipped: {error:#}");
+    }
     window.set_always_on_top(always_on_top)?;
     set_windows_11_rounded_corners(window);
     Ok(())
