@@ -17,14 +17,7 @@ const fuzzyMatch = (source: string, keyword: string) => {
   const text = normalize(source);
   const query = normalize(keyword);
   if (!query) return false;
-  if (text.includes(query)) return true;
-
-  let queryIndex = 0;
-  for (const char of text) {
-    if (char === query[queryIndex]) queryIndex += 1;
-    if (queryIndex === query.length) return true;
-  }
-  return false;
+  return text.includes(query);
 };
 
 const Search: React.FC = () => {
@@ -82,7 +75,8 @@ const Search: React.FC = () => {
     const seriesResults: SearchItem[] = seriesItems
       .filter((series) =>
         fuzzyMatch(series.title, searchKeyword) ||
-        fuzzyMatch(series.description || '', searchKeyword)
+        fuzzyMatch(series.description || '', searchKeyword) ||
+        fuzzyMatch(series.code || '', searchKeyword)
       )
       .map((series) => ({
         type: 'series',

@@ -13,7 +13,6 @@ import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCl
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 const OBSERVED_PROPERTIES = MPV_OBSERVED_PROPERTIES;
-type ResizeDirection = 'East' | 'North' | 'NorthEast' | 'NorthWest' | 'South' | 'SouthEast' | 'SouthWest' | 'West';
 
 function playerErrorText(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -76,6 +75,7 @@ const Player: React.FC = () => {
   const [cursorVisible, setCursorVisible] = useState(true);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const cursorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeNavigationRef = useRef<'top' | 'right' | 'bottom' | null>(null);
   
   const [draggingTime, setDraggingTime] = useState<number | null>(null);
   
@@ -686,14 +686,92 @@ const Player: React.FC = () => {
     };
   }, [getCurrentVideoRatio, isFullscreen, isPiP, playerWindow]);
 
-  const startWindowResize = useCallback((event: React.PointerEvent<HTMLDivElement>, direction: ResizeDirection) => {
+  const startAspectResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
-    playerWindow.startResizeDragging(direction).catch((error) => {
-      console.error('[Player] 启动原生窗口缩放失败:', error);
-    });
-  }, [isFullscreen, isWindowMaximized, playerWindow]);
+
+    const grip = event.currentTarget;
+    grip.setPointerCapture(event.pointerId);
+
+    const startX = event.screenX;
+    const startY = event.screenY;
+    const startW = lastWindowSizeRef.current?.width || window.innerWidth || 1280;
+    const startH = lastWindowSizeRef.current?.height || window.innerHeight || 720;
+    const ratio = getCurrentVideoRatio();
+    const minW = isPiP ? 360 : 520;
+    const minH = Math.round(minW / ratio);
+    let latest = { width: startW, height: startH };
+
+    const syncViewport = (height: number) => {
+      const value = `${Math.round(height)}px`;
+      document.documentElement.style.height = value;
+      document.body.style.height = value;
+      document.getElementById('root')?.style.setProperty('height', value);
+      const player = document.querySelector('.changli-player-window') as HTMLElement | null;
+      if (player) player.style.height = value;
+    };
+
+    const scheduleSize = (size: { width: number; height: number }) => {
+      const state = customResizeRef.current;
+      state.pending = size;
+      if (state.raf || state.inFlight) return;
+
+      state.raf = window.requestAnimationFrame(() => {
+        state.raf = 0;
+        const target = state.pending;
+        state.pending = null;
+        if (!target || !state.active) return;
+
+        state.inFlight = true;
+        playerWindow.setSize(new LogicalSize(target.width, target.height))
+          .catch((error) => console.error('[Player] 等比调整窗口失败:', error))
+          .finally(() => {
+            state.inFlight = false;
+            if (state.active && state.pending) scheduleSize(state.pending);
+          });
+      });
+    };
+
+    customResizeRef.current.active = true;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      if (!customResizeRef.current.active) return;
+      moveEvent.preventDefault();
+
+      const dx = moveEvent.screenX - startX;
+      const dy = moveEvent.screenY - startY;
+      const widthFromX = startW + dx;
+      const widthFromY = (startH + dy) * ratio;
+      const desiredW = Math.abs(dy * ratio) > Math.abs(dx) ? widthFromY : widthFromX;
+      const width = Math.max(minW, Math.round(desiredW));
+      const height = Math.max(minH, Math.round(width / ratio));
+
+      latest = { width, height };
+      lastWindowSizeRef.current = latest;
+      syncViewport(height);
+      scheduleSize(latest);
+    };
+
+    const finish = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      customResizeRef.current.active = false;
+      if (customResizeRef.current.raf) {
+        window.cancelAnimationFrame(customResizeRef.current.raf);
+        customResizeRef.current.raf = 0;
+      }
+      customResizeRef.current.pending = null;
+      playerWindow.setSize(new LogicalSize(latest.width, latest.height))
+        .catch((error) => console.error('[Player] 完成等比调整窗口失败:', error))
+        .finally(() => syncViewport(latest.height));
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', finish, { once: true });
+    window.addEventListener('pointercancel', finish, { once: true });
+  }, [getCurrentVideoRatio, isFullscreen, isPiP, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     const _markDirty = markSeriesDirty;
@@ -884,26 +962,50 @@ const Player: React.FC = () => {
 
   const handlePlayerMouseMove = useCallback((event: React.MouseEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
+    const overHeaderControls = Boolean(target.closest('.changli-player-titlebar'));
     const overFooterControls = Boolean(target.closest('.changli-player-controls'));
+    const overEpisodeSide = Boolean(target.closest('.changli-player-side'));
+    const overEpisodeTrigger = Boolean(target.closest('.changli-player-hover-zone'));
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     const rightBottomResizeSafeZone = x >= rect.width - 56 && y >= rect.height * 0.8;
     const nearTop = y <= 60;
     const nearBottom = y >= rect.height - 100;
-    if (overFooterControls) {
+    const activeNavigation = activeNavigationRef.current;
+    if (activeNavigation === 'right' && (overEpisodeSide || overEpisodeTrigger)) {
+      setShowHeader(false);
+      setShowFooter(false);
+    } else if (activeNavigation === 'top' && overHeaderControls) {
+      setShowHeader(true);
+      setShowFooter(false);
+    } else if (activeNavigation === 'bottom' && overFooterControls) {
+      setShowHeader(false);
+      setShowFooter(true);
+    } else if (overEpisodeSide) {
+      // The episode drawer extends to the bottom edge. Do not let the global
+      // bottom-edge hover rule open the footer on top of its lower entries.
+      activeNavigationRef.current = 'right';
+      setShowHeader(false);
+      setShowFooter(false);
+    } else if (overFooterControls) {
+      activeNavigationRef.current = 'bottom';
       setShowHeader(false);
       setShowFooter(true);
     } else if (rightBottomResizeSafeZone) {
+      activeNavigationRef.current = null;
       setShowHeader(false);
       setShowFooter(false);
     } else if (nearTop) {
+      activeNavigationRef.current = 'top';
       setShowHeader(true);
       setShowFooter(false);
     } else if (nearBottom) {
+      activeNavigationRef.current = 'bottom';
       setShowHeader(false);
       setShowFooter(true);
     } else {
+      activeNavigationRef.current = null;
       setShowHeader(false);
       setShowFooter(false);
     }
@@ -911,6 +1013,42 @@ const Player: React.FC = () => {
     setCursorVisible(true);
     if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
     cursorTimerRef.current = setTimeout(() => setCursorVisible(false), 2000);
+  }, []);
+
+  const openEpisodeNavigation = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    const activeNavigation = activeNavigationRef.current;
+    if (activeNavigation === 'top' || activeNavigation === 'bottom') {
+      const selector = activeNavigation === 'top'
+        ? '.changli-player-titlebar.show'
+        : '.changli-player-controls.show';
+      const activeElement = document.querySelector(selector);
+      if (activeElement) {
+        const rect = activeElement.getBoundingClientRect();
+        if (
+          event.clientX >= rect.left
+          && event.clientX <= rect.right
+          && event.clientY >= rect.top
+          && event.clientY <= rect.bottom
+        ) {
+          return;
+        }
+      }
+    }
+
+    if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
+    activeNavigationRef.current = 'right';
+    setShowHeader(false);
+    setShowFooter(false);
+    setEpisodeListExpanded(true);
+  }, []);
+
+  const scheduleEpisodeNavigationClose = useCallback(() => {
+    episodeHoverTimerRef.current = setTimeout(() => {
+      setEpisodeListExpanded(false);
+      if (activeNavigationRef.current === 'right') {
+        activeNavigationRef.current = null;
+      }
+    }, 300);
   }, []);
 
   // 播放状态变化时：播放中隐藏导航栏，暂停时也保持当前状态（不强制展开）
@@ -1128,23 +1266,13 @@ const Player: React.FC = () => {
         {/* 选集侧边栏：鼠标靠近右侧展开，离开收起 */}
         <div
           className="changli-player-hover-zone"
-          onMouseEnter={() => {
-            if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
-            setEpisodeListExpanded(true);
-          }}
-          onMouseLeave={() => {
-            episodeHoverTimerRef.current = setTimeout(() => setEpisodeListExpanded(false), 300);
-          }}
+          onMouseEnter={openEpisodeNavigation}
+          onMouseLeave={scheduleEpisodeNavigationClose}
         />
         <aside
           className={`changli-player-side ${episodeListExpanded ? 'open' : ''}`}
-          onMouseEnter={() => {
-            if (episodeHoverTimerRef.current) clearTimeout(episodeHoverTimerRef.current);
-            setEpisodeListExpanded(true);
-          }}
-          onMouseLeave={() => {
-            episodeHoverTimerRef.current = setTimeout(() => setEpisodeListExpanded(false), 300);
-          }}
+          onMouseEnter={openEpisodeNavigation}
+          onMouseLeave={scheduleEpisodeNavigationClose}
         >
           <div className="changli-player-side-head">
             <strong>选集</strong>
@@ -1271,21 +1399,11 @@ const Player: React.FC = () => {
         </div>
       </footer>
       {!isFullscreen && !isWindowMaximized && (
-        <>
-          {(['North', 'South', 'East', 'West', 'NorthEast', 'NorthWest', 'SouthWest'] as ResizeDirection[]).map((direction) => (
-            <div
-              key={direction}
-              className={`changli-player-resize-edge resize-${direction.toLowerCase()}`}
-              onPointerDown={(event) => startWindowResize(event, direction)}
-              aria-hidden="true"
-            />
-          ))}
-          <div
-            className="changli-player-resize-grip"
-            onPointerDown={(event) => startWindowResize(event, 'SouthEast')}
-            aria-label="调整播放器窗口大小"
-          />
-        </>
+        <div
+          className="changli-player-resize-grip"
+          onPointerDown={startAspectResize}
+          aria-label="按视频比例调整播放器窗口大小"
+        />
       )}
     </section>
   );

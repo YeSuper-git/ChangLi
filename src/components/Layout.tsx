@@ -27,7 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [navVisibility, setNavVisibility] = useState<NavVisibility>(() => readNavVisibility());
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const hideGlobalSearch = location.pathname.startsWith('/library') || location.pathname.startsWith('/video') || location.pathname.startsWith('/series') || location.pathname.startsWith('/actors') || location.pathname.startsWith('/completion');
+  const hideGlobalSearch = false; // 搜索栏全局显示
   const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes('Mac');
 
   const navItems: Array<{ key: NavItemKey; path: string; label: string; tutorial?: string }> = [

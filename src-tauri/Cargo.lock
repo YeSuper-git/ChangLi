@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "changli"
-version = "1.9.46"
+version = "1.9.47"
 dependencies = [
  "anyhow",
  "async-stream",

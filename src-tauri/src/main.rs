@@ -325,8 +325,22 @@ fn extract_subscription_group(title: &str) -> Option<String> {
     None
 }
 
+/// 将文本中的语言关键词归一化为标准类别
+/// 简中/简体/简日/CHS/GB → "简中"，繁中/繁体/繁日/CHT/Big5 → "繁中"，简繁共存 → "简繁"
+fn classify_language(text: &str) -> Option<&'static str> {
+    let t = text.to_lowercase();
+    let has_jian = t.contains('简') || t.contains("chs") || t.contains("[gb]");
+    let has_fan = t.contains('繁') || t.contains("cht") || t.contains("[big5]");
+    match (has_jian, has_fan) {
+        (true, true) => Some("简繁"),
+        (true, false) => Some("简中"),
+        (false, true) => Some("繁中"),
+        (false, false) => None,
+    }
+}
+
 /// 检查 selectedPrefixes 的一个 part 是否匹配标题中的对应关键词
-/// 支持字幕组中英文括号、简中/繁中/简繁等语言变体、画质变体、来源变体、容器变体
+/// 支持字幕组中英文括号、语言归一化匹配、画质变体、来源变体、容器变体
 fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
     let part = part.trim();
     if title_lower.contains(part) {
@@ -335,6 +349,7 @@ fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
     if part.contains("未知字幕组") {
         return true;
     }
+    // 字幕组括号匹配：[喵萌奶茶屋] ↔ 【喵萌奶茶屋】
     if let Some(group_part) = part
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
@@ -344,31 +359,20 @@ fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
             return title_group == group_part;
         }
     }
-    // 语言变体
-    if part.contains("简中") {
-        return title_lower.contains("简日内嵌")
-            || title_lower.contains("简日内封")
-            || title_lower.contains("简体内嵌")
-            || title_lower.contains("简体内封")
-            || title_lower.contains("简体")
-            || title_lower.contains("chs")
-            || title_lower.contains("[gb]");
+    // 语言归一化匹配：前端把各种语言格式压缩为 简中/繁中/简繁，
+    // 后端用同样的分类逻辑还原，不再维护关键词列表
+    if classify_language(part).is_some() || classify_language(title_lower).is_some() {
+        let part_lang = classify_language(part);
+        let title_lang = classify_language(title_lower);
+        if part_lang.is_some() || title_lang.is_some() {
+            return part_lang == title_lang;
+        }
     }
-    if part.contains("繁中") {
-        return title_lower.contains("繁日内嵌")
-            || title_lower.contains("繁日内封")
-            || title_lower.contains("繁体内嵌")
-            || title_lower.contains("繁体内封")
-            || title_lower.contains("繁体")
-            || title_lower.contains("cht")
-            || title_lower.contains("[big5]");
-    }
+    // 简繁特殊处理
     if part.contains("简繁") {
         return title_lower.contains("简繁")
             || title_lower.contains("简／繁")
-            || title_lower.contains("简/繁")
-            || title_lower.contains("简繁内封")
-            || title_lower.contains("简繁内嵌");
+            || title_lower.contains("简/繁");
     }
     // 画质变体
     if part.contains("1080p") || part.contains("1920x1080") {

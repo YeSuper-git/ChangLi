@@ -535,11 +535,16 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
         // DirectComposition supplies the antialiased shape. Do not combine it
         // with SetWindowRgn: HRGN clipping is binary and reintroduces the
         // jagged edge this compositor path is designed to remove.
+        // A -1 margin asks DWM to treat the complete client area as glass.
+        // The DirectComposition visual is clipped to the rounded rectangle,
+        // so pixels outside that clip must come from a genuinely transparent
+        // host surface. Zero margins leave Tao's HWND background visible in
+        // those pixels (usually as the Windows accent-colour corner wedges).
         let margins = MARGINS {
-            cxLeftWidth: 0,
-            cxRightWidth: 0,
-            cyTopHeight: 0,
-            cyBottomHeight: 0,
+            cxLeftWidth: -1,
+            cxRightWidth: -1,
+            cyTopHeight: -1,
+            cyBottomHeight: -1,
         };
         let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
     }
