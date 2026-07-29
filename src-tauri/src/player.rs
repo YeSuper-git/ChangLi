@@ -233,15 +233,22 @@ mod mpv_ipc {
     }
 
     pub fn socket_path() -> Option<String> {
-        socket_mutex().lock().unwrap().clone()
+        socket_mutex()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     pub fn set_socket_path(path: Option<String>) {
-        *socket_mutex().lock().unwrap() = path;
+        *socket_mutex()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = path;
     }
 
     pub fn clear_socket_path_if_current(path: &str) {
-        let mut guard = socket_mutex().lock().unwrap();
+        let mut guard = socket_mutex()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if guard.as_deref() == Some(path) {
             *guard = None;
         }

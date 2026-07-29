@@ -221,11 +221,10 @@ impl<R: Runtime> Mpv<R> {
                 wrapper.mpv_wrapper_destroy(instance.handle);
             }
 
-            // Phase 3: Reclaim the raw Arc pointer that was passed to native libmpv.
-            // This balances the Arc::into_raw in init_wid_mode.
-            // The allocation will only be freed when both this Arc AND the one in
-            // instance.event_data are dropped (i.e., after this function returns).
-            let _ = unsafe { Arc::from_raw(instance.event_userdata as *const EventUserData<R>) };
+            // Keep the raw callback Arc as a permanent tombstone. Reclaiming it
+            // here can race a native callback that has entered but has not yet
+            // incremented the strong count. The tombstone is tiny, marked dead,
+            // and makes any late callback return without touching freed memory.
 
             // Phase 4: Drop the MpvInstance (and its event_data Arc clone).
             // If no in-flight callback holds a clone, the EventUserData is freed now.
@@ -352,19 +351,18 @@ impl<R: Runtime> Mpv<R> {
                 )
             };
 
+            if result_ptr.is_null() {
+                return Err(crate::Error::GetProperty {
+                    window_label: window_label.to_string(),
+                    message: "FFI call returned null pointer".into(),
+                });
+            }
+
             defer! {
                 unsafe { wrapper.mpv_wrapper_free(result_ptr) };
             }
 
-            let response_str = unsafe {
-                if result_ptr.is_null() {
-                    return Err(crate::Error::GetProperty {
-                        window_label: window_label.to_string(),
-                        message: "FFI call returned null pointer".into(),
-                    });
-                }
-                CStr::from_ptr(result_ptr).to_string_lossy()
-            };
+            let response_str = unsafe { CStr::from_ptr(result_ptr).to_string_lossy() };
 
             let response: FfiResponse = serde_json::from_str(&response_str)?;
 

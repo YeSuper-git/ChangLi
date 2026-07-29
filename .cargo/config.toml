@@ -1,0 +1,5 @@
+[target.x86_64-pc-windows-msvc]
+# Keep release artifacts compatible with the x86-64 Windows baseline. In
+# particular, never inherit `target-cpu=native` from a fast CI/build machine:
+# doing so can emit AVX/AVX2 instructions and fail with 0xc000001d on older CPUs.
+rustflags = ["-C", "target-cpu=x86-64"]

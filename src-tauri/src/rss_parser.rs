@@ -31,7 +31,9 @@ fn extract_magnet(text: &str) -> Option<String> {
     if let Some(start) = lower.find("magnet:?xt=") {
         let slice = &text[start..];
         // 磁力链接以 & 或空格或引号结束
-        let end = slice.find(|c: char| c == '"' || c == '\'' || c.is_whitespace()).unwrap_or(slice.len());
+        let end = slice
+            .find(|c: char| c == '"' || c == '\'' || c.is_whitespace())
+            .unwrap_or(slice.len());
         let magnet = &slice[..end];
         // 解码 HTML 实体
         let magnet = magnet.replace("&amp;", "&");
@@ -69,7 +71,7 @@ pub fn parse_mikanani_rss(xml: &str) -> Result<RssFeed> {
         let item_start = pos + item_start;
         if let Some(item_end) = xml[item_start..].find("</item>") {
             let item_xml = &xml[item_start..item_start + item_end + 7];
-            
+
             let mut item = RssItem {
                 guid: String::new(),
                 title: String::new(),
@@ -88,7 +90,9 @@ pub fn parse_mikanani_rss(xml: &str) -> Result<RssFeed> {
                     let guid_text = &item_xml[g_start..g_start + g_end + 7];
                     // 去掉标签，只保留文本
                     if let Some(text_start) = guid_text.find('>') {
-                        item.guid = guid_text[text_start + 1..guid_text.len() - 7].trim().to_string();
+                        item.guid = guid_text[text_start + 1..guid_text.len() - 7]
+                            .trim()
+                            .to_string();
                     }
                 }
             }
@@ -139,17 +143,19 @@ pub fn parse_mikanani_rss(xml: &str) -> Result<RssFeed> {
             // 提取 pubDate
             if let Some(pd_start) = item_xml.find("<pubDate>") {
                 if let Some(pd_end) = item_xml[pd_start..].find("</pubDate>") {
-                    item.pub_date = Some(item_xml[pd_start + 9..pd_start + pd_end].trim().to_string());
+                    item.pub_date =
+                        Some(item_xml[pd_start + 9..pd_start + pd_end].trim().to_string());
                 }
             }
 
             // 提取 infoHash（Nyaa 用 nyaa:infoHash，其他站可能用不同命名空间）
             if let Some(ih_start) = item_xml.find("infoHash>") {
                 if let Some(ih_end) = item_xml[ih_start..].find("</") {
-                    item.info_hash = Some(item_xml[ih_start + 9..ih_start + ih_end].trim().to_string());
+                    item.info_hash =
+                        Some(item_xml[ih_start + 9..ih_start + ih_end].trim().to_string());
                 }
             }
-            
+
             // 从整个 item XML 中提取磁力链接
             item.magnet_link = extract_magnet(item_xml);
 
@@ -192,7 +198,10 @@ mod tests {
         let feed = parse_mikanani_rss(xml).unwrap();
         assert_eq!(feed.title, "Mikan Project - Test");
         assert_eq!(feed.items.len(), 1);
-        assert_eq!(feed.items[0].title, "[ANi] Test - 02 [1080P][Baha][AAC AVC][CHT][MP4]");
+        assert_eq!(
+            feed.items[0].title,
+            "[ANi] Test - 02 [1080P][Baha][AAC AVC][CHT][MP4]"
+        );
         assert!(feed.items[0].torrent_url.is_some());
         assert_eq!(feed.items[0].content_length, Some(534878624));
     }

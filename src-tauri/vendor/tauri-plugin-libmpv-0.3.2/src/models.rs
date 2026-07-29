@@ -9,10 +9,9 @@ use crate::wrapper::MpvHandle;
 
 pub struct MpvInstance<R: Runtime> {
     pub handle: *mut MpvHandle,
-    /// Raw pointer passed to native libmpv as event_userdata.
-    /// The pointed-to Arc<EventUserData> is also held by this struct
-    /// (via `event_data`) so the callback can safely upgrade it even
-    /// after the instance is removed from the map.
+    /// Raw pointer passed to native libmpv as event_userdata. Successful
+    /// instances intentionally leave its Arc as a dead tombstone on destroy,
+    /// preventing late native callbacks from touching freed memory.
     pub event_userdata: *mut c_void,
     /// Keeps EventUserData alive until after mpv_wrapper_destroy returns.
     /// The callback clones this Arc before checking is_alive, ensuring

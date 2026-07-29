@@ -2844,6 +2844,60 @@ html.changli-player-html .changli-player-stage {
   touch-action: none;
 }
 
+.changli-player-resize-edge {
+  position: absolute;
+  z-index: 40;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.changli-player-resize-edge.resize-north,
+.changli-player-resize-edge.resize-south {
+  left: 10px;
+  right: 10px;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+.changli-player-resize-edge.resize-north { top: 0; }
+.changli-player-resize-edge.resize-south { bottom: 0; }
+
+.changli-player-resize-edge.resize-east,
+.changli-player-resize-edge.resize-west {
+  top: 10px;
+  bottom: 10px;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+.changli-player-resize-edge.resize-east { right: 0; }
+.changli-player-resize-edge.resize-west { left: 0; }
+
+.changli-player-resize-edge.resize-northeast,
+.changli-player-resize-edge.resize-northwest,
+.changli-player-resize-edge.resize-southwest {
+  width: 16px;
+  height: 16px;
+}
+
+.changli-player-resize-edge.resize-northeast {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.changli-player-resize-edge.resize-northwest {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.changli-player-resize-edge.resize-southwest {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
 .changli-player-resize-grip::after {
   content: '';
   position: absolute;

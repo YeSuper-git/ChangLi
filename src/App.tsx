@@ -24,7 +24,7 @@ import { currentVersion } from './generated/versionInfo';
 import { clearLibraryFilterCaches } from './pages/Library';
 import { clearSeriesDetailCache } from './pages/SeriesDetail';
 import { clearActorDetailCache } from './pages/ActorDetail';
-import { registerMemoryCleanup, requestAppMemoryCleanup, scheduleIdleMemoryCleanup, getJsHeapUsageRatio } from './utils/memoryCleanup';
+import { registerMemoryCleanup, scheduleIdleMemoryCleanup, getJsHeapUsageRatio } from './utils/memoryCleanup';
 import { preloadVideoSeriesPosters } from './utils/media';
 
 function App() {
@@ -68,7 +68,9 @@ function App() {
     }, 60 * 1000);
     const onHidden = () => {
       if (document.visibilityState === 'hidden') {
-        requestAppMemoryCleanup('background');
+        // Minimize/restore already rebuilds WebView2 surfaces. Defer cache
+        // cleanup so it does not run in the same transition.
+        scheduleIdleMemoryCleanup('background');
       }
     };
     document.addEventListener('visibilitychange', onHidden);

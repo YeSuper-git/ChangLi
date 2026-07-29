@@ -108,13 +108,6 @@ fn write_storage_settings(settings: &StorageSettings) -> Result<()> {
     Ok(())
 }
 
-pub fn download_dir() -> PathBuf {
-    read_storage_settings()
-        .download_dir
-        .map(PathBuf::from)
-        .unwrap_or_else(default_download_dir)
-}
-
 pub fn set_download_dir(path: &str) -> Result<PathBuf> {
     let selected = PathBuf::from(path);
     std::fs::create_dir_all(&selected)?;
@@ -128,10 +121,6 @@ pub fn set_auto_use_last_download_dir(enabled: bool) -> Result<()> {
     let mut settings = read_storage_settings();
     settings.auto_use_last_download_dir = enabled;
     write_storage_settings(&settings)
-}
-
-pub fn auto_use_last_download_dir() -> bool {
-    read_storage_settings().auto_use_last_download_dir
 }
 
 pub fn player_mode() -> String {

@@ -304,11 +304,45 @@ async fn update_subscription_cmd(
         .await
         .map_err(|e| e.to_string())
 }
+fn extract_subscription_group(title: &str) -> Option<String> {
+    let title = title.trim();
+    if let Some(rest) = title.strip_prefix('[') {
+        if let Some(end) = rest.find(']') {
+            let group = rest[..end].trim();
+            if !group.is_empty() {
+                return Some(group.to_lowercase());
+            }
+        }
+    }
+    if let Some(rest) = title.strip_prefix('【') {
+        if let Some(end) = rest.find('】') {
+            let group = rest[..end].trim();
+            if !group.is_empty() {
+                return Some(group.to_lowercase());
+            }
+        }
+    }
+    None
+}
+
 /// 检查 selectedPrefixes 的一个 part 是否匹配标题中的对应关键词
-/// 支持简中/繁中/简繁等语言变体、画质变体、来源变体、容器变体
+/// 支持字幕组中英文括号、简中/繁中/简繁等语言变体、画质变体、来源变体、容器变体
 fn prefix_part_matches_title(part: &str, title_lower: &str) -> bool {
+    let part = part.trim();
     if title_lower.contains(part) {
         return true;
+    }
+    if part.contains("未知字幕组") {
+        return true;
+    }
+    if let Some(group_part) = part
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .map(|s| s.trim().to_lowercase())
+    {
+        if let Some(title_group) = extract_subscription_group(title_lower) {
+            return title_group == group_part;
+        }
     }
     // 语言变体
     if part.contains("简中") {
@@ -2009,6 +2043,7 @@ async fn add_videos_to_series(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let mut videos = Vec::new();
+    let mut next_episode_by_season: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     for path in paths {
         let video_path = Path::new(&path);
         if !video_path.is_file() || !scanner::is_video_file(video_path) {
@@ -2045,19 +2080,28 @@ async fn add_videos_to_series(
             }
         }
 
-        // 文件名提取不到集数时，分配下一个集数序号
+        // 文件名提取不到集数时，按本次批量操作连续分配下一个集数序号
         if video.episode_number.is_none() {
             let season_val = video.season.unwrap_or(0);
-            let max_ep: Option<i32> = sqlx::query_scalar(
-                "SELECT MAX(episode_number) FROM videos WHERE series_id = ? AND COALESCE(season, 0) = ? AND episode_number IS NOT NULL",
-            )
-            .bind(series_id)
-            .bind(season_val)
-            .fetch_optional(&pool)
-            .await
-            .ok()
-            .flatten();
-            video.episode_number = Some(max_ep.unwrap_or(0) + 1);
+            let next_ep = if let Some(next) = next_episode_by_season.get_mut(&season_val) {
+                let current = *next;
+                *next += 1;
+                current
+            } else {
+                let max_ep: Option<i32> = sqlx::query_scalar(
+                    "SELECT MAX(episode_number) FROM videos WHERE series_id = ? AND COALESCE(season, 0) = ? AND episode_number IS NOT NULL",
+                )
+                .bind(series_id)
+                .bind(season_val)
+                .fetch_optional(&pool)
+                .await
+                .ok()
+                .flatten();
+                let current = max_ep.unwrap_or(0) + 1;
+                next_episode_by_season.insert(season_val, current + 1);
+                current
+            };
+            video.episode_number = Some(next_ep);
         }
 
         videos.push(video);

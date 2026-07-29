@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import appIcon from '../assets/brand/app-icon.png';
@@ -61,7 +61,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     });
   };
 
-  const appWindow = getCurrentWindow();
+  // Keep one stable JS window handle. Recreating it on every render made the
+  // resize effect repeatedly unsubscribe/subscribe while Windows was
+  // minimizing or restoring the WebView.
+  const appWindow = useMemo(() => getCurrentWindow(), []);
 
   const runWindowAction = (action: () => Promise<void>, name: string) => {
     action().catch((error) => console.error(`[Layout] ${name} 失败:`, error));
@@ -150,13 +153,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let resizeTimer = 0;
     appWindow.isMaximized().then(setIsMaximized).catch((error) => console.error('[Layout] 获取最大化状态失败:', error));
-    appWindow.onResized(async () => {
-      setIsMaximized(await appWindow.isMaximized());
+    appWindow.onResized(() => {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(async () => {
+        resizeTimer = 0;
+        const maximized = await appWindow.isMaximized().catch(() => false);
+        setIsMaximized((current) => current === maximized ? current : maximized);
+      }, 120);
     }).then((fn) => {
       unlisten = fn;
     }).catch((error) => console.error('[Layout] 监听窗口大小失败:', error));
-    return () => unlisten?.();
+    return () => {
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      unlisten?.();
+    };
   }, [appWindow]);
 
   return (

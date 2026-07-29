@@ -46,7 +46,10 @@ impl Aria2Client {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("Failed to create HTTP client");
+            .unwrap_or_else(|error| {
+                log::error!("Failed to create configured HTTP client: {error}");
+                Client::new()
+            });
 
         Self {
             rpc_url: rpc_url.to_string(),
@@ -151,7 +154,6 @@ impl Aria2Client {
         self.call("aria2.remove", params).await?;
         Ok(())
     }
-
 }
 
 // 全局 aria2 客户端

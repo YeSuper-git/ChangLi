@@ -49,6 +49,23 @@ jobs:
           Copy-Item "build-deps/changli-ffmpeg.exe" "src-tauri/resources/ffmpeg/ffmpeg.exe" -Force
           Get-Item "src-tauri/resources/mpv/mpv.exe", "src-tauri/resources/ffmpeg/ffmpeg.exe" | Select-Object FullName, Length
 
+      - name: Verify Windows CPU baseline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:RUSTFLAGS -match "target-cpu\s*=\s*native" -or
+              $env:RUSTFLAGS -match "target-feature\s*=\s*\+avx") {
+            throw "Release RUSTFLAGS must not enable host-specific AVX instructions: $env:RUSTFLAGS"
+          }
+          & "src-tauri/resources/mpv/mpv.exe" --no-config --version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled mpv failed its Windows startup smoke test (exit $LASTEXITCODE)"
+          }
+          & "src-tauri/resources/ffmpeg/ffmpeg.exe" -version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled ffmpeg failed its Windows startup smoke test (exit $LASTEXITCODE)"
+          }
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:

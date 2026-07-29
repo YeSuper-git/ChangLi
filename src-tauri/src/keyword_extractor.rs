@@ -62,10 +62,20 @@ pub fn extract_keywords(titles: &[String]) -> HashMap<KeywordCategory, Vec<Strin
 fn extract_keywords_from_title(title: &str) -> Vec<ExtractedKeyword> {
     let mut keywords = Vec::new();
 
-    // 1. 提取字幕组（第一个 [...] 中的内容）
+    // 1. 提取字幕组（第一个 [...] 或 【...】 中的内容）
     if title.starts_with('[') {
         if let Some(end) = title.find(']') {
             let group = &title[1..end];
+            if !group.is_empty() {
+                keywords.push(ExtractedKeyword {
+                    category: KeywordCategory::SubtitleGroup,
+                    value: group.to_string(),
+                });
+            }
+        }
+    } else if title.starts_with('【') {
+        if let Some(end) = title.find('】') {
+            let group = &title['【'.len_utf8()..end];
             if !group.is_empty() {
                 keywords.push(ExtractedKeyword {
                     category: KeywordCategory::SubtitleGroup,

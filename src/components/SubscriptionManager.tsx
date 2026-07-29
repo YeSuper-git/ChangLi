@@ -126,6 +126,10 @@ function extractSubtitleGroup(title: string): string {
     const end = title.indexOf(']');
     if (end > 0) return title.substring(1, end).trim();
   }
+  if (title.startsWith('【')) {
+    const end = title.indexOf('】');
+    if (end > 0) return title.substring(1, end).trim();
+  }
   return '未知字幕组';
 }
 

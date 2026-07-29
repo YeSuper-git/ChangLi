@@ -4808,12 +4808,15 @@ pub async fn check_category_updates(
                                             "[check_updates] 检测到改名: {} -> {}",
                                             old_title, name
                                         );
-                                        renamed_series.lock().unwrap().push((
-                                            *sid,
-                                            old_title.clone(),
-                                            name.clone(),
-                                            fps.clone(),
-                                        ));
+                                        renamed_series
+                                            .lock()
+                                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                            .push((
+                                                *sid,
+                                                old_title.clone(),
+                                                name.clone(),
+                                                fps.clone(),
+                                            ));
                                     }
                                 }
                                 eprintln!(
@@ -5075,12 +5078,15 @@ pub async fn check_category_updates(
                                             "[check_updates] 检测到改名(非标签): {} -> {}",
                                             old_title, name
                                         );
-                                        renamed_series.lock().unwrap().push((
-                                            *sid,
-                                            old_title.clone(),
-                                            name.clone(),
-                                            fps.clone(),
-                                        ));
+                                        renamed_series
+                                            .lock()
+                                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                            .push((
+                                                *sid,
+                                                old_title.clone(),
+                                                name.clone(),
+                                                fps.clone(),
+                                            ));
                                     }
                                 }
                                 continue;
@@ -5127,7 +5133,9 @@ pub async fn check_category_updates(
     };
 
     // 批量更新重命名的视频集，并从 missing_series 移除
-    let renamed_series = renamed_series.into_inner().unwrap();
+    let renamed_series = renamed_series
+        .into_inner()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let renamed_ids: std::collections::HashSet<i64> =
         renamed_series.iter().map(|(sid, _, _, _)| *sid).collect();
     missing_series.retain(|s| !s.id.map_or(false, |id| renamed_ids.contains(&id)));

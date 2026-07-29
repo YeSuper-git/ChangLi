@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -28,7 +29,9 @@ static CACHE_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
 static ACTIVE_TASKS: Mutex<Option<HashMap<String, tokio::task::JoinHandle<()>>>> = Mutex::new(None);
 
 fn thumbnail_cache_dir(app: &AppHandle) -> PathBuf {
-    let mut guard = CACHE_DIR.lock().unwrap();
+    let mut guard = CACHE_DIR
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(ref dir) = *guard {
         return dir.clone();
     }
@@ -42,21 +45,15 @@ fn thumbnail_cache_dir(app: &AppHandle) -> PathBuf {
     dir
 }
 
-fn video_hash(path: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    path.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
 fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
     if let Ok(resource_dir) = app.path().resource_dir() {
         let candidates = if cfg!(target_os = "windows") {
             vec![
                 resource_dir.join("ffmpeg").join("ffmpeg.exe"),
-                resource_dir.join("resources").join("ffmpeg").join("ffmpeg.exe"),
-
+                resource_dir
+                    .join("resources")
+                    .join("ffmpeg")
+                    .join("ffmpeg.exe"),
             ]
         } else {
             vec![
@@ -75,7 +72,9 @@ fn ffmpeg_path(app: &AppHandle) -> Option<PathBuf> {
 
 /// 取消指定视频的预抽任务
 pub fn abort_prebuild(file_id: &str) {
-    let mut tasks = ACTIVE_TASKS.lock().unwrap();
+    let mut tasks = ACTIVE_TASKS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(map) = tasks.as_mut() {
         if let Some(handle) = map.remove(file_id) {
             handle.abort();
@@ -164,7 +163,9 @@ pub async fn prebuild_thumbnails(
         std::fs::write(cache_dir_clone.join(".done"), "").ok();
 
         // 清理任务引用
-        let mut tasks = ACTIVE_TASKS.lock().unwrap();
+        let mut tasks = ACTIVE_TASKS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some(map) = tasks.as_mut() {
             map.remove(&file_id_clone);
         }
@@ -172,7 +173,9 @@ pub async fn prebuild_thumbnails(
 
     // 注册任务
     {
-        let mut tasks = ACTIVE_TASKS.lock().unwrap();
+        let mut tasks = ACTIVE_TASKS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let map = tasks.get_or_insert_with(HashMap::new);
         map.insert(file_id, handle);
     }
@@ -195,7 +198,17 @@ pub async fn get_preview_thumb(
     let idx = (time / 5.0).floor() as u32;
     let cached_path = cache_dir.join(format!("{}.jpg", idx));
     if cached_path.exists() {
-        return Ok(cached_path.to_string_lossy().to_string());
+        match thumbnail_data_url(&cached_path) {
+            Ok(data_url) => return Ok(data_url),
+            Err(error) => {
+                eprintln!(
+                    "[thumb] removing invalid cached preview {}: {}",
+                    cached_path.display(),
+                    error
+                );
+                let _ = std::fs::remove_file(&cached_path);
+            }
+        }
     }
 
     // 兜底：实时抽（降分辨率加速）
@@ -208,7 +221,8 @@ pub async fn get_preview_thumb(
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
-        let output = cmd.args([
+        let output = cmd
+            .args([
                 "-ss",
                 &format!("{:.1}", time),
                 "-i",
@@ -235,7 +249,7 @@ pub async fn get_preview_thumb(
                 std::fs::create_dir_all(&cache_dir_clone).ok();
                 let out_path = format!("{}/{}.jpg", cache_dir_clone.display(), idx);
                 std::fs::write(&out_path, &o.stdout).ok();
-                Ok(out_path)
+                thumbnail_data_url(std::path::Path::new(&out_path))
             }
             Ok(_) => Err(ThumbnailError::DecodeFailed),
             Err(e) => Err(ThumbnailError::IoError(e.to_string())),
@@ -248,6 +262,15 @@ pub async fn get_preview_thumb(
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(ThumbnailError::IoError(join_err.to_string())),
     }
+}
+
+fn thumbnail_data_url(path: &std::path::Path) -> Result<String, ThumbnailError> {
+    let bytes = std::fs::read(path).map_err(|e| ThumbnailError::IoError(e.to_string()))?;
+    image::load_from_memory(&bytes).map_err(|_| ThumbnailError::DecodeFailed)?;
+    Ok(format!(
+        "data:image/jpeg;base64,{}",
+        general_purpose::STANDARD.encode(bytes)
+    ))
 }
 
 /// 获取缩略图缓存目录路径

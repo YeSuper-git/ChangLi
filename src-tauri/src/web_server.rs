@@ -333,7 +333,11 @@ async fn api_stream(
                 };
 
                 let mut headers = axum::http::HeaderMap::new();
-                headers.insert("content-type", HeaderValue::from_str(&mime).unwrap());
+                headers.insert(
+                    "content-type",
+                    HeaderValue::from_str(&mime)
+                        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+                );
                 headers.insert("accept-ranges", HeaderValue::from_static("bytes"));
                 headers.insert(
                     "content-range",
@@ -342,7 +346,8 @@ async fn api_stream(
                 );
                 headers.insert(
                     "content-length",
-                    HeaderValue::from_str(&content_length.to_string()).unwrap(),
+                    HeaderValue::from_str(&content_length.to_string())
+                        .unwrap_or_else(|_| HeaderValue::from_static("0")),
                 );
 
                 return Ok((
@@ -376,11 +381,16 @@ async fn api_stream(
     };
 
     let mut headers = axum::http::HeaderMap::new();
-    headers.insert("content-type", HeaderValue::from_str(&mime).unwrap());
+    headers.insert(
+        "content-type",
+        HeaderValue::from_str(&mime)
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
     headers.insert("accept-ranges", HeaderValue::from_static("bytes"));
     headers.insert(
         "content-length",
-        HeaderValue::from_str(&file_size.to_string()).unwrap(),
+        HeaderValue::from_str(&file_size.to_string())
+            .unwrap_or_else(|_| HeaderValue::from_static("0")),
     );
 
     Ok((

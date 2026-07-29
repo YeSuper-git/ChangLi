@@ -2,7 +2,6 @@ const isMac = navigator.platform.includes('Mac') || navigator.userAgent.includes
 
 export const MPV_OBSERVED_PROPERTIES = [
   'pause',
-  'time-pos',
   'duration',
   'volume',
   'speed',
@@ -36,7 +35,6 @@ async function withMpvStage<T>(code: string, stage: string, action: () => Promis
 
 const LIBMPV_PROPERTY_FORMATS: Record<ObservedProperty, 'flag' | 'double' | 'int64'> = {
   pause: 'flag',
-  'time-pos': 'double',
   duration: 'double',
   volume: 'double',
   speed: 'double',

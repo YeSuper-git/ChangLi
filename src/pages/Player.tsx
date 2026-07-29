@@ -7,12 +7,13 @@ import { getPlayHistory, getVideo, getVideoSeriesDetail, updatePlayHistory } fro
 import { useLibraryStore } from '../store/libraryStore';
 import type { Video, VideoSeries, PlayHistory } from '../utils/api';
 import appIcon from '../assets/brand/app-icon.png';
-import { MPV_OBSERVED_PROPERTIES, isMac, mpvCommand, mpvInit, mpvObserveProperties, mpvSetProperty, mpvSetVideoMarginRatio } from '../utils/mpv-bridge';
+import { MPV_OBSERVED_PROPERTIES, isMac, mpvCommand, mpvGetProperty, mpvInit, mpvObserveProperties, mpvSetProperty, mpvSetVideoMarginRatio } from '../utils/mpv-bridge';
 import { usePreviewThumb } from '../hooks/usePreviewThumb';
 import { addMemoryCleanupListener, getJsHeapUsageRatio } from '../utils/memoryCleanup';
 import { navigateToLibraryReady } from '../utils/libraryNavigation';
 
 const OBSERVED_PROPERTIES = MPV_OBSERVED_PROPERTIES;
+type ResizeDirection = 'East' | 'North' | 'NorthEast' | 'NorthWest' | 'South' | 'SouthEast' | 'SouthWest' | 'West';
 
 function playerErrorText(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -44,7 +45,7 @@ const Player: React.FC = () => {
   const [duration, setDuration] = useState(0);
 
   // FFmpeg preview hook — must be before callbacks that reference it
-  const { thumbnailUrl, hoverTime, hoverX, onHover: previewOnHover, onLeave: previewOnLeave } = usePreviewThumb({
+  const { thumbnailUrl, hoverTime, hoverX, onHover: previewOnHover, onLeave: previewOnLeave, onImageError: previewOnImageError } = usePreviewThumb({
     fileId: currentVideo ? String(currentVideo.id) : '',
     filePath: currentVideo?.file_path || '',
     duration,
@@ -52,7 +53,14 @@ const Player: React.FC = () => {
   const [volume, setVolume] = useState(() => {
     try { return parseInt(localStorage.getItem('changli-player-volume') || '80', 10) || 80; } catch { return 80; }
   });
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem('changli-player-speed') || '1');
+      return Number.isFinite(stored) && stored > 0 ? stored : 1;
+    } catch {
+      return 1;
+    }
+  });
   
   // UI 状态
   const [showHeader, setShowHeader] = useState(true);
@@ -79,7 +87,9 @@ const Player: React.FC = () => {
   const mpvOperationLock = useRef(Promise.resolve());
   const mpvCommandQueueRef = useRef(Promise.resolve());
   const switchingVideoRef = useRef(false);
+  const playerClosingRef = useRef(false);
   const isPlayingRef = useRef(false);
+  const pausedPositionRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
@@ -260,6 +270,8 @@ const Player: React.FC = () => {
             setCurrentTime(previousPosition);
           }
           await runMpvCommand(() => mpvSetProperty('pause', false)).catch(() => undefined);
+          await runMpvCommand(() => mpvSetProperty('speed', speed)).catch(() => undefined);
+          pausedPositionRef.current = null;
           switchingVideoRef.current = false;
           isPlayingRef.current = true;
           setIsPlaying(true);
@@ -354,11 +366,9 @@ const Player: React.FC = () => {
               {
                 const playing = !data;
                 isPlayingRef.current = playing;
+                if (playing) pausedPositionRef.current = null;
                 setIsPlaying(playing);
               }
-              break;
-            case 'time-pos':
-              setCurrentTime((data as number) ?? 0);
               break;
             case 'duration':
               setDuration((data as number) ?? 0);
@@ -397,6 +407,8 @@ const Player: React.FC = () => {
           setCurrentTime(previousPosition);
         }
         await runMpvCommand(() => mpvSetProperty('pause', false)).catch(() => undefined);
+        await runMpvCommand(() => mpvSetProperty('speed', speed)).catch(() => undefined);
+        pausedPositionRef.current = null;
         isPlayingRef.current = true;
         setIsPlaying(true);
         
@@ -418,6 +430,53 @@ const Player: React.FC = () => {
     };
   }, [id, runMpvCommand, handleObservedVideoSize]);
 
+  // `time-pos` changes at video-frame frequency. At 2x playback the Windows
+  // mpv plugin used to forward every change through a native listener thread,
+  // Tauri's event bus and WebView2. Polling at 4 Hz keeps the UI smooth while
+  // avoiding sustained cross-thread event pressure in the host process.
+  useEffect(() => {
+    let disposed = false;
+    let inFlight = false;
+
+    const pollTimePosition = async () => {
+      if (
+        disposed
+        || inFlight
+        || !mpvInitialized.current
+        || playerClosingRef.current
+        || switchingVideoRef.current
+        || !isPlayingRef.current
+      ) return;
+
+      inFlight = true;
+      try {
+        const value = Number(await runMpvCommand(() => mpvGetProperty('time-pos')));
+        if (
+          !disposed
+          && Number.isFinite(value)
+          && pausedPositionRef.current === null
+          && !draggingProgressRef.current
+        ) {
+          setCurrentTime(value);
+        }
+      } catch {
+        // A transient IPC miss must not interrupt playback.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void pollTimePosition();
+    }, 250);
+    void pollTimePosition();
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [runMpvCommand]);
+
   // 组件卸载时清理 — 不再操作 mpv，所有销毁由 Rust 层 request_close_player 统一控制
   useEffect(() => {
     return () => {
@@ -431,30 +490,47 @@ const Player: React.FC = () => {
     try { localStorage.setItem('changli-player-volume', String(Math.round(volume))); } catch { /* ignore */ }
   }, [volume]);
 
+  useEffect(() => {
+    try { localStorage.setItem('changli-player-speed', String(speed)); } catch { /* ignore */ }
+  }, [speed]);
+
   // 播放/暂停
   const togglePlay = useCallback(async () => {
     if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
       const nextPaused = isPlayingRef.current;
+      const freezeAt = currentTime;
       isPlayingRef.current = !nextPaused;
+      pausedPositionRef.current = nextPaused ? freezeAt : null;
       setIsPlaying(!nextPaused);
       await runMpvCommand(() => mpvSetProperty('pause', nextPaused));
       if (nextPaused) {
+        setCurrentTime(freezeAt);
+        // 丢弃暂停命令前已经进入视频输出队列的帧，并重新呈现确认后的暂停帧。
+        await runMpvCommand(() => mpvCommand('seek', [String(freezeAt), 'absolute+exact']))
+          .catch(() => undefined);
         window.setTimeout(() => cleanupPlayerMemory('paused'), 500);
+      } else {
+        pausedPositionRef.current = null;
       }
     } catch (err) {
+      pausedPositionRef.current = null;
       if (isMountedRef.current) {
         isPlayingRef.current = !isPlayingRef.current;
         setIsPlaying(isPlayingRef.current);
       }
       console.error('[Player] 切换播放状态失败:', err);
     }
-  }, [runMpvCommand, cleanupPlayerMemory]);
+  }, [runMpvCommand, cleanupPlayerMemory, currentTime]);
 
   // 跳转
   const seek = useCallback(async (time: number) => {
     if (!mpvInitialized.current || !isMountedRef.current) return;
     try {
+      if (!isPlayingRef.current) {
+        pausedPositionRef.current = time;
+        setCurrentTime(time);
+      }
       await runMpvCommand(() => mpvCommand('seek', [String(time), 'absolute']));
     } catch (err) {
       console.error('[Player] 跳转失败:', err);
@@ -474,6 +550,7 @@ const Player: React.FC = () => {
   const changeSpeed = useCallback(async (spd: number) => {
     try {
       await runMpvCommand(() => mpvSetProperty('speed', spd));
+      setSpeed(spd);
     } catch (err) {
       console.error('[Player] 设置倍速失败:', err);
     }
@@ -554,7 +631,7 @@ const Player: React.FC = () => {
   }, [isAlwaysOnTop, playerWindow, runPlayerWindowAction]);
 
   useEffect(() => {
-    playerWindow.setResizable(false).catch(() => undefined);
+    playerWindow.setResizable(true).catch(() => undefined);
     return () => {
       if (customResizeRef.current.raf) window.cancelAnimationFrame(customResizeRef.current.raf);
       customResizeRef.current.active = false;
@@ -609,97 +686,20 @@ const Player: React.FC = () => {
     };
   }, [getCurrentVideoRatio, isFullscreen, isPiP, playerWindow]);
 
-  const startAspectResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  const startWindowResize = useCallback((event: React.PointerEvent<HTMLDivElement>, direction: ResizeDirection) => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
-
-    const grip = event.currentTarget;
-    grip.setPointerCapture(event.pointerId);
-
-    const startX = event.screenX;
-    const startY = event.screenY;
-    const startW = lastWindowSizeRef.current?.width || window.innerWidth || 1280;
-    const startH = lastWindowSizeRef.current?.height || window.innerHeight || 720;
-    const ratio = getCurrentVideoRatio();
-    const minW = isPiP ? 360 : 520;
-    const minH = Math.round(minW / ratio);
-    let latest = { width: startW, height: startH };
-
-    const syncViewport = (h: number) => {
-      const hStr = `${Math.round(h)}px`;
-      document.documentElement.style.height = hStr;
-      document.body.style.height = hStr;
-      document.getElementById('root')?.style.setProperty('height', hStr);
-      const el = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (el) el.style.height = hStr;
-    };
-
-    const scheduleSize = (size: { width: number; height: number }) => {
-      const state = customResizeRef.current;
-      state.pending = size;
-      if (state.raf || state.inFlight) return;
-
-      state.raf = window.requestAnimationFrame(() => {
-        state.raf = 0;
-        const target = state.pending;
-        state.pending = null;
-        if (!target || !state.active) return;
-
-        state.inFlight = true;
-        playerWindow.setSize(new LogicalSize(target.width, target.height))
-          .catch(() => undefined)
-          .finally(() => {
-            state.inFlight = false;
-            if (state.active && state.pending) {
-              scheduleSize(state.pending);
-            }
-          });
-      });
-    };
-
-    customResizeRef.current.active = true;
-
-    const onMove = (moveEvent: PointerEvent) => {
-      if (!customResizeRef.current.active) return;
-      moveEvent.preventDefault();
-      const dx = moveEvent.screenX - startX;
-      const dy = moveEvent.screenY - startY;
-      const widthFromX = startW + dx;
-      const widthFromY = (startH + dy) * ratio;
-      const useVertical = Math.abs(dy * ratio) > Math.abs(dx);
-      const desiredW = useVertical ? widthFromY : widthFromX;
-      const width = Math.max(minW, Math.round(desiredW));
-      const height = Math.max(minH, Math.round(width / ratio));
-      latest = { width, height };
-      lastWindowSizeRef.current = latest;
-      syncViewport(height);
-      scheduleSize(latest);
-    };
-
-    const finish = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      customResizeRef.current.active = false;
-      if (customResizeRef.current.raf) {
-        window.cancelAnimationFrame(customResizeRef.current.raf);
-        customResizeRef.current.raf = 0;
-      }
-      customResizeRef.current.pending = null;
-      playerWindow.setSize(new LogicalSize(latest.width, latest.height)).catch(() => undefined).finally(() => {
-        syncViewport(latest.height);
-      });
-    };
-
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', finish, { once: true });
-    window.addEventListener('pointercancel', finish, { once: true });
-  }, [getCurrentVideoRatio, isFullscreen, isPiP, isWindowMaximized, playerWindow]);
+    playerWindow.startResizeDragging(direction).catch((error) => {
+      console.error('[Player] 启动原生窗口缩放失败:', error);
+    });
+  }, [isFullscreen, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     const _markDirty = markSeriesDirty;
     runPlayerWindowAction(async () => {
+      if (playerClosingRef.current) return;
+      playerClosingRef.current = true;
       // Save playback progress BEFORE closing — the plugin's CloseRequested
       // handler will destroy mpv, after which get_property calls would fail.
       if (currentVideo && currentTime > 1) {
@@ -718,6 +718,9 @@ const Player: React.FC = () => {
           await mainWindow.setAlwaysOnTop(false).catch(() => undefined);
         }
       } catch { /* 主窗口操作失败不影响关闭 */ }
+      // Let all queued property reads/writes finish before Rust removes the
+      // plugin instance and terminates its IPC endpoint.
+      await mpvCommandQueueRef.current.catch(() => undefined);
       // 通知 Rust 统一执行：销毁 mpv → 关闭窗口，前端不再直接操作
       // 加 3 秒超时，防止 mpv.destroy() 卡住导致按钮无响应
       const closeResult = await Promise.race([
@@ -1212,7 +1215,7 @@ const Player: React.FC = () => {
             <i style={{ left: `${progressPercent}%` }} />
             {hoverTime !== null && (
               <div className="changli-player-preview" style={{ left: `${hoverX}px` }}>
-                {thumbnailUrl ? <img src={thumbnailUrl} alt="预览" /> : <div>{formatTime(hoverTime)}</div>}
+                {thumbnailUrl ? <img src={thumbnailUrl} alt="预览" onError={previewOnImageError} /> : <div>{formatTime(hoverTime)}</div>}
                 <small>{formatTime(hoverTime)}</small>
               </div>
             )}
@@ -1268,11 +1271,21 @@ const Player: React.FC = () => {
         </div>
       </footer>
       {!isFullscreen && !isWindowMaximized && (
-        <div
-          className="changli-player-resize-grip"
-          onPointerDown={startAspectResize}
-          aria-label="按视频比例拉伸播放器"
-        />
+        <>
+          {(['North', 'South', 'East', 'West', 'NorthEast', 'NorthWest', 'SouthWest'] as ResizeDirection[]).map((direction) => (
+            <div
+              key={direction}
+              className={`changli-player-resize-edge resize-${direction.toLowerCase()}`}
+              onPointerDown={(event) => startWindowResize(event, direction)}
+              aria-hidden="true"
+            />
+          ))}
+          <div
+            className="changli-player-resize-grip"
+            onPointerDown={(event) => startWindowResize(event, 'SouthEast')}
+            aria-label="调整播放器窗口大小"
+          />
+        </>
       )}
     </section>
   );
