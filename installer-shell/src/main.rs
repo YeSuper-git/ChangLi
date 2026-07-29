@@ -502,7 +502,10 @@ fn html(default_dir: &Path, is_update: bool) -> String {
 fn apply_true_transparent_window(window: &tao::window::Window) {
     use windows::Win32::{
         Foundation::HWND,
-        Graphics::Dwm::DwmExtendFrameIntoClientArea,
+        Graphics::Dwm::{
+            DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_BORDER_COLOR,
+            DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+        },
         UI::{
             Controls::MARGINS,
             WindowsAndMessaging::{
@@ -547,6 +550,27 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
             cyBottomHeight: -1,
         };
         let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+        // Windows 11 can still paint its active-window accent border outside
+        // the DirectComposition visual. At rounded corners that rectangular
+        // non-client border appears as blue/cyan wedges. Disable that border
+        // and the system's own corner treatment; DComp is the sole owner of
+        // the final antialiased 34 px shape.
+        const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
+        let border_color = DWMWA_COLOR_NONE;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            (&border_color as *const u32).cast(),
+            std::mem::size_of_val(&border_color) as u32,
+        );
+        let corner_preference = DWMWCP_DONOTROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            (&corner_preference as *const DWM_WINDOW_CORNER_PREFERENCE).cast(),
+            std::mem::size_of_val(&corner_preference) as u32,
+        );
     }
 }
 
