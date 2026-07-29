@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::thread;
@@ -27,6 +27,137 @@ static MPV_SESSION: Mutex<Option<MpvSession>> = Mutex::new(None);
 static ALWAYS_ON_TOP: Mutex<bool> = Mutex::new(false);
 /// 防止重复进入播放器关闭流程的原子标记
 static PLAYER_CLOSING: AtomicBool = AtomicBool::new(false);
+static PLAYER_ASPECT_BITS: AtomicU64 = AtomicU64::new((16.0_f64 / 9.0).to_bits());
+
+pub fn set_player_aspect_ratio_value(ratio: f64) {
+    if ratio.is_finite() && ratio > 0.0 {
+        PLAYER_ASPECT_BITS.store(ratio.clamp(0.45, 3.20).to_bits(), Ordering::Relaxed);
+    }
+}
+
+#[tauri::command]
+pub fn set_player_aspect_ratio(ratio: f64) {
+    set_player_aspect_ratio_value(ratio);
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn player_sizing_subclass(
+    hwnd: windows::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+    _subclass_id: usize,
+    _ref_data: usize,
+) -> windows::Win32::Foundation::LRESULT {
+    use windows::Win32::{
+        Foundation::RECT,
+        UI::{
+            Shell::DefSubclassProc,
+            WindowsAndMessaging::{
+                GetWindowRect, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT,
+                WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_SIZING,
+            },
+        },
+    };
+
+    if message == WM_SIZING && lparam.0 != 0 {
+        let rect = &mut *(lparam.0 as *mut RECT);
+        let ratio = f64::from_bits(PLAYER_ASPECT_BITS.load(Ordering::Relaxed));
+        let edge = wparam.0 as u32;
+        let proposed_width = (rect.right - rect.left).max(1);
+        let proposed_height = (rect.bottom - rect.top).max(1);
+        let mut current = RECT::default();
+        let _ = GetWindowRect(hwnd, &mut current);
+        let current_width = (current.right - current.left).max(1);
+        let current_height = (current.bottom - current.top).max(1);
+
+        let width_driven = match edge {
+            WMSZ_LEFT | WMSZ_RIGHT => true,
+            WMSZ_TOP | WMSZ_BOTTOM => false,
+            _ => {
+                (proposed_width - current_width).abs() as f64
+                    >= (proposed_height - current_height).abs() as f64 * ratio
+            }
+        };
+
+        let (width, height) = if width_driven {
+            (
+                proposed_width,
+                (proposed_width as f64 / ratio).round().max(1.0) as i32,
+            )
+        } else {
+            (
+                (proposed_height as f64 * ratio).round().max(1.0) as i32,
+                proposed_height,
+            )
+        };
+
+        match edge {
+            WMSZ_LEFT => {
+                rect.left = rect.right - width;
+                rect.bottom = rect.top + height;
+            }
+            WMSZ_RIGHT => {
+                rect.right = rect.left + width;
+                rect.bottom = rect.top + height;
+            }
+            WMSZ_TOP => {
+                rect.top = rect.bottom - height;
+                rect.right = rect.left + width;
+            }
+            WMSZ_BOTTOM => {
+                rect.bottom = rect.top + height;
+                rect.right = rect.left + width;
+            }
+            WMSZ_TOPLEFT => {
+                rect.left = rect.right - width;
+                rect.top = rect.bottom - height;
+            }
+            WMSZ_TOPRIGHT => {
+                rect.right = rect.left + width;
+                rect.top = rect.bottom - height;
+            }
+            WMSZ_BOTTOMLEFT => {
+                rect.left = rect.right - width;
+                rect.bottom = rect.top + height;
+            }
+            WMSZ_BOTTOMRIGHT => {
+                rect.right = rect.left + width;
+                rect.bottom = rect.top + height;
+            }
+            _ => {}
+        }
+        return windows::Win32::Foundation::LRESULT(1);
+    }
+
+    DefSubclassProc(hwnd, message, wparam, lparam)
+}
+
+#[cfg(target_os = "windows")]
+fn install_player_aspect_ratio_subclass(window: &WebviewWindow) -> Result<()> {
+    use windows::Win32::UI::Shell::SetWindowSubclass;
+
+    const PLAYER_ASPECT_SUBCLASS_ID: usize = 0x434C_4152;
+    let handle = window.hwnd().context("get player HWND for aspect resize")?;
+    let hwnd = windows::Win32::Foundation::HWND(handle.0);
+    let installed = unsafe {
+        SetWindowSubclass(
+            hwnd,
+            Some(player_sizing_subclass),
+            PLAYER_ASPECT_SUBCLASS_ID,
+            0,
+        )
+    };
+    if !installed.as_bool() {
+        return Err(anyhow!("install player aspect-ratio window subclass"));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn install_player_aspect_ratio_subclass(_window: &WebviewWindow) -> Result<()> {
+    Ok(())
+}
 
 struct MpvSession {
     child: Child,
@@ -534,6 +665,7 @@ fn apply_player_window_style(window: &WebviewWindow) -> Result<()> {
     // 播放器是独立顶层窗口，应在任务栏和 Alt+Tab 中与主窗口分别出现。
     window.set_skip_taskbar(false)?;
     window.set_resizable(true)?;
+    install_player_aspect_ratio_subclass(window)?;
     window.set_always_on_top(always_on_top)?;
     set_windows_11_rounded_corners(window);
     Ok(())

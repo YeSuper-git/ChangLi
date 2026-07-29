@@ -3479,6 +3479,7 @@ async fn open_player_window(
         (Some(w), Some(h)) if w > 0 && h > 0 => (w as f64 / h as f64).clamp(0.45, 3.20),
         _ => 16.0 / 9.0,
     };
+    player::set_player_aspect_ratio_value(aspect);
     let mut player_w = target_w;
     let mut player_h = (player_w / aspect).round();
     if player_h > target_h {
@@ -4720,6 +4721,7 @@ fn main() {
             cancel_update_download,
             install_update,
             player::request_close_player,
+            player::set_player_aspect_ratio,
             get_downloaded_update,
             get_updates_dir,
             detect_rss_url,

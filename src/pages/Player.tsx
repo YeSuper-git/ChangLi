@@ -94,7 +94,6 @@ const Player: React.FC = () => {
   const observedVideoSizeRef = useRef<{ width?: number; height?: number }>({});
   const windowRatioAdjustedRef = useRef(false);
   const lastWindowSizeRef = useRef<{ width: number; height: number } | null>(null);
-  const customResizeRef = useRef({ active: false, raf: 0, inFlight: false, pending: null as { width: number; height: number } | null });
   const pipOriginalState = useRef<{ size: LogicalSize; position: LogicalPosition } | null>(null);
   // preview refs removed — using usePreviewThumb hook
 
@@ -121,12 +120,6 @@ const Player: React.FC = () => {
       clearTimeout(episodeHoverTimerRef.current);
       episodeHoverTimerRef.current = null;
     }
-    if (customResizeRef.current.raf) {
-      cancelAnimationFrame(customResizeRef.current.raf);
-      customResizeRef.current.raf = 0;
-    }
-    customResizeRef.current.pending = null;
-
     // drop-buffers 只释放 mpv 可重建的 demux/解码缓存；失败静默忽略，避免影响播放。
     // 播放中只响应后台/手动清理，普通周期清理只在暂停/空闲时触发。
     if (!mpvInitialized.current || switchingVideoRef.current) return;
@@ -144,7 +137,11 @@ const Player: React.FC = () => {
 
     const videoW = observedVideoSizeRef.current.width;
     const videoH = observedVideoSizeRef.current.height;
-    if (videoW && videoH && videoW > 0 && videoH > 0) setHasVideoFrame(true);
+    if (videoW && videoH && videoW > 0 && videoH > 0) {
+      setHasVideoFrame(true);
+      const videoRatio = Math.max(0.45, Math.min(3.2, videoW / videoH));
+      invoke('set_player_aspect_ratio', { ratio: videoRatio }).catch(() => undefined);
+    }
 
     if (windowRatioAdjustedRef.current) return;
     if (!videoW || !videoH || videoW <= 0 || videoH <= 0) return;
@@ -632,10 +629,6 @@ const Player: React.FC = () => {
 
   useEffect(() => {
     playerWindow.setResizable(true).catch(() => undefined);
-    return () => {
-      if (customResizeRef.current.raf) window.cancelAnimationFrame(customResizeRef.current.raf);
-      customResizeRef.current.active = false;
-    };
   }, [playerWindow]);
 
   useEffect(() => {
@@ -690,88 +683,10 @@ const Player: React.FC = () => {
     event.preventDefault();
     event.stopPropagation();
     if (isFullscreen || isWindowMaximized) return;
-
-    const grip = event.currentTarget;
-    grip.setPointerCapture(event.pointerId);
-
-    const startX = event.screenX;
-    const startY = event.screenY;
-    const startW = lastWindowSizeRef.current?.width || window.innerWidth || 1280;
-    const startH = lastWindowSizeRef.current?.height || window.innerHeight || 720;
-    const ratio = getCurrentVideoRatio();
-    const minW = isPiP ? 360 : 520;
-    const minH = Math.round(minW / ratio);
-    let latest = { width: startW, height: startH };
-
-    const syncViewport = (height: number) => {
-      const value = `${Math.round(height)}px`;
-      document.documentElement.style.height = value;
-      document.body.style.height = value;
-      document.getElementById('root')?.style.setProperty('height', value);
-      const player = document.querySelector('.changli-player-window') as HTMLElement | null;
-      if (player) player.style.height = value;
-    };
-
-    const scheduleSize = (size: { width: number; height: number }) => {
-      const state = customResizeRef.current;
-      state.pending = size;
-      if (state.raf || state.inFlight) return;
-
-      state.raf = window.requestAnimationFrame(() => {
-        state.raf = 0;
-        const target = state.pending;
-        state.pending = null;
-        if (!target || !state.active) return;
-
-        state.inFlight = true;
-        playerWindow.setSize(new LogicalSize(target.width, target.height))
-          .catch((error) => console.error('[Player] 等比调整窗口失败:', error))
-          .finally(() => {
-            state.inFlight = false;
-            if (state.active && state.pending) scheduleSize(state.pending);
-          });
-      });
-    };
-
-    customResizeRef.current.active = true;
-
-    const onMove = (moveEvent: PointerEvent) => {
-      if (!customResizeRef.current.active) return;
-      moveEvent.preventDefault();
-
-      const dx = moveEvent.screenX - startX;
-      const dy = moveEvent.screenY - startY;
-      const widthFromX = startW + dx;
-      const widthFromY = (startH + dy) * ratio;
-      const desiredW = Math.abs(dy * ratio) > Math.abs(dx) ? widthFromY : widthFromX;
-      const width = Math.max(minW, Math.round(desiredW));
-      const height = Math.max(minH, Math.round(width / ratio));
-
-      latest = { width, height };
-      lastWindowSizeRef.current = latest;
-      syncViewport(height);
-      scheduleSize(latest);
-    };
-
-    const finish = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', finish);
-      window.removeEventListener('pointercancel', finish);
-      customResizeRef.current.active = false;
-      if (customResizeRef.current.raf) {
-        window.cancelAnimationFrame(customResizeRef.current.raf);
-        customResizeRef.current.raf = 0;
-      }
-      customResizeRef.current.pending = null;
-      playerWindow.setSize(new LogicalSize(latest.width, latest.height))
-        .catch((error) => console.error('[Player] 完成等比调整窗口失败:', error))
-        .finally(() => syncViewport(latest.height));
-    };
-
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', finish, { once: true });
-    window.addEventListener('pointercancel', finish, { once: true });
-  }, [getCurrentVideoRatio, isFullscreen, isPiP, isWindowMaximized, playerWindow]);
+    playerWindow.startResizeDragging('SouthEast').catch((error) => {
+      console.error('[Player] 启动原生等比缩放失败:', error);
+    });
+  }, [isFullscreen, isWindowMaximized, playerWindow]);
 
   const handlePlayerClose = useCallback(() => {
     const _markDirty = markSeriesDirty;
