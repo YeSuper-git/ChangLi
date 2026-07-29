@@ -25,7 +25,7 @@ use wry::{
 mod composition_webview;
 
 #[cfg(target_os = "windows")]
-use tao::platform::windows::WindowExtWindows;
+use tao::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
 #[cfg(target_os = "windows")]
 use winreg::{enums::*, RegKey};
 
@@ -503,16 +503,13 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
     use windows::Win32::{
         Foundation::HWND,
         Graphics::Dwm::{
-            DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMWA_BORDER_COLOR,
-            DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+            DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE,
+            DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
         },
-        UI::{
-            Controls::MARGINS,
-            WindowsAndMessaging::{
-                GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, HWND_TOP,
-                SET_WINDOW_POS_FLAGS, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-                WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
-            },
+        UI::WindowsAndMessaging::{
+            GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, HWND_TOP,
+            SET_WINDOW_POS_FLAGS, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+            WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
         },
     };
 
@@ -534,22 +531,6 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
         let flags: SET_WINDOW_POS_FLAGS =
             SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER;
         let _ = SetWindowPos(hwnd, HWND_TOP, 0, 0, width, height, flags);
-
-        // DirectComposition supplies the antialiased shape. Do not combine it
-        // with SetWindowRgn: HRGN clipping is binary and reintroduces the
-        // jagged edge this compositor path is designed to remove.
-        // A -1 margin asks DWM to treat the complete client area as glass.
-        // The DirectComposition visual is clipped to the rounded rectangle,
-        // so pixels outside that clip must come from a genuinely transparent
-        // host surface. Zero margins leave Tao's HWND background visible in
-        // those pixels (usually as the Windows accent-colour corner wedges).
-        let margins = MARGINS {
-            cxLeftWidth: -1,
-            cxRightWidth: -1,
-            cyTopHeight: -1,
-            cyBottomHeight: -1,
-        };
-        let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
 
         // Windows 11 can still paint its active-window accent border outside
         // the DirectComposition visual. At rounded corners that rectangular
@@ -641,6 +622,14 @@ fn main() -> wry::Result<()> {
         .with_transparent(true)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(W as f64, H as f64));
+    #[cfg(target_os = "windows")]
+    {
+        // DirectComposition owns every visible pixel. Without this flag Tao
+        // creates a DWM blur-behind redirection surface for transparent
+        // windows; on some Windows 11 themes that surface is cyan and becomes
+        // visible outside the rounded DComp clip.
+        builder = builder.with_no_redirection_bitmap(true);
+    }
     if let Some(pos) = pos {
         builder = builder.with_position(pos);
     }
