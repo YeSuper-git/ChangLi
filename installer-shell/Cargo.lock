@@ -359,6 +359,7 @@ dependencies = [
  "rfd",
  "serde_json",
  "tao",
+ "webview2-com",
  "windows",
  "winreg",
  "winresource",
