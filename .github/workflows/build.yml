@@ -58,12 +58,14 @@ jobs:
             throw "Release RUSTFLAGS must not enable host-specific AVX instructions: $env:RUSTFLAGS"
           }
           & "src-tauri/resources/mpv/mpv.exe" --no-config --version
-          if ($LASTEXITCODE -ne 0) {
-            throw "Bundled mpv failed its Windows startup smoke test (exit $LASTEXITCODE)"
+          $mpvExit = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+          if ($mpvExit -ne 0) {
+            throw "Bundled mpv failed its Windows startup smoke test (exit $mpvExit)"
           }
           & "src-tauri/resources/ffmpeg/ffmpeg.exe" -version
-          if ($LASTEXITCODE -ne 0) {
-            throw "Bundled ffmpeg failed its Windows startup smoke test (exit $LASTEXITCODE)"
+          $ffmpegExit = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }
+          if ($ffmpegExit -ne 0) {
+            throw "Bundled ffmpeg failed its Windows startup smoke test (exit $ffmpegExit)"
           }
 
       - name: Build Tauri app
