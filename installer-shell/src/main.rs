@@ -503,8 +503,9 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
     use windows::Win32::{
         Foundation::HWND,
         Graphics::Dwm::{
-            DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE,
-            DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+            DwmSetWindowAttribute, DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMWA_BORDER_COLOR,
+            DWMWA_NCRENDERING_POLICY, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+            DWM_WINDOW_CORNER_PREFERENCE,
         },
         UI::WindowsAndMessaging::{
             GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, HWND_TOP,
@@ -532,11 +533,19 @@ fn apply_true_transparent_window(window: &tao::window::Window) {
             SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER;
         let _ = SetWindowPos(hwnd, HWND_TOP, 0, 0, width, height, flags);
 
-        // Windows 11 can still paint its active-window accent border outside
-        // the DirectComposition visual. At rounded corners that rectangular
-        // non-client border appears as blue/cyan wedges. Disable that border
-        // and the system's own corner treatment; DComp is the sole owner of
-        // the final antialiased 34 px shape.
+        // Windows 11 can still paint a translucent non-client shadow/highlight
+        // outside an undecorated popup. It is almost invisible over dark
+        // wallpaper but appears as a milky veil and a one-pixel white line
+        // over light windows. Disable all DWM non-client painting before
+        // disabling its border and corner treatment; DirectComposition is the
+        // sole owner of every visible pixel and the antialiased 34 px shape.
+        let nc_rendering = DWMNCRP_DISABLED;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_NCRENDERING_POLICY,
+            (&nc_rendering as *const DWMNCRENDERINGPOLICY).cast(),
+            std::mem::size_of_val(&nc_rendering) as u32,
+        );
         const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
         let border_color = DWMWA_COLOR_NONE;
         let _ = DwmSetWindowAttribute(
