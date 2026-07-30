@@ -261,9 +261,9 @@ fn html(default_dir: &Path, is_update: bool) -> String {
   a {{ text-decoration:none; }}
   html,body {{ width:100%; height:100%; margin:0; overflow:hidden; background:transparent; }}
   body {{ user-select:none; }}
-  .shell {{ position:relative; width:100vw; height:100vh; display:grid; grid-template-columns:318px minmax(0,1fr); overflow:hidden; background:#f6f8fc; border-radius:34px; box-shadow:0 28px 90px rgba(31,35,49,.20); }}
-  .shell::before {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; box-shadow:inset 0 0 0 1px rgba(255,255,255,.72), inset 0 0 26px rgba(255,255,255,.34), inset 0 -18px 34px rgba(31,35,49,.045); }}
-  .shell::after {{ content:""; position:absolute; inset:0; z-index:4; pointer-events:none; border-radius:34px; background:linear-gradient(135deg,rgba(255,255,255,.38),transparent 16%,transparent 84%,rgba(31,35,49,.07)); }}
+  .shell {{ position:relative; width:100vw; height:100vh; display:grid; grid-template-columns:318px minmax(0,1fr); overflow:hidden; background:#f6f8fc; border-radius:0; box-shadow:none; }}
+  .shell::before {{ content:""; position:absolute; inset:1px; z-index:4; pointer-events:none; border-radius:0; box-shadow:inset 0 -18px 34px rgba(31,35,49,.045); }}
+  .shell::after {{ content:""; position:absolute; inset:1px; z-index:4; pointer-events:none; border-radius:0; background:linear-gradient(135deg,rgba(255,255,255,.28),transparent 16%,transparent 84%,rgba(31,35,49,.07)); }}
   .drag {{ cursor:default; }}
   .side {{ position:relative; overflow:hidden; padding:32px; color:#fff;
     background:

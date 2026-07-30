@@ -54,11 +54,38 @@ unsafe extern "system" fn player_sizing_subclass(
         UI::{
             Shell::DefSubclassProc,
             WindowsAndMessaging::{
-                GetWindowRect, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT,
-                WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_SIZING,
+                HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT, HTCLIENT, HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT,
+                HTTOPRIGHT, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT, WMSZ_RIGHT,
+                WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_ERASEBKGND, WM_NCHITTEST, WM_SIZING,
             },
         },
     };
+
+    // The transparent WebView and mpv child repaint independently during a
+    // live resize. Suppress the parent background erase between their frames
+    // so Windows keeps the previous composed frame instead of flashing the
+    // empty transparent/black host surface.
+    if message == WM_ERASEBKGND {
+        return windows::Win32::Foundation::LRESULT(1);
+    }
+
+    if message == WM_NCHITTEST {
+        let hit = DefSubclassProc(hwnd, message, wparam, lparam);
+        let hit_code = hit.0 as u32;
+        if matches!(
+            hit_code,
+            HTLEFT | HTRIGHT | HTTOP | HTBOTTOM | HTTOPLEFT | HTTOPRIGHT | HTBOTTOMLEFT
+        ) {
+            return windows::Win32::Foundation::LRESULT(HTCLIENT as isize);
+        }
+        // Keep the native south-east result available for accessibility and
+        // system resize semantics. The visible frontend grip also explicitly
+        // starts a SouthEast resize drag.
+        if hit_code == HTBOTTOMRIGHT {
+            return hit;
+        }
+        return hit;
+    }
 
     if message == WM_SIZING && lparam.0 != 0 {
         let rect = &mut *(lparam.0 as *mut RECT);
@@ -66,30 +93,27 @@ unsafe extern "system" fn player_sizing_subclass(
         let edge = wparam.0 as u32;
         let proposed_width = (rect.right - rect.left).max(1);
         let proposed_height = (rect.bottom - rect.top).max(1);
-        let mut current = RECT::default();
-        let _ = GetWindowRect(hwnd, &mut current);
-        let current_width = (current.right - current.left).max(1);
-        let current_height = (current.bottom - current.top).max(1);
 
-        let width_driven = match edge {
-            WMSZ_LEFT | WMSZ_RIGHT => true,
-            WMSZ_TOP | WMSZ_BOTTOM => false,
-            _ => {
-                (proposed_width - current_width).abs() as f64
-                    >= (proposed_height - current_height).abs() as f64 * ratio
-            }
-        };
-
-        let (width, height) = if width_driven {
-            (
+        let (width, height) = match edge {
+            WMSZ_LEFT | WMSZ_RIGHT => (
                 proposed_width,
                 (proposed_width as f64 / ratio).round().max(1.0) as i32,
-            )
-        } else {
-            (
+            ),
+            WMSZ_TOP | WMSZ_BOTTOM => (
                 (proposed_height as f64 * ratio).round().max(1.0) as i32,
                 proposed_height,
-            )
+            ),
+            _ => {
+                // Orthogonally project the freely proposed width/height onto
+                // w = ratio * h. Both mouse axes continuously contribute, so
+                // corner dragging stays responsive without discrete axis
+                // switching or a per-drag direction lock.
+                let projected_height = (ratio * proposed_width as f64 + proposed_height as f64)
+                    / (ratio * ratio + 1.0);
+                let height = projected_height.round().max(1.0) as i32;
+                let width = (projected_height * ratio).round().max(1.0) as i32;
+                (width, height)
+            }
         };
 
         match edge {

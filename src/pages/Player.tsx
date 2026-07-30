@@ -651,23 +651,25 @@ const Player: React.FC = () => {
       applyViewportHeight(size.height / scale);
     }).catch(() => {});
 
-    // debounce onResized：只同步视口高度和最大化状态，不再调 setSize（mpv --wid 嵌入后自行处理 WM_SIZE）
+    // The viewport must follow every native resize frame. Debouncing this
+    // update makes the transparent WebView keep its old dimensions until the
+    // pointer is released, even though the HWND and mpv child are resizing.
+    // Only the comparatively expensive maximized-state query stays debounced.
     let resizeDebounceTimer = 0;
-    playerWindow.onResized(async () => {
+    playerWindow.onResized((event) => {
+      const size = event.payload;
+      const scale = window.devicePixelRatio || 1;
+      const logicalWidth = size.width / scale;
+      const logicalHeight = size.height / scale;
+      lastWindowSizeRef.current = { width: logicalWidth, height: logicalHeight };
+      applyViewportHeight(logicalHeight);
+
       if (resizeDebounceTimer) window.clearTimeout(resizeDebounceTimer);
       resizeDebounceTimer = window.setTimeout(async () => {
         resizeDebounceTimer = 0;
         try {
-          const [maximized, size] = await Promise.all([
-            playerWindow.isMaximized().catch(() => false),
-            playerWindow.outerSize().catch(() => null),
-          ]);
+          const maximized = await playerWindow.isMaximized().catch(() => false);
           setIsWindowMaximized(maximized);
-          if (size) {
-            const scale = window.devicePixelRatio || 1;
-            lastWindowSizeRef.current = { width: size.width / scale, height: size.height / scale };
-            applyViewportHeight(size.height / scale);
-          }
         } catch { /* ignore resize sync errors */ }
       }, 100);
     }).then((fn) => {
