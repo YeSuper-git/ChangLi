@@ -17,6 +17,7 @@ import Tags from './pages/Tags';
 import SeriesDetail from './pages/SeriesDetail';
 import Settings from './pages/Settings';
 import Subscriptions from './pages/Subscriptions';
+import WatchHistory from './pages/WatchHistory';
 import { useLibraryStore } from './store/libraryStore';
 import ToastProvider from './components/ToastProvider';
 import { checkLatestRelease, downloadUpdate, cancelUpdateDownload, installUpdate } from './utils/api';
@@ -186,6 +187,7 @@ function App() {
           <Route path="/series/:id" element={<SeriesDetail />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
+          <Route path="/history" element={<WatchHistory />} />
         </Routes>
       </Layout>
       <OnboardingTutorial />

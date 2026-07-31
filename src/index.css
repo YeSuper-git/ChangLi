@@ -186,6 +186,26 @@ html.is-macos .changli-topbar {
   max-width: calc(6 * 210px + 5 * 20px); /* 6 cards + 5 gaps */
 }
 
+/* Full-width landscape grids used by the library and actor detail pages.
+   The calculated minimum track consumes exactly one sixth of the available
+   row (after five gaps), so auto-fill can never create a seventh column. */
+.changli-six-column-fill {
+  --changli-card-min-width: 210px;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(
+      max(var(--changli-card-min-width), calc((100% - 100px) / 6)),
+      1fr
+    )
+  );
+  width: 100%;
+  max-width: none;
+}
+
+.changli-auto-grid-video.changli-six-column-fill {
+  --changli-card-min-width: 270px;
+}
+
 .changli-auto-grid-episode {
   display: grid;
   grid-template-columns: repeat(auto-fill, 190px);
@@ -260,6 +280,14 @@ html.is-macos .changli-topbar {
   .changli-auto-grid-video,
   .changli-auto-grid-actor {
     grid-template-columns: repeat(auto-fill, 220px);
+  }
+
+  .changli-auto-grid-video.changli-six-column-fill {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  }
+
+  .changli-auto-grid-work.changli-six-column-fill {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
   }
 }
 

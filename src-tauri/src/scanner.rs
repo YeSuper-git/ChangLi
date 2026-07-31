@@ -451,7 +451,9 @@ async fn process_directory_video_index(
             let mut video = scan_video_file_index(video_path)?;
             video.season = season;
             video.subtitle = subtitle.map(|s| s.to_string()).or(video.subtitle);
-            if fixed_episode_names {
+            if sorted_videos.len() == 1 && parse_adult_filename(&video.file_name).is_some() {
+                video.episode_number = Some(1);
+            } else if fixed_episode_names {
                 video.episode_number = video_path
                     .file_stem()
                     .and_then(|stem| stem.to_str())
@@ -575,7 +577,10 @@ async fn process_directory_videos(
                 Ok(mut video) => {
                     video.season = season;
                     video.subtitle = subtitle.map(|s| s.to_string());
-                    if folder_uses_fixed_episode_names(&sorted_videos) {
+                    if sorted_videos.len() == 1 && parse_adult_filename(&video.file_name).is_some()
+                    {
+                        video.episode_number = Some(1);
+                    } else if folder_uses_fixed_episode_names(&sorted_videos) {
                         video.episode_number = video_path
                             .file_stem()
                             .and_then(|stem| stem.to_str())
@@ -806,12 +811,11 @@ pub async fn scan_video_file(path: &Path, poster: Option<&str>) -> Result<Video>
 
     let file_size = std::fs::metadata(path)?.len() as i64;
 
-    // 从文件名提取集数信息。固定两位数字文件名 01/02/03 直接作为集数。
-    let episode =
-        fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name));
-
     // 解析成人视频文件名（车牌、中文字幕、标题）
     let adult_info = parse_adult_filename(&file_name);
+
+    let episode =
+        fixed_episode_from_path(path).or_else(|| extract_episode_from_filename(&file_name));
 
     // 如果解析到成人视频标题，用作 subtitle
     let subtitle = adult_info.as_ref().and_then(|info| info.title.clone());
@@ -1079,6 +1083,22 @@ mod tests {
 
         assert_eq!(episodes[0], ("01.mp4".to_string(), Some(1)));
         assert_eq!(episodes[1], ("02.mp4".to_string(), Some(2)));
+
+        fs::remove_dir_all(dir).ok();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn single_catalogued_work_does_not_use_title_episode_token() -> Result<()> {
+        let dir = temp_dir("single-work-episode");
+        let video_path = dir.join("ABC-123 EP08[测试标题].mp4");
+        fs::write(&video_path, b"video")?;
+
+        let full = scan_directory(dir.to_str().unwrap()).await?;
+        let index = scan_directory_video_index(dir.to_str().unwrap()).await?;
+
+        assert_eq!(full.videos[0].episode_number, Some(1));
+        assert_eq!(index[0].episode_number, Some(1));
 
         fs::remove_dir_all(dir).ok();
         Ok(())

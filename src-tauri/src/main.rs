@@ -2047,7 +2047,8 @@ async fn add_videos_to_series(
         guard.as_ref().ok_or("数据库未初始化")?.clone()
     };
     let mut videos = Vec::new();
-    let mut next_episode_by_season: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    let mut next_episode_by_season: std::collections::HashMap<i32, i32> =
+        std::collections::HashMap::new();
     for path in paths {
         let video_path = Path::new(&path);
         if !video_path.is_file() || !scanner::is_video_file(video_path) {
@@ -3632,6 +3633,28 @@ async fn get_play_history(state: State<'_, AppState>) -> Result<Vec<db::PlayHist
 }
 
 #[tauri::command]
+async fn delete_play_history(state: State<'_, AppState>, history_id: i64) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::delete_play_history(&pool, history_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn clear_play_history(state: State<'_, AppState>) -> Result<(), String> {
+    let pool = {
+        let guard = state.db.lock().await;
+        guard.as_ref().ok_or("数据库未初始化")?.clone()
+    };
+    db::clear_play_history(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_video_series_map(state: State<'_, AppState>) -> Result<Vec<(i64, i64)>, String> {
     let pool = {
         let guard = state.db.lock().await;
@@ -4813,6 +4836,8 @@ fn main() {
             check_category_updates,
             update_play_history,
             get_play_history,
+            delete_play_history,
+            clear_play_history,
             get_video_series_map,
             get_recent_watch_items,
             update_watch_progress,

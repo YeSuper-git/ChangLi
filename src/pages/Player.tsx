@@ -83,9 +83,11 @@ const Player: React.FC = () => {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const draggingProgressRef = useRef(false);
   const stageDraggedRef = useRef(false);
+  const windowDragInProgressRef = useRef(false);
   const mpvInitialized = useRef(false);
   const mpvOperationLock = useRef(Promise.resolve());
   const mpvCommandQueueRef = useRef(Promise.resolve());
+  const relativeSeekPendingRef = useRef(0);
   const switchingVideoRef = useRef(false);
   const playerClosingRef = useRef(false);
   const isPlayingRef = useRef(false);
@@ -452,6 +454,7 @@ const Player: React.FC = () => {
           !disposed
           && Number.isFinite(value)
           && pausedPositionRef.current === null
+          && relativeSeekPendingRef.current === 0
           && !draggingProgressRef.current
         ) {
           setCurrentTime(value);
@@ -534,6 +537,27 @@ const Player: React.FC = () => {
     }
   }, [runMpvCommand]);
 
+  // 快进/后退使用 mpv 的相对 seek，而不是基于可能尚未刷新的
+  // currentTime 反复计算绝对目标。命令队列保证每次点击都依次累计。
+  const seekRelative = useCallback(async (seconds: number) => {
+    if (!mpvInitialized.current || !isMountedRef.current || seconds === 0) return;
+
+    relativeSeekPendingRef.current += 1;
+    setCurrentTime((previousTime) => {
+      const target = Math.max(0, Math.min(duration || Number.POSITIVE_INFINITY, previousTime + seconds));
+      if (!isPlayingRef.current) pausedPositionRef.current = target;
+      return target;
+    });
+
+    try {
+      await runMpvCommand(() => mpvCommand('seek', [String(seconds), 'relative+exact']));
+    } catch (err) {
+      console.error('[Player] 相对跳转失败:', err);
+    } finally {
+      relativeSeekPendingRef.current = Math.max(0, relativeSeekPendingRef.current - 1);
+    }
+  }, [duration, runMpvCommand]);
+
   // 设置音量
   const changeVolume = useCallback(async (vol: number) => {
     try {
@@ -593,12 +617,20 @@ const Player: React.FC = () => {
     action().catch((error) => console.error(`[Player] ${name}失败:`, error));
   }, []);
 
+  const startPlayerWindowDrag = useCallback(() => {
+    if (windowDragInProgressRef.current || playerClosingRef.current) return;
+    windowDragInProgressRef.current = true;
+    playerWindow.startDragging()
+      .catch((error) => console.error('[Player] 拖动窗口失败:', error))
+      .finally(() => { windowDragInProgressRef.current = false; });
+  }, [playerWindow]);
+
   const handlePlayerWindowDrag = useCallback((event: React.MouseEvent<HTMLElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest('button,select,input,.changli-player-actions,.changli-player-controls,.changli-player-side,.changli-player-badge,.changli-player-center-play,.changli-player-stage')) return;
-    playerWindow.startDragging().catch((error) => console.error('[Player] 拖动窗口失败:', error));
-  }, [playerWindow]);
+    startPlayerWindowDrag();
+  }, [startPlayerWindowDrag]);
 
   const stopWindowButtonMouseDown = useCallback((event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -1001,11 +1033,11 @@ const Player: React.FC = () => {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          seek(Math.max(0, currentTime - 10));
+          seekRelative(-10);
           break;
         case 'ArrowRight':
           e.preventDefault();
-          seek(Math.min(duration, currentTime + 10));
+          seekRelative(10);
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -1029,7 +1061,7 @@ const Player: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, currentTime, duration, volume, isFullscreen, togglePlay, seek, changeVolume, toggleFullscreen]);
+  }, [isPlaying, volume, isFullscreen, togglePlay, seekRelative, changeVolume, toggleFullscreen]);
 
   // 倍速选项
   const speedOptions = [1, 1.5, 2, 3];
@@ -1159,15 +1191,19 @@ const Player: React.FC = () => {
             const startX = e.screenX;
             const startY = e.screenY;
             stageDraggedRef.current = false;
+            const cleanupDragListeners = () => {
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', cleanupDragListeners);
+            };
             const onMove = (me: MouseEvent) => {
               if (Math.abs(me.screenX - startX) > 5 || Math.abs(me.screenY - startY) > 5) {
                 stageDraggedRef.current = true;
-                window.removeEventListener('mousemove', onMove);
-                playerWindow.startDragging().catch(() => {});
+                cleanupDragListeners();
+                startPlayerWindowDrag();
               }
             };
             window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', () => window.removeEventListener('mousemove', onMove), { once: true });
+            window.addEventListener('mouseup', cleanupDragListeners, { once: true });
           }}
           onClick={() => {
             if (stageDraggedRef.current) return;
@@ -1279,9 +1315,9 @@ const Player: React.FC = () => {
         <div className="changli-player-bottom">
           <div className="changli-player-left-controls">
             <button type="button" className="changli-player-round primary" aria-label={isPlaying ? '暂停' : '播放'} onClick={togglePlay}><span className={isPlaying ? 'pause-icon' : 'play-icon'} /></button>
-            <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seek(Math.max(0, currentTime - 10))}><span className="back-icon" /></button>
+            <button type="button" className="changli-player-round" aria-label="后退10秒" onClick={() => seekRelative(-10)}><span className="back-icon" /></button>
             <button type="button" className="changli-player-round next" aria-label="下一集" disabled={!nextEpisode} onClick={() => playEpisode(nextEpisode)}><span className="next-icon" /></button>
-            <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seek(Math.min(duration, currentTime + 10))}><span className="forward-icon" /></button>
+            <button type="button" className="changli-player-round" aria-label="前进10秒" onClick={() => seekRelative(10)}><span className="forward-icon" /></button>
             {isPiP && (
               <button type="button" className="changli-player-round speed-pip" aria-label="切换小窗倍速" onClick={() => changeSpeed(speed === 2 ? 1 : 2)}>
                 {speed === 2 ? '2X' : '1X'}

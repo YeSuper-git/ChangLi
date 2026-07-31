@@ -280,6 +280,7 @@ pub struct SeriesCompletionRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentWatchItem {
+    pub history_id: i64,
     pub video: Video,
     pub series: Option<VideoSeries>,
     pub last_position: f64,
@@ -553,9 +554,29 @@ pub async fn add_video(pool: &SqlitePool, video: Video) -> Result<Video> {
 /// 批量插入视频（事务批处理，1000条视频也只提交1次事务）
 pub async fn add_videos_batch(
     pool: &SqlitePool,
-    videos: Vec<Video>,
+    mut videos: Vec<Video>,
     series_id: Option<i64>,
 ) -> Result<Vec<Video>> {
+    // Some category layouts represent each file as its own series. In that
+    // path scan_video_file cannot know that the incoming catalogued work is
+    // the only item, so normalize it when the target series is still empty.
+    if videos.len() == 1
+        && videos
+            .first()
+            .is_some_and(|video| crate::scanner::parse_adult_filename(&video.file_name).is_some())
+    {
+        if let Some(sid) = series_id {
+            let existing_count: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM videos WHERE series_id = ?")
+                    .bind(sid)
+                    .fetch_one(pool)
+                    .await?;
+            if existing_count == 0 {
+                videos[0].episode_number = Some(1);
+            }
+        }
+    }
+
     let mut tx = pool.begin().await?;
     let mut saved_videos = Vec::new();
 
@@ -2285,6 +2306,21 @@ pub async fn get_play_history(pool: &SqlitePool) -> Result<Vec<PlayHistory>> {
     Ok(history)
 }
 
+pub async fn delete_play_history(pool: &SqlitePool, history_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM play_history WHERE id = ?")
+        .bind(history_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn clear_play_history(pool: &SqlitePool) -> Result<()> {
+    sqlx::query("DELETE FROM play_history")
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 /// 返回 video_id → series_id 的轻量映射（只查两列，用于首页排序）
 pub async fn get_completion_records(pool: &SqlitePool) -> Result<Vec<SeriesCompletionRecord>> {
     let rows = sqlx::query(
@@ -2434,7 +2470,8 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
     let rows = sqlx::query(
         "SELECT ph.id AS history_id, ph.last_position, ph.total_duration, ph.play_count, ph.last_played,
                 v.*, s.id AS s_id, s.title AS s_title, s.description AS s_description, s.poster AS s_poster,
-                s.folder_path AS s_folder_path, s.poster_base64 AS s_poster_base64, s.created_at AS s_created_at, s.updated_at AS s_updated_at,
+                s.folder_path AS s_folder_path, s.poster_base64 AS s_poster_base64, s.poster_orientation AS s_poster_orientation,
+                s.status AS s_status, s.created_at AS s_created_at, s.updated_at AS s_updated_at,
                 (SELECT COUNT(*) FROM videos sv WHERE sv.series_id = s.id) AS s_video_count
          FROM play_history ph
          JOIN videos v ON v.id = ph.video_id
@@ -2481,6 +2518,7 @@ pub async fn get_recent_watch_items(pool: &SqlitePool, limit: i64) -> Result<Vec
             }
         });
         items.push(RecentWatchItem {
+            history_id: row.get("history_id"),
             video,
             series,
             last_position: row.get("last_position"),
@@ -4178,7 +4216,27 @@ pub async fn check_series_updates(pool: &SqlitePool, series_id: i64) -> Result<S
     }
 
     // 获取数据库中现有的视频
-    let existing_videos = get_series_videos(pool, series_id).await?;
+    let mut existing_videos = get_series_videos(pool, series_id).await?;
+
+    // Repair records created by the old generic filename parser. A catalogued
+    // single work can contain tokens such as E02/EP08 in its title, but it is
+    // still the first work inside its own one-video series.
+    if existing_videos.len() == 1 {
+        let video = &mut existing_videos[0];
+        let is_catalogued_work = code
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+            || crate::scanner::parse_adult_filename(&video.file_name).is_some();
+        if is_catalogued_work && video.episode_number != Some(1) {
+            sqlx::query(
+                "UPDATE videos SET episode_number = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            )
+            .bind(video.id)
+            .execute(pool)
+            .await?;
+            video.episode_number = Some(1);
+        }
+    }
     let mut existing_paths: std::collections::HashSet<String> = existing_videos
         .iter()
         .map(|v| v.file_path.clone())

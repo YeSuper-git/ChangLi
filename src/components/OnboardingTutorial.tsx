@@ -26,7 +26,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
       {
         page: '/',
         title: '欢迎来到长离',
-        content: '这是你的私人视频库。顶部可以快速进入视频库和演员库，也可以从导航栏进入。',
+        content: '这是你的私人视频库。顶部可以快速进入视频库和观看历史，其他功能可以从导航栏进入。',
         highlight: '[data-tutorial="home-hero"]',
         position: 'bottom',
       },
@@ -229,7 +229,7 @@ const getSteps = (hasData: boolean, hasScanPath: boolean, hasUserTags: boolean):
     {
       page: '/',
       title: '欢迎来到长离',
-      content: '这是你的私人视频库，顶部可以快速进入视频库和演员库，也可以从导航栏进入。',
+      content: '这是你的私人视频库，顶部可以快速进入视频库和观看历史，其他功能可以从导航栏进入。',
       highlight: '[data-tutorial="home-hero"]',
       position: 'bottom',
     },

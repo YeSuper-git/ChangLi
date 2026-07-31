@@ -28,6 +28,8 @@ static ALWAYS_ON_TOP: Mutex<bool> = Mutex::new(false);
 /// 防止重复进入播放器关闭流程的原子标记
 static PLAYER_CLOSING: AtomicBool = AtomicBool::new(false);
 static PLAYER_ASPECT_BITS: AtomicU64 = AtomicU64::new((16.0_f64 / 9.0).to_bits());
+#[cfg(target_os = "windows")]
+const PLAYER_ASPECT_SUBCLASS_ID: usize = 0x434C_4152;
 
 pub fn set_player_aspect_ratio_value(ratio: f64) {
     if ratio.is_finite() && ratio > 0.0 {
@@ -56,10 +58,24 @@ unsafe extern "system" fn player_sizing_subclass(
             WindowsAndMessaging::{
                 HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT, HTCLIENT, HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT,
                 HTTOPRIGHT, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT, WMSZ_LEFT, WMSZ_RIGHT,
-                WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_ERASEBKGND, WM_NCHITTEST, WM_SIZING,
+                WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_ERASEBKGND, WM_NCDESTROY, WM_NCHITTEST,
+                WM_SIZING,
             },
         },
     };
+
+    // comctl32 normally tears its bookkeeping down with the HWND, but remove
+    // our callback explicitly before forwarding WM_NCDESTROY. This guarantees
+    // that no nested WebView/mpv message can re-enter the Rust callback after
+    // the native player window has started releasing its children.
+    if message == WM_NCDESTROY {
+        let _ = windows::Win32::UI::Shell::RemoveWindowSubclass(
+            hwnd,
+            Some(player_sizing_subclass),
+            PLAYER_ASPECT_SUBCLASS_ID,
+        );
+        return DefSubclassProc(hwnd, message, wparam, lparam);
+    }
 
     // The transparent WebView and mpv child repaint independently during a
     // live resize. Suppress the parent background erase between their frames
@@ -159,7 +175,6 @@ unsafe extern "system" fn player_sizing_subclass(
 
 #[cfg(target_os = "windows")]
 fn install_player_aspect_ratio_subclass(window: &WebviewWindow) -> Result<()> {
-    const PLAYER_ASPECT_SUBCLASS_ID: usize = 0x434C_4152;
     let handle = window.hwnd().context("get player HWND for aspect resize")?;
     let raw_hwnd = handle.0 as isize;
 
@@ -169,9 +184,13 @@ fn install_player_aspect_ratio_subclass(window: &WebviewWindow) -> Result<()> {
     // path with a misleading "file no longer exists" notification.
     window
         .run_on_main_thread(move || {
-            use windows::Win32::UI::Shell::SetWindowSubclass;
+            use windows::Win32::{UI::Shell::SetWindowSubclass, UI::WindowsAndMessaging::IsWindow};
 
             let hwnd = windows::Win32::Foundation::HWND(raw_hwnd as *mut core::ffi::c_void);
+            if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+                eprintln!("[player] skip aspect-ratio subclass for stale HWND");
+                return;
+            }
             let installed = unsafe {
                 SetWindowSubclass(
                     hwnd,
@@ -186,6 +205,45 @@ fn install_player_aspect_ratio_subclass(window: &WebviewWindow) -> Result<()> {
         })
         .context("schedule player aspect-ratio subclass on UI thread")
 }
+
+#[cfg(target_os = "windows")]
+fn remove_player_aspect_ratio_subclass(window: &WebviewWindow) {
+    use std::sync::mpsc;
+
+    let Ok(handle) = window.hwnd() else {
+        return;
+    };
+    let raw_hwnd = handle.0 as isize;
+    let (finished_tx, finished_rx) = mpsc::sync_channel(1);
+    if window
+        .run_on_main_thread(move || {
+            use windows::Win32::{
+                UI::Shell::RemoveWindowSubclass, UI::WindowsAndMessaging::IsWindow,
+            };
+
+            let hwnd = windows::Win32::Foundation::HWND(raw_hwnd as *mut core::ffi::c_void);
+            if unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+                let _ = unsafe {
+                    RemoveWindowSubclass(
+                        hwnd,
+                        Some(player_sizing_subclass),
+                        PLAYER_ASPECT_SUBCLASS_ID,
+                    )
+                };
+            }
+            let _ = finished_tx.send(());
+        })
+        .is_ok()
+    {
+        // Never destroy the HWND while the removal closure is still queued on
+        // its owning UI thread. A short timeout keeps shutdown recoverable if
+        // the event loop itself is already exiting.
+        let _ = finished_rx.recv_timeout(Duration::from_secs(2));
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn remove_player_aspect_ratio_subclass(_window: &WebviewWindow) {}
 
 #[cfg(not(target_os = "windows"))]
 fn install_player_aspect_ratio_subclass(_window: &WebviewWindow) -> Result<()> {
@@ -567,6 +625,15 @@ pub async fn request_close_player(app: tauri::AppHandle) -> Result<(), String> {
         eprintln!("[player] request_close_player: PLAYER_CLOSING reset");
     });
 
+    // Detach the Rust Win32 callback before asking mpv/WebView2 to release
+    // child windows. Plugin teardown can pump nested window messages; leaving
+    // the subclass installed during that interval permits a callback into a
+    // top-level HWND whose children are already being destroyed.
+    let player_window = app.get_webview_window(PLAYER_WINDOW_LABEL);
+    if let Some(window) = player_window.as_ref() {
+        remove_player_aspect_ratio_subclass(window);
+    }
+
     // 1. 销毁 mpv 实例（kill 子进程 + wait）
     #[cfg(target_os = "windows")]
     {
@@ -589,7 +656,7 @@ pub async fn request_close_player(app: tauri::AppHandle) -> Result<(), String> {
     // 3. mpv has released the HWND, so WebView2 can now be destroyed. Use
     // destroy rather than close: close emits CloseRequested again and races
     // with tauri-plugin-mpv's own close hook.
-    if let Some(window) = app.get_webview_window(PLAYER_WINDOW_LABEL) {
+    if let Some(window) = player_window {
         eprintln!("[player] request_close_player: destroying player window");
         window
             .destroy()

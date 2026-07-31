@@ -1351,7 +1351,7 @@ const ActorDetail: React.FC = () => {
             {actorNamePeriodItems.length > 0 && (
               <div className="changli-panel mb-8 p-5">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">{actor.name}</h3>
-                <div className="changli-auto-grid-work">
+                <div className="changli-auto-grid-work changli-six-column-fill">
                   {actorNamePeriodItems.map(resource => renderWorkCard(resource))}
                 </div>
               </div>
@@ -1387,7 +1387,7 @@ const ActorDetail: React.FC = () => {
                     </h3>
                   )}
                   {periodItems.length > 0 ? (
-                    <div className="changli-auto-grid-work">
+                    <div className="changli-auto-grid-work changli-six-column-fill">
                       {periodItems.map(resource => renderWorkCard(resource))}
                     </div>
                   ) : (

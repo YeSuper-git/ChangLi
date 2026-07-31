@@ -162,7 +162,7 @@ const Home: React.FC = () => {
             </div>
             <div className="flex flex-wrap gap-3">
               <button type="button" className="action-btn action-btn-primary" data-tutorial="go-library" onClick={() => navigateToLibraryReady(navigate, '/library')}>进入视频库</button>
-              <Link to="/actors" className="action-btn">演员库</Link>
+              <Link to="/history" className="action-btn">观看历史</Link>
             </div>
           </div>
           <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">

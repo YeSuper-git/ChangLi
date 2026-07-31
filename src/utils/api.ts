@@ -995,6 +995,7 @@ export interface PlayHistory {
 
 
 export interface RecentWatchItem {
+  history_id: number;
   video: Video;
   series?: VideoSeries;
   last_position: number;
@@ -1033,6 +1034,14 @@ export async function getRecentWatchItems(limit?: number): Promise<RecentWatchIt
     console.error('[API] getRecentWatchItems 失败:', err);
     throw err;
   }
+}
+
+export async function deletePlayHistory(historyId: number): Promise<void> {
+  return invoke('delete_play_history', { historyId });
+}
+
+export async function clearPlayHistory(): Promise<void> {
+  return invoke('clear_play_history');
 }
 
 // 观看进度相关

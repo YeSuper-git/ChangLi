@@ -970,7 +970,7 @@ const Library: React.FC = () => {
       <div key={contentMotionKey} className="changli-library-content-motion">
       {filteredSeries.length > 0 && (
         <div className="mb-12" data-tutorial="library-grid">
-          <div className={`auto-rows-max ${scopeAll ? 'changli-auto-grid-mixed' : isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video'}`}>
+          <div className={`auto-rows-max ${scopeAll ? 'changli-auto-grid-mixed' : isPortrait ? 'changli-auto-grid-series' : 'changli-auto-grid-video changli-six-column-fill'}`}>
             {filteredSeries.map((series) => {
               const itemCategory = getSeriesCategory(series);
               const itemFeatures = getSeriesFeatures(series) || features;
